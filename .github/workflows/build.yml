@@ -1,0 +1,29 @@
+name: Build RupeeFlow APK
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Set up Java
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+
+    - name: Build APK (Bina PC hang kiye)
+      run: gradle assembleDebug
+
+    - name: Upload APK (Download Link ke liye)
+      uses: actions/upload-artifact@v4
+      with:
+        name: RupeeFlow-App
+        path: app/build/outputs/apk/debug/app-debug.apk
