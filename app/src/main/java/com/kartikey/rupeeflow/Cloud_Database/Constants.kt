@@ -1,7 +1,5 @@
 package com.kartikey.rupeeflow.Cloud_Database
 
 object Constants {
-    // Yahan aapki Google Sheet (App Script) ka link aayega.
-    // Future mein koi nayi sheet ya email use karni ho, toh bas is link ko change karna hoga.
-    const val GOOGLE_SHEET_API_URL = "YOUR_GOOGLE_SHEET_LINK_HERE"
+    const val GOOGLE_SHEET_API_URL = "https://script.google.com/macros/s/AKfycbxq6GiNwSEDI85iWu8Zl1mMokr0TPidrIKyM5eHfnnPumnhq4Z1szCLjg-JcuTK_gr6Aw/exec"
 }
