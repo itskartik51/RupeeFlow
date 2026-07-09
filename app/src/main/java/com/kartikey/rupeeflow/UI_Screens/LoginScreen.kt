@@ -74,7 +74,7 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
                                 val loggedInUser = jsonResponse.optString("username")
                                 onLoginSuccess(loggedInUser)
                             } else {
-                                // Jo asli error hai wo dikhegi (e.g. Invalid password)
+                                // Jo asli error hai wo dikhegi
                                 statusMessage = message
                             }
                         } catch (e: Exception) {
