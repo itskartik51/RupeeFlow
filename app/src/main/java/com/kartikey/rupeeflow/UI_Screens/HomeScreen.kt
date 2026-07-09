@@ -34,7 +34,6 @@ fun HomeScreen(username: String) {
         OutlinedTextField(value = amount, onValueChange = { amount = it }, label = { Text("Amount (₹)") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Simple Category Selection
         ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = !expanded }) {
             OutlinedTextField(value = selectedCategory, onValueChange = {}, readOnly = true, label = { Text("Category") }, modifier = Modifier.menuAnchor().fillMaxWidth())
             ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
@@ -48,12 +47,12 @@ fun HomeScreen(username: String) {
             coroutineScope.launch(Dispatchers.IO) {
                 try {
                     statusMessage = "Saving..."
-                    val json = JSONObject().apply {
-                        put("action", "add_expense")
-                        put("username", username) // IDHAR JA RAHA HAI USERNAME
-                        put("amount", amount)
-                        put("category", selectedCategory)
-                    }
+                    val json = JSONObject()
+                    json.put("action", "add_expense")
+                    json.put("username", username)
+                    json.put("amount", amount)
+                    json.put("category", selectedCategory)
+                    
                     val client = OkHttpClient()
                     val body = json.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
                     val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(body).build()
