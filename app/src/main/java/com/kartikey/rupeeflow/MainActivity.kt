@@ -16,7 +16,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        // Phone ki permanent memory read karna
+        // Permanent Memory
         val sharedPreferences = getSharedPreferences("RupeeFlowPrefs", Context.MODE_PRIVATE)
         val savedLoginState = sharedPreferences.getBoolean("isLoggedIn", false)
         val savedUsername = sharedPreferences.getString("username", "") ?: ""
@@ -31,7 +31,6 @@ class MainActivity : ComponentActivity() {
                         HomeScreen(
                             username = currentUser,
                             onLogout = {
-                                // Logout dabane par memory saaf hogi
                                 sharedPreferences.edit().clear().apply()
                                 isLoggedIn = false
                                 currentUser = ""
@@ -39,7 +38,6 @@ class MainActivity : ComponentActivity() {
                         )
                     } else {
                         LoginScreen(onLoginSuccess = { username -> 
-                            // Login hone par memory me save kar lena
                             sharedPreferences.edit().apply {
                                 putBoolean("isLoggedIn", true)
                                 putString("username", username)
