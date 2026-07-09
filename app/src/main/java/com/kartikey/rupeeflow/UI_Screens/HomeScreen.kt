@@ -5,64 +5,57 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.kartikey.rupeeflow.Cloud_Database.Constants
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONObject
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen() {
     var amount by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf("Food") }
-    var expanded by remember { mutableStateOf(false) } // Dropdown khula hai ya band, uske liye
-    val categories = listOf("Food", "Transport", "Bills", "Shopping", "Others") // Aapke options
+    var expanded by remember { mutableStateOf(false) }
+    val categories = listOf("Food", "Transport", "Bills", "Shopping", "Others")
     
-    // Optional Details ke variables
     var foodWhere by remember { mutableStateOf("") }
     var foodWhat by remember { mutableStateOf("") }
     var transportFrom by remember { mutableStateOf("") }
     var transportTo by remember { mutableStateOf("") }
     var billFor by remember { mutableStateOf("") }
+    
+    // Status message dikhane ke liye variables
+    val coroutineScope = rememberCoroutineScope()
+    var statusMessage by remember { mutableStateOf("") }
 
     Column(modifier = Modifier.fillMaxSize().padding(20.dp)) {
         Text("Add New Expense", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Amount Field
         OutlinedTextField(
-            value = amount,
-            onValueChange = { amount = it },
-            label = { Text("Amount (₹)") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            colors = TextFieldDefaults.outlinedTextFieldColors(
-                focusedBorderColor = MaterialTheme.colorScheme.primary
-            )
+            value = amount, onValueChange = { amount = it }, label = { Text("Amount (₹)") },
+            modifier = Modifier.fillMaxWidth(), singleLine = true,
+            colors = TextFieldDefaults.outlinedTextFieldColors(focusedBorderColor = MaterialTheme.colorScheme.primary)
         )
         
         Spacer(modifier = Modifier.height(16.dp))
         
-        // Asli Dropdown Menu (Category chunne ke liye)
-        ExposedDropdownMenuBox(
-            expanded = expanded,
-            onExpandedChange = { expanded = !expanded }
-        ) {
+        ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = !expanded }) {
             OutlinedTextField(
-                value = selectedCategory,
-                onValueChange = {},
-                readOnly = true,
-                label = { Text("Select Category") },
+                value = selectedCategory, onValueChange = {}, readOnly = true, label = { Text("Select Category") },
                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
                 modifier = Modifier.menuAnchor().fillMaxWidth()
             )
-            ExposedDropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { expanded = false }
-            ) {
+            ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                 categories.forEach { category ->
                     DropdownMenuItem(
                         text = { Text(category) },
-                        onClick = {
-                            selectedCategory = category
-                            expanded = false // Select karte hi menu band ho jayega
-                        }
+                        onClick = { selectedCategory = category; expanded = false }
                     )
                 }
             }
@@ -70,7 +63,6 @@ fun HomeScreen() {
         
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Dynamic Fields: Jo category chunenge, wahi dabbe aayenge
         when (selectedCategory) {
             "Food" -> {
                 OutlinedTextField(value = foodWhere, onValueChange = { foodWhere = it }, label = { Text("Where did you eat?") }, modifier = Modifier.fillMaxWidth())
@@ -83,19 +75,65 @@ fun HomeScreen() {
                 OutlinedTextField(value = transportTo, onValueChange = { transportTo = it }, label = { Text("To Where?") }, modifier = Modifier.fillMaxWidth())
             }
             "Bills" -> {
-                OutlinedTextField(value = billFor, onValueChange = { billFor = it }, label = { Text("Which Bill? (e.g. Electricity, Jio)") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = billFor, onValueChange = { billFor = it }, label = { Text("Which Bill?") }, modifier = Modifier.fillMaxWidth())
             }
-            // "Shopping" aur "Others" ke liye humne abhi khali rakha hai, aap chaho toh amount ke sath direct save kar sakte ho
         }
 
         Spacer(modifier = Modifier.height(40.dp))
 
-        // Save Button (Abhi iska design thoda aur premium kar diya hai)
         Button(
-            onClick = { /* Database me bhejne ka logic aayega */ },
+            onClick = { 
+                if(amount.isNotEmpty()) {
+                    statusMessage = "Saving to Database..."
+                    // Data ko background me bhejna taaki app hang na ho
+                    coroutineScope.launch(Dispatchers.IO) {
+                        try {
+                            val json = JSONObject()
+                            json.put("amount", amount)
+                            json.put("category", selectedCategory)
+                            
+                            when (selectedCategory) {
+                                "Food" -> { json.put("detail1", foodWhere); json.put("detail2", foodWhat) }
+                                "Transport" -> { json.put("detail1", transportFrom); json.put("detail2", transportTo) }
+                                "Bills" -> { json.put("detail1", billFor); json.put("detail2", "") }
+                                else -> { json.put("detail1", ""); json.put("detail2", "") }
+                            }
+
+                            val client = OkHttpClient()
+                            val mediaType = "application/json; charset=utf-8".toMediaType()
+                            val body = json.toString().toRequestBody(mediaType)
+                            val request = Request.Builder()
+                                .url(Constants.GOOGLE_SHEET_API_URL)
+                                .post(body)
+                                .build()
+
+                            client.newCall(request).execute().use { response ->
+                                withContext(Dispatchers.Main) {
+                                    if (response.isSuccessful) {
+                                        statusMessage = "🎉 Expense Saved Successfully!"
+                                        // Form ko wapas khali kar dena
+                                        amount = ""; foodWhere = ""; foodWhat = ""; transportFrom = ""; transportTo = ""; billFor = ""
+                                    } else {
+                                        statusMessage = "❌ Failed to save!"
+                                    }
+                                }
+                            }
+                        } catch (e: Exception) {
+                            withContext(Dispatchers.Main) { statusMessage = "Error: Network issue" }
+                        }
+                    }
+                } else {
+                    statusMessage = "Please enter amount!"
+                }
+            },
             modifier = Modifier.fillMaxWidth().height(50.dp)
         ) {
             Text("Save Expense", style = MaterialTheme.typography.titleMedium)
+        }
+        
+        if (statusMessage.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(statusMessage, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleMedium)
         }
     }
 }
