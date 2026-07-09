@@ -36,10 +36,10 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
             OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Full Name") }, modifier = Modifier.fillMaxWidth())
             Spacer(modifier = Modifier.height(8.dp))
             OutlinedTextField(value = username, onValueChange = { username = it }, label = { Text("Create Username") }, modifier = Modifier.fillMaxWidth())
+            Spacer(modifier = Modifier.height(8.dp))
         }
         
-        Spacer(modifier = Modifier.height(8.dp))
-        OutlinedTextField(value = mobile, onValueChange = { mobile = it }, label = { Text("Mobile Number") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+        OutlinedTextField(value = mobile, onValueChange = { mobile = it }, label = { Text(if(isLoginMode) "Mobile or Username" else "Mobile Number") }, modifier = Modifier.fillMaxWidth())
         Spacer(modifier = Modifier.height(8.dp))
         OutlinedTextField(value = password, onValueChange = { password = it }, label = { Text("Password") }, modifier = Modifier.fillMaxWidth(), visualTransformation = PasswordVisualTransformation())
         
@@ -49,12 +49,13 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
             coroutineScope.launch(Dispatchers.IO) {
                 try {
                     statusMessage = "Processing..."
-                    val json = JSONObject()
-                    json.put("action", if (isLoginMode) "login" else "signup")
-                    json.put("name", name)
-                    json.put("mobile", mobile)
-                    json.put("username", username)
-                    json.put("password", password)
+                    val json = JSONObject().apply {
+                        put("action", if (isLoginMode) "login" else "signup")
+                        put("name", name)
+                        put("mobile", mobile)
+                        put("username", username)
+                        put("password", password)
+                    }
 
                     val client = OkHttpClient()
                     val body = json.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
@@ -63,17 +64,32 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
                     val responseData = response.body?.string() ?: ""
                     
                     withContext(Dispatchers.Main) {
-                        if (responseData.contains("success")) {
-                            onLoginSuccess(username)
-                        } else {
-                            statusMessage = "Error: Check details or User already exists"
+                        try {
+                            val jsonResponse = JSONObject(responseData)
+                            val status = jsonResponse.optString("status")
+                            val message = jsonResponse.optString("message")
+
+                            if (status == "success") {
+                                // Server se aaya hua asli username pakdenge
+                                val loggedInUser = jsonResponse.optString("username")
+                                onLoginSuccess(loggedInUser)
+                            } else {
+                                // Jo asli error hai wo dikhegi (e.g. Invalid password)
+                                statusMessage = message
+                            }
+                        } catch (e: Exception) {
+                            statusMessage = "Error parsing data!"
                         }
                     }
-                } catch (e: Exception) { withContext(Dispatchers.Main) { statusMessage = "Network Error" } }
+                } catch (e: Exception) { withContext(Dispatchers.Main) { statusMessage = "Network Error!" } }
             }
         }, modifier = Modifier.fillMaxWidth()) { Text(if (isLoginMode) "Login" else "Sign Up") }
         
-        TextButton(onClick = { isLoginMode = !isLoginMode }) { Text(if (isLoginMode) "New? Sign Up" else "Already have account? Login") }
-        Text(statusMessage)
+        TextButton(onClick = { 
+            isLoginMode = !isLoginMode
+            statusMessage = "" 
+        }) { Text(if (isLoginMode) "New? Sign Up" else "Already have account? Login") }
+        
+        Text(statusMessage, color = MaterialTheme.colorScheme.error)
     }
 }
