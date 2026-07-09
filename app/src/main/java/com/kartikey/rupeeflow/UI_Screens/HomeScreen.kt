@@ -31,7 +31,6 @@ fun HomeScreen(username: String, onLogout: () -> Unit) {
 
     Column(modifier = Modifier.fillMaxSize().padding(20.dp)) {
         
-        // Welcome Text aur Logout Button
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text("Welcome, $username", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary)
             TextButton(onClick = onLogout) { Text("Logout", color = MaterialTheme.colorScheme.error) }
