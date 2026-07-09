@@ -95,7 +95,6 @@ fun HomeScreen(username: String, onLogout: () -> Unit) {
             }
         }
     ) { paddingValues ->
-        // Tab Navigation Logic
         if (selectedTab == 0) {
             HomeDashboardDesign(username = username, paddingValues = paddingValues, onLogout = onLogout)
         } else if (selectedTab == 2) {
@@ -104,9 +103,6 @@ fun HomeScreen(username: String, onLogout: () -> Unit) {
     }
 }
 
-// ----------------------------------------------------
-// NAYA HOME DASHBOARD (Photo jaisa exact design)
-// ----------------------------------------------------
 @Composable
 fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout: () -> Unit) {
     Column(
@@ -133,16 +129,17 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
                 Text("RupeeFlow", fontWeight = FontWeight.ExtraBold, fontSize = 20.sp)
                 Text("Hi, $username", color = Color.Gray, fontSize = 12.sp)
             }
-            Text("INR (₹) / USD", fontSize = 10.sp, color = Color(0xFF5E35B1), fontWeight = FontWeight.Bold)
+            // Lavender se badal kar Green kar diya hai
+            Text("INR (₹) / USD", fontSize = 10.sp, color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.width(12.dp))
             Box(
                 modifier = Modifier
                     .size(36.dp)
                     .clip(CircleShape)
-                    .background(Color(0xFFE1BEE7)),
+                    .background(Color(0xFFE8F5E9)), // Light Green tint match karne ke liye
                 contentAlignment = Alignment.Center
             ) {
-                Text(username.take(2).uppercase(), color = Color(0xFF5E35B1), fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Text(username.take(2).uppercase(), color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold, fontSize = 14.sp)
             }
         }
 
@@ -151,7 +148,7 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
         // 2. TOTAL NET WORTH CARD
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFFF1F8E9)), // Light Green
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFF1F8E9)), 
             shape = RoundedCornerShape(16.dp),
             elevation = CardDefaults.cardElevation(0.dp)
         ) {
@@ -171,7 +168,7 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
 
         // 3. FOUR GRID CARDS
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            GridCard(title = "STOCKS", value = "₹0", lineColor = Color(0xFF5E35B1), modifier = Modifier.weight(1f))
+            GridCard(title = "STOCKS", value = "₹0", lineColor = Color(0xFF2E7D32), modifier = Modifier.weight(1f)) // Stocks line also Green
             GridCard(title = "MUTUAL FUNDS", value = "₹0", lineColor = Color(0xFF039BE5), modifier = Modifier.weight(1f))
         }
         Spacer(modifier = Modifier.height(12.dp))
@@ -182,7 +179,7 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // 4. SPENDING HABITS TRACKER
+        // 4. SPENDING HABITS TRACKER (Graph me Lavender color chor diya hai)
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -192,10 +189,12 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
             Column(modifier = Modifier.padding(16.dp)) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text("Spending Habits Tracker", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                    Text("VIEW ANALYTICS", fontWeight = FontWeight.Bold, fontSize = 10.sp, color = Color(0xFF5E35B1))
+                    // Button/Action text ko Green kiya
+                    Text("VIEW ANALYTICS", fontWeight = FontWeight.Bold, fontSize = 10.sp, color = Color(0xFF2E7D32))
                 }
                 Spacer(modifier = Modifier.height(16.dp))
-                // Dummy Bar Chart
+                
+                // Graph bars stay Lavender as you requested
                 Row(
                     modifier = Modifier.fillMaxWidth().height(80.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly,
@@ -208,7 +207,7 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
                                 .width(28.dp)
                                 .fillMaxHeight(height / 100f)
                                 .background(
-                                    if (index == 3) Color(0xFF5E35B1) else Color(0xFFD1C4E9),
+                                    if (index == 3) Color(0xFF5E35B1) else Color(0xFFD1C4E9), // Kept Lavender for graph bars
                                     shape = RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp)
                                 )
                         )
@@ -230,7 +229,8 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
                 modifier = Modifier.padding(16.dp).fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(Icons.Default.Notifications, contentDescription = "Reminder", tint = Color(0xFF5E35B1))
+                // Icon ko Green kiya
+                Icon(Icons.Default.Notifications, contentDescription = "Reminder", tint = Color(0xFF2E7D32))
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text("Daily Expense Filling Reminder", fontWeight = FontWeight.Bold, fontSize = 12.sp)
@@ -241,8 +241,11 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
         }
 
         Spacer(modifier = Modifier.height(24.dp))
-        Text("Recent Transactions", fontWeight = FontWeight.ExtraBold, fontSize = 16.sp)
-        Spacer(modifier = Modifier.height(60.dp)) // Space for floating bottom bar
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text("Recent Transactions", fontWeight = FontWeight.ExtraBold, fontSize = 16.sp)
+            TextButton(onClick = onLogout) { Text("Logout", color = Color(0xFFD32F2F)) } // Clean Logout option on Dashboard
+        }
+        Spacer(modifier = Modifier.height(60.dp)) 
     }
 }
 
@@ -266,9 +269,6 @@ fun GridCard(title: String, value: String, lineColor: Color, modifier: Modifier 
     }
 }
 
-// ----------------------------------------------------
-// PURANA EXPENSE ADD KARNE WALA FORM 
-// ----------------------------------------------------
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddExpenseForm(username: String, paddingValues: PaddingValues) {
@@ -277,75 +277,5 @@ fun AddExpenseForm(username: String, paddingValues: PaddingValues) {
     var expanded by remember { mutableStateOf(false) }
     val categories = listOf("Food", "Transport", "Bills", "Shopping", "Others")
     var detail1 by remember { mutableStateOf("") }
-    var detail2 by remember { mutableStateOf("") }
-    var statusMessage by remember { mutableStateOf("") }
-    val coroutineScope = rememberCoroutineScope()
-
-    Column(modifier = Modifier.fillMaxSize().padding(paddingValues).padding(20.dp).verticalScroll(rememberScrollState())) {
-        Text("Add New Expense", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        OutlinedTextField(value = amount, onValueChange = { amount = it }, label = { Text("Amount (₹)") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
-        Spacer(modifier = Modifier.height(8.dp))
-
-        ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = !expanded }) {
-            OutlinedTextField(value = selectedCategory, onValueChange = {}, readOnly = true, label = { Text("Category") }, modifier = Modifier.menuAnchor().fillMaxWidth())
-            ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                categories.forEach { cat -> 
-                    DropdownMenuItem(text = { Text(cat) }, onClick = { 
-                        selectedCategory = cat
-                        expanded = false
-                        detail1 = ""; detail2 = ""
-                    }) 
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        when (selectedCategory) {
-            "Food" -> {
-                OutlinedTextField(value = detail1, onValueChange = { detail1 = it }, label = { Text("Where did you eat?") }, modifier = Modifier.fillMaxWidth())
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(value = detail2, onValueChange = { detail2 = it }, label = { Text("What did you eat?") }, modifier = Modifier.fillMaxWidth())
-            }
-            "Transport" -> {
-                OutlinedTextField(value = detail1, onValueChange = { detail1 = it }, label = { Text("From Where?") }, modifier = Modifier.fillMaxWidth())
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(value = detail2, onValueChange = { detail2 = it }, label = { Text("To Where?") }, modifier = Modifier.fillMaxWidth())
-            }
-            "Bills" -> {
-                OutlinedTextField(value = detail1, onValueChange = { detail1 = it }, label = { Text("Which Bill?") }, modifier = Modifier.fillMaxWidth())
-            }
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        Button(onClick = {
-            coroutineScope.launch(Dispatchers.IO) {
-                try {
-                    statusMessage = "Saving..."
-                    val json = JSONObject().apply {
-                        put("action", "add_expense")
-                        put("username", username)
-                        put("amount", amount)
-                        put("category", selectedCategory)
-                        put("detail1", detail1)
-                        put("detail2", detail2)
-                    }
-                    val client = OkHttpClient()
-                    val body = json.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
-                    val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(body).build()
-                    val response = client.newCall(request).execute()
-                    
-                    withContext(Dispatchers.Main) {
-                        if (response.isSuccessful) {
-                            statusMessage = "Saved Successfully!"
-                            amount = ""; detail1 = ""; detail2 = ""
-                        } else statusMessage = "Failed!"
-                    }
-                } catch (e: Exception) { withContext(Dispatchers.Main) { statusMessage = "Error!" } }
-            }
-        }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))) { 
-            Text("Save Expense
-                 
+    var
+    
