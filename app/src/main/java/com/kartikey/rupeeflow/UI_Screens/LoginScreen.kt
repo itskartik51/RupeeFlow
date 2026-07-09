@@ -49,13 +49,13 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
             coroutineScope.launch(Dispatchers.IO) {
                 try {
                     statusMessage = "Processing..."
-                    val json = JSONObject().apply {
-                        put("action", if (isLoginMode) "login" else "signup")
-                        put("name", name)
-                        put("mobile", mobile)
-                        put("username", username)
-                        put("password", password)
-                    }
+                    val json = JSONObject()
+                    json.put("action", if (isLoginMode) "login" else "signup")
+                    json.put("name", name)
+                    json.put("mobile", mobile)
+                    json.put("username", username)
+                    json.put("password", password)
+
                     val client = OkHttpClient()
                     val body = json.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
                     val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(body).build()
