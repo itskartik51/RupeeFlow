@@ -24,11 +24,15 @@ fun HomeScreen(username: String) {
     var selectedCategory by remember { mutableStateOf("Food") }
     var expanded by remember { mutableStateOf(false) }
     val categories = listOf("Food", "Transport", "Bills", "Shopping", "Others")
+    
+    var detail1 by remember { mutableStateOf("") }
+    var detail2 by remember { mutableStateOf("") }
+    
     var statusMessage by remember { mutableStateOf("") }
     val coroutineScope = rememberCoroutineScope()
 
     Column(modifier = Modifier.fillMaxSize().padding(20.dp)) {
-        Text("Welcome, $username", style = MaterialTheme.typography.headlineSmall)
+        Text("Welcome, $username", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary)
         Spacer(modifier = Modifier.height(16.dp))
         
         OutlinedTextField(value = amount, onValueChange = { amount = it }, label = { Text("Amount (₹)") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
@@ -37,7 +41,33 @@ fun HomeScreen(username: String) {
         ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = !expanded }) {
             OutlinedTextField(value = selectedCategory, onValueChange = {}, readOnly = true, label = { Text("Category") }, modifier = Modifier.menuAnchor().fillMaxWidth())
             ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                categories.forEach { cat -> DropdownMenuItem(text = { Text(cat) }, onClick = { selectedCategory = cat; expanded = false }) }
+                categories.forEach { cat -> 
+                    DropdownMenuItem(text = { Text(cat) }, onClick = { 
+                        selectedCategory = cat
+                        expanded = false
+                        detail1 = "" // Category change hone par dabbe khali ho jayein
+                        detail2 = ""
+                    }) 
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Dynamic Boxes wapas add kar diye hain
+        when (selectedCategory) {
+            "Food" -> {
+                OutlinedTextField(value = detail1, onValueChange = { detail1 = it }, label = { Text("Where did you eat?") }, modifier = Modifier.fillMaxWidth())
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(value = detail2, onValueChange = { detail2 = it }, label = { Text("What did you eat?") }, modifier = Modifier.fillMaxWidth())
+            }
+            "Transport" -> {
+                OutlinedTextField(value = detail1, onValueChange = { detail1 = it }, label = { Text("From Where?") }, modifier = Modifier.fillMaxWidth())
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(value = detail2, onValueChange = { detail2 = it }, label = { Text("To Where?") }, modifier = Modifier.fillMaxWidth())
+            }
+            "Bills" -> {
+                OutlinedTextField(value = detail1, onValueChange = { detail1 = it }, label = { Text("Which Bill?") }, modifier = Modifier.fillMaxWidth())
             }
         }
 
@@ -47,24 +77,32 @@ fun HomeScreen(username: String) {
             coroutineScope.launch(Dispatchers.IO) {
                 try {
                     statusMessage = "Saving..."
-                    val json = JSONObject()
-                    json.put("action", "add_expense")
-                    json.put("username", username)
-                    json.put("amount", amount)
-                    json.put("category", selectedCategory)
-                    
+                    val json = JSONObject().apply {
+                        put("action", "add_expense")
+                        put("username", username)
+                        put("amount", amount)
+                        put("category", selectedCategory)
+                        put("detail1", detail1)
+                        put("detail2", detail2)
+                    }
                     val client = OkHttpClient()
                     val body = json.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
                     val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(body).build()
                     val response = client.newCall(request).execute()
                     
                     withContext(Dispatchers.Main) {
-                        if (response.isSuccessful) statusMessage = "Saved!" else statusMessage = "Failed!"
+                        if (response.isSuccessful) {
+                            statusMessage = "Saved Successfully!"
+                            amount = ""; detail1 = ""; detail2 = ""
+                        } else {
+                            statusMessage = "Failed!"
+                        }
                     }
                 } catch (e: Exception) { withContext(Dispatchers.Main) { statusMessage = "Error!" } }
             }
         }, modifier = Modifier.fillMaxWidth()) { Text("Save Expense") }
         
-        Text(statusMessage)
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(statusMessage, color = MaterialTheme.colorScheme.primary)
     }
 }
