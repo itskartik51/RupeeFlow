@@ -20,12 +20,16 @@ android {
     }
     
     composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.1"
+        kotlinCompilerExtensionVersion = "1.5.8" // Yeh version match hona zaroori tha
     }
 }
 
 dependencies {
-    // UI & Design (Mint/Lavender Theme aur Layout ke liye)
+    // Core Android features jo pehle miss ho gaye the
+    implementation("androidx.core:core-ktx:1.12.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
+    
+    // UI & Design (Mint/Lavender Theme)
     implementation("androidx.compose.ui:ui:1.6.0")
     implementation("androidx.compose.material3:material3:1.2.0")
     implementation("androidx.activity:activity-compose:1.8.2")
