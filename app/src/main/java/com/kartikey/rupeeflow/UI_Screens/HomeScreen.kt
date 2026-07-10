@@ -1,7 +1,6 @@
 package com.kartikey.rupeeflow.UI_Screens
 
 import androidx.compose.foundation.Image
-import com.kartikey.rupeeflow.UI_Screens.Features.StockButton
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -24,6 +23,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kartikey.rupeeflow.Cloud_Database.Constants
 import com.kartikey.rupeeflow.R
+import com.kartikey.rupeeflow.UI_Screens.Features.ExpenseSummaryCard
+import com.kartikey.rupeeflow.UI_Screens.Features.StockButton // Ye raha aapka StockButton ka import!
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -113,6 +114,7 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
     ) {
         Spacer(modifier = Modifier.height(16.dp))
 
+        // 1. HEADER (Logo, Name, Currency, Profile)
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth()
@@ -142,26 +144,12 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFFF1F8E9)), 
-            shape = RoundedCornerShape(16.dp),
-            elevation = CardDefaults.cardElevation(0.dp)
-        ) {
-            Column(modifier = Modifier.padding(20.dp)) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("TOTAL NET WORTH", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF388E3C))
-                    Icon(Icons.Default.Info, contentDescription = "Info", tint = Color(0xFF388E3C), modifier = Modifier.size(16.dp))
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-                Text("₹0", fontSize = 32.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
-                Spacer(modifier = Modifier.height(4.dp))
-                Text("+₹0 (Today's returns count)", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF388E3C))
-            }
-        }
+        // 2. EXPENSES SUMMARY CARD (Modular Red Theme)
+        ExpenseSummaryCard()
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        // 3. FOUR GRID CARDS
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             GridCard(title = "STOCKS", value = "₹0", lineColor = Color(0xFF2E7D32), modifier = Modifier.weight(1f)) 
             GridCard(title = "MUTUAL FUNDS", value = "₹0", lineColor = Color(0xFF039BE5), modifier = Modifier.weight(1f))
@@ -174,6 +162,7 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
 
         Spacer(modifier = Modifier.height(24.dp))
 
+        // 4. SPENDING HABITS TRACKER
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -210,6 +199,7 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        // 5. REMINDER BANNER
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = Color.White),
