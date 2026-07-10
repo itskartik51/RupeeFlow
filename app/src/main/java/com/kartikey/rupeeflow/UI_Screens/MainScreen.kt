@@ -1,6 +1,9 @@
 package com.kartikey.rupeeflow.UI_Screens
 
 import androidx.activity.compose.BackHandler // YAHAN BACK HANDLER IMPORT KIYA HAI
+import com.kartikey.rupeeflow.UI_Screens.Assets.AssetsScreen
+import com.kartikey.rupeeflow.UI_Screens.Analytics.AnalyticsScreen
+import com.kartikey.rupeeflow.UI_Screens.Profile.ProfileScreen
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
