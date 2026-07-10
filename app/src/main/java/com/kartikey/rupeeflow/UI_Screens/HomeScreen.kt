@@ -24,12 +24,11 @@ import androidx.compose.ui.unit.sp
 import com.kartikey.rupeeflow.Cloud_Database.Constants
 import com.kartikey.rupeeflow.R
 
-// Saari files ab Home folder se import ho rahi hain
+// Home folder se clean features import
 import com.kartikey.rupeeflow.UI_Screens.Home.ExpenseSummaryCard
 import com.kartikey.rupeeflow.UI_Screens.Home.GridCard
 import com.kartikey.rupeeflow.UI_Screens.Home.SpendingTrackerCard
 import com.kartikey.rupeeflow.UI_Screens.Home.ReminderBanner
-import com.kartikey.rupeeflow.UI_Screens.Home.StockButton
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -125,30 +124,58 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
                         var monthSum = 0.0
                         var yearSum = 0.0
 
-                        val sdf = SimpleDateFormat("dd-MM-yyyy", Locale.getDefault())
                         val currentCal = Calendar.getInstance()
                         val currMonth = currentCal.get(Calendar.MONTH)
                         val currYear = currentCal.get(Calendar.YEAR)
+
+                        // Multiple robust date formats check karne ke liye list
+                        val parsingFormats = listOf(
+                            SimpleDateFormat("dd-MM-yyyy", Locale.getDefault()),
+                            SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()),
+                            SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()),
+                            SimpleDateFormat("EEE MMM dd yyyy", Locale.US)
+                        )
 
                         if (dataArray != null) {
                             for (i in 0 until dataArray.length()) {
                                 val item = dataArray.getJSONObject(i)
                                 val dateStr = item.optString("date")
-                                val amt = item.optDouble("amount", 0.0)
+                                val amtStr = item.optString("amount", "0")
+                                
+                                // Safe double parsing bina crash risk ke
+                                val amt = amtStr.toDoubleOrNull() ?: item.optDouble("amount", 0.0)
+                                if (amt.isNaN()) continue
 
-                                try {
-                                    val date = sdf.parse(dateStr.take(10))
-                                    if (date != null) {
-                                        val cal = Calendar.getInstance()
-                                        cal.time = date
-                                        if (cal.get(Calendar.YEAR) == currYear) {
-                                            yearSum += amt
-                                            if (cal.get(Calendar.MONTH) == currMonth) {
-                                                monthSum += amt
-                                            }
+                                var parsedDate: java.util.Date? = null
+                                
+                                // Pura data alag alag logic se match karke check karega
+                                for (format in parsingFormats) {
+                                    try {
+                                        parsedDate = format.parse(dateStr)
+                                        if (parsedDate != null) break
+                                    } catch (e: Exception) {
+                                        try {
+                                            parsedDate = format.parse(dateStr.take(10))
+                                            if (parsedDate != null) break
+                                        } catch (e2: Exception) {
+                                            try {
+                                                parsedDate = format.parse(dateStr.take(15))
+                                                if (parsedDate != null) break
+                                            } catch (e3: Exception) {}
                                         }
                                     }
-                                } catch (e: Exception) { }
+                                }
+
+                                if (parsedDate != null) {
+                                    val cal = Calendar.getInstance()
+                                    cal.time = parsedDate
+                                    if (cal.get(Calendar.YEAR) == currYear) {
+                                        yearSum += amt
+                                        if (cal.get(Calendar.MONTH) == currMonth) {
+                                            monthSum += amt
+                                        }
+                                    }
+                                }
                             }
                         }
                         withContext(Dispatchers.Main) {
@@ -165,6 +192,7 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
     Column(modifier = Modifier.fillMaxSize().padding(paddingValues).padding(horizontal = 16.dp).verticalScroll(rememberScrollState())) {
         Spacer(modifier = Modifier.height(16.dp))
 
+        // HEADER
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Image(painter = painterResource(id = R.mipmap.ic_launcher), contentDescription = "App Logo", modifier = Modifier.size(44.dp).clip(CircleShape))
             Spacer(modifier = Modifier.width(12.dp))
