@@ -1,6 +1,6 @@
 package com.kartikey.rupeeflow.UI_Screens.Features
 
-import androidx.compose.foundation.background // <-- Ye line miss ho gayi thi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -17,15 +17,21 @@ import androidx.compose.ui.unit.sp
 
 @Composable
 fun ExpenseSummaryCard(
-    totalExpense: String = "₹0", 
+    thisMonthTotal: Double = 0.0,
+    thisYearTotal: Double = 0.0,
+    isLoading: Boolean = false, // Jab tak data aa raha hai, loading dikhane ke liye
     modifier: Modifier = Modifier
 ) {
     var expanded by remember { mutableStateOf(false) }
     var selectedFilter by remember { mutableStateOf("This Month") }
 
+    // Filter ke hisab se UI turant update hoga bina net ke
+    val displayTotal = if (selectedFilter == "This Month") thisMonthTotal else thisYearTotal
+    val formattedTotal = if (isLoading) "Loading..." else "₹${displayTotal.toInt()}"
+
     Card(
         modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFEBEE)), // Light Redish Background
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFEBEE)), 
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
@@ -40,7 +46,7 @@ fun ExpenseSummaryCard(
                     text = "EXPENSES", 
                     fontSize = 12.sp, 
                     fontWeight = FontWeight.Bold, 
-                    color = Color(0xFFD32F2F) // Dark Red Text
+                    color = Color(0xFFD32F2F) 
                 )
                 
                 Box {
@@ -88,7 +94,7 @@ fun ExpenseSummaryCard(
             Spacer(modifier = Modifier.height(12.dp)) 
             
             Text(
-                text = totalExpense, 
+                text = formattedTotal, 
                 fontSize = 32.sp, 
                 fontWeight = FontWeight.ExtraBold, 
                 color = Color.Black
