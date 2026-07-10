@@ -1,4 +1,4 @@
-package com.kartikey.rupeeflow.UI_Screens.Features
+package com.kartikey.rupeeflow.UI_Screens.Home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
