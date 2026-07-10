@@ -38,7 +38,6 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.text.SimpleDateFormat
-import java.util.Calendar
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -102,7 +101,6 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
     var thisMonthExpenses by remember { mutableDoubleStateOf(0.0) }
     var thisYearExpenses by remember { mutableDoubleStateOf(0.0) }
     var isLoadingExpenses by remember { mutableStateOf(true) }
-    var debugErrorMessage by remember { mutableStateOf("") } 
 
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
@@ -117,103 +115,70 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
                 val response = client.newCall(request).execute()
                 val responseData = response.body?.string() ?: ""
 
-                if (response.isSuccessful) {
-                    if (!responseData.trim().startsWith("{")) {
-                        withContext(Dispatchers.Main) { debugErrorMessage = "Server Error: Code Update nahi hua hai."; isLoadingExpenses = false }
-                        return@withContext
-                    }
-
+                if (response.isSuccessful && responseData.trim().startsWith("{")) {
                     val jsonResponse = JSONObject(responseData)
                     if (jsonResponse.optString("status") == "success") {
                         val dataArray = jsonResponse.optJSONArray("data")
                         var monthSum = 0.0
                         var yearSum = 0.0
 
-                        val currentCal = Calendar.getInstance()
-                        val currMonth = currentCal.get(Calendar.MONTH)
-                        val currYear = currentCal.get(Calendar.YEAR)
-                        
-                        // TEXT MATCHING STRATEGY (100% Fail-Proof)
-                        val currMonthStr = String.format(Locale.US, "%02d", currMonth + 1) // Jaise "07"
-                        val currYearStr = currYear.toString() // Jaise "2026"
+                        // Strict Device-Independent Date format parameters (Forcing US Locale to avoid Calendar Glitches)
+                        val currentTimestamp = System.currentTimeMillis()
+                        val currMonthStr = SimpleDateFormat("MM", Locale.US).format(currentTimestamp) // Always "07"
+                        val currYearStr = SimpleDateFormat("yyyy", Locale.US).format(currentTimestamp) // Always "2026"
 
                         if (dataArray != null && dataArray.length() > 0) {
                             for (i in 0 until dataArray.length()) {
                                 val item = dataArray.getJSONObject(i)
                                 
-                                val rawDateStr = item.optString("date", item.optString("Date", ""))
+                                val rawDateStr = item.optString("date", item.optString("Date", "")).trim()
                                 val rawAmtStr = item.optString("amount", item.optString("Amount", "0"))
                                 
                                 val cleanAmtStr = rawAmtStr.replace("[^\\d.]".toRegex(), "")
                                 val amt = cleanAmtStr.toDoubleOrNull() ?: item.optDouble("amount", item.optDouble("Amount", 0.0))
                                 
-                                if (amt <= 0.0) continue
+                                if (amt.isNaN() || amt <= 0.0) continue
 
-                                var matchedMonth = false
-                                var matchedYear = false
-
-                                // 1. Direct String Check (Ye Android ke Date Bugs ko Bypass karega)
-                                if (rawDateStr.contains(currYearStr)) {
-                                    matchedYear = true
-                                    // Check agar date me "-07-2026" ya aisa kuch pattern hai
-                                    if (rawDateStr.contains("-$currMonthStr-$currYearStr") || 
-                                        rawDateStr.contains("/$currMonthStr/$currYearStr") || 
-                                        rawDateStr.contains("-$currMonthStr-") ||
-                                        rawDateStr.contains("/$currMonthStr/")
-                                    ) {
-                                        matchedMonth = true
+                                // 1. Split to isolate date from time ("09-07-2026 4:14 PM" -> "09-07-2026")
+                                val datePartOnly = rawDateStr.split("\\s+".toRegex())[0]
+                                
+                                // 2. Robust separator split (handles both dashes '-' and slashes '/' cleanly)
+                                val parts = datePartOnly.split("-", "/")
+                                
+                                if (parts.size >= 3) {
+                                    var itemYear = ""
+                                    var itemMonth = ""
+                                    
+                                    if (parts[0].length == 4) { // yyyy-MM-dd format
+                                        itemYear = parts[0]
+                                        itemMonth = parts[1]
+                                    } else if (parts[2].length == 4) { // dd-MM-yyyy format
+                                        itemYear = parts[2]
+                                        itemMonth = parts[1]
+                                    }
+                                    
+                                    // Single digit month buffer correction ("7" -> "07")
+                                    val cleanItemMonth = if (itemMonth.length == 1) "0$itemMonth" else itemMonth
+                                    
+                                    // 3. String comparison check (completely immune to device locale bugs)
+                                    if (itemYear == currYearStr) {
+                                        yearSum += amt
+                                        if (cleanItemMonth == currMonthStr) {
+                                            monthSum += amt
+                                        }
                                     }
                                 }
-
-                                // 2. Agar string match kisi reason se na ho, tab Date Parser ka backup use karenge
-                                if (!matchedYear || !matchedMonth) {
-                                    val datePartOnly = rawDateStr.trim().split("\\s+".toRegex())[0]
-                                    val parsingFormats = listOf(
-                                        SimpleDateFormat("dd-MM-yyyy", Locale.getDefault()),
-                                        SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()),
-                                        SimpleDateFormat("MM/dd/yyyy", Locale.getDefault()),
-                                        SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
-                                    )
-                                    for (format in parsingFormats) {
-                                        try {
-                                            val parsedDate = format.parse(datePartOnly)
-                                            if (parsedDate != null) {
-                                                val cal = Calendar.getInstance()
-                                                cal.time = parsedDate
-                                                if (cal.get(Calendar.YEAR) == currYear) {
-                                                    matchedYear = true
-                                                    if (cal.get(Calendar.MONTH) == currMonth) {
-                                                        matchedMonth = true
-                                                    }
-                                                }
-                                                break
-                                            }
-                                        } catch (e: Exception) {}
-                                    }
-                                }
-
-                                // Finally Amount Jodna
-                                if (matchedYear) yearSum += amt
-                                if (matchedMonth) monthSum += amt
                             }
-                            
-                            withContext(Dispatchers.Main) {
-                                thisMonthExpenses = monthSum
-                                thisYearExpenses = yearSum
-                                debugErrorMessage = "" // Sab sahi raha to koi error nahi
-                                isLoadingExpenses = false
-                            }
-                        } else {
-                            withContext(Dispatchers.Main) { isLoadingExpenses = false }
                         }
-                    } else {
-                        withContext(Dispatchers.Main) { debugErrorMessage = "Error: ${jsonResponse.optString("message")}"; isLoadingExpenses = false }
+                        withContext(Dispatchers.Main) {
+                            thisMonthExpenses = monthSum
+                            thisYearExpenses = yearSum
+                            isLoadingExpenses = false
+                        }
                     }
-                } else {
-                    withContext(Dispatchers.Main) { debugErrorMessage = "Connection Failed!"; isLoadingExpenses = false }
                 }
-            } catch (e: Exception) { 
-                withContext(Dispatchers.Main) { debugErrorMessage = e.localizedMessage; isLoadingExpenses = false } 
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) { isLoadingExpenses = false }
             }
         }
     }
@@ -234,10 +199,6 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
             Box(modifier = Modifier.size(36.dp).clip(CircleShape).background(Color(0xFFE8F5E9)), contentAlignment = Alignment.Center) {
                 Text(username.take(2).uppercase(), color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold, fontSize = 14.sp)
             }
-        }
-
-        if (debugErrorMessage.isNotEmpty()) {
-            Text(debugErrorMessage, color = Color.Red, fontSize = 10.sp, modifier = Modifier.padding(top = 8.dp))
         }
 
         Spacer(modifier = Modifier.height(24.dp))
