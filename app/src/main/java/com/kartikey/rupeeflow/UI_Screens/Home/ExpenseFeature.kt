@@ -3,6 +3,9 @@ package com.kartikey.rupeeflow.UI_Screens.Home
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -26,7 +29,16 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 
-// 1. YE WAHI PURANA RED CARD HAI (Jo Home Screen par dikhta hai)
+// Data Model Transaction History ke liye
+data class TransactionModel(
+    val date: String,
+    val amount: Double,
+    val category: String,
+    val detail1: String,
+    val detail2: String
+)
+
+// 1. RED CARD (Home Screen ke liye)
 @Composable
 fun ExpenseSummaryCard(
     thisMonthTotal: Double = 0.0,
@@ -66,31 +78,40 @@ fun ExpenseSummaryCard(
     }
 }
 
-// 2. YE NAYA EXPENSE PAGE HAI (Aapke hath ke banaye Sketch jaisa)
+// 2. EXPENSE ADD SCREEN (Aapke Design & GPay Style History ke sath)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ExpenseAddScreen(username: String, paddingValues: PaddingValues) {
+fun ExpenseAddScreen(
+    username: String, 
+    paddingValues: PaddingValues,
+    history: List<TransactionModel> // Naya parameter jo sheet data layega
+) {
     var amount by remember { mutableStateOf("") }
-    // Category ab ek freely editable text ban gaya hai
     var categoryText by remember { mutableStateOf("") }
     var expanded by remember { mutableStateOf(false) }
-    val predefinedCategories = listOf("Food", "Transport", "Bills", "Shopping", "Others")
+    val predefinedCategories = listOf("Food", "Transport", "Bills", "Shopping", "Custom")
     
     var detail1 by remember { mutableStateOf("") }
     var detail2 by remember { mutableStateOf("") }
     var statusMessage by remember { mutableStateOf("") }
     val coroutineScope = rememberCoroutineScope()
 
+    // Jadu wala logic: Category badalte hi Labels badal jayenge
+    val labels = when (categoryText) {
+        "Transport" -> Pair("From (Kahan se?)", "To (Kahan tak?)")
+        "Food" -> Pair("Place (Kahan khaya?)", "Food Item (Kya khaya?)")
+        "Bills" -> Pair("Whose Bill?", "Company (e.g. Jio)")
+        "Shopping" -> Pair("Item/Brand", "Shop/App Name")
+        "" -> Pair("Detail 1", "Detail 2")
+        else -> Pair("About 1", "About 2") // Custom ke liye About set kiya hai
+    }
+
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(paddingValues)
-            .padding(16.dp)
+        modifier = Modifier.fillMaxSize().padding(paddingValues).padding(16.dp)
     ) {
         Text("Add Expenses", fontWeight = FontWeight.ExtraBold, fontSize = 22.sp, color = Color(0xFF2E7D32))
         Spacer(modifier = Modifier.height(16.dp))
 
-        // MAIN CARD FROM SKETCH
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -99,14 +120,13 @@ fun ExpenseAddScreen(username: String, paddingValues: PaddingValues) {
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 
-                // ROW 1: Editable Category Dropdown
                 ExposedDropdownMenuBox(
                     expanded = expanded,
                     onExpandedChange = { expanded = it }
                 ) {
                     OutlinedTextField(
                         value = categoryText,
-                        onValueChange = { categoryText = it }, // User ab kuch bhi type kar sakta hai
+                        onValueChange = { categoryText = it },
                         label = { Text("Category") },
                         placeholder = { Text("Select or type custom") },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
@@ -122,7 +142,7 @@ fun ExpenseAddScreen(username: String, paddingValues: PaddingValues) {
                             DropdownMenuItem(
                                 text = { Text(selectionOption) },
                                 onClick = {
-                                    categoryText = selectionOption
+                                    categoryText = if(selectionOption == "Custom") "" else selectionOption
                                     expanded = false
                                 }
                             )
@@ -132,19 +152,18 @@ fun ExpenseAddScreen(username: String, paddingValues: PaddingValues) {
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // ROW 2: Detail 1 | Detail 2
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
                         value = detail1, 
                         onValueChange = { detail1 = it }, 
-                        label = { Text("Detail_1") }, 
+                        label = { Text(labels.first) }, 
                         modifier = Modifier.weight(1f),
                         singleLine = true
                     )
                     OutlinedTextField(
                         value = detail2, 
                         onValueChange = { detail2 = it }, 
-                        label = { Text("Detail_2") }, 
+                        label = { Text(labels.second) }, 
                         modifier = Modifier.weight(1f),
                         singleLine = true
                     )
@@ -152,17 +171,16 @@ fun ExpenseAddScreen(username: String, paddingValues: PaddingValues) {
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // ROW 3: Amount | Green Add Button
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.Bottom // Align bottom taaki button aur text field ek line me dikhe
+                    verticalAlignment = Alignment.Bottom 
                 ) {
                     OutlinedTextField(
                         value = amount, 
                         onValueChange = { amount = it }, 
                         label = { Text("Amount") }, 
-                        prefix = { Text("₹ ", fontWeight = FontWeight.Bold, color = Color(0xFF2E7D32)) }, // AUTOMATIC ₹ SYMBOL
+                        prefix = { Text("₹ ", fontWeight = FontWeight.Bold, color = Color(0xFF2E7D32)) }, 
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.weight(1.5f),
                         singleLine = true
@@ -189,7 +207,7 @@ fun ExpenseAddScreen(username: String, paddingValues: PaddingValues) {
                                         
                                         withContext(Dispatchers.Main) {
                                             if (response.isSuccessful) {
-                                                statusMessage = "Added Successfully!"
+                                                statusMessage = "Added Successfully! (Restart to see below)"
                                                 amount = ""; detail1 = ""; detail2 = ""; categoryText = ""
                                             } else statusMessage = "Failed to add!"
                                         }
@@ -199,9 +217,9 @@ fun ExpenseAddScreen(username: String, paddingValues: PaddingValues) {
                                 statusMessage = "Amount & Category required!"
                             }
                         }, 
-                        modifier = Modifier.weight(1f).height(56.dp), // Height matches OutlinedTextField
+                        modifier = Modifier.weight(1f).height(56.dp), 
                         shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)) // GREEN COLOR
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)) 
                     ) { 
                         Text("Add", color = Color.White, fontWeight = FontWeight.Bold) 
                     }
@@ -213,24 +231,62 @@ fun ExpenseAddScreen(username: String, paddingValues: PaddingValues) {
             }
         }
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
-        // TRANSACTION HISTORY (M/Y) SKETCH UI
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Text("Transaction History", fontWeight = FontWeight.ExtraBold, fontSize = 16.sp, color = Color.DarkGray)
-            
-            // Month / Year Dropdown Placeholder
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.background(Color(0xFFE8F5E9), RoundedCornerShape(8.dp)).padding(horizontal = 8.dp, vertical = 4.dp)) {
-                Text("M / Y", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color(0xFF2E7D32))
-                Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Filter", tint = Color(0xFF2E7D32), modifier = Modifier.size(16.dp))
-            }
         }
         
         Spacer(modifier = Modifier.height(12.dp))
         
-        // Blank box for future history list
-        Box(modifier = Modifier.fillMaxWidth().weight(1f).background(Color(0xFFF5F5F5), RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
-            Text("History will appear here...", color = Color.Gray, fontSize = 12.sp)
+        // GPAY STYLE TRANSACTION LIST
+        LazyColumn(
+            modifier = Modifier.fillMaxWidth().weight(1f),
+            contentPadding = PaddingValues(bottom = 80.dp)
+        ) {
+            if (history.isEmpty()) {
+                item {
+                    Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                        Text("No transactions yet...", color = Color.Gray, fontSize = 12.sp)
+                    }
+                }
+            } else {
+                items(history) { txn ->
+                    TransactionHistoryRow(txn)
+                    HorizontalDivider(color = Color(0xFFEEEEEE), thickness = 1.dp, modifier = Modifier.padding(vertical = 4.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun TransactionHistoryRow(txn: TransactionModel) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            // Circle Avatar (GPay Style)
+            Box(
+                modifier = Modifier.size(48.dp).background(Color(0xFFE8F5E9), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(txn.category.take(1).uppercase(), fontWeight = FontWeight.Bold, fontSize = 20.sp, color = Color(0xFF2E7D32))
+            }
+            Spacer(modifier = Modifier.width(16.dp))
+            Column {
+                Text(txn.category, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.DarkGray)
+                val details = listOf(txn.detail1, txn.detail2).filter { it.isNotBlank() }.joinToString(" • ")
+                if (details.isNotEmpty()) {
+                    Text(details, color = Color.Gray, fontSize = 13.sp, maxLines = 1)
+                }
+            }
+        }
+        Column(horizontalAlignment = Alignment.End) {
+            Text("-₹${txn.amount.toInt()}", fontWeight = FontWeight.ExtraBold, fontSize = 16.sp, color = Color.Black)
+            Text(txn.date.take(10), color = Color.Gray, fontSize = 12.sp)
         }
     }
 }
