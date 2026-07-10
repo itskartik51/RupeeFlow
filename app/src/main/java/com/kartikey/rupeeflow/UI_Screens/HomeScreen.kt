@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -18,13 +17,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kartikey.rupeeflow.Cloud_Database.Constants
 import com.kartikey.rupeeflow.R
 
+// Nayi combined file se dono cheezein import kar li
 import com.kartikey.rupeeflow.UI_Screens.Home.ExpenseSummaryCard
+import com.kartikey.rupeeflow.UI_Screens.Home.ExpenseAddScreen 
+
 import com.kartikey.rupeeflow.UI_Screens.Home.GridCard
 import com.kartikey.rupeeflow.UI_Screens.Home.SpendingTrackerCard
 import com.kartikey.rupeeflow.UI_Screens.Home.ReminderBanner
@@ -37,7 +38,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
-import java.util.Calendar
+import java.text.SimpleDateFormat
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -91,7 +92,8 @@ fun HomeScreen(username: String, onLogout: () -> Unit) {
         if (selectedTab == 0) {
             HomeDashboardDesign(username = username, paddingValues = paddingValues, onLogout = onLogout)
         } else if (selectedTab == 2) {
-            AddExpenseForm(username = username, paddingValues = paddingValues)
+            // YAHAN AAPKA NAYA SKETCH WALA DESIGN CALL HO RAHA HAI
+            ExpenseAddScreen(username = username, paddingValues = paddingValues)
         }
     }
 }
@@ -101,23 +103,10 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
     var thisMonthExpenses by remember { mutableDoubleStateOf(0.0) }
     var thisYearExpenses by remember { mutableDoubleStateOf(0.0) }
     var isLoadingExpenses by remember { mutableStateOf(true) }
-    
-    // Yahan saare Diagnostics Variables hain jo asli sach batayenge
-    var dPhoneDate by remember { mutableStateOf("") }
-    var dRawDate by remember { mutableStateOf("") }
-    var dRawAmt by remember { mutableStateOf("") }
-    var dTotalCount by remember { mutableIntStateOf(0) }
-    var dTotalUnfiltered by remember { mutableDoubleStateOf(0.0) }
-    var dError by remember { mutableStateOf("") }
 
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
             try {
-                val cal = Calendar.getInstance()
-                val currM = cal.get(Calendar.MONTH) + 1
-                val currY = cal.get(Calendar.YEAR)
-                dPhoneDate = "$currM/$currY"
-
                 val json = JSONObject().apply {
                     put("action", "get_expenses")
                     put("username", username)
@@ -132,63 +121,55 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
                     val jsonResponse = JSONObject(responseData)
                     if (jsonResponse.optString("status") == "success") {
                         val dataArray = jsonResponse.optJSONArray("data")
-                        
-                        var tempTotal = 0.0
-                        var tempMonth = 0.0
-                        var tempYear = 0.0
+                        var monthSum = 0.0
+                        var yearSum = 0.0
+
+                        val currentTimestamp = System.currentTimeMillis()
+                        val currMonthStr = SimpleDateFormat("MM", Locale.US).format(currentTimestamp)
+                        val currYearStr = SimpleDateFormat("yyyy", Locale.US).format(currentTimestamp)
 
                         if (dataArray != null && dataArray.length() > 0) {
-                            dTotalCount = dataArray.length()
-                            
-                            // App Sheet se exact kya data le raha hai, usko yahan capture kar liya
-                            val firstItem = dataArray.getJSONObject(0)
-                            dRawDate = firstItem.optString("date", "NULL")
-                            dRawAmt = firstItem.optString("amount", "NULL")
-
-                            val currMonthStr = String.format(Locale.US, "%02d", currM)
-                            val currYearStr = currY.toString()
-
                             for (i in 0 until dataArray.length()) {
                                 val item = dataArray.getJSONObject(i)
-                                val rawDate = item.optString("date", "").trim()
-                                val rawAmt = item.optString("amount", "0")
+                                val rawDateStr = item.optString("date", item.optString("Date", "")).trim()
+                                val rawAmtStr = item.optString("amount", item.optString("Amount", "0"))
+                                val cleanAmtStr = rawAmtStr.replace("[^\\d.]".toRegex(), "")
+                                val amt = cleanAmtStr.toDoubleOrNull() ?: item.optDouble("amount", item.optDouble("Amount", 0.0))
                                 
-                                val cleanAmt = rawAmt.replace("[^\\d.]".toRegex(), "")
-                                val amt = cleanAmt.toDoubleOrNull() ?: item.optDouble("amount", 0.0)
+                                if (amt.isNaN() || amt <= 0.0) continue
+
+                                val datePartOnly = rawDateStr.split("\\s+".toRegex())[0]
+                                val parts = datePartOnly.split("-", "/")
                                 
-                                if (amt > 0.0) {
-                                    tempTotal += amt // BINA KISI FILTER KE SAARE PAISE JOD LIYE
-                                    
-                                    if (rawDate.contains(currYearStr)) {
-                                        tempYear += amt
-                                        if (rawDate.contains("-$currMonthStr-") || rawDate.contains("/$currMonthStr/") || rawDate.contains("-$currMonthStr")) {
-                                            tempMonth += amt
+                                if (parts.size >= 3) {
+                                    var itemYear = ""
+                                    var itemMonth = ""
+                                    if (parts[0].length == 4) { 
+                                        itemYear = parts[0]
+                                        itemMonth = parts[1]
+                                    } else if (parts[2].length == 4) { 
+                                        itemYear = parts[2]
+                                        itemMonth = parts[1]
+                                    }
+                                    val cleanItemMonth = if (itemMonth.length == 1) "0$itemMonth" else itemMonth
+                                    if (itemYear == currYearStr) {
+                                        yearSum += amt
+                                        if (cleanItemMonth == currMonthStr) {
+                                            monthSum += amt
                                         }
                                     }
                                 }
                             }
                         }
                         withContext(Dispatchers.Main) {
-                            dTotalUnfiltered = tempTotal
-                            
-                            // TEMPORARY BYPASS: Agar Date Filter fail ho raha hai, toh app 
-                            // poora total screen par dikhayega taaki 0 na dikhe.
-                            thisMonthExpenses = if (tempMonth > 0) tempMonth else tempTotal 
-                            thisYearExpenses = if (tempYear > 0) tempYear else tempTotal
-                            
+                            thisMonthExpenses = monthSum
+                            thisYearExpenses = yearSum
                             isLoadingExpenses = false
                         }
-                    } else {
-                        dError = "API Status: ${jsonResponse.optString("message")}"
-                        isLoadingExpenses = false
                     }
-                } else {
-                    dError = "Invalid JSON or Server Error"
-                    isLoadingExpenses = false
                 }
             } catch (e: Exception) {
-                dError = e.localizedMessage ?: "Unknown Error"
-                isLoadingExpenses = false
+                withContext(Dispatchers.Main) { isLoadingExpenses = false }
             }
         }
     }
@@ -196,7 +177,6 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
     Column(modifier = Modifier.fillMaxSize().padding(paddingValues).padding(horizontal = 16.dp).verticalScroll(rememberScrollState())) {
         Spacer(modifier = Modifier.height(16.dp))
 
-        // HEADER
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Image(painter = painterResource(id = R.mipmap.ic_launcher), contentDescription = "App Logo", modifier = Modifier.size(44.dp).clip(CircleShape))
             Spacer(modifier = Modifier.width(12.dp))
@@ -210,31 +190,8 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
                 Text(username.take(2).uppercase(), color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold, fontSize = 14.sp)
             }
         }
-        
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // ULTIMATE DIAGNOSTIC BOX (Yellow Color)
-        Card(
-            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF9C4)), 
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text("DIAGNOSTICS (Please Screenshot):", fontWeight = FontWeight.Bold, color = Color.Red, fontSize = 14.sp)
-                Spacer(modifier = Modifier.height(4.dp))
-                Text("1. Phone Date: $dPhoneDate", fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                Text("2. Entries Found: $dTotalCount", fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                Text("3. Row 1 (Raw Date): '$dRawDate'", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1565C0))
-                Text("4. Row 1 (Raw Amt): '$dRawAmt'", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2E7D32))
-                Text("5. Total Sum (No Filter): ₹$dTotalUnfiltered", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                if (dError.isNotEmpty()) {
-                    Text("Error: $dError", color = Color.Red, fontSize = 12.sp)
-                }
-            }
-        }
 
         Spacer(modifier = Modifier.height(24.dp))
-        
-        // Is baar ye guarantee se ₹0 nahi dikhayega
         ExpenseSummaryCard(thisMonthTotal = thisMonthExpenses, thisYearTotal = thisYearExpenses, isLoading = isLoadingExpenses)
         
         Spacer(modifier = Modifier.height(16.dp))
@@ -257,87 +214,5 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
             TextButton(onClick = onLogout) { Text("Logout", color = Color(0xFFD32F2F)) }
         }
         Spacer(modifier = Modifier.height(60.dp)) 
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun AddExpenseForm(username: String, paddingValues: PaddingValues) {
-    var amount by remember { mutableStateOf("") }
-    var selectedCategory by remember { mutableStateOf("Food") }
-    var expanded by remember { mutableStateOf(false) }
-    val categories = listOf("Food", "Transport", "Bills", "Shopping", "Others")
-    var detail1 by remember { mutableStateOf("") }
-    var detail2 by remember { mutableStateOf("") }
-    var statusMessage by remember { mutableStateOf("") }
-    val coroutineScope = rememberCoroutineScope()
-
-    Column(modifier = Modifier.fillMaxSize().padding(paddingValues).padding(20.dp).verticalScroll(rememberScrollState())) {
-        Text("Add New Expense", style = MaterialTheme.typography.headlineSmall, color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold)
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        OutlinedTextField(value = amount, onValueChange = { amount = it }, label = { Text("Amount (₹)") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
-        Spacer(modifier = Modifier.height(8.dp))
-
-        ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = !expanded }) {
-            OutlinedTextField(value = selectedCategory, onValueChange = {}, readOnly = true, label = { Text("Category") }, modifier = Modifier.menuAnchor().fillMaxWidth())
-            ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                categories.forEach { cat -> 
-                    DropdownMenuItem(text = { Text(cat) }, onClick = { selectedCategory = cat; expanded = false; detail1 = ""; detail2 = "" }) 
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-        when (selectedCategory) {
-            "Food" -> {
-                OutlinedTextField(value = detail1, onValueChange = { detail1 = it }, label = { Text("Where did you eat?") }, modifier = Modifier.fillMaxWidth())
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(value = detail2, onValueChange = { detail2 = it }, label = { Text("What did you eat?") }, modifier = Modifier.fillMaxWidth())
-            }
-            "Transport" -> {
-                OutlinedTextField(value = detail1, onValueChange = { detail1 = it }, label = { Text("From Where?") }, modifier = Modifier.fillMaxWidth())
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(value = detail2, onValueChange = { detail2 = it }, label = { Text("To Where?") }, modifier = Modifier.fillMaxWidth())
-            }
-            "Bills" -> {
-                OutlinedTextField(value = detail1, onValueChange = { detail1 = it }, label = { Text("Which Bill?") }, modifier = Modifier.fillMaxWidth())
-            }
-        }
-        Spacer(modifier = Modifier.height(24.dp))
-
-        Button(
-            onClick = {
-                coroutineScope.launch(Dispatchers.IO) {
-                    try {
-                        statusMessage = "Saving..."
-                        val json = JSONObject().apply {
-                            put("action", "add_expense")
-                            put("username", username)
-                            put("amount", amount)
-                            put("category", selectedCategory)
-                            put("detail1", detail1)
-                            put("detail2", detail2)
-                        }
-                        val client = OkHttpClient()
-                        val body = json.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
-                        val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(body).build()
-                        val response = client.newCall(request).execute()
-                        
-                        withContext(Dispatchers.Main) {
-                            if (response.isSuccessful) {
-                                statusMessage = "Saved Successfully!"
-                                amount = ""; detail1 = ""; detail2 = ""
-                            } else statusMessage = "Failed!"
-                        }
-                    } catch (e: Exception) { withContext(Dispatchers.Main) { statusMessage = "Error!" } }
-                }
-            }, 
-            modifier = Modifier.fillMaxWidth(), 
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
-        ) { Text("Save Expense", color = Color.White) }
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(statusMessage, color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold)
     }
 }
