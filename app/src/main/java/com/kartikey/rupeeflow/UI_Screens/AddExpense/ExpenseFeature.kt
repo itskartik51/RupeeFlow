@@ -83,6 +83,8 @@ fun ExpenseAddScreen(username: String, paddingValues: PaddingValues) {
     var amount by remember { mutableStateOf("") }
     var categoryText by remember { mutableStateOf("") }
     var expanded by remember { mutableStateOf(false) }
+    var isCustomCategory by remember { mutableStateOf(false) } // Custom lock/unlock ka state
+    
     val predefinedCategories = listOf("Food", "Transport", "Bills", "Shopping", "Custom")
     
     var detail1 by remember { mutableStateOf("") }
@@ -90,23 +92,22 @@ fun ExpenseAddScreen(username: String, paddingValues: PaddingValues) {
     var statusMessage by remember { mutableStateOf("") }
     val coroutineScope = rememberCoroutineScope()
 
-    val labels = when (categoryText) {
-        "Transport" -> Pair("From (Kahan se?)", "To (Kahan tak?)")
-        "Food" -> Pair("Place (Kahan khaya?)", "Food Item (Kya khaya?)")
-        "Bills" -> Pair("Whose Bill?", "Company (e.g. Jio)")
-        "Shopping" -> Pair("Item/Brand", "Shop/App Name")
-        "" -> Pair("Detail 1", "Detail 2")
-        else -> Pair("About 1", "About 2")
+    // Ekdum Professional aur Clean Labels
+    val labels = when {
+        isCustomCategory -> Pair("Description", "Remarks")
+        categoryText == "Transport" -> Pair("From", "To")
+        categoryText == "Food" -> Pair("Place", "Food Item")
+        categoryText == "Bills" -> Pair("Bill Type", "Operator")
+        categoryText == "Shopping" -> Pair("Item", "Shop")
+        else -> Pair("Description", "Remarks")
     }
 
-    // Plus icon ki custom identity design language (14.dp rounding)
     val plusIconShape = RoundedCornerShape(14.dp)
 
     Column(modifier = Modifier.fillMaxSize().padding(paddingValues).padding(16.dp)) {
         Text("Add Expenses", fontWeight = FontWeight.ExtraBold, fontSize = 22.sp, color = Color(0xFF2E7D32))
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Main entry container card ki rounding plus icon se match kar di hai
         Card(
             modifier = Modifier.fillMaxWidth(), 
             colors = CardDefaults.cardColors(containerColor = Color.White), 
@@ -116,18 +117,31 @@ fun ExpenseAddScreen(username: String, paddingValues: PaddingValues) {
             Column(modifier = Modifier.padding(16.dp)) {
                 ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
                     OutlinedTextField(
-                        value = categoryText, onValueChange = { categoryText = it },
-                        label = { Text("Category") }, placeholder = { Text("Select or type custom") },
+                        value = categoryText, 
+                        onValueChange = { categoryText = it },
+                        label = { Text("Category") }, 
+                        placeholder = { Text("Select category") },
+                        readOnly = !isCustomCategory, // SIRF CUSTOM WALE MEIN TYPING ALLOWED HAI
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
                         colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
-                        shape = plusIconShape, // Category Box Roundish hua
-                        modifier = Modifier.menuAnchor().fillMaxWidth(), singleLine = true
+                        shape = plusIconShape,
+                        modifier = Modifier.menuAnchor().fillMaxWidth(), 
+                        singleLine = true
                     )
                     ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                         predefinedCategories.forEach { selectionOption ->
                             DropdownMenuItem(
                                 text = { Text(selectionOption) },
-                                onClick = { categoryText = if(selectionOption == "Custom") "" else selectionOption; expanded = false }
+                                onClick = { 
+                                    if (selectionOption == "Custom") {
+                                        isCustomCategory = true
+                                        categoryText = ""
+                                    } else {
+                                        isCustomCategory = false
+                                        categoryText = selectionOption
+                                    }
+                                    expanded = false 
+                                }
                             )
                         }
                     }
@@ -135,7 +149,6 @@ fun ExpenseAddScreen(username: String, paddingValues: PaddingValues) {
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Detail 1 aur Detail 2 ke squares ko side se roundish kiya
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
                         value = detail1, 
@@ -157,7 +170,6 @@ fun ExpenseAddScreen(username: String, paddingValues: PaddingValues) {
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Amount text field ko bhi same waisa hi round kiya jaisa plus icon hai
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
                     OutlinedTextField(
                         value = amount, onValueChange = { amount = it }, label = { Text("Amount") }, 
@@ -189,7 +201,7 @@ fun ExpenseAddScreen(username: String, paddingValues: PaddingValues) {
                                         withContext(Dispatchers.Main) {
                                             if (response.isSuccessful) {
                                                 statusMessage = "Added! Check History."
-                                                amount = ""; detail1 = ""; detail2 = ""; categoryText = ""
+                                                amount = ""; detail1 = ""; detail2 = ""; categoryText = ""; isCustomCategory = false
                                             } else statusMessage = "Failed to add!"
                                         }
                                     } catch (e: Exception) { withContext(Dispatchers.Main) { statusMessage = "Error connecting to server!" } }
@@ -197,7 +209,7 @@ fun ExpenseAddScreen(username: String, paddingValues: PaddingValues) {
                             } else { statusMessage = "Amount & Category required!" }
                         }, 
                         modifier = Modifier.weight(1f).height(56.dp), 
-                        shape = plusIconShape, // Button shape also matches 14.dp round
+                        shape = plusIconShape,
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)) 
                     ) { Text("Add", color = Color.White, fontWeight = FontWeight.Bold) }
                 }
@@ -206,27 +218,6 @@ fun ExpenseAddScreen(username: String, paddingValues: PaddingValues) {
                     Text(statusMessage, color = if(statusMessage.contains("Check")) Color(0xFF2E7D32) else Color.Red, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
                 }
             }
-        }
-    }
-}
-
-@Composable
-fun TransactionHistoryRow(txn: TransactionModel) {
-    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(modifier = Modifier.size(48.dp).background(Color(0xFFE8F5E9), CircleShape), contentAlignment = Alignment.Center) {
-                Text(txn.category.take(1).uppercase(), fontWeight = FontWeight.Bold, fontSize = 20.sp, color = Color(0xFF2E7D32))
-            }
-            Spacer(modifier = Modifier.width(16.dp))
-            Column {
-                Text(txn.category, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.DarkGray)
-                val details = listOf(txn.detail1, txn.detail2).filter { it.isNotBlank() }.joinToString(" • ")
-                if (details.isNotEmpty()) { Text(details, color = Color.Gray, fontSize = 13.sp, maxLines = 1) }
-            }
-        }
-        Column(horizontalAlignment = Alignment.End) {
-            Text("-₹${txn.amount.toInt()}", fontWeight = FontWeight.ExtraBold, fontSize = 16.sp, color = Color.Black)
-            Text(txn.date.take(10), color = Color.Gray, fontSize = 12.sp)
         }
     }
 }
