@@ -19,13 +19,13 @@ import androidx.compose.ui.unit.sp
 fun ExpenseSummaryCard(thisMonthTotal: Double, thisYearTotal: Double, isLoading: Boolean, onClick: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth().clickable { onClick() },
-        // Yahan color change kar diya hai, ab ye deep/professional red dikhega
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFB71C1C)), 
+        // Ye soft light red shade hai jo diagnosis card ki tarah light aur airy lagega
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFEF9A9A)), 
         shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(8.dp)
+        elevation = CardDefaults.cardElevation(4.dp) // Elevation thoda kam kiya hai taki aur light lage
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
-            Text("Total Expenses", color = Color.White.copy(alpha = 0.8f), fontSize = 14.sp)
+            Text("Total Expenses", color = Color.White.copy(alpha = 0.9f), fontSize = 14.sp)
             Spacer(modifier = Modifier.height(4.dp))
             if (isLoading) {
                 CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
@@ -35,10 +35,10 @@ fun ExpenseSummaryCard(thisMonthTotal: Double, thisYearTotal: Double, isLoading:
             Spacer(modifier = Modifier.height(16.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Column {
-                    Text("This Year", color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp)
+                    Text("This Year", color = Color.White.copy(alpha = 0.9f), fontSize = 12.sp)
                     Text("₹${thisYearTotal.toInt()}", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White)
                 }
-                Box(modifier = Modifier.background(Color.White.copy(alpha = 0.2f), RoundedCornerShape(8.dp)).padding(horizontal = 12.dp, vertical = 6.dp)) {
+                Box(modifier = Modifier.background(Color.White.copy(alpha = 0.25f), RoundedCornerShape(8.dp)).padding(horizontal = 12.dp, vertical = 6.dp)) {
                     Text("View History", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
             }
