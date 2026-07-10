@@ -1,5 +1,6 @@
 package com.kartikey.rupeeflow.UI_Screens.Home
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -8,6 +9,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -28,6 +32,9 @@ fun HomeDashboardDesign(
     onLogout: () -> Unit,
     onExpenseCardClick: () -> Unit
 ) {
+    // Ye variable track karega ki diagnosis card open hai ya close
+    var showDiagnostics by remember { mutableStateOf(false) }
+
     Column(modifier = Modifier.fillMaxSize().padding(paddingValues).padding(horizontal = 16.dp).verticalScroll(rememberScrollState())) {
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -47,17 +54,21 @@ fun HomeDashboardDesign(
         
         Spacer(modifier = Modifier.height(16.dp))
 
-        Card(colors = CardDefaults.cardColors(containerColor = Color(0xFFE1F5FE)), modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text("SYSTEM DIAGNOSTICS (Navigation Mode):", fontWeight = FontWeight.Bold, color = Color(0xFF0277BD), fontSize = 14.sp)
-                Spacer(modifier = Modifier.height(4.dp))
+        // NAYA CLICKABLE DIAGNOSIS CARD
+        SystemDiagnosisCard(
+            testName = "Navigation Mode",
+            isExpanded = showDiagnostics,
+            onToggle = { showDiagnostics = !showDiagnostics }
+        ) {
+            // Yahan hum jo chahein details daal sakte hain, UI automatic adjust hoga
+            Column(modifier = Modifier.padding(top = 12.dp)) {
                 Text("1. Current Active Route: $dNavState", fontSize = 12.sp, fontWeight = FontWeight.Medium)
                 Text("2. Back Button Saved Exits: $dBackPresses times", fontSize = 12.sp, fontWeight = FontWeight.Medium)
                 Text("3. SuperBoss Architecture: Active & Stable", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2E7D32))
             }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(16.dp)) // Card ke beech ka gap
         
         ExpenseSummaryCard(
             thisMonthTotal = thisMonthExpenses, 
@@ -89,80 +100,39 @@ fun HomeDashboardDesign(
     }
 }
 
-// -------------------------------------------------------------------------
-// YAHAN SE NEECHE WOH MISSING DESIGNS HAIN JO DELETE HO GAYE THE
-// -------------------------------------------------------------------------
-
+// ---------------------------------------------------------------------------------
+// UNIVERSAL DIAGNOSIS COMPONENT (Ise hum future mein kahin bhi use kar sakte hain)
+// ---------------------------------------------------------------------------------
 @Composable
-fun ExpenseSummaryCard(thisMonthTotal: Double, thisYearTotal: Double, isLoading: Boolean, onClick: () -> Unit) {
+fun SystemDiagnosisCard(
+    testName: String,
+    isExpanded: Boolean,
+    onToggle: () -> Unit,
+    detailsContent: @Composable () -> Unit
+) {
     Card(
-        modifier = Modifier.fillMaxWidth().clickable { onClick() },
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFD32F2F)), 
-        shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(8.dp)
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable { onToggle() },
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFE1F5FE)),
+        elevation = CardDefaults.cardElevation(0.dp)
     ) {
-        Column(modifier = Modifier.padding(20.dp)) {
-            Text("Total Expenses", color = Color.White.copy(alpha = 0.8f), fontSize = 14.sp)
-            Spacer(modifier = Modifier.height(4.dp))
-            if (isLoading) {
-                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
-            } else {
-                Text("₹${thisMonthTotal.toInt()}", fontWeight = FontWeight.ExtraBold, fontSize = 32.sp, color = Color.White)
-            }
-            Spacer(modifier = Modifier.height(16.dp))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Column {
-                    Text("This Year", color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp)
-                    Text("₹${thisYearTotal.toInt()}", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White)
-                }
-                Box(modifier = Modifier.background(Color.White.copy(alpha = 0.2f), RoundedCornerShape(8.dp)).padding(horizontal = 12.dp, vertical = 6.dp)) {
-                    Text("View History", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun GridCard(title: String, value: String, lineColor: Color, modifier: Modifier = Modifier) {
-    Card(modifier = modifier, colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(2.dp)) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Text(title, fontSize = 10.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(value, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
-            if (lineColor != Color.Transparent) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(lineColor, RoundedCornerShape(50)))
-            }
-        }
-    }
-}
-
-@Composable
-fun SpendingTrackerCard() {
-    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(2.dp)) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Monthly Budget", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                Text("0% Used", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color(0xFF2E7D32))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "System Diagnosis ($testName)", 
+                    fontWeight = FontWeight.Bold, 
+                    color = Color(0xFF0277BD), 
+                    fontSize = 14.sp
+                )
+                Icon(
+                    imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                    contentDescription = "Toggle Diagnosis",
+                    tint = Color(0xFF0277BD)
+                )
             }
-            Spacer(modifier = Modifier.height(8.dp))
-            LinearProgressIndicator(progress = { 0f }, modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(50)), color = Color(0xFF2E7D32), trackColor = Color(0xFFE8F5E9))
-        }
-    }
-}
-
-@Composable
-fun ReminderBanner() {
-    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF3E0)), elevation = CardDefaults.cardElevation(0.dp)) {
-        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(modifier = Modifier.size(40.dp).background(Color(0xFFFFB300), CircleShape), contentAlignment = Alignment.Center) {
-                Text("!", color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp)
-            }
-            Spacer(modifier = Modifier.width(16.dp))
-            Column {
-                Text("No pending bills", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color(0xFFE65100))
-                Text("You're all caught up for this month.", fontSize = 12.sp, color = Color(0xFFEF6C00))
+            
+            // Jab click hoga tabhi ye smoothly open hoke details dikhayega
+            AnimatedVisibility(visible = isExpanded) {
+                detailsContent()
             }
         }
     }
