@@ -22,9 +22,10 @@ import androidx.compose.ui.unit.sp
 import com.kartikey.rupeeflow.Cloud_Database.Constants
 import com.kartikey.rupeeflow.R
 
-// Saari files aur naye Transaction Model ko import kiya
+// Teeno Naye Screen aur Model Import kiye
 import com.kartikey.rupeeflow.UI_Screens.Home.ExpenseSummaryCard
 import com.kartikey.rupeeflow.UI_Screens.Home.ExpenseAddScreen 
+import com.kartikey.rupeeflow.UI_Screens.Home.ExpenseHistoryScreen 
 import com.kartikey.rupeeflow.UI_Screens.Home.TransactionModel
 import com.kartikey.rupeeflow.UI_Screens.Home.GridCard
 import com.kartikey.rupeeflow.UI_Screens.Home.SpendingTrackerCard
@@ -38,21 +39,20 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
-import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
 
 @Composable
 fun HomeScreen(username: String, onLogout: () -> Unit) {
     var selectedTab by remember { mutableIntStateOf(0) } 
+    var showExpenseHistory by remember { mutableStateOf(false) } // Naya state Red Card click ke liye
 
-    // DATA HOISTING: Taki tabs switch hone par data hide na ho aur dobara fetch na karna pade
     var thisMonthExpenses by remember { mutableDoubleStateOf(0.0) }
     var thisYearExpenses by remember { mutableDoubleStateOf(0.0) }
     var isLoadingExpenses by remember { mutableStateOf(true) }
     var transactionList by remember { mutableStateOf(emptyList<TransactionModel>()) }
     
-    // DIAGNOSTIC STATES (User ki request par testing tak ON rahega)
+    // DIAGNOSTIC STATES 
     var dPhoneDate by remember { mutableStateOf("") }
     var dRawDate by remember { mutableStateOf("") }
     var dRawAmt by remember { mutableStateOf("") }
@@ -109,7 +109,6 @@ fun HomeScreen(username: String, onLogout: () -> Unit) {
                                 
                                 if (amt > 0.0) {
                                     tempTotal += amt 
-                                    // List mein naya data add karna history ke liye
                                     tempHistory.add(TransactionModel(rawDate, amt, category, detail1, detail2))
                                     
                                     if (rawDate.contains(currYearStr)) {
@@ -125,7 +124,6 @@ fun HomeScreen(username: String, onLogout: () -> Unit) {
                             dTotalUnfiltered = tempTotal
                             thisMonthExpenses = if (tempMonth > 0) tempMonth else tempTotal 
                             thisYearExpenses = if (tempYear > 0) tempYear else tempTotal
-                            // Reversed isliye kiya taaki sabse naya kharcha list me sabse upar dikhe
                             transactionList = tempHistory.reversed()
                             isLoadingExpenses = false
                         }
@@ -134,11 +132,11 @@ fun HomeScreen(username: String, onLogout: () -> Unit) {
                         isLoadingExpenses = false
                     }
                 } else {
-                    dError = "Invalid JSON or Server Error"
+                    dError = "Invalid JSON"
                     isLoadingExpenses = false
                 }
             } catch (e: Exception) {
-                dError = e.localizedMessage ?: "Unknown Error"
+                dError = e.localizedMessage ?: "Error"
                 isLoadingExpenses = false
             }
         }
@@ -148,40 +146,38 @@ fun HomeScreen(username: String, onLogout: () -> Unit) {
         bottomBar = {
             NavigationBar(containerColor = Color.White, tonalElevation = 8.dp) {
                 NavigationBarItem(
-                    selected = selectedTab == 0,
-                    onClick = { selectedTab = 0 },
+                    selected = selectedTab == 0 && !showExpenseHistory,
+                    onClick = { selectedTab = 0; showExpenseHistory = false },
                     icon = { Icon(Icons.Default.Home, contentDescription = "Home") },
                     label = { Text("Home") },
                     colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
                 )
                 NavigationBarItem(
                     selected = selectedTab == 1,
-                    onClick = { /* Link later */ },
+                    onClick = { selectedTab = 1; showExpenseHistory = false },
                     icon = { Icon(Icons.Default.List, contentDescription = "Assets") },
                     label = { Text("Assets") },
                     colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
                 )
-                
                 NavigationBarItem(
                     selected = selectedTab == 2,
-                    onClick = { selectedTab = 2 },
+                    onClick = { selectedTab = 2; showExpenseHistory = false },
                     icon = {
                         Box(modifier = Modifier.size(48.dp).clip(RoundedCornerShape(14.dp)).background(Color(0xFF2E7D32)), contentAlignment = Alignment.Center) {
                             Icon(Icons.Default.Add, contentDescription = "Add", tint = Color.White)
                         }
                     }
                 )
-                
                 NavigationBarItem(
                     selected = selectedTab == 3,
-                    onClick = { /* Link later */ },
+                    onClick = { selectedTab = 3; showExpenseHistory = false },
                     icon = { Icon(Icons.Default.DateRange, contentDescription = "Analytics") },
                     label = { Text("Analytics") },
                     colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
                 )
                 NavigationBarItem(
                     selected = selectedTab == 4,
-                    onClick = { /* Link later */ },
+                    onClick = { selectedTab = 4; showExpenseHistory = false },
                     icon = { Icon(Icons.Default.Person, contentDescription = "Profile") },
                     label = { Text("Profile") },
                     colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
@@ -189,24 +185,25 @@ fun HomeScreen(username: String, onLogout: () -> Unit) {
             }
         }
     ) { paddingValues ->
-        if (selectedTab == 0) {
-            HomeDashboardDesign(
-                username = username, 
+        // NAVIGATION LOGIC
+        if (showExpenseHistory) {
+            // RED CARD PAR CLICK KARTE HI YE DIKHEGA
+            ExpenseHistoryScreen(
                 paddingValues = paddingValues, 
-                thisMonthExpenses = thisMonthExpenses,
-                thisYearExpenses = thisYearExpenses,
-                isLoadingExpenses = isLoadingExpenses,
-                dPhoneDate = dPhoneDate,
-                dRawDate = dRawDate,
-                dRawAmt = dRawAmt,
-                dTotalCount = dTotalCount,
-                dTotalUnfiltered = dTotalUnfiltered,
-                dError = dError,
-                onLogout = onLogout
+                history = transactionList,
+                onBackClick = { showExpenseHistory = false } // Back dabane par wapas Home par
+            )
+        } else if (selectedTab == 0) {
+            HomeDashboardDesign(
+                username = username, paddingValues = paddingValues, 
+                thisMonthExpenses = thisMonthExpenses, thisYearExpenses = thisYearExpenses, isLoadingExpenses = isLoadingExpenses,
+                dPhoneDate = dPhoneDate, dRawDate = dRawDate, dRawAmt = dRawAmt, dTotalCount = dTotalCount, dTotalUnfiltered = dTotalUnfiltered, dError = dError,
+                onLogout = onLogout,
+                onExpenseCardClick = { showExpenseHistory = true } // Yahan Action Pass Kiya
             )
         } else if (selectedTab == 2) {
-            // YAHAN AAPKA NAYA DESIGN AUR DATA BHEJA JA RAHA HAI
-            ExpenseAddScreen(username = username, paddingValues = paddingValues, history = transactionList)
+            // '+' BUTTON PAR SIRF ADD WALA FORM DIKHEGA
+            ExpenseAddScreen(username = username, paddingValues = paddingValues)
         }
     }
 }
@@ -216,7 +213,8 @@ fun HomeDashboardDesign(
     username: String, paddingValues: PaddingValues, 
     thisMonthExpenses: Double, thisYearExpenses: Double, isLoadingExpenses: Boolean,
     dPhoneDate: String, dRawDate: String, dRawAmt: String, dTotalCount: Int, dTotalUnfiltered: Double, dError: String,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    onExpenseCardClick: () -> Unit // Naya Parameter
 ) {
     Column(modifier = Modifier.fillMaxSize().padding(paddingValues).padding(horizontal = 16.dp).verticalScroll(rememberScrollState())) {
         Spacer(modifier = Modifier.height(16.dp))
@@ -237,7 +235,6 @@ fun HomeDashboardDesign(
         
         Spacer(modifier = Modifier.height(16.dp))
 
-        // ULTIMATE DIAGNOSTIC BOX 
         Card(colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF9C4)), modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text("DIAGNOSTICS (Please Screenshot):", fontWeight = FontWeight.Bold, color = Color.Red, fontSize = 14.sp)
@@ -252,7 +249,14 @@ fun HomeDashboardDesign(
         }
 
         Spacer(modifier = Modifier.height(24.dp))
-        ExpenseSummaryCard(thisMonthTotal = thisMonthExpenses, thisYearTotal = thisYearExpenses, isLoading = isLoadingExpenses)
+        
+        // RED CARD WALI CALL (Yahan onClick pass kar diya)
+        ExpenseSummaryCard(
+            thisMonthTotal = thisMonthExpenses, 
+            thisYearTotal = thisYearExpenses, 
+            isLoading = isLoadingExpenses,
+            onClick = onExpenseCardClick
+        )
         
         Spacer(modifier = Modifier.height(16.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
