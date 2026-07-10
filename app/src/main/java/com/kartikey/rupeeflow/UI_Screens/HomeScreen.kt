@@ -22,7 +22,7 @@ import androidx.compose.ui.unit.sp
 import com.kartikey.rupeeflow.Cloud_Database.Constants
 import com.kartikey.rupeeflow.R
 
-// Nayi combined file se dono cheezein import kar li
+// YAHAN DEKHIYE: Aapki file se naya Add Expense screen import kiya hai
 import com.kartikey.rupeeflow.UI_Screens.Home.ExpenseSummaryCard
 import com.kartikey.rupeeflow.UI_Screens.Home.ExpenseAddScreen 
 
@@ -38,7 +38,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
-import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -63,6 +63,8 @@ fun HomeScreen(username: String, onLogout: () -> Unit) {
                     label = { Text("Assets") },
                     colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
                 )
+                
+                // BICH WALA GREEN '+' BUTTON (Index 2)
                 NavigationBarItem(
                     selected = selectedTab == 2,
                     onClick = { selectedTab = 2 },
@@ -72,6 +74,7 @@ fun HomeScreen(username: String, onLogout: () -> Unit) {
                         }
                     }
                 )
+                
                 NavigationBarItem(
                     selected = selectedTab == 3,
                     onClick = { /* Link later */ },
@@ -89,10 +92,11 @@ fun HomeScreen(username: String, onLogout: () -> Unit) {
             }
         }
     ) { paddingValues ->
+        // NAVIGATION LOGIC
         if (selectedTab == 0) {
             HomeDashboardDesign(username = username, paddingValues = paddingValues, onLogout = onLogout)
         } else if (selectedTab == 2) {
-            // YAHAN AAPKA NAYA SKETCH WALA DESIGN CALL HO RAHA HAI
+            // JAISE HI BICH WALA BUTTON DABEGA, AAPKA NAYA DESIGN KHULEGA
             ExpenseAddScreen(username = username, paddingValues = paddingValues)
         }
     }
@@ -103,10 +107,23 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
     var thisMonthExpenses by remember { mutableDoubleStateOf(0.0) }
     var thisYearExpenses by remember { mutableDoubleStateOf(0.0) }
     var isLoadingExpenses by remember { mutableStateOf(true) }
+    
+    // Diagnostics Variables (Testing ke liye ON rakhe hain)
+    var dPhoneDate by remember { mutableStateOf("") }
+    var dRawDate by remember { mutableStateOf("") }
+    var dRawAmt by remember { mutableStateOf("") }
+    var dTotalCount by remember { mutableIntStateOf(0) }
+    var dTotalUnfiltered by remember { mutableDoubleStateOf(0.0) }
+    var dError by remember { mutableStateOf("") }
 
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
             try {
+                val cal = Calendar.getInstance()
+                val currM = cal.get(Calendar.MONTH) + 1
+                val currY = cal.get(Calendar.YEAR)
+                dPhoneDate = "$currM/$currY"
+
                 val json = JSONObject().apply {
                     put("action", "get_expenses")
                     put("username", username)
@@ -121,55 +138,60 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
                     val jsonResponse = JSONObject(responseData)
                     if (jsonResponse.optString("status") == "success") {
                         val dataArray = jsonResponse.optJSONArray("data")
-                        var monthSum = 0.0
-                        var yearSum = 0.0
-
-                        val currentTimestamp = System.currentTimeMillis()
-                        val currMonthStr = SimpleDateFormat("MM", Locale.US).format(currentTimestamp)
-                        val currYearStr = SimpleDateFormat("yyyy", Locale.US).format(currentTimestamp)
+                        
+                        var tempTotal = 0.0
+                        var tempMonth = 0.0
+                        var tempYear = 0.0
 
                         if (dataArray != null && dataArray.length() > 0) {
+                            dTotalCount = dataArray.length()
+                            
+                            val firstItem = dataArray.getJSONObject(0)
+                            dRawDate = firstItem.optString("date", "NULL")
+                            dRawAmt = firstItem.optString("amount", "NULL")
+
+                            val currMonthStr = String.format(Locale.US, "%02d", currM)
+                            val currYearStr = currY.toString()
+
                             for (i in 0 until dataArray.length()) {
                                 val item = dataArray.getJSONObject(i)
-                                val rawDateStr = item.optString("date", item.optString("Date", "")).trim()
-                                val rawAmtStr = item.optString("amount", item.optString("Amount", "0"))
-                                val cleanAmtStr = rawAmtStr.replace("[^\\d.]".toRegex(), "")
-                                val amt = cleanAmtStr.toDoubleOrNull() ?: item.optDouble("amount", item.optDouble("Amount", 0.0))
+                                val rawDate = item.optString("date", "").trim()
+                                val rawAmt = item.optString("amount", "0")
                                 
-                                if (amt.isNaN() || amt <= 0.0) continue
-
-                                val datePartOnly = rawDateStr.split("\\s+".toRegex())[0]
-                                val parts = datePartOnly.split("-", "/")
+                                val cleanAmt = rawAmt.replace("[^\\d.]".toRegex(), "")
+                                val amt = cleanAmt.toDoubleOrNull() ?: item.optDouble("amount", 0.0)
                                 
-                                if (parts.size >= 3) {
-                                    var itemYear = ""
-                                    var itemMonth = ""
-                                    if (parts[0].length == 4) { 
-                                        itemYear = parts[0]
-                                        itemMonth = parts[1]
-                                    } else if (parts[2].length == 4) { 
-                                        itemYear = parts[2]
-                                        itemMonth = parts[1]
-                                    }
-                                    val cleanItemMonth = if (itemMonth.length == 1) "0$itemMonth" else itemMonth
-                                    if (itemYear == currYearStr) {
-                                        yearSum += amt
-                                        if (cleanItemMonth == currMonthStr) {
-                                            monthSum += amt
+                                if (amt > 0.0) {
+                                    tempTotal += amt 
+                                    
+                                    if (rawDate.contains(currYearStr)) {
+                                        tempYear += amt
+                                        if (rawDate.contains("-$currMonthStr-") || rawDate.contains("/$currMonthStr/") || rawDate.startsWith("$currMonthStr-") || rawDate.startsWith("$currMonthStr/")) {
+                                            tempMonth += amt
                                         }
                                     }
                                 }
                             }
                         }
                         withContext(Dispatchers.Main) {
-                            thisMonthExpenses = monthSum
-                            thisYearExpenses = yearSum
+                            dTotalUnfiltered = tempTotal
+                            
+                            thisMonthExpenses = if (tempMonth > 0) tempMonth else tempTotal 
+                            thisYearExpenses = if (tempYear > 0) tempYear else tempTotal
+                            
                             isLoadingExpenses = false
                         }
+                    } else {
+                        dError = "API Status: ${jsonResponse.optString("message")}"
+                        isLoadingExpenses = false
                     }
+                } else {
+                    dError = "Invalid JSON or Server Error"
+                    isLoadingExpenses = false
                 }
             } catch (e: Exception) {
-                withContext(Dispatchers.Main) { isLoadingExpenses = false }
+                dError = e.localizedMessage ?: "Unknown Error"
+                isLoadingExpenses = false
             }
         }
     }
@@ -188,6 +210,27 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
             Spacer(modifier = Modifier.width(12.dp))
             Box(modifier = Modifier.size(36.dp).clip(CircleShape).background(Color(0xFFE8F5E9)), contentAlignment = Alignment.Center) {
                 Text(username.take(2).uppercase(), color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            }
+        }
+        
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // ULTIMATE DIAGNOSTIC BOX (Abhi rakhenge isko aage ke features test karne ke liye)
+        Card(
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF9C4)), 
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("DIAGNOSTICS (Please Screenshot):", fontWeight = FontWeight.Bold, color = Color.Red, fontSize = 14.sp)
+                Spacer(modifier = Modifier.height(4.dp))
+                Text("1. Phone Date: $dPhoneDate", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                Text("2. Entries Found: $dTotalCount", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                Text("3. Row 1 (Raw Date): '$dRawDate'", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1565C0))
+                Text("4. Row 1 (Raw Amt): '$dRawAmt'", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2E7D32))
+                Text("5. Total Sum (No Filter): ₹$dTotalUnfiltered", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                if (dError.isNotEmpty()) {
+                    Text("Error: $dError", color = Color.Red, fontSize = 12.sp)
+                }
             }
         }
 
