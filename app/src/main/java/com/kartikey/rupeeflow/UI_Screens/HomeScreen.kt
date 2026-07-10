@@ -24,7 +24,7 @@ import androidx.compose.ui.unit.sp
 import com.kartikey.rupeeflow.Cloud_Database.Constants
 import com.kartikey.rupeeflow.R
 import com.kartikey.rupeeflow.UI_Screens.Features.ExpenseSummaryCard
-import com.kartikey.rupeeflow.UI_Screens.Features.StockButton // Ye raha aapka StockButton ka import!
+import com.kartikey.rupeeflow.UI_Screens.Features.StockButton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -33,6 +33,9 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -52,7 +55,6 @@ fun HomeScreen(username: String, onLogout: () -> Unit) {
                     label = { Text("Home") },
                     colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
                 )
-                
                 NavigationBarItem(
                     selected = selectedTab == 1,
                     onClick = { /* Link later */ },
@@ -60,7 +62,6 @@ fun HomeScreen(username: String, onLogout: () -> Unit) {
                     label = { Text("Assets") },
                     colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
                 )
-                
                 NavigationBarItem(
                     selected = selectedTab == 2,
                     onClick = { selectedTab = 2 },
@@ -76,7 +77,6 @@ fun HomeScreen(username: String, onLogout: () -> Unit) {
                         }
                     }
                 )
-                
                 NavigationBarItem(
                     selected = selectedTab == 3,
                     onClick = { /* Link later */ },
@@ -84,7 +84,6 @@ fun HomeScreen(username: String, onLogout: () -> Unit) {
                     label = { Text("Analytics") },
                     colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
                 )
-                
                 NavigationBarItem(
                     selected = selectedTab == 4,
                     onClick = { /* Link later */ },
@@ -105,6 +104,81 @@ fun HomeScreen(username: String, onLogout: () -> Unit) {
 
 @Composable
 fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout: () -> Unit) {
+    // 1. Data Store Karne ke liye memory variables
+    var thisMonthExpenses by remember { mutableDoubleStateOf(0.0) }
+    var thisYearExpenses by remember { mutableDoubleStateOf(0.0) }
+    var isLoadingExpenses by remember { mutableStateOf(true) }
+
+    // 2. Background task jo App khulte hi API se data mangwayega aur calculate karega
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.IO) {
+            try {
+                val json = JSONObject().apply {
+                    put("action", "get_expenses")
+                    put("username", username)
+                }
+                val client = OkHttpClient()
+                val body = json.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
+                val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(body).build()
+                val response = client.newCall(request).execute()
+                val responseData = response.body?.string() ?: ""
+
+                if (response.isSuccessful) {
+                    val jsonResponse = JSONObject(responseData)
+                    if (jsonResponse.optString("status") == "success") {
+                        val dataArray = jsonResponse.optJSONArray("data")
+                        
+                        var monthSum = 0.0
+                        var yearSum = 0.0
+
+                        // Aaj ka current Month aur Year nikal rahe hain
+                        val sdf = SimpleDateFormat("dd-MM-yyyy", Locale.getDefault())
+                        val currentCal = Calendar.getInstance()
+                        val currMonth = currentCal.get(Calendar.MONTH)
+                        val currYear = currentCal.get(Calendar.YEAR)
+
+                        if (dataArray != null) {
+                            for (i in 0 until dataArray.length()) {
+                                val item = dataArray.getJSONObject(i)
+                                val dateStr = item.optString("date") // Format: "10-07-2026 10:11 AM"
+                                val amt = item.optDouble("amount", 0.0)
+
+                                try {
+                                    // Sirf shuru ki tarikh parse karenge "dd-MM-yyyy" (Time ignore karenge)
+                                    val date = sdf.parse(dateStr.take(10))
+                                    if (date != null) {
+                                        val cal = Calendar.getInstance()
+                                        cal.time = date
+                                        val itemMonth = cal.get(Calendar.MONTH)
+                                        val itemYear = cal.get(Calendar.YEAR)
+
+                                        // Agar Expense is saal ka hai to YearSum me jodo
+                                        if (itemYear == currYear) {
+                                            yearSum += amt
+                                            // Agar Expense is mahine ka bhi hai to MonthSum me bhi jodo
+                                            if (itemMonth == currMonth) {
+                                                monthSum += amt
+                                            }
+                                        }
+                                    }
+                                } catch (e: Exception) { }
+                            }
+                        }
+                        
+                        // Result ko UI mein update karna
+                        withContext(Dispatchers.Main) {
+                            thisMonthExpenses = monthSum
+                            thisYearExpenses = yearSum
+                            isLoadingExpenses = false
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) { isLoadingExpenses = false }
+            }
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -114,7 +188,7 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
     ) {
         Spacer(modifier = Modifier.height(16.dp))
 
-        // 1. HEADER (Logo, Name, Currency, Profile)
+        // HEADER
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth()
@@ -144,12 +218,16 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // 2. EXPENSES SUMMARY CARD (Modular Red Theme)
-        ExpenseSummaryCard()
+        // Yahan hum calculate kiya hua data Card ko bhej rahe hain
+        ExpenseSummaryCard(
+            thisMonthTotal = thisMonthExpenses,
+            thisYearTotal = thisYearExpenses,
+            isLoading = isLoadingExpenses
+        )
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // 3. FOUR GRID CARDS
+        // FOUR GRID CARDS
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             GridCard(title = "STOCKS", value = "₹0", lineColor = Color(0xFF2E7D32), modifier = Modifier.weight(1f)) 
             GridCard(title = "MUTUAL FUNDS", value = "₹0", lineColor = Color(0xFF039BE5), modifier = Modifier.weight(1f))
@@ -162,7 +240,7 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // 4. SPENDING HABITS TRACKER
+        // SPENDING HABITS TRACKER
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -199,7 +277,7 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // 5. REMINDER BANNER
+        // REMINDER BANNER
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -341,12 +419,4 @@ fun AddExpenseForm(username: String, paddingValues: PaddingValues) {
                 }
             }, 
             modifier = Modifier.fillMaxWidth(), 
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
-        ) { 
-            Text("Save Expense", color = Color.White) 
-        }
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(statusMessage, color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold)
-    }
-}
+            colors = ButtonDefau
