@@ -23,12 +23,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kartikey.rupeeflow.Cloud_Database.Constants
 import com.kartikey.rupeeflow.R
-// Saari Alag Branches (Features) ka Clean Import
-import com.kartikey.rupeeflow.UI_Screens.Features.ExpenseSummaryCard
-import com.kartikey.rupeeflow.UI_Screens.Features.GridCard
-import com.kartikey.rupeeflow.UI_Screens.Features.SpendingTrackerCard
-import com.kartikey.rupeeflow.UI_Screens.Features.ReminderBanner
-import com.kartikey.rupeeflow.UI_Screens.Features.StockButton
+
+// Saari files ab Home folder se import ho rahi hain
+import com.kartikey.rupeeflow.UI_Screens.Home.ExpenseSummaryCard
+import com.kartikey.rupeeflow.UI_Screens.Home.GridCard
+import com.kartikey.rupeeflow.UI_Screens.Home.SpendingTrackerCard
+import com.kartikey.rupeeflow.UI_Screens.Home.ReminderBanner
+import com.kartikey.rupeeflow.UI_Screens.Home.StockButton
+
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -160,12 +162,9 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
         }
     }
 
-    Column(
-        modifier = Modifier.fillMaxSize().padding(paddingValues).padding(horizontal = 16.dp).verticalScroll(rememberScrollState())
-    ) {
+    Column(modifier = Modifier.fillMaxSize().padding(paddingValues).padding(horizontal = 16.dp).verticalScroll(rememberScrollState())) {
         Spacer(modifier = Modifier.height(16.dp))
 
-        // HEADER
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Image(painter = painterResource(id = R.mipmap.ic_launcher), contentDescription = "App Logo", modifier = Modifier.size(44.dp).clip(CircleShape))
             Spacer(modifier = Modifier.width(12.dp))
@@ -181,13 +180,8 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
         }
 
         Spacer(modifier = Modifier.height(24.dp))
-
-        // 2. EXPENSES SUMMARY CARD (Branch)
         ExpenseSummaryCard(thisMonthTotal = thisMonthExpenses, thisYearTotal = thisYearExpenses, isLoading = isLoadingExpenses)
-
         Spacer(modifier = Modifier.height(16.dp))
-
-        // 3. FOUR GRID CARDS (Branch)
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             GridCard(title = "STOCKS", value = "₹0", lineColor = Color(0xFF2E7D32), modifier = Modifier.weight(1f)) 
             GridCard(title = "MUTUAL FUNDS", value = "₹0", lineColor = Color(0xFF039BE5), modifier = Modifier.weight(1f))
@@ -197,17 +191,10 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
             GridCard(title = "BANK / FD", value = "₹0", lineColor = Color(0xFFFFB300), modifier = Modifier.weight(1f))
             GridCard(title = "BUDGET LIMIT", value = "0% Used", lineColor = Color.Transparent, modifier = Modifier.weight(1f))
         }
-
         Spacer(modifier = Modifier.height(24.dp))
-
-        // 4. SPENDING HABITS TRACKER (Branch)
         SpendingTrackerCard()
-
         Spacer(modifier = Modifier.height(16.dp))
-
-        // 5. REMINDER BANNER (Branch)
         ReminderBanner()
-
         Spacer(modifier = Modifier.height(24.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Text("Recent Transactions", fontWeight = FontWeight.ExtraBold, fontSize = 16.sp)
@@ -246,7 +233,6 @@ fun AddExpenseForm(username: String, paddingValues: PaddingValues) {
         }
 
         Spacer(modifier = Modifier.height(16.dp))
-
         when (selectedCategory) {
             "Food" -> {
                 OutlinedTextField(value = detail1, onValueChange = { detail1 = it }, label = { Text("Where did you eat?") }, modifier = Modifier.fillMaxWidth())
@@ -262,7 +248,6 @@ fun AddExpenseForm(username: String, paddingValues: PaddingValues) {
                 OutlinedTextField(value = detail1, onValueChange = { detail1 = it }, label = { Text("Which Bill?") }, modifier = Modifier.fillMaxWidth())
             }
         }
-
         Spacer(modifier = Modifier.height(24.dp))
 
         Button(
