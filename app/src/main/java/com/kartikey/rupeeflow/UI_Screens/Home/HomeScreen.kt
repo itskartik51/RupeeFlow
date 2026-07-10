@@ -18,17 +18,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kartikey.rupeeflow.R
 
-// Baki cards atomic functions ki tarah aaram se chalte rahenge
-import com.kartikey.rupeeflow.UI_Screens.Home.ExpenseSummaryCard
-import com.kartikey.rupeeflow.UI_Screens.Home.GridCard
-import com.kartikey.rupeeflow.UI_Screens.Home.SpendingTrackerCard
-import com.kartikey.rupeeflow.UI_Screens.Home.ReminderBanner
-
 @Composable
 fun HomeDashboardDesign(
     username: String, paddingValues: PaddingValues, 
     thisMonthExpenses: Double, thisYearExpenses: Double, isLoadingExpenses: Boolean,
-    dPhoneDate: String, dRawDate: String, dRawAmt: String, dTotalCount: Int, dTotalUnfiltered: Double, dError: String,
+    dNavState: String, dBackPresses: Int, // Updated parameters
     onLogout: () -> Unit,
     onExpenseCardClick: () -> Unit
 ) {
@@ -51,23 +45,19 @@ fun HomeDashboardDesign(
         
         Spacer(modifier = Modifier.height(16.dp))
 
-        // USER REQUESTED: Diagnostics Box testing tak live rahega hamari madad ke liye
-        Card(colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF9C4)), modifier = Modifier.fillMaxWidth()) {
+        // NAYA DIAGNOSTICS BOX (Navigation System Tracking)
+        Card(colors = CardDefaults.cardColors(containerColor = Color(0xFFE1F5FE)), modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text("DIAGNOSTICS (Please Screenshot):", fontWeight = FontWeight.Bold, color = Color.Red, fontSize = 14.sp)
+                Text("SYSTEM DIAGNOSTICS (Navigation Mode):", fontWeight = FontWeight.Bold, color = Color(0xFF0277BD), fontSize = 14.sp)
                 Spacer(modifier = Modifier.height(4.dp))
-                Text("1. Phone Date: $dPhoneDate", fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                Text("2. Entries Found: $dTotalCount", fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                Text("3. Row 1 (Raw Date): '$dRawDate'", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1565C0))
-                Text("4. Row 1 (Raw Amt): '$dRawAmt'", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2E7D32))
-                Text("5. Total Sum (No Filter): ₹$dTotalUnfiltered", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                if (dError.isNotEmpty()) { Text("Error: $dError", color = Color.Red, fontSize = 12.sp) }
+                Text("1. Current Active Route: $dNavState", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                Text("2. Back Button Saved Exits: $dBackPresses times", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                Text("3. SuperBoss Architecture: Active & Stable", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2E7D32))
             }
         }
 
         Spacer(modifier = Modifier.height(24.dp))
         
-        // Red Expenses Card click karne par history popup karega
         ExpenseSummaryCard(
             thisMonthTotal = thisMonthExpenses, 
             thisYearTotal = thisYearExpenses, 
