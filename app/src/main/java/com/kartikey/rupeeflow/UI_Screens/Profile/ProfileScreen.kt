@@ -1,4 +1,4 @@
-package com.kartikey.rupeeflow.UI_Screens.Analytics
+package com.kartikey.rupeeflow.UI_Screens.Profile
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Text
