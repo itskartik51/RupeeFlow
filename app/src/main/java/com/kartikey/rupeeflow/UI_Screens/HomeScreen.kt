@@ -24,7 +24,6 @@ import androidx.compose.ui.unit.sp
 import com.kartikey.rupeeflow.Cloud_Database.Constants
 import com.kartikey.rupeeflow.R
 
-// Home folder se clean features import
 import com.kartikey.rupeeflow.UI_Screens.Home.ExpenseSummaryCard
 import com.kartikey.rupeeflow.UI_Screens.Home.GridCard
 import com.kartikey.rupeeflow.UI_Screens.Home.SpendingTrackerCard
@@ -103,6 +102,7 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
     var thisMonthExpenses by remember { mutableDoubleStateOf(0.0) }
     var thisYearExpenses by remember { mutableDoubleStateOf(0.0) }
     var isLoadingExpenses by remember { mutableStateOf(true) }
+    var debugErrorMessage by remember { mutableStateOf("") } // Debugging ke liye naya variable
 
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
@@ -118,6 +118,15 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
                 val responseData = response.body?.string() ?: ""
 
                 if (response.isSuccessful) {
+                    // Agar response JSON nahi hai (purana webapp HTML error de raha hai)
+                    if (!responseData.trim().startsWith("{")) {
+                        withContext(Dispatchers.Main) {
+                            debugErrorMessage = "Server returned non-JSON! Check Deployment."
+                            isLoadingExpenses = false
+                        }
+                        return@withContext
+                    }
+
                     val jsonResponse = JSONObject(responseData)
                     if (jsonResponse.optString("status") == "success") {
                         val dataArray = jsonResponse.optJSONArray("data")
@@ -128,7 +137,6 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
                         val currMonth = currentCal.get(Calendar.MONTH)
                         val currYear = currentCal.get(Calendar.YEAR)
 
-                        // Multiple robust date formats check karne ke liye list
                         val parsingFormats = listOf(
                             SimpleDateFormat("dd-MM-yyyy", Locale.getDefault()),
                             SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()),
@@ -136,33 +144,22 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
                             SimpleDateFormat("EEE MMM dd yyyy", Locale.US)
                         )
 
-                        if (dataArray != null) {
+                        if (dataArray != null && dataArray.length() > 0) {
                             for (i in 0 until dataArray.length()) {
                                 val item = dataArray.getJSONObject(i)
                                 val dateStr = item.optString("date")
                                 val amtStr = item.optString("amount", "0")
                                 
-                                // Safe double parsing bina crash risk ke
                                 val amt = amtStr.toDoubleOrNull() ?: item.optDouble("amount", 0.0)
                                 if (amt.isNaN()) continue
 
                                 var parsedDate: java.util.Date? = null
-                                
-                                // Pura data alag alag logic se match karke check karega
                                 for (format in parsingFormats) {
                                     try {
                                         parsedDate = format.parse(dateStr)
                                         if (parsedDate != null) break
                                     } catch (e: Exception) {
-                                        try {
-                                            parsedDate = format.parse(dateStr.take(10))
-                                            if (parsedDate != null) break
-                                        } catch (e2: Exception) {
-                                            try {
-                                                parsedDate = format.parse(dateStr.take(15))
-                                                if (parsedDate != null) break
-                                            } catch (e3: Exception) {}
-                                        }
+                                        try { parsedDate = format.parse(dateStr.take(10)) } catch (e2: Exception) {}
                                     }
                                 }
 
@@ -177,15 +174,33 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
                                     }
                                 }
                             }
+                            withContext(Dispatchers.Main) {
+                                thisMonthExpenses = monthSum
+                                thisYearExpenses = yearSum
+                                debugErrorMessage = "" // No error
+                            }
+                        } else {
+                            withContext(Dispatchers.Main) { debugErrorMessage = "No entries found in your sheet tab." }
                         }
+                        withContext(Dispatchers.Main) { isLoadingExpenses = false }
+                    } else {
                         withContext(Dispatchers.Main) {
-                            thisMonthExpenses = monthSum
-                            thisYearExpenses = yearSum
+                            debugErrorMessage = "API Status Error: ${jsonResponse.optString("message")}"
                             isLoadingExpenses = false
                         }
                     }
+                } else {
+                    withContext(Dispatchers.Main) {
+                        debugErrorMessage = "HTTP Connection Failed!"
+                        isLoadingExpenses = false
+                    }
                 }
-            } catch (e: Exception) { withContext(Dispatchers.Main) { isLoadingExpenses = false } }
+            } catch (e: Exception) { 
+                withContext(Dispatchers.Main) { 
+                    debugErrorMessage = "Exception: ${e.localizedMessage}"
+                    isLoadingExpenses = false 
+                } 
+            }
         }
     }
 
@@ -209,6 +224,7 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
 
         Spacer(modifier = Modifier.height(24.dp))
         ExpenseSummaryCard(thisMonthTotal = thisMonthExpenses, thisYearTotal = thisYearExpenses, isLoading = isLoadingExpenses)
+        
         Spacer(modifier = Modifier.height(16.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             GridCard(title = "STOCKS", value = "₹0", lineColor = Color(0xFF2E7D32), modifier = Modifier.weight(1f)) 
@@ -223,6 +239,13 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
         SpendingTrackerCard()
         Spacer(modifier = Modifier.height(16.dp))
         ReminderBanner()
+        
+        // Asli Error Message dekhne ke liye area
+        if (debugErrorMessage.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(text = debugErrorMessage, color = Color.Red, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        }
+
         Spacer(modifier = Modifier.height(24.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Text("Recent Transactions", fontWeight = FontWeight.ExtraBold, fontSize = 16.sp)
