@@ -1,4 +1,4 @@
-package com.kartikey.rupeeflow.UI_Screens.Features
+package com.kartikey.rupeeflow.UI_Screens.Home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -29,22 +29,10 @@ fun SpendingTrackerCard(modifier: Modifier = Modifier) {
             }
             Spacer(modifier = Modifier.height(16.dp))
             
-            Row(
-                modifier = Modifier.fillMaxWidth().height(80.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.Bottom
-            ) {
+            Row(modifier = Modifier.fillMaxWidth().height(80.dp), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.Bottom) {
                 val heights = listOf(30f, 40f, 20f, 80f, 40f, 35f, 50f)
                 heights.forEachIndexed { index, height ->
-                    Box(
-                        modifier = Modifier
-                            .width(28.dp)
-                            .fillMaxHeight(height / 100f)
-                            .background(
-                                if (index == 3) Color(0xFF5E35B1) else Color(0xFFD1C4E9),
-                                shape = RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp)
-                            )
-                    )
+                    Box(modifier = Modifier.width(28.dp).fillMaxHeight(height / 100f).background(if (index == 3) Color(0xFF5E35B1) else Color(0xFFD1C4E9), shape = RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp)))
                 }
             }
         }
