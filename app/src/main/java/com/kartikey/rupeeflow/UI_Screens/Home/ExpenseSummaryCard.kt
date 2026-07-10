@@ -19,7 +19,8 @@ import androidx.compose.ui.unit.sp
 fun ExpenseSummaryCard(thisMonthTotal: Double, thisYearTotal: Double, isLoading: Boolean, onClick: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth().clickable { onClick() },
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFD32F2F)), 
+        // Yahan color change kar diya hai, ab ye deep/professional red dikhega
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFB71C1C)), 
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(8.dp)
     ) {
