@@ -12,6 +12,8 @@ jobs:
     steps:
     - name: Checkout Code
       uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Set up Java
       uses: actions/setup-java@v4
@@ -22,6 +24,25 @@ jobs:
     - name: Safe Environment Setup
       run: gradle wrapper --gradle-version 8.7
 
+    - name: Setup Permanent Debug Keystore
+      run: |
+        mkdir -p ~/.android
+        if [ ! -f debug.keystore ]; then
+          echo "Generating new permanent debug keystore..."
+          keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          cp debug.keystore ~/.android/debug.keystore
+          
+          # Is key ko repo me save karne ka logic taaki hamesha same key use ho
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add debug.keystore
+          git commit -m "Add permanent debug keystore [skip ci]" || echo "Nothing to commit"
+          git push || echo "Failed to push"
+        else
+          echo "Using existing permanent debug keystore..."
+          cp debug.keystore ~/.android/debug.keystore
+        fi
+
     - name: Build APK (Bina PC hang kiye)
       run: ./gradlew assembleDebug
 
@@ -30,3 +51,4 @@ jobs:
       with:
         name: RupeeFlow-App
         path: app/build/outputs/apk/debug/app-debug.apk
+        
