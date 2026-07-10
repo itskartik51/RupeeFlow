@@ -83,7 +83,7 @@ fun ExpenseAddScreen(username: String, paddingValues: PaddingValues) {
     var amount by remember { mutableStateOf("") }
     var categoryText by remember { mutableStateOf("") }
     var expanded by remember { mutableStateOf(false) }
-    var isCustomCategory by remember { mutableStateOf(false) } // Custom lock/unlock ka state
+    var isCustomCategory by remember { mutableStateOf(false) } 
     
     val predefinedCategories = listOf("Food", "Transport", "Bills", "Shopping", "Custom")
     
@@ -92,7 +92,6 @@ fun ExpenseAddScreen(username: String, paddingValues: PaddingValues) {
     var statusMessage by remember { mutableStateOf("") }
     val coroutineScope = rememberCoroutineScope()
 
-    // Ekdum Professional aur Clean Labels
     val labels = when {
         isCustomCategory -> Pair("Description", "Remarks")
         categoryText == "Transport" -> Pair("From", "To")
@@ -121,7 +120,7 @@ fun ExpenseAddScreen(username: String, paddingValues: PaddingValues) {
                         onValueChange = { categoryText = it },
                         label = { Text("Category") }, 
                         placeholder = { Text("Select category") },
-                        readOnly = !isCustomCategory, // SIRF CUSTOM WALE MEIN TYPING ALLOWED HAI
+                        readOnly = !isCustomCategory, 
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
                         colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
                         shape = plusIconShape,
@@ -218,6 +217,28 @@ fun ExpenseAddScreen(username: String, paddingValues: PaddingValues) {
                     Text(statusMessage, color = if(statusMessage.contains("Check")) Color(0xFF2E7D32) else Color.Red, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
                 }
             }
+        }
+    }
+}
+
+// YAHI WO CODE HAI JO CHHUT GAYA THA (TransactionHistoryRow)
+@Composable
+fun TransactionHistoryRow(txn: TransactionModel) {
+    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(modifier = Modifier.size(48.dp).background(Color(0xFFE8F5E9), CircleShape), contentAlignment = Alignment.Center) {
+                Text(txn.category.take(1).uppercase(), fontWeight = FontWeight.Bold, fontSize = 20.sp, color = Color(0xFF2E7D32))
+            }
+            Spacer(modifier = Modifier.width(16.dp))
+            Column {
+                Text(txn.category, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.DarkGray)
+                val details = listOf(txn.detail1, txn.detail2).filter { it.isNotBlank() }.joinToString(" • ")
+                if (details.isNotEmpty()) { Text(details, color = Color.Gray, fontSize = 13.sp, maxLines = 1) }
+            }
+        }
+        Column(horizontalAlignment = Alignment.End) {
+            Text("-₹${txn.amount.toInt()}", fontWeight = FontWeight.ExtraBold, fontSize = 16.sp, color = Color.Black)
+            Text(txn.date.take(10), color = Color.Gray, fontSize = 12.sp)
         }
     }
 }
