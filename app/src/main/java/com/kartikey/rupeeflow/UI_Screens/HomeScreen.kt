@@ -102,7 +102,7 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
     var thisMonthExpenses by remember { mutableDoubleStateOf(0.0) }
     var thisYearExpenses by remember { mutableDoubleStateOf(0.0) }
     var isLoadingExpenses by remember { mutableStateOf(true) }
-    var debugErrorMessage by remember { mutableStateOf("") } // Debugging ke liye naya variable
+    var debugErrorMessage by remember { mutableStateOf("") } 
 
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
@@ -118,10 +118,9 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
                 val responseData = response.body?.string() ?: ""
 
                 if (response.isSuccessful) {
-                    // Agar response JSON nahi hai (purana webapp HTML error de raha hai)
                     if (!responseData.trim().startsWith("{")) {
                         withContext(Dispatchers.Main) {
-                            debugErrorMessage = "Server returned non-JSON! Check Deployment."
+                            debugErrorMessage = "API Error: Naya App Script deploy nahi hua hai (Non-JSON return hua)."
                             isLoadingExpenses = false
                         }
                         return@withContext
@@ -132,6 +131,7 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
                         val dataArray = jsonResponse.optJSONArray("data")
                         var monthSum = 0.0
                         var yearSum = 0.0
+                        var totalParsed = 0 
 
                         val currentCal = Calendar.getInstance()
                         val currMonth = currentCal.get(Calendar.MONTH)
@@ -140,30 +140,31 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
                         val parsingFormats = listOf(
                             SimpleDateFormat("dd-MM-yyyy", Locale.getDefault()),
                             SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()),
-                            SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()),
-                            SimpleDateFormat("EEE MMM dd yyyy", Locale.US)
+                            SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
                         )
 
                         if (dataArray != null && dataArray.length() > 0) {
                             for (i in 0 until dataArray.length()) {
                                 val item = dataArray.getJSONObject(i)
-                                val dateStr = item.optString("date")
+                                val rawDateStr = item.optString("date")
                                 val amtStr = item.optString("amount", "0")
                                 
                                 val amt = amtStr.toDoubleOrNull() ?: item.optDouble("amount", 0.0)
                                 if (amt.isNaN()) continue
 
+                                // Time hatane ke liye space se split kiya ("09-07-2026 4:14 PM" -> "09-07-2026")
+                                val datePartOnly = rawDateStr.trim().split("\\s+".toRegex())[0]
+
                                 var parsedDate: java.util.Date? = null
                                 for (format in parsingFormats) {
                                     try {
-                                        parsedDate = format.parse(dateStr)
+                                        parsedDate = format.parse(datePartOnly)
                                         if (parsedDate != null) break
-                                    } catch (e: Exception) {
-                                        try { parsedDate = format.parse(dateStr.take(10)) } catch (e2: Exception) {}
-                                    }
+                                    } catch (e: Exception) {}
                                 }
 
                                 if (parsedDate != null) {
+                                    totalParsed++
                                     val cal = Calendar.getInstance()
                                     cal.time = parsedDate
                                     if (cal.get(Calendar.YEAR) == currYear) {
@@ -177,15 +178,15 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
                             withContext(Dispatchers.Main) {
                                 thisMonthExpenses = monthSum
                                 thisYearExpenses = yearSum
-                                debugErrorMessage = "" // No error
+                                debugErrorMessage = "Success: ${dataArray.length()} entries aayi, usme se $totalParsed ka date match hua!" 
+                                isLoadingExpenses = false
                             }
                         } else {
-                            withContext(Dispatchers.Main) { debugErrorMessage = "No entries found in your sheet tab." }
+                            withContext(Dispatchers.Main) { debugErrorMessage = "Sheet se 0 data mila. Username check karein."; isLoadingExpenses = false }
                         }
-                        withContext(Dispatchers.Main) { isLoadingExpenses = false }
                     } else {
                         withContext(Dispatchers.Main) {
-                            debugErrorMessage = "API Status Error: ${jsonResponse.optString("message")}"
+                            debugErrorMessage = "Sheet Status Error: ${jsonResponse.optString("message")}"
                             isLoadingExpenses = false
                         }
                     }
@@ -197,7 +198,7 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
                 }
             } catch (e: Exception) { 
                 withContext(Dispatchers.Main) { 
-                    debugErrorMessage = "Exception: ${e.localizedMessage}"
+                    debugErrorMessage = "Code Exception: ${e.localizedMessage}"
                     isLoadingExpenses = false 
                 } 
             }
@@ -206,6 +207,22 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
 
     Column(modifier = Modifier.fillMaxSize().padding(paddingValues).padding(horizontal = 16.dp).verticalScroll(rememberScrollState())) {
         Spacer(modifier = Modifier.height(16.dp))
+
+        // X-RAY (DIAGNOSTIC) BANNER 
+        if (debugErrorMessage.isNotEmpty()) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFCDD2)), // Light Red background
+                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
+            ) {
+                Text(
+                    text = "STATUS X-RAY: $debugErrorMessage",
+                    color = Color.Red,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(16.dp)
+                )
+            }
+        }
 
         // HEADER
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
@@ -239,13 +256,6 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
         SpendingTrackerCard()
         Spacer(modifier = Modifier.height(16.dp))
         ReminderBanner()
-        
-        // Asli Error Message dekhne ke liye area
-        if (debugErrorMessage.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(text = debugErrorMessage, color = Color.Red, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-        }
-
         Spacer(modifier = Modifier.height(24.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Text("Recent Transactions", fontWeight = FontWeight.ExtraBold, fontSize = 16.sp)
