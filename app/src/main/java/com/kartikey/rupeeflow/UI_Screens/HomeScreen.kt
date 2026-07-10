@@ -119,10 +119,7 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
 
                 if (response.isSuccessful) {
                     if (!responseData.trim().startsWith("{")) {
-                        withContext(Dispatchers.Main) {
-                            debugErrorMessage = "API Error: Naya App Script deploy nahi hua hai (Non-JSON return hua)."
-                            isLoadingExpenses = false
-                        }
+                        withContext(Dispatchers.Main) { debugErrorMessage = "API Error: App Script non-JSON bhej raha hai."; isLoadingExpenses = false }
                         return@withContext
                     }
 
@@ -132,6 +129,7 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
                         var monthSum = 0.0
                         var yearSum = 0.0
                         var totalParsed = 0 
+                        var lastAmtRead = 0.0 // Tracking ke liye
 
                         val currentCal = Calendar.getInstance()
                         val currMonth = currentCal.get(Calendar.MONTH)
@@ -146,13 +144,19 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
                         if (dataArray != null && dataArray.length() > 0) {
                             for (i in 0 until dataArray.length()) {
                                 val item = dataArray.getJSONObject(i)
-                                val rawDateStr = item.optString("date")
-                                val amtStr = item.optString("amount", "0")
                                 
-                                val amt = amtStr.toDoubleOrNull() ?: item.optDouble("amount", 0.0)
-                                if (amt.isNaN()) continue
+                                // UNIVERSAL DATA EXTRACTOR (Date aur Amount)
+                                val rawDateStr = item.optString("date", item.optString("Date", ""))
+                                val rawAmtStr = item.optString("amount", item.optString("Amount", "0"))
+                                
+                                // Kisi bhi tarah ka kachra (spaces, ₹) hata kar sirf number nikalenge
+                                val cleanAmtStr = rawAmtStr.replace("[^\\d.]".toRegex(), "")
+                                val amt = cleanAmtStr.toDoubleOrNull() ?: item.optDouble("amount", item.optDouble("Amount", 0.0))
+                                
+                                if (amt > 0.0) lastAmtRead = amt
 
-                                // Time hatane ke liye space se split kiya ("09-07-2026 4:14 PM" -> "09-07-2026")
+                                if (amt.isNaN() || amt == 0.0) continue
+
                                 val datePartOnly = rawDateStr.trim().split("\\s+".toRegex())[0]
 
                                 var parsedDate: java.util.Date? = null
@@ -167,6 +171,7 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
                                     totalParsed++
                                     val cal = Calendar.getInstance()
                                     cal.time = parsedDate
+                                    
                                     if (cal.get(Calendar.YEAR) == currYear) {
                                         yearSum += amt
                                         if (cal.get(Calendar.MONTH) == currMonth) {
@@ -178,29 +183,21 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
                             withContext(Dispatchers.Main) {
                                 thisMonthExpenses = monthSum
                                 thisYearExpenses = yearSum
-                                debugErrorMessage = "Success: ${dataArray.length()} entries aayi, usme se $totalParsed ka date match hua!" 
+                                // Ab Red Box me Exact Total dikhega
+                                debugErrorMessage = "Success: $totalParsed entries matched. Total calculated: ₹$monthSum (Last read amt: ₹$lastAmtRead)" 
                                 isLoadingExpenses = false
                             }
                         } else {
-                            withContext(Dispatchers.Main) { debugErrorMessage = "Sheet se 0 data mila. Username check karein."; isLoadingExpenses = false }
+                            withContext(Dispatchers.Main) { debugErrorMessage = "Sheet se 0 data mila."; isLoadingExpenses = false }
                         }
                     } else {
-                        withContext(Dispatchers.Main) {
-                            debugErrorMessage = "Sheet Status Error: ${jsonResponse.optString("message")}"
-                            isLoadingExpenses = false
-                        }
+                        withContext(Dispatchers.Main) { debugErrorMessage = "Sheet Status Error: ${jsonResponse.optString("message")}"; isLoadingExpenses = false }
                     }
                 } else {
-                    withContext(Dispatchers.Main) {
-                        debugErrorMessage = "HTTP Connection Failed!"
-                        isLoadingExpenses = false
-                    }
+                    withContext(Dispatchers.Main) { debugErrorMessage = "HTTP Connection Failed!"; isLoadingExpenses = false }
                 }
             } catch (e: Exception) { 
-                withContext(Dispatchers.Main) { 
-                    debugErrorMessage = "Code Exception: ${e.localizedMessage}"
-                    isLoadingExpenses = false 
-                } 
+                withContext(Dispatchers.Main) { debugErrorMessage = "Code Exception: ${e.localizedMessage}"; isLoadingExpenses = false } 
             }
         }
     }
@@ -211,7 +208,7 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
         // X-RAY (DIAGNOSTIC) BANNER 
         if (debugErrorMessage.isNotEmpty()) {
             Card(
-                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFCDD2)), // Light Red background
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFCDD2)), 
                 modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
             ) {
                 Text(
