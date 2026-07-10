@@ -1,5 +1,6 @@
 package com.kartikey.rupeeflow.UI_Screens.Features
 
+import androidx.compose.foundation.background // <-- Ye line miss ho gayi thi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -16,10 +17,9 @@ import androidx.compose.ui.unit.sp
 
 @Composable
 fun ExpenseSummaryCard(
-    totalExpense: String = "₹0", // Abhi ke liye default ₹0 hai
+    totalExpense: String = "₹0", 
     modifier: Modifier = Modifier
 ) {
-    // Dropdown open/close aur selected filter yaad rakhne ke liye
     var expanded by remember { mutableStateOf(false) }
     var selectedFilter by remember { mutableStateOf("This Month") }
 
@@ -31,7 +31,6 @@ fun ExpenseSummaryCard(
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
             
-            // Upar wali line: "EXPENSES" aur "This Month v"
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -44,7 +43,6 @@ fun ExpenseSummaryCard(
                     color = Color(0xFFD32F2F) // Dark Red Text
                 )
                 
-                // Dropdown Menu Box
                 Box {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -57,7 +55,7 @@ fun ExpenseSummaryCard(
                             color = Color(0xFFD32F2F)
                         )
                         Icon(
-                            imageVector = Icons.Default.KeyboardArrowDown, // Niche wala arrow (v)
+                            imageVector = Icons.Default.KeyboardArrowDown, 
                             contentDescription = "Select Duration",
                             tint = Color(0xFFD32F2F),
                             modifier = Modifier.size(16.dp)
@@ -74,7 +72,6 @@ fun ExpenseSummaryCard(
                             onClick = { 
                                 selectedFilter = "This Month"
                                 expanded = false 
-                                // Aage chalkar yahan logic lagayenge data change karne ka
                             }
                         )
                         DropdownMenuItem(
@@ -82,16 +79,14 @@ fun ExpenseSummaryCard(
                             onClick = { 
                                 selectedFilter = "This Year"
                                 expanded = false 
-                                // Yahan bhi logic aayega
                             }
                         )
                     }
                 }
             }
             
-            Spacer(modifier = Modifier.height(12.dp)) // Niche ka extra text hata kar direct Amount
+            Spacer(modifier = Modifier.height(12.dp)) 
             
-            // Main Amount
             Text(
                 text = totalExpense, 
                 fontSize = 32.sp, 
