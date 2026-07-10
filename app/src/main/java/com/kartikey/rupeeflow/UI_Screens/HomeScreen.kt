@@ -22,10 +22,10 @@ import androidx.compose.ui.unit.sp
 import com.kartikey.rupeeflow.Cloud_Database.Constants
 import com.kartikey.rupeeflow.R
 
-// YAHAN DEKHIYE: Aapki file se naya Add Expense screen import kiya hai
+// Saari files aur naye Transaction Model ko import kiya
 import com.kartikey.rupeeflow.UI_Screens.Home.ExpenseSummaryCard
 import com.kartikey.rupeeflow.UI_Screens.Home.ExpenseAddScreen 
-
+import com.kartikey.rupeeflow.UI_Screens.Home.TransactionModel
 import com.kartikey.rupeeflow.UI_Screens.Home.GridCard
 import com.kartikey.rupeeflow.UI_Screens.Home.SpendingTrackerCard
 import com.kartikey.rupeeflow.UI_Screens.Home.ReminderBanner
@@ -38,77 +38,21 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
+import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(username: String, onLogout: () -> Unit) {
     var selectedTab by remember { mutableIntStateOf(0) } 
 
-    Scaffold(
-        bottomBar = {
-            NavigationBar(containerColor = Color.White, tonalElevation = 8.dp) {
-                NavigationBarItem(
-                    selected = selectedTab == 0,
-                    onClick = { selectedTab = 0 },
-                    icon = { Icon(Icons.Default.Home, contentDescription = "Home") },
-                    label = { Text("Home") },
-                    colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
-                )
-                NavigationBarItem(
-                    selected = selectedTab == 1,
-                    onClick = { /* Link later */ },
-                    icon = { Icon(Icons.Default.List, contentDescription = "Assets") },
-                    label = { Text("Assets") },
-                    colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
-                )
-                
-                // BICH WALA GREEN '+' BUTTON (Index 2)
-                NavigationBarItem(
-                    selected = selectedTab == 2,
-                    onClick = { selectedTab = 2 },
-                    icon = {
-                        Box(modifier = Modifier.size(48.dp).clip(RoundedCornerShape(14.dp)).background(Color(0xFF2E7D32)), contentAlignment = Alignment.Center) {
-                            Icon(Icons.Default.Add, contentDescription = "Add", tint = Color.White)
-                        }
-                    }
-                )
-                
-                NavigationBarItem(
-                    selected = selectedTab == 3,
-                    onClick = { /* Link later */ },
-                    icon = { Icon(Icons.Default.DateRange, contentDescription = "Analytics") },
-                    label = { Text("Analytics") },
-                    colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
-                )
-                NavigationBarItem(
-                    selected = selectedTab == 4,
-                    onClick = { /* Link later */ },
-                    icon = { Icon(Icons.Default.Person, contentDescription = "Profile") },
-                    label = { Text("Profile") },
-                    colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
-                )
-            }
-        }
-    ) { paddingValues ->
-        // NAVIGATION LOGIC
-        if (selectedTab == 0) {
-            HomeDashboardDesign(username = username, paddingValues = paddingValues, onLogout = onLogout)
-        } else if (selectedTab == 2) {
-            // JAISE HI BICH WALA BUTTON DABEGA, AAPKA NAYA DESIGN KHULEGA
-            ExpenseAddScreen(username = username, paddingValues = paddingValues)
-        }
-    }
-}
-
-@Composable
-fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout: () -> Unit) {
+    // DATA HOISTING: Taki tabs switch hone par data hide na ho aur dobara fetch na karna pade
     var thisMonthExpenses by remember { mutableDoubleStateOf(0.0) }
     var thisYearExpenses by remember { mutableDoubleStateOf(0.0) }
     var isLoadingExpenses by remember { mutableStateOf(true) }
+    var transactionList by remember { mutableStateOf(emptyList<TransactionModel>()) }
     
-    // Diagnostics Variables (Testing ke liye ON rakhe hain)
+    // DIAGNOSTIC STATES (User ki request par testing tak ON rahega)
     var dPhoneDate by remember { mutableStateOf("") }
     var dRawDate by remember { mutableStateOf("") }
     var dRawAmt by remember { mutableStateOf("") }
@@ -138,14 +82,13 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
                     val jsonResponse = JSONObject(responseData)
                     if (jsonResponse.optString("status") == "success") {
                         val dataArray = jsonResponse.optJSONArray("data")
-                        
                         var tempTotal = 0.0
                         var tempMonth = 0.0
                         var tempYear = 0.0
+                        val tempHistory = mutableListOf<TransactionModel>()
 
                         if (dataArray != null && dataArray.length() > 0) {
                             dTotalCount = dataArray.length()
-                            
                             val firstItem = dataArray.getJSONObject(0)
                             dRawDate = firstItem.optString("date", "NULL")
                             dRawAmt = firstItem.optString("amount", "NULL")
@@ -157,12 +100,17 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
                                 val item = dataArray.getJSONObject(i)
                                 val rawDate = item.optString("date", "").trim()
                                 val rawAmt = item.optString("amount", "0")
+                                val category = item.optString("category", item.optString("Category", "Unknown"))
+                                val detail1 = item.optString("detail 1", item.optString("Detail 1", item.optString("detail1", "")))
+                                val detail2 = item.optString("detail 2", item.optString("Detail 2", item.optString("detail2", "")))
                                 
                                 val cleanAmt = rawAmt.replace("[^\\d.]".toRegex(), "")
                                 val amt = cleanAmt.toDoubleOrNull() ?: item.optDouble("amount", 0.0)
                                 
                                 if (amt > 0.0) {
                                     tempTotal += amt 
+                                    // List mein naya data add karna history ke liye
+                                    tempHistory.add(TransactionModel(rawDate, amt, category, detail1, detail2))
                                     
                                     if (rawDate.contains(currYearStr)) {
                                         tempYear += amt
@@ -175,10 +123,10 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
                         }
                         withContext(Dispatchers.Main) {
                             dTotalUnfiltered = tempTotal
-                            
                             thisMonthExpenses = if (tempMonth > 0) tempMonth else tempTotal 
                             thisYearExpenses = if (tempYear > 0) tempYear else tempTotal
-                            
+                            // Reversed isliye kiya taaki sabse naya kharcha list me sabse upar dikhe
+                            transactionList = tempHistory.reversed()
                             isLoadingExpenses = false
                         }
                     } else {
@@ -196,6 +144,80 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
         }
     }
 
+    Scaffold(
+        bottomBar = {
+            NavigationBar(containerColor = Color.White, tonalElevation = 8.dp) {
+                NavigationBarItem(
+                    selected = selectedTab == 0,
+                    onClick = { selectedTab = 0 },
+                    icon = { Icon(Icons.Default.Home, contentDescription = "Home") },
+                    label = { Text("Home") },
+                    colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
+                )
+                NavigationBarItem(
+                    selected = selectedTab == 1,
+                    onClick = { /* Link later */ },
+                    icon = { Icon(Icons.Default.List, contentDescription = "Assets") },
+                    label = { Text("Assets") },
+                    colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
+                )
+                
+                NavigationBarItem(
+                    selected = selectedTab == 2,
+                    onClick = { selectedTab = 2 },
+                    icon = {
+                        Box(modifier = Modifier.size(48.dp).clip(RoundedCornerShape(14.dp)).background(Color(0xFF2E7D32)), contentAlignment = Alignment.Center) {
+                            Icon(Icons.Default.Add, contentDescription = "Add", tint = Color.White)
+                        }
+                    }
+                )
+                
+                NavigationBarItem(
+                    selected = selectedTab == 3,
+                    onClick = { /* Link later */ },
+                    icon = { Icon(Icons.Default.DateRange, contentDescription = "Analytics") },
+                    label = { Text("Analytics") },
+                    colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
+                )
+                NavigationBarItem(
+                    selected = selectedTab == 4,
+                    onClick = { /* Link later */ },
+                    icon = { Icon(Icons.Default.Person, contentDescription = "Profile") },
+                    label = { Text("Profile") },
+                    colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
+                )
+            }
+        }
+    ) { paddingValues ->
+        if (selectedTab == 0) {
+            HomeDashboardDesign(
+                username = username, 
+                paddingValues = paddingValues, 
+                thisMonthExpenses = thisMonthExpenses,
+                thisYearExpenses = thisYearExpenses,
+                isLoadingExpenses = isLoadingExpenses,
+                dPhoneDate = dPhoneDate,
+                dRawDate = dRawDate,
+                dRawAmt = dRawAmt,
+                dTotalCount = dTotalCount,
+                dTotalUnfiltered = dTotalUnfiltered,
+                dError = dError,
+                onLogout = onLogout
+            )
+        } else if (selectedTab == 2) {
+            // YAHAN AAPKA NAYA DESIGN AUR DATA BHEJA JA RAHA HAI
+            ExpenseAddScreen(username = username, paddingValues = paddingValues, history = transactionList)
+        }
+    }
+}
+
+@Composable
+fun HomeDashboardDesign(
+    username: String, paddingValues: PaddingValues, 
+    thisMonthExpenses: Double, thisYearExpenses: Double, isLoadingExpenses: Boolean,
+    dPhoneDate: String, dRawDate: String, dRawAmt: String, dTotalCount: Int, dTotalUnfiltered: Double, dError: String,
+    onLogout: () -> Unit
+) {
     Column(modifier = Modifier.fillMaxSize().padding(paddingValues).padding(horizontal = 16.dp).verticalScroll(rememberScrollState())) {
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -215,11 +237,8 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
         
         Spacer(modifier = Modifier.height(16.dp))
 
-        // ULTIMATE DIAGNOSTIC BOX (Abhi rakhenge isko aage ke features test karne ke liye)
-        Card(
-            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF9C4)), 
-            modifier = Modifier.fillMaxWidth()
-        ) {
+        // ULTIMATE DIAGNOSTIC BOX 
+        Card(colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF9C4)), modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text("DIAGNOSTICS (Please Screenshot):", fontWeight = FontWeight.Bold, color = Color.Red, fontSize = 14.sp)
                 Spacer(modifier = Modifier.height(4.dp))
@@ -228,9 +247,7 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
                 Text("3. Row 1 (Raw Date): '$dRawDate'", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1565C0))
                 Text("4. Row 1 (Raw Amt): '$dRawAmt'", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2E7D32))
                 Text("5. Total Sum (No Filter): ₹$dTotalUnfiltered", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                if (dError.isNotEmpty()) {
-                    Text("Error: $dError", color = Color.Red, fontSize = 12.sp)
-                }
+                if (dError.isNotEmpty()) { Text("Error: $dError", color = Color.Red, fontSize = 12.sp) }
             }
         }
 
