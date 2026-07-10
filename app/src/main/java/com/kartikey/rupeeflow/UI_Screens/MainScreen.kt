@@ -1,5 +1,6 @@
 package com.kartikey.rupeeflow.UI_Screens
 
+import androidx.activity.compose.BackHandler // YAHAN BACK HANDLER IMPORT KIYA HAI
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -14,7 +15,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.kartikey.rupeeflow.Cloud_Database.Constants
 
-// SAARE ALAG FOLDERS SE BOSS SCREENS IMPORT KIYE
 import com.kartikey.rupeeflow.UI_Screens.Home.HomeDashboardDesign
 import com.kartikey.rupeeflow.UI_Screens.AddExpense.ExpenseAddScreen
 import com.kartikey.rupeeflow.UI_Screens.AddExpense.ExpenseHistoryScreen
@@ -41,13 +41,23 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
     var isLoadingExpenses by remember { mutableStateOf(true) }
     var transactionList by remember { mutableStateOf(emptyList<TransactionModel>()) }
     
-    // TESTING DIAGNOSTIC STATES (Yellow Box ke liye data hoisting)
-    var dPhoneDate by remember { mutableStateOf("") }
-    var dRawDate by remember { mutableStateOf("") }
-    var dRawAmt by remember { mutableStateOf("") }
-    var dTotalCount by remember { mutableIntStateOf(0) }
-    var dTotalUnfiltered by remember { mutableDoubleStateOf(0.0) }
-    var dError by remember { mutableStateOf("") }
+    // NAYA DIAGNOSTICS: Ab ye Navigation aur Back Button ko track karega
+    var dNavState by remember { mutableStateOf("Home") }
+    var dBackPresses by remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(selectedTab, showExpenseHistory) {
+        dNavState = if (showExpenseHistory) "Expense History" else "Tab $selectedTab"
+    }
+
+    // BACK BUTTON LOGIC: App band hone se rokenge!
+    BackHandler(enabled = showExpenseHistory || selectedTab != 0) {
+        dBackPresses++ // Track karenge ki back kitni baar daba
+        if (showExpenseHistory) {
+            showExpenseHistory = false // History se wapas Home par
+        } else if (selectedTab != 0) {
+            selectedTab = 0 // Kisi aur tab se wapas Home par
+        }
+    }
 
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
@@ -55,7 +65,6 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                 val cal = Calendar.getInstance()
                 val currM = cal.get(Calendar.MONTH) + 1
                 val currY = cal.get(Calendar.YEAR)
-                dPhoneDate = "$currM/$currY"
 
                 val json = JSONObject().apply {
                     put("action", "get_expenses")
@@ -77,11 +86,6 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                         val tempHistory = mutableListOf<TransactionModel>()
 
                         if (dataArray != null && dataArray.length() > 0) {
-                            dTotalCount = dataArray.length()
-                            val firstItem = dataArray.getJSONObject(0)
-                            dRawDate = firstItem.optString("date", "NULL")
-                            dRawAmt = firstItem.optString("amount", "NULL")
-
                             val currMonthStr = String.format(Locale.US, "%02d", currM)
                             val currYearStr = currY.toString()
 
@@ -110,24 +114,14 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                             }
                         }
                         withContext(Dispatchers.Main) {
-                            dTotalUnfiltered = tempTotal
                             thisMonthExpenses = if (tempMonth > 0) tempMonth else tempTotal 
                             thisYearExpenses = if (tempYear > 0) tempYear else tempTotal
                             transactionList = tempHistory.reversed()
                             isLoadingExpenses = false
                         }
-                    } else {
-                        dError = "API Status: ${jsonResponse.optString("message")}"
-                        isLoadingExpenses = false
-                    }
-                } else {
-                    dError = "Invalid JSON"
-                    isLoadingExpenses = false
-                }
-            } catch (e: Exception) {
-                dError = e.localizedMessage ?: "Error"
-                isLoadingExpenses = false
-            }
+                    } else isLoadingExpenses = false
+                } else isLoadingExpenses = false
+            } catch (e: Exception) { isLoadingExpenses = false }
         }
     }
 
@@ -148,8 +142,6 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                     label = { Text("Assets") },
                     colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
                 )
-                
-                // BICH WALA PLUS BUTTON
                 NavigationBarItem(
                     selected = selectedTab == 2,
                     onClick = { selectedTab = 2; showExpenseHistory = false },
@@ -159,7 +151,6 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                         }
                     }
                 )
-                
                 NavigationBarItem(
                     selected = selectedTab == 3,
                     onClick = { selectedTab = 3; showExpenseHistory = false },
@@ -187,12 +178,11 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
             HomeDashboardDesign(
                 username = username, paddingValues = paddingValues, 
                 thisMonthExpenses = thisMonthExpenses, thisYearExpenses = thisYearExpenses, isLoadingExpenses = isLoadingExpenses,
-                dPhoneDate = dPhoneDate, dRawDate = dRawDate, dRawAmt = dRawAmt, dTotalCount = dTotalCount, dTotalUnfiltered = dTotalUnfiltered, dError = dError,
+                dNavState = dNavState, dBackPresses = dBackPresses, // Naye Diagnostics parameters
                 onLogout = onLogout,
                 onExpenseCardClick = { showExpenseHistory = true }
             )
         } else if (selectedTab == 2) {
-            // AAPKA SEPARATE PLUS TAB WALA FORM OPEN HOGA YAHAN SE
             ExpenseAddScreen(username = username, paddingValues = paddingValues)
         }
     }
