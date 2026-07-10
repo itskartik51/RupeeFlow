@@ -1,199 +1,33 @@
-package com.kartikey.rupeeflow.UI_Screens
+package com.kartikey.rupeeflow
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
-import com.kartikey.rupeeflow.Cloud_Database.Constants
+import com.kartikey.rupeeflow.UI_Screens.MainScreen // Naye Super Boss ka proper import
+import com.kartikey.rupeeflow.ui.theme.RupeeFlowTheme
 
-// SAARE ALAG FOLDERS SE BOSS SCREENS IMPORT KIYE
-import com.kartikey.rupeeflow.UI_Screens.Home.HomeDashboardDesign
-import com.kartikey.rupeeflow.UI_Screens.AddExpense.ExpenseAddScreen
-import com.kartikey.rupeeflow.UI_Screens.AddExpense.ExpenseHistoryScreen
-import com.kartikey.rupeeflow.UI_Screens.AddExpense.TransactionModel
-
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
-import org.json.JSONObject
-import java.util.Calendar
-import java.util.Locale
-
-@Composable
-fun MainScreen(username: String, onLogout: () -> Unit) {
-    var selectedTab by remember { mutableIntStateOf(0) } 
-    var showExpenseHistory by remember { mutableStateOf(false) }
-
-    var thisMonthExpenses by remember { mutableDoubleStateOf(0.0) }
-    var thisYearExpenses by remember { mutableDoubleStateOf(0.0) }
-    var isLoadingExpenses by remember { mutableStateOf(true) }
-    var transactionList by remember { mutableStateOf(emptyList<TransactionModel>()) }
-    
-    // TESTING DIAGNOSTIC STATES (Yellow Box ke liye data hoisting)
-    var dPhoneDate by remember { mutableStateOf("") }
-    var dRawDate by remember { mutableStateOf("") }
-    var dRawAmt by remember { mutableStateOf("") }
-    var dTotalCount by remember { mutableIntStateOf(0) }
-    var dTotalUnfiltered by remember { mutableDoubleStateOf(0.0) }
-    var dError by remember { mutableStateOf("") }
-
-    LaunchedEffect(Unit) {
-        withContext(Dispatchers.IO) {
-            try {
-                val cal = Calendar.getInstance()
-                val currM = cal.get(Calendar.MONTH) + 1
-                val currY = cal.get(Calendar.YEAR)
-                dPhoneDate = "$currM/$currY"
-
-                val json = JSONObject().apply {
-                    put("action", "get_expenses")
-                    put("username", username)
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContent {
+            RupeeFlowTheme {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    // Yahan HomeScreen ki jagah ab direct MainScreen call ho raha hai
+                    MainScreen(
+                        username = "itskartik51", 
+                        onLogout = {
+                            // Logout functionality yahan handle hogi
+                        }
+                    )
                 }
-                val client = OkHttpClient()
-                val body = json.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
-                val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(body).build()
-                val response = client.newCall(request).execute()
-                val responseData = response.body?.string() ?: ""
-
-                if (response.isSuccessful && responseData.trim().startsWith("{")) {
-                    val jsonResponse = JSONObject(responseData)
-                    if (jsonResponse.optString("status") == "success") {
-                        val dataArray = jsonResponse.optJSONArray("data")
-                        var tempTotal = 0.0
-                        var tempMonth = 0.0
-                        var tempYear = 0.0
-                        val tempHistory = mutableListOf<TransactionModel>()
-
-                        if (dataArray != null && dataArray.length() > 0) {
-                            dTotalCount = dataArray.length()
-                            val firstItem = dataArray.getJSONObject(0)
-                            dRawDate = firstItem.optString("date", "NULL")
-                            dRawAmt = firstItem.optString("amount", "NULL")
-
-                            val currMonthStr = String.format(Locale.US, "%02d", currM)
-                            val currYearStr = currY.toString()
-
-                            for (i in 0 until dataArray.length()) {
-                                val item = dataArray.getJSONObject(i)
-                                val rawDate = item.optString("date", "").trim()
-                                val rawAmt = item.optString("amount", "0")
-                                val category = item.optString("category", item.optString("Category", "Unknown"))
-                                val detail1 = item.optString("detail 1", item.optString("Detail 1", item.optString("detail1", "")))
-                                val detail2 = item.optString("detail 2", item.optString("Detail 2", item.optString("detail2", "")))
-                                
-                                val cleanAmt = rawAmt.replace("[^\\d.]".toRegex(), "")
-                                val amt = cleanAmt.toDoubleOrNull() ?: item.optDouble("amount", 0.0)
-                                
-                                if (amt > 0.0) {
-                                    tempTotal += amt 
-                                    tempHistory.add(TransactionModel(rawDate, amt, category, detail1, detail2))
-                                    
-                                    if (rawDate.contains(currYearStr)) {
-                                        tempYear += amt
-                                        if (rawDate.contains("-$currMonthStr-") || rawDate.contains("/$currMonthStr/") || rawDate.startsWith("$currMonthStr-") || rawDate.startsWith("$currMonthStr/")) {
-                                            tempMonth += amt
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        withContext(Dispatchers.Main) {
-                            dTotalUnfiltered = tempTotal
-                            thisMonthExpenses = if (tempMonth > 0) tempMonth else tempTotal 
-                            thisYearExpenses = if (tempYear > 0) tempYear else tempTotal
-                            transactionList = tempHistory.reversed()
-                            isLoadingExpenses = false
-                        }
-                    } else {
-                        dError = "API Status: ${jsonResponse.optString("message")}"
-                        isLoadingExpenses = false
-                    }
-                } else {
-                    dError = "Invalid JSON"
-                    isLoadingExpenses = false
-                }
-            } catch (e: Exception) {
-                dError = e.localizedMessage ?: "Error"
-                isLoadingExpenses = false
             }
-        }
-    }
-
-    Scaffold(
-        bottomBar = {
-            NavigationBar(containerColor = Color.White, tonalElevation = 8.dp) {
-                NavigationBarItem(
-                    selected = selectedTab == 0 && !showExpenseHistory,
-                    onClick = { selectedTab = 0; showExpenseHistory = false },
-                    icon = { Icon(Icons.Default.Home, contentDescription = "Home") },
-                    label = { Text("Home") },
-                    colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
-                )
-                NavigationBarItem(
-                    selected = selectedTab == 1,
-                    onClick = { selectedTab = 1; showExpenseHistory = false },
-                    icon = { Icon(Icons.Default.List, contentDescription = "Assets") },
-                    label = { Text("Assets") },
-                    colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
-                )
-                
-                // BICH WALA PLUS BUTTON
-                NavigationBarItem(
-                    selected = selectedTab == 2,
-                    onClick = { selectedTab = 2; showExpenseHistory = false },
-                    icon = {
-                        Box(modifier = Modifier.size(48.dp).clip(RoundedCornerShape(14.dp)).background(Color(0xFF2E7D32)), contentAlignment = Alignment.Center) {
-                            Icon(Icons.Default.Add, contentDescription = "Add", tint = Color.White)
-                        }
-                    }
-                )
-                
-                NavigationBarItem(
-                    selected = selectedTab == 3,
-                    onClick = { selectedTab = 3; showExpenseHistory = false },
-                    icon = { Icon(Icons.Default.DateRange, contentDescription = "Analytics") },
-                    label = { Text("Analytics") },
-                    colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
-                )
-                NavigationBarItem(
-                    selected = selectedTab == 4,
-                    onClick = { selectedTab = 4; showExpenseHistory = false },
-                    icon = { Icon(Icons.Default.Person, contentDescription = "Profile") },
-                    label = { Text("Profile") },
-                    colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
-                )
-            }
-        }
-    ) { paddingValues ->
-        if (showExpenseHistory) {
-            ExpenseHistoryScreen(
-                paddingValues = paddingValues, 
-                history = transactionList,
-                onBackClick = { showExpenseHistory = false }
-            )
-        } else if (selectedTab == 0) {
-            HomeDashboardDesign(
-                username = username, paddingValues = paddingValues, 
-                thisMonthExpenses = thisMonthExpenses, thisYearExpenses = thisYearExpenses, isLoadingExpenses = isLoadingExpenses,
-                dPhoneDate = dPhoneDate, dRawDate = dRawDate, dRawAmt = dRawAmt, dTotalCount = dTotalCount, dTotalUnfiltered = dTotalUnfiltered, dError = dError,
-                onLogout = onLogout,
-                onExpenseCardClick = { showExpenseHistory = true }
-            )
-        } else if (selectedTab == 2) {
-            // AAPKA SEPARATE PLUS TAB WALA FORM OPEN HOGA YAHAN SE
-            ExpenseAddScreen(username = username, paddingValues = paddingValues)
         }
     }
 }
