@@ -119,7 +119,7 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
 
                 if (response.isSuccessful) {
                     if (!responseData.trim().startsWith("{")) {
-                        withContext(Dispatchers.Main) { debugErrorMessage = "API Error: App Script non-JSON bhej raha hai."; isLoadingExpenses = false }
+                        withContext(Dispatchers.Main) { debugErrorMessage = "Server Error: Code Update nahi hua hai."; isLoadingExpenses = false }
                         return@withContext
                     }
 
@@ -128,98 +128,98 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
                         val dataArray = jsonResponse.optJSONArray("data")
                         var monthSum = 0.0
                         var yearSum = 0.0
-                        var totalParsed = 0 
-                        var lastAmtRead = 0.0 // Tracking ke liye
 
                         val currentCal = Calendar.getInstance()
                         val currMonth = currentCal.get(Calendar.MONTH)
                         val currYear = currentCal.get(Calendar.YEAR)
-
-                        val parsingFormats = listOf(
-                            SimpleDateFormat("dd-MM-yyyy", Locale.getDefault()),
-                            SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()),
-                            SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
-                        )
+                        
+                        // TEXT MATCHING STRATEGY (100% Fail-Proof)
+                        val currMonthStr = String.format(Locale.US, "%02d", currMonth + 1) // Jaise "07"
+                        val currYearStr = currYear.toString() // Jaise "2026"
 
                         if (dataArray != null && dataArray.length() > 0) {
                             for (i in 0 until dataArray.length()) {
                                 val item = dataArray.getJSONObject(i)
                                 
-                                // UNIVERSAL DATA EXTRACTOR (Date aur Amount)
                                 val rawDateStr = item.optString("date", item.optString("Date", ""))
                                 val rawAmtStr = item.optString("amount", item.optString("Amount", "0"))
                                 
-                                // Kisi bhi tarah ka kachra (spaces, ₹) hata kar sirf number nikalenge
                                 val cleanAmtStr = rawAmtStr.replace("[^\\d.]".toRegex(), "")
                                 val amt = cleanAmtStr.toDoubleOrNull() ?: item.optDouble("amount", item.optDouble("Amount", 0.0))
                                 
-                                if (amt > 0.0) lastAmtRead = amt
+                                if (amt <= 0.0) continue
 
-                                if (amt.isNaN() || amt == 0.0) continue
+                                var matchedMonth = false
+                                var matchedYear = false
 
-                                val datePartOnly = rawDateStr.trim().split("\\s+".toRegex())[0]
-
-                                var parsedDate: java.util.Date? = null
-                                for (format in parsingFormats) {
-                                    try {
-                                        parsedDate = format.parse(datePartOnly)
-                                        if (parsedDate != null) break
-                                    } catch (e: Exception) {}
-                                }
-
-                                if (parsedDate != null) {
-                                    totalParsed++
-                                    val cal = Calendar.getInstance()
-                                    cal.time = parsedDate
-                                    
-                                    if (cal.get(Calendar.YEAR) == currYear) {
-                                        yearSum += amt
-                                        if (cal.get(Calendar.MONTH) == currMonth) {
-                                            monthSum += amt
-                                        }
+                                // 1. Direct String Check (Ye Android ke Date Bugs ko Bypass karega)
+                                if (rawDateStr.contains(currYearStr)) {
+                                    matchedYear = true
+                                    // Check agar date me "-07-2026" ya aisa kuch pattern hai
+                                    if (rawDateStr.contains("-$currMonthStr-$currYearStr") || 
+                                        rawDateStr.contains("/$currMonthStr/$currYearStr") || 
+                                        rawDateStr.contains("-$currMonthStr-") ||
+                                        rawDateStr.contains("/$currMonthStr/")
+                                    ) {
+                                        matchedMonth = true
                                     }
                                 }
+
+                                // 2. Agar string match kisi reason se na ho, tab Date Parser ka backup use karenge
+                                if (!matchedYear || !matchedMonth) {
+                                    val datePartOnly = rawDateStr.trim().split("\\s+".toRegex())[0]
+                                    val parsingFormats = listOf(
+                                        SimpleDateFormat("dd-MM-yyyy", Locale.getDefault()),
+                                        SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()),
+                                        SimpleDateFormat("MM/dd/yyyy", Locale.getDefault()),
+                                        SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+                                    )
+                                    for (format in parsingFormats) {
+                                        try {
+                                            val parsedDate = format.parse(datePartOnly)
+                                            if (parsedDate != null) {
+                                                val cal = Calendar.getInstance()
+                                                cal.time = parsedDate
+                                                if (cal.get(Calendar.YEAR) == currYear) {
+                                                    matchedYear = true
+                                                    if (cal.get(Calendar.MONTH) == currMonth) {
+                                                        matchedMonth = true
+                                                    }
+                                                }
+                                                break
+                                            }
+                                        } catch (e: Exception) {}
+                                    }
+                                }
+
+                                // Finally Amount Jodna
+                                if (matchedYear) yearSum += amt
+                                if (matchedMonth) monthSum += amt
                             }
+                            
                             withContext(Dispatchers.Main) {
                                 thisMonthExpenses = monthSum
                                 thisYearExpenses = yearSum
-                                // Ab Red Box me Exact Total dikhega
-                                debugErrorMessage = "Success: $totalParsed entries matched. Total calculated: ₹$monthSum (Last read amt: ₹$lastAmtRead)" 
+                                debugErrorMessage = "" // Sab sahi raha to koi error nahi
                                 isLoadingExpenses = false
                             }
                         } else {
-                            withContext(Dispatchers.Main) { debugErrorMessage = "Sheet se 0 data mila."; isLoadingExpenses = false }
+                            withContext(Dispatchers.Main) { isLoadingExpenses = false }
                         }
                     } else {
-                        withContext(Dispatchers.Main) { debugErrorMessage = "Sheet Status Error: ${jsonResponse.optString("message")}"; isLoadingExpenses = false }
+                        withContext(Dispatchers.Main) { debugErrorMessage = "Error: ${jsonResponse.optString("message")}"; isLoadingExpenses = false }
                     }
                 } else {
-                    withContext(Dispatchers.Main) { debugErrorMessage = "HTTP Connection Failed!"; isLoadingExpenses = false }
+                    withContext(Dispatchers.Main) { debugErrorMessage = "Connection Failed!"; isLoadingExpenses = false }
                 }
             } catch (e: Exception) { 
-                withContext(Dispatchers.Main) { debugErrorMessage = "Code Exception: ${e.localizedMessage}"; isLoadingExpenses = false } 
+                withContext(Dispatchers.Main) { debugErrorMessage = e.localizedMessage; isLoadingExpenses = false } 
             }
         }
     }
 
     Column(modifier = Modifier.fillMaxSize().padding(paddingValues).padding(horizontal = 16.dp).verticalScroll(rememberScrollState())) {
         Spacer(modifier = Modifier.height(16.dp))
-
-        // X-RAY (DIAGNOSTIC) BANNER 
-        if (debugErrorMessage.isNotEmpty()) {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFCDD2)), 
-                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
-            ) {
-                Text(
-                    text = "STATUS X-RAY: $debugErrorMessage",
-                    color = Color.Red,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp,
-                    modifier = Modifier.padding(16.dp)
-                )
-            }
-        }
 
         // HEADER
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
@@ -234,6 +234,10 @@ fun HomeDashboardDesign(username: String, paddingValues: PaddingValues, onLogout
             Box(modifier = Modifier.size(36.dp).clip(CircleShape).background(Color(0xFFE8F5E9)), contentAlignment = Alignment.Center) {
                 Text(username.take(2).uppercase(), color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold, fontSize = 14.sp)
             }
+        }
+
+        if (debugErrorMessage.isNotEmpty()) {
+            Text(debugErrorMessage, color = Color.Red, fontSize = 10.sp, modifier = Modifier.padding(top = 8.dp))
         }
 
         Spacer(modifier = Modifier.height(24.dp))
