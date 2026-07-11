@@ -20,7 +20,7 @@ import com.kartikey.rupeeflow.UI_Screens.Home.HomeDashboardDesign
 import com.kartikey.rupeeflow.UI_Screens.AddExpense.ExpenseHistoryScreen
 import com.kartikey.rupeeflow.UI_Screens.AddExpense.TransactionModel
 
-// NAYA ADD SCREEN IMPORT (Jisme Expense aur Investment dono hain)
+// NAYA ADD SCREEN IMPORT
 import com.kartikey.rupeeflow.UI_Screens.Add.AddScreen
 
 // BAAKI 3 PAGES KE IMPORTS
@@ -48,22 +48,18 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
     var isLoadingExpenses by remember { mutableStateOf(true) }
     var transactionList by remember { mutableStateOf(emptyList<TransactionModel>()) }
     
-    // NAYA: Investment fetch aur count check karne ke liye variables
     var investmentCount by remember { mutableIntStateOf(0) }
     var isLoadingInvestments by remember { mutableStateOf(true) }
     
-    // DIAGNOSTICS LOGIC
     var dNavState by remember { mutableStateOf("Connecting to Sheet...") }
     var dBackPresses by remember { mutableIntStateOf(0) }
 
-    // REAL-TIME DIAGNOSIS UPDATE
     LaunchedEffect(selectedTab, showExpenseHistory, isLoadingExpenses, isLoadingInvestments, transactionList.size, investmentCount) {
         if (showExpenseHistory) {
             dNavState = "Expense History"
         } else if (selectedTab != 0) {
             dNavState = "Tab $selectedTab"
         } else {
-            // Jab Home par honge toh dono database ka sync status dikhayega
             dNavState = if (isLoadingExpenses || isLoadingInvestments) {
                 "Syncing Data... ⏳"
             } else {
@@ -72,7 +68,6 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
         }
     }
 
-    // BACK BUTTON LOGIC: App band hone se rokenge
     BackHandler(enabled = showExpenseHistory || selectedTab != 0) {
         dBackPresses++ 
         if (showExpenseHistory) {
@@ -83,7 +78,6 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
     }
 
     LaunchedEffect(Unit) {
-        // 1. Fetch Expenses (Background me chalega)
         launch(Dispatchers.IO) {
             try {
                 val cal = Calendar.getInstance()
@@ -148,7 +142,6 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
             } catch (e: Exception) { isLoadingExpenses = false }
         }
 
-        // 2. Fetch Investments count for diagnosis (Sath hi sath chalega)
         launch(Dispatchers.IO) {
             try {
                 val json = JSONObject().apply {
@@ -233,9 +226,9 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                 onExpenseCardClick = { showExpenseHistory = true }
             )
         } else if (selectedTab == 1) {
-            AssetsScreen(paddingValues = paddingValues)
+            // FIX: AssetsScreen ko Username bhej rahe hain taaki wahan se InvestmentScreen ko mil sake
+            AssetsScreen(paddingValues = paddingValues, username = username)
         } else if (selectedTab == 2) {
-            // Yahan par humne purane ExpenseAddScreen() ki jagah naya AddScreen() laga diya hai
             AddScreen(paddingValues = paddingValues, username = username)
         } else if (selectedTab == 3) {
             AnalyticsScreen(paddingValues = paddingValues)
