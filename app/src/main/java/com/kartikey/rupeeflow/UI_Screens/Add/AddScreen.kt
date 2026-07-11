@@ -11,7 +11,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 @Composable
-fun AddScreen(paddingValues: PaddingValues, username: String) { // Yahan username add kiya
+fun AddScreen(paddingValues: PaddingValues, username: String) {
     var selectedTabIndex by remember { mutableStateOf(0) }
     val tabs = listOf("Add Expense", "Add Investment")
 
@@ -49,9 +49,8 @@ fun AddScreen(paddingValues: PaddingValues, username: String) { // Yahan usernam
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Dono forms ko username bhej rahe hain taaki wo API me use kar sakein
         when (selectedTabIndex) {
-            0 -> AddExpenseForm(username = username) 
+            0 -> AddExpenseForm(username = username)
             1 -> AddInvestmentForm(username = username)
         }
     }
