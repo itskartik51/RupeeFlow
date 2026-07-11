@@ -10,7 +10,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-// NAYA IMPORT: Outlined icons ke liye
+// Outlined icons ke liye
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.KeyboardArrowUp
 import androidx.compose.material3.*
@@ -31,9 +31,9 @@ fun HomeDashboardDesign(
     thisMonthExpenses: Double, thisYearExpenses: Double, isLoadingExpenses: Boolean,
     dNavState: String, dBackPresses: Int, 
     onLogout: () -> Unit,
+    onRefreshExpenses: () -> Unit = {}, // NAYA PARAMETER (Future connection ke liye)
     onExpenseCardClick: () -> Unit
 ) {
-    // Ye variable track karega ki diagnosis card open hai ya close
     var showDiagnostics by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.fillMaxSize().padding(paddingValues).padding(horizontal = 16.dp).verticalScroll(rememberScrollState())) {
@@ -55,13 +55,11 @@ fun HomeDashboardDesign(
         
         Spacer(modifier = Modifier.height(16.dp))
 
-        // NAYA CLICKABLE DIAGNOSIS CARD
         SystemDiagnosisCard(
             testName = "Navigation Mode",
             isExpanded = showDiagnostics,
             onToggle = { showDiagnostics = !showDiagnostics }
         ) {
-            // Yahan hum jo chahein details daal sakte hain, UI automatic adjust hoga
             Column(modifier = Modifier.padding(top = 12.dp)) {
                 Text("1. Current Active Route: $dNavState", fontSize = 12.sp, fontWeight = FontWeight.Medium)
                 Text("2. Back Button Saved Exits: $dBackPresses times", fontSize = 12.sp, fontWeight = FontWeight.Medium)
@@ -69,12 +67,13 @@ fun HomeDashboardDesign(
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp)) // Card ke beech ka gap
+        Spacer(modifier = Modifier.height(16.dp)) 
         
         ExpenseSummaryCard(
             thisMonthTotal = thisMonthExpenses, 
             thisYearTotal = thisYearExpenses, 
             isLoading = isLoadingExpenses,
+            onRefresh = onRefreshExpenses, // Yahan connect kar diya
             onClick = onExpenseCardClick
         )
         
@@ -101,9 +100,7 @@ fun HomeDashboardDesign(
     }
 }
 
-// ---------------------------------------------------------------------------------
-// UNIVERSAL DIAGNOSIS COMPONENT (Ise hum future mein kahin bhi use kar sakte hain)
-// ---------------------------------------------------------------------------------
+// Universal Component
 @Composable
 fun SystemDiagnosisCard(
     testName: String,
@@ -125,14 +122,12 @@ fun SystemDiagnosisCard(
                     fontSize = 14.sp
                 )
                 Icon(
-                    // UPDATED: Icons.Outlined ka use kiya gaya hai
                     imageVector = if (isExpanded) Icons.Outlined.KeyboardArrowUp else Icons.Outlined.KeyboardArrowDown,
                     contentDescription = "Toggle Diagnosis",
                     tint = Color(0xFF0277BD)
                 )
             }
             
-            // Jab click hoga tabhi ye smoothly open hoke details dikhayega
             AnimatedVisibility(visible = isExpanded) {
                 detailsContent()
             }
