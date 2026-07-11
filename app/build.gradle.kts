@@ -44,6 +44,9 @@ dependencies {
     implementation("androidx.compose.material3:material3:1.2.0")
     implementation("androidx.activity:activity-compose:1.8.2")
     
+    // Nayi Library: Material Icons Extended (Eye aur Graph icons ke liye)
+    implementation("androidx.compose.material:material-icons-extended:1.6.0")
+    
     // Google Sheets se connect karne ke liye
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
 }
