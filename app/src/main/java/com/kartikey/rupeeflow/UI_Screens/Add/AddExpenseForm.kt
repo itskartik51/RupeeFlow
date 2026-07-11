@@ -1,8 +1,8 @@
 package com.kartikey.rupeeflow.UI_Screens.Add
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -10,90 +10,49 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddExpenseForm() {
-    var category by remember { mutableStateOf("") }
-    var description by remember { mutableStateOf("") }
-    var remarks by remember { mutableStateOf("") }
-    var amount by remember { mutableStateOf("") }
-    var expanded by remember { mutableStateOf(false) }
+fun AddScreen(paddingValues: PaddingValues, username: String) { // Yahan username add kiya
+    var selectedTabIndex by remember { mutableStateOf(0) }
+    val tabs = listOf("Add Expense", "Add Investment")
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(4.dp),
-        shape = RoundedCornerShape(16.dp)
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(paddingValues)
+            .padding(16.dp)
     ) {
-        Column(modifier = Modifier.padding(20.dp)) {
-            
-            // Row 1: Category Dropdown
-            ExposedDropdownMenuBox(
-                expanded = expanded,
-                onExpandedChange = { expanded = !expanded }
-            ) {
-                OutlinedTextField(
-                    value = category,
-                    onValueChange = {},
-                    readOnly = true,
-                    label = { Text("Category") },
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                    modifier = Modifier.fillMaxWidth().menuAnchor(),
-                    shape = RoundedCornerShape(12.dp)
-                )
-                ExposedDropdownMenu(
-                    expanded = expanded,
-                    onDismissRequest = { expanded = false }
-                ) {
-                    listOf("Food", "Transport", "Shopping", "Bills").forEach { selectionOption ->
-                        DropdownMenuItem(
-                            text = { Text(selectionOption) },
-                            onClick = {
-                                category = selectionOption
-                                expanded = false
-                            }
-                        )
-                    }
-                }
-            }
+        Text("Add New Entry", fontWeight = FontWeight.Bold, fontSize = 24.sp, color = Color(0xFF2E7D32))
+        Spacer(modifier = Modifier.height(16.dp))
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Row 2: Description & Remarks (Half-Half)
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(
-                    value = description, onValueChange = { description = it },
-                    label = { Text("Description") },
-                    modifier = Modifier.weight(1f), singleLine = true,
-                    shape = RoundedCornerShape(12.dp)
-                )
-                OutlinedTextField(
-                    value = remarks, onValueChange = { remarks = it },
-                    label = { Text("Remarks") },
-                    modifier = Modifier.weight(1f), singleLine = true,
-                    shape = RoundedCornerShape(12.dp)
+        TabRow(
+            selectedTabIndex = selectedTabIndex,
+            containerColor = Color.Transparent,
+            contentColor = Color(0xFF2E7D32),
+            indicator = { tabPositions ->
+                TabRowDefaults.Indicator(
+                    Modifier.tabIndicatorOffset(tabPositions[selectedTabIndex]),
+                    color = Color(0xFF2E7D32),
+                    height = 3.dp
                 )
             }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Row 3: Amount & Add Button (Half-Half exactly like screenshot)
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(
-                    value = amount, onValueChange = { amount = it },
-                    label = { Text("Amount") },
-                    modifier = Modifier.weight(1f), singleLine = true,
-                    shape = RoundedCornerShape(12.dp)
+        ) {
+            tabs.forEachIndexed { index, title ->
+                Tab(
+                    selected = selectedTabIndex == index,
+                    onClick = { selectedTabIndex = index },
+                    text = { Text(title, fontWeight = FontWeight.Bold) },
+                    selectedContentColor = Color(0xFF2E7D32),
+                    unselectedContentColor = Color.Gray
                 )
-                Button(
-                    onClick = { /* TODO: Save Expense API Call */ },
-                    modifier = Modifier.weight(1f).height(56.dp).padding(top = 8.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF388E3C)),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Text("Add", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White)
-                }
             }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Dono forms ko username bhej rahe hain taaki wo API me use kar sakein
+        when (selectedTabIndex) {
+            0 -> AddExpenseForm(username = username) 
+            1 -> AddInvestmentForm(username = username)
         }
     }
 }
