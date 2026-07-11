@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.* // NAYA IMPORT: Outlined icons ke liye
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -174,14 +175,14 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                 NavigationBarItem(
                     selected = selectedTab == 0 && !showExpenseHistory,
                     onClick = { selectedTab = 0; showExpenseHistory = false },
-                    icon = { Icon(Icons.Default.Home, contentDescription = "Home") },
+                    icon = { Icon(Icons.Outlined.Home, contentDescription = "Home") }, // UPDATED to Outlined Home
                     label = { Text("Home") },
                     colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
                 )
                 NavigationBarItem(
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1; showExpenseHistory = false },
-                    icon = { Icon(Icons.Default.List, contentDescription = "Assets") },
+                    icon = { Icon(Icons.Outlined.AccountBalanceWallet, contentDescription = "Assets") }, // UPDATED to Wallet
                     label = { Text("Assets") },
                     colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
                 )
@@ -190,21 +191,21 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                     onClick = { selectedTab = 2; showExpenseHistory = false },
                     icon = {
                         Box(modifier = Modifier.size(48.dp).clip(RoundedCornerShape(14.dp)).background(Color(0xFF2E7D32)), contentAlignment = Alignment.Center) {
-                            Icon(Icons.Default.Add, contentDescription = "Add", tint = Color.White)
+                            Icon(Icons.Outlined.Add, contentDescription = "Add", tint = Color.White) // UPDATED to Outlined Add
                         }
                     }
                 )
                 NavigationBarItem(
                     selected = selectedTab == 3,
                     onClick = { selectedTab = 3; showExpenseHistory = false },
-                    icon = { Icon(Icons.Default.DateRange, contentDescription = "Analytics") },
+                    icon = { Icon(Icons.Outlined.PieChart, contentDescription = "Analytics") }, // UPDATED to PieChart
                     label = { Text("Analytics") },
                     colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
                 )
                 NavigationBarItem(
                     selected = selectedTab == 4,
                     onClick = { selectedTab = 4; showExpenseHistory = false },
-                    icon = { Icon(Icons.Default.Person, contentDescription = "Profile") },
+                    icon = { Icon(Icons.Outlined.Person, contentDescription = "Profile") }, // UPDATED to Outlined Person
                     label = { Text("Profile") },
                     colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
                 )
@@ -226,7 +227,6 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                 onExpenseCardClick = { showExpenseHistory = true }
             )
         } else if (selectedTab == 1) {
-            // FIX: AssetsScreen ko Username bhej rahe hain taaki wahan se InvestmentScreen ko mil sake
             AssetsScreen(paddingValues = paddingValues, username = username)
         } else if (selectedTab == 2) {
             AddScreen(paddingValues = paddingValues, username = username)
