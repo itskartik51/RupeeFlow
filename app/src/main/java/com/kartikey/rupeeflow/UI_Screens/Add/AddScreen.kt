@@ -11,7 +11,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 @Composable
-fun AddScreen(paddingValues: PaddingValues) {
+fun AddScreen(paddingValues: PaddingValues, username: String) { // Yahan username add kiya
     var selectedTabIndex by remember { mutableStateOf(0) }
     val tabs = listOf("Add Expense", "Add Investment")
 
@@ -21,11 +21,9 @@ fun AddScreen(paddingValues: PaddingValues) {
             .padding(paddingValues)
             .padding(16.dp)
     ) {
-        // Top Heading
         Text("Add New Entry", fontWeight = FontWeight.Bold, fontSize = 24.sp, color = Color(0xFF2E7D32))
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Tabs (Expense vs Investment switch karne ke liye)
         TabRow(
             selectedTabIndex = selectedTabIndex,
             containerColor = Color.Transparent,
@@ -51,10 +49,10 @@ fun AddScreen(paddingValues: PaddingValues) {
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Tab selection ke hisaab se form open hoga
+        // Dono forms ko username bhej rahe hain taaki wo API me use kar sakein
         when (selectedTabIndex) {
-            0 -> AddExpenseForm()
-            1 -> AddInvestmentForm()
+            0 -> AddExpenseForm(username = username) 
+            1 -> AddInvestmentForm(username = username)
         }
     }
 }
