@@ -1,34 +1,73 @@
 package com.kartikey.rupeeflow.UI_Screens.Profile
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Text
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 @Composable
-fun ProfileScreen(username: String, paddingValues: PaddingValues, onLogout: () -> Unit) {
-    Box(
-        modifier = Modifier.fillMaxSize().padding(paddingValues),
-        contentAlignment = Alignment.Center
+fun ProfileScreen(username: String, email: String, paddingValues: PaddingValues) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(paddingValues)
+            .padding(16.dp)
+            .verticalScroll(rememberScrollState()),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("Profile Settings", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
-            Spacer(modifier = Modifier.height(8.dp))
-            Text("Logged in as: $username", color = Color.Gray, fontSize = 14.sp)
-            Spacer(modifier = Modifier.height(24.dp))
-            Button(
-                onClick = onLogout,
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F))
-            ) {
-                Text("Logout", color = Color.White, fontWeight = FontWeight.Bold)
-            }
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // 1. Profile Header
+        Box(modifier = Modifier.size(100.dp).clip(CircleShape).background(Color(0xFF2E7D32)), contentAlignment = Alignment.Center) {
+            Text(username.take(2).uppercase(), color = Color.White, fontSize = 40.sp, fontWeight = FontWeight.Bold)
         }
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(username, fontWeight = FontWeight.ExtraBold, fontSize = 22.sp)
+        Text(email, color = Color.Gray, fontSize = 14.sp)
+        
+        Spacer(modifier = Modifier.height(32.dp))
+
+        // 2. Options List
+        ProfileOptionRow(Icons.Default.Lock, "Security Lock", onClick = { /* TODO: Next step logic */ })
+        ProfileOptionRow(Icons.Default.Download, "Data Download", onClick = { /* TODO: Next step logic */ })
+        ProfileOptionRow(Icons.Default.AttachMoney, "Currency", onClick = { /* TODO: Next step logic */ })
+        ProfileOptionRow(Icons.Default.Palette, "Theme", onClick = { /* TODO: Next step logic */ })
+        ProfileOptionRow(Icons.Default.Support, "Help & Support", onClick = { /* TODO: Next step logic */ })
+        ProfileOptionRow(Icons.Default.Info, "App Update & Info", onClick = { /* TODO: Next step logic */ })
+        
+        Spacer(modifier = Modifier.height(32.dp))
+
+        // 3. Logout
+        ProfileOptionRow(Icons.Default.ExitToApp, "Logout", textColor = Color.Red, onClick = { /* TODO: Next step logic */ })
     }
+}
+
+@Composable
+fun ProfileOptionRow(icon: ImageVector, title: String, textColor: Color = Color.Black, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+            .padding(vertical = 16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(imageVector = icon, contentDescription = title, tint = textColor, modifier = Modifier.size(24.dp))
+        Spacer(modifier = Modifier.width(16.dp))
+        Text(text = title, fontSize = 16.sp, fontWeight = FontWeight.Medium, color = textColor)
+    }
+    HorizontalDivider(thickness = 1.dp, color = Color(0xFFEEEEEE))
 }
