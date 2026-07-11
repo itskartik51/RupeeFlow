@@ -15,13 +15,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.kartikey.rupeeflow.Cloud_Database.Constants
 
-// HOMESCREEN AUR ADD EXPENSE KE IMPORTS
+// HOMESCREEN AUR EXPENSE HISTORY KE IMPORTS
 import com.kartikey.rupeeflow.UI_Screens.Home.HomeDashboardDesign
-import com.kartikey.rupeeflow.UI_Screens.AddExpense.ExpenseAddScreen
 import com.kartikey.rupeeflow.UI_Screens.AddExpense.ExpenseHistoryScreen
 import com.kartikey.rupeeflow.UI_Screens.AddExpense.TransactionModel
 
-// NAYE 3 PAGES KE IMPORTS (Jo aapne abhi banaye hain)
+// NAYA ADD SCREEN IMPORT (Jisme Expense aur Investment dono hain)
+import com.kartikey.rupeeflow.UI_Screens.Add.AddScreen
+
+// BAAKI 3 PAGES KE IMPORTS
 import com.kartikey.rupeeflow.UI_Screens.Assets.AssetsScreen
 import com.kartikey.rupeeflow.UI_Screens.Analytics.AnalyticsScreen
 import com.kartikey.rupeeflow.UI_Screens.Profile.ProfileScreen
@@ -46,12 +48,28 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
     var isLoadingExpenses by remember { mutableStateOf(true) }
     var transactionList by remember { mutableStateOf(emptyList<TransactionModel>()) }
     
-    // NAYA DIAGNOSTICS: Navigation aur Back Button ko track karega
-    var dNavState by remember { mutableStateOf("Home") }
+    // NAYA: Investment fetch aur count check karne ke liye variables
+    var investmentCount by remember { mutableIntStateOf(0) }
+    var isLoadingInvestments by remember { mutableStateOf(true) }
+    
+    // DIAGNOSTICS LOGIC
+    var dNavState by remember { mutableStateOf("Connecting to Sheet...") }
     var dBackPresses by remember { mutableIntStateOf(0) }
 
-    LaunchedEffect(selectedTab, showExpenseHistory) {
-        dNavState = if (showExpenseHistory) "Expense History" else "Tab $selectedTab"
+    // REAL-TIME DIAGNOSIS UPDATE
+    LaunchedEffect(selectedTab, showExpenseHistory, isLoadingExpenses, isLoadingInvestments, transactionList.size, investmentCount) {
+        if (showExpenseHistory) {
+            dNavState = "Expense History"
+        } else if (selectedTab != 0) {
+            dNavState = "Tab $selectedTab"
+        } else {
+            // Jab Home par honge toh dono database ka sync status dikhayega
+            dNavState = if (isLoadingExpenses || isLoadingInvestments) {
+                "Syncing Data... ⏳"
+            } else {
+                "Sheet Sync: Expenses (${transactionList.size}) ✅ | Investments ($investmentCount) ✅"
+            }
+        }
     }
 
     // BACK BUTTON LOGIC: App band hone se rokenge
@@ -65,7 +83,8 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
     }
 
     LaunchedEffect(Unit) {
-        withContext(Dispatchers.IO) {
+        // 1. Fetch Expenses (Background me chalega)
+        launch(Dispatchers.IO) {
             try {
                 val cal = Calendar.getInstance()
                 val currM = cal.get(Calendar.MONTH) + 1
@@ -128,6 +147,32 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                 } else isLoadingExpenses = false
             } catch (e: Exception) { isLoadingExpenses = false }
         }
+
+        // 2. Fetch Investments count for diagnosis (Sath hi sath chalega)
+        launch(Dispatchers.IO) {
+            try {
+                val json = JSONObject().apply {
+                    put("action", "get_investments")
+                    put("username", username)
+                }
+                val client = OkHttpClient()
+                val body = json.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
+                val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(body).build()
+                val response = client.newCall(request).execute()
+                val responseData = response.body?.string() ?: ""
+
+                if (response.isSuccessful && responseData.trim().startsWith("{")) {
+                    val jsonResponse = JSONObject(responseData)
+                    if (jsonResponse.optString("status") == "success") {
+                        val dataArray = jsonResponse.optJSONArray("data")
+                        withContext(Dispatchers.Main) {
+                            investmentCount = dataArray?.length() ?: 0
+                            isLoadingInvestments = false
+                        }
+                    } else isLoadingInvestments = false
+                } else isLoadingInvestments = false
+            } catch (e: Exception) { isLoadingInvestments = false }
+        }
     }
 
     Scaffold(
@@ -173,7 +218,6 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
             }
         }
     ) { paddingValues ->
-        // YAHI HAI WO NAVIGATION LOGIC JO ABHI AAPNE PUCHA THA
         if (showExpenseHistory) {
             ExpenseHistoryScreen(
                 paddingValues = paddingValues, 
@@ -191,7 +235,8 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
         } else if (selectedTab == 1) {
             AssetsScreen(paddingValues = paddingValues)
         } else if (selectedTab == 2) {
-            ExpenseAddScreen(username = username, paddingValues = paddingValues)
+            // Yahan par humne purane ExpenseAddScreen() ki jagah naya AddScreen() laga diya hai
+            AddScreen(paddingValues = paddingValues, username = username)
         } else if (selectedTab == 3) {
             AnalyticsScreen(paddingValues = paddingValues)
         } else if (selectedTab == 4) {
