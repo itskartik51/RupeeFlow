@@ -1,7 +1,7 @@
 package com.kartikey.rupeeflow.UI_Screens.Assets
 
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -9,101 +9,122 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.StrokeJoin
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 @Composable
 fun AssetsScreen(paddingValues: PaddingValues) {
-    // Ye variable track karega ki hum summary pe hain ya detail screen pe
-    var currentView by remember { mutableStateOf("Summary") }
+    // Ye variable track karega ki hume main page dikhana hai ya aage ka section
+    var currentView by remember { mutableStateOf("Main") }
 
-    if (currentView == "Summary") {
+    if (currentView == "Main") {
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .background(Color(0xFFF8F9FA)) // Halka off-white background
                 .padding(paddingValues)
                 .padding(16.dp)
         ) {
-            Text("Click card to view detailed portfolio", fontSize = 12.sp, color = Color.Gray, modifier = Modifier.padding(bottom = 8.dp))
-            
-            NetWorthSummaryCard(
-                totalAssets = 124500.0,
-                totalLiabilities = 45000.0,
-                netWorthHistory = listOf(50000.0, 55000.0, 62000.0, 59000.0, 71000.0, 79500.0),
+            // 1. Apni Networth Screen ka Green Card
+            NetworthCard(
+                networthAmount = 79500.0,
+                isLoading = false,
                 onClick = { 
-                    // Card pe click karte hi Investment view khul jayega
-                    currentView = "Investments" 
+                    /* Networth ki history yahan open hogi */ 
                 }
             )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // 2. Investment 4-Grid Section
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "My Investments", 
+                    fontWeight = FontWeight.Bold, 
+                    fontSize = 18.sp,
+                    color = Color.Black
+                )
+                // "More" Button jo clickable hai
+                TextButton(onClick = { currentView = "InvestmentDetails" }) {
+                    Text("More", color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // 4 Grid Boxes
+            Column(modifier = Modifier.fillMaxWidth()) {
+                // Row 1: Stock & Mutual Funds
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Box(modifier = Modifier.weight(1f)) {
+                        GridItemCard("STOCKS", "₹0", Color(0xFF388E3C)) // Green line
+                    }
+                    Box(modifier = Modifier.weight(1f)) {
+                        GridItemCard("MUTUAL FUNDS", "₹0", Color(0xFF1976D2)) // Blue line
+                    }
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                // Row 2: ETF & Bonds
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Box(modifier = Modifier.weight(1f)) {
+                        GridItemCard("ETF", "₹0", Color(0xFF7B1FA2)) // Purple line
+                    }
+                    Box(modifier = Modifier.weight(1f)) {
+                        GridItemCard("BONDS", "₹0", Color(0xFFF57C00)) // Orange line
+                    }
+                }
+            }
         }
-    } else {
-        // Investment Screen dikhegi, aur Back button pe wapas Summary aayega
-        InvestmentScreen(onBackClick = { currentView = "Summary" })
+    } else if (currentView == "InvestmentDetails") {
+        // Yahan par aage chalkar humari detailed Investment list (jo J2 se U2 tak ka data legi) aayegi.
+        // Abhi ke liye bas ek temporary text dikha rahe hain aur wapas aane ka button hai.
+        Column(
+            modifier = Modifier.fillMaxSize().padding(paddingValues).padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text("Investment Details Section Opened!", fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(16.dp))
+            Button(
+                onClick = { currentView = "Main" },
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
+            ) {
+                Text("Go Back")
+            }
+        }
     }
 }
 
+// Ye un 4 chote boxes ka design hai (Same to same screenshot jaisa)
 @Composable
-fun NetWorthSummaryCard(
-    totalAssets: Double,
-    totalLiabilities: Double,
-    netWorthHistory: List<Double>,
-    onClick: () -> Unit
-) {
-    val netWorth = totalAssets - totalLiabilities
-    val isPositive = netWorth >= 0
-    val netWorthColor = if (isPositive) Color(0xFF2E7D32) else Color(0xFFD32F2F)
-
+fun GridItemCard(title: String, amount: String, lineColor: Color) {
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() }, 
+        modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(4.dp)
+        shape = RoundedCornerShape(12.dp),
+        elevation = CardDefaults.cardElevation(2.dp),
+        border = BorderStroke(1.dp, Color(0xFFEEEEEE))
     ) {
-        Column(modifier = Modifier.padding(20.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Column {
-                    Text("Total Assets", color = Color.Gray, fontSize = 12.sp)
-                    Text("₹${totalAssets.toInt()}", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.Black)
-                }
-                Column(horizontalAlignment = Alignment.End) {
-                    Text("Total Liabilities", color = Color.Gray, fontSize = 12.sp)
-                    Text("₹${totalLiabilities.toInt()}", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.Black)
-                }
-            }
-            Spacer(modifier = Modifier.height(20.dp))
-            Text("Net Worth", color = Color.Gray, fontSize = 14.sp)
-            Text(
-                text = "₹${netWorth.toInt()}",
-                fontWeight = FontWeight.ExtraBold,
-                fontSize = 36.sp,
-                color = netWorthColor
+        Column(
+            modifier = Modifier.padding(16.dp),
+            crossAxisAlignment = CrossAxisAlignment.Start
+        ) {
+            Text(text = title, color = Color.Gray, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(text = amount, color = Color.Black, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
+            Spacer(modifier = Modifier.height(12.dp))
+            // Niche wali colored line
+            Box(
+                modifier = Modifier
+                    .height(4.dp)
+                    .fillMaxWidth(0.6f) // Line thodi choti rakhi hai design ke hisaab se
+                    .background(lineColor, RoundedCornerShape(2.dp))
             )
-            Spacer(modifier = Modifier.height(24.dp))
-            if (netWorthHistory.isNotEmpty()) {
-                Text("Last 6 Months Trend", color = Color.Gray, fontSize = 10.sp, modifier = Modifier.padding(bottom = 8.dp))
-                Canvas(modifier = Modifier.fillMaxWidth().height(40.dp)) {
-                    val max = netWorthHistory.maxOrNull() ?: 1.0
-                    val min = netWorthHistory.minOrNull() ?: 0.0
-                    val range = if (max == min) 1.0 else (max - min)
-                    val stepX = size.width / (netWorthHistory.size - 1).coerceAtLeast(1)
-                    val path = Path()
-
-                    netWorthHistory.forEachIndexed { index, value ->
-                        val x = index * stepX
-                        val normalizedY = ((max - value) / range).toFloat()
-                        val y = normalizedY * size.height
-                        if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
-                    }
-                    drawPath(path = path, color = netWorthColor.copy(alpha = 0.6f), style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
-                }
-            }
         }
     }
 }
