@@ -10,8 +10,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.outlined.BarChart
-import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.filled.Info // Changed Icon
+import androidx.compose.material.icons.filled.List // Changed Icon
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -76,7 +76,7 @@ fun InvestmentScreen(onBackClick: () -> Unit) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(horizontal = 12.dp) // Thoda padding kam kiya taaki 4 columns easily fit ho jayein
+                .padding(horizontal = 12.dp)
         ) {
             item {
                 InvestmentSummaryCard(
@@ -122,10 +122,10 @@ fun InvestmentSummaryCard(
                 Text("INVESTMENT ($itemCount)", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
                 Row {
                     IconButton(onClick = { }, modifier = Modifier.size(32.dp)) {
-                        Icon(Icons.Outlined.Visibility, contentDescription = "Hide", tint = Color.DarkGray, modifier = Modifier.size(20.dp))
+                        Icon(Icons.Default.Info, contentDescription = "Info", tint = Color.DarkGray, modifier = Modifier.size(20.dp))
                     }
                     IconButton(onClick = { }, modifier = Modifier.size(32.dp)) {
-                        Icon(Icons.Outlined.BarChart, contentDescription = "Analytics", tint = Color.DarkGray, modifier = Modifier.size(20.dp))
+                        Icon(Icons.Default.List, contentDescription = "Analytics", tint = Color.DarkGray, modifier = Modifier.size(20.dp))
                     }
                     IconButton(onClick = { }, modifier = Modifier.size(32.dp)) {
                         Icon(Icons.Default.MoreVert, contentDescription = "More", tint = Color.DarkGray, modifier = Modifier.size(20.dp))
@@ -168,18 +168,16 @@ fun SummaryRow(label: String, amount: Double, percent: Double) {
     }
 }
 
-// Yahan maine header ko exactly aapke screenshots ki tarah single line me kar diya hai
 @Composable
 fun ListHeaderRow() {
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
         Text("Data", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.Gray, modifier = Modifier.weight(0.8f))
-        Text("Market Price (1D %)", fontSize = 10.sp, color = Color.Gray, textAlign = TextAlign.End, maxLines = 1, modifier = Modifier.weight(1.3f))
-        Text("Current (Invested)", fontSize = 10.sp, color = Color.Gray, textAlign = TextAlign.End, maxLines = 1, modifier = Modifier.weight(1.2f))
-        Text("Returns (%)", fontSize = 10.sp, color = Color.Gray, textAlign = TextAlign.End, maxLines = 1, modifier = Modifier.weight(1f))
+        Text("Market Price\n(1D %)", fontSize = 10.sp, color = Color.Gray, textAlign = TextAlign.End, maxLines = 2, modifier = Modifier.weight(1.3f))
+        Text("Current\n(Invested)", fontSize = 10.sp, color = Color.Gray, textAlign = TextAlign.End, maxLines = 2, modifier = Modifier.weight(1.2f))
+        Text("Returns\n(%)", fontSize = 10.sp, color = Color.Gray, textAlign = TextAlign.End, maxLines = 2, modifier = Modifier.weight(1f))
     }
 }
 
-// Yahan Data exactly () wale logic ke hisaab se drop ho raha hai
 @Composable
 fun InvestmentListItem(item: InvestmentItem) {
     val currentVal = item.quantity * item.currentPrice
@@ -195,25 +193,21 @@ fun InvestmentListItem(item: InvestmentItem) {
     val totalRetSign = if (totalRet >= 0) "+" else ""
 
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        // Col 1: Data (Name & Shares)
         Column(modifier = Modifier.weight(0.8f)) {
             Text(item.assetName, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color.Black, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text("${item.quantity.toInt()} shares", fontSize = 11.sp, color = Color.Gray)
         }
         
-        // Col 2: Market Price \n (1D %) -> Exactly Screenshot #2
         Column(modifier = Modifier.weight(1.3f), horizontalAlignment = Alignment.End) {
             Text(formatRupee(item.currentPrice), fontSize = 13.sp, color = Color.Black, fontWeight = FontWeight.Medium)
             Text("$oneDaySign${item.oneDayChangePrice} ($oneDaySign${String.format("%.2f", oneDPct)}%)", fontSize = 11.sp, color = oneDayColor)
         }
         
-        // Col 3: Current \n (Invested) -> Exactly Screenshot #3
         Column(modifier = Modifier.weight(1.2f), horizontalAlignment = Alignment.End) {
             Text(formatRupee(currentVal), fontSize = 13.sp, color = Color.Black, fontWeight = FontWeight.Medium)
             Text("(${formatRupee(investedVal)})", fontSize = 11.sp, color = Color.Gray)
         }
         
-        // Col 4: Returns \n (%) -> Exactly Screenshot #4
         Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.End) {
             Text("$totalRetSign${formatRupee(totalRet)}", fontSize = 13.sp, color = Color.Black, fontWeight = FontWeight.Medium)
             Text("($totalRetSign${String.format("%.2f", totalRetPct)}%)", fontSize = 11.sp, color = totalRetColor)
@@ -224,5 +218,5 @@ fun InvestmentListItem(item: InvestmentItem) {
 fun formatRupee(amount: Double): String {
     val format = NumberFormat.getCurrencyInstance(Locale("en", "IN"))
     format.maximumFractionDigits = 2
-    return format.format(amount).replace("-₹", "-₹") 
+    return format.format(amount).replace("-₹", "-₹ ") 
 }
