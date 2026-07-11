@@ -32,7 +32,6 @@ fun AddExpenseForm(username: String) {
     var amount by remember { mutableStateOf("") }
     var expanded by remember { mutableStateOf(false) }
     
-    // Nayi chizein: Loading state, Coroutine scope aur Context (Toast ke liye)
     var isSubmitting by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -98,8 +97,8 @@ fun AddExpenseForm(username: String) {
                     value = amount, 
                     onValueChange = { amount = it },
                     label = { Text("Amount") },
-                    // Yahan ₹ ka sign permanently fix kar diya hai
-                    leadingIcon = { Text("₹", fontWeight = FontWeight.Bold, color = Color.Black) },
+                    // FIX: leadingIcon ki jagah prefix use kiya hai. Ye sirf click karne par dikhega!
+                    prefix = { Text("₹ ", fontWeight = FontWeight.Bold, color = Color.Black) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.weight(1f), 
                     singleLine = true,
@@ -128,7 +127,6 @@ fun AddExpenseForm(username: String) {
                                     withContext(Dispatchers.Main) {
                                         isSubmitting = false
                                         Toast.makeText(context, "Expense Added Successfully!", Toast.LENGTH_SHORT).show()
-                                        // Form clear karne ke liye:
                                         amount = ""; description = ""; remarks = ""; category = ""
                                     }
                                 } catch (e: Exception) {
