@@ -12,12 +12,12 @@ import androidx.compose.ui.unit.sp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddInvestmentForm() {
+fun AddInvestmentForm(username: String) { // Yahan username add kiya
     var assetType by remember { mutableStateOf("Stock") }
     var assetName by remember { mutableStateOf("") }
     var quantity by remember { mutableStateOf("") }
     var buyPrice by remember { mutableStateOf("") }
-    var date by remember { mutableStateOf("") } // Optional
+    var date by remember { mutableStateOf("") } 
     var expanded by remember { mutableStateOf(false) }
 
     Card(
@@ -28,7 +28,6 @@ fun AddInvestmentForm() {
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
             
-            // Row 1: Asset Type Dropdown
             ExposedDropdownMenuBox(
                 expanded = expanded,
                 onExpandedChange = { expanded = !expanded }
@@ -60,7 +59,6 @@ fun AddInvestmentForm() {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Row 2: Asset Name & Quantity (Half-Half)
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(
                     value = assetName, onValueChange = { assetName = it },
@@ -78,7 +76,6 @@ fun AddInvestmentForm() {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Row 3: Buy Price & Date (Half-Half)
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(
                     value = buyPrice, onValueChange = { buyPrice = it },
@@ -96,9 +93,8 @@ fun AddInvestmentForm() {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Row 4: Add Button (Full Width to balance design)
             Button(
-                onClick = { /* TODO: Save Investment API Call */ },
+                onClick = { /* TODO: Save Investment API Call using 'username' */ },
                 modifier = Modifier.fillMaxWidth().height(50.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF388E3C)),
                 shape = RoundedCornerShape(12.dp)
