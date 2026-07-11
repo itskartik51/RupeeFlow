@@ -17,6 +17,26 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
+// 1. Ye hai aapki main Assets Screen jisko MainScreen dhoondh raha tha
+@Composable
+fun AssetsScreen(paddingValues: PaddingValues) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(paddingValues)
+            .padding(16.dp)
+    ) {
+        // Yahan humne aapka NetWorth card dummy data ke sath call kar diya
+        NetWorthSummaryCard(
+            totalAssets = 124500.0,
+            totalLiabilities = 45000.0,
+            netWorthHistory = listOf(50000.0, 55000.0, 62000.0, 59000.0, 71000.0, 79500.0),
+            onClick = { /* TODO: Aage script lagayenge */ }
+        )
+    }
+}
+
+// 2. Ye raha aapka Net Worth Summary Card jo maine pehle diya tha
 @Composable
 fun NetWorthSummaryCard(
     totalAssets: Double,
@@ -24,14 +44,11 @@ fun NetWorthSummaryCard(
     netWorthHistory: List<Double>,
     onClick: () -> Unit
 ) {
-    // Net Worth Calculation
     val netWorth = totalAssets - totalLiabilities
     val isPositive = netWorth >= 0
-    // Positive hai toh Green, Negative hai toh Red
     val netWorthColor = if (isPositive) Color(0xFF2E7D32) else Color(0xFFD32F2F)
 
     Card(
-        // Sirf clickable banaya hai jaisa aapne kaha tha
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() }, 
@@ -41,7 +58,6 @@ fun NetWorthSummaryCard(
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
             
-            // --- ROW 1: Assets & Liabilities ---
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
@@ -58,7 +74,6 @@ fun NetWorthSummaryCard(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // --- ROW 2: Net Worth (Sabse bada aur bold) ---
             Text("Net Worth", color = Color.Gray, fontSize = 14.sp)
             Text(
                 text = "₹${netWorth.toInt()}",
@@ -69,7 +84,6 @@ fun NetWorthSummaryCard(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // --- ROW 3: Line Graph (Last 6 months trend) ---
             if (netWorthHistory.isNotEmpty()) {
                 Text("Last 6 Months Trend", color = Color.Gray, fontSize = 10.sp, modifier = Modifier.padding(bottom = 8.dp))
                 
@@ -83,7 +97,6 @@ fun NetWorthSummaryCard(
 
                     netWorthHistory.forEachIndexed { index, value ->
                         val x = index * stepX
-                        // Point ki position calculate kar rahe hain height ke hisaab se
                         val normalizedY = ((max - value) / range).toFloat()
                         val y = normalizedY * size.height
 
@@ -94,10 +107,9 @@ fun NetWorthSummaryCard(
                         }
                     }
 
-                    // Line draw karna
                     drawPath(
                         path = path,
-                        color = netWorthColor.copy(alpha = 0.6f), // Line ka color Net Worth ke color jaisa hoga
+                        color = netWorthColor.copy(alpha = 0.6f),
                         style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
                     )
                 }
