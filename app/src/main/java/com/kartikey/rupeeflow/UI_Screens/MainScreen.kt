@@ -1,7 +1,6 @@
 package com.kartikey.rupeeflow.UI_Screens
 
 import androidx.activity.compose.BackHandler
-// NAYE IMPORTS ANIMATION AUR HAPTICS KE LIYE
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -16,8 +15,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import com.kartikey.rupeeflow.Cloud_Database.Constants
 
@@ -61,9 +58,6 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
     var dBackPresses by remember { mutableIntStateOf(0) }
 
     var refreshTrigger by remember { mutableIntStateOf(0) }
-    
-    // HAPTIC FEEDBACK CONTROLLER
-    val haptic = LocalHapticFeedback.current
 
     LaunchedEffect(selectedTab, showExpenseHistory, isLoadingExpenses, isLoadingInvestments, transactionList.size, investmentCount) {
         if (showExpenseHistory) {
@@ -187,30 +181,21 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
             NavigationBar(containerColor = Color.White, tonalElevation = 8.dp) {
                 NavigationBarItem(
                     selected = selectedTab == 0 && !showExpenseHistory,
-                    onClick = { 
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress) // NAYA: Vibrate on Click
-                        selectedTab = 0; showExpenseHistory = false 
-                    },
+                    onClick = { selectedTab = 0; showExpenseHistory = false },
                     icon = { Icon(Icons.Outlined.Home, contentDescription = "Home") }, 
                     label = { Text("Home") },
                     colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
                 )
                 NavigationBarItem(
                     selected = selectedTab == 1,
-                    onClick = { 
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        selectedTab = 1; showExpenseHistory = false 
-                    },
+                    onClick = { selectedTab = 1; showExpenseHistory = false },
                     icon = { Icon(Icons.Outlined.AccountBalanceWallet, contentDescription = "Assets") }, 
                     label = { Text("Assets") },
                     colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
                 )
                 NavigationBarItem(
                     selected = selectedTab == 2,
-                    onClick = { 
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        selectedTab = 2; showExpenseHistory = false 
-                    },
+                    onClick = { selectedTab = 2; showExpenseHistory = false },
                     icon = {
                         Box(modifier = Modifier.size(48.dp).clip(RoundedCornerShape(14.dp)).background(Color(0xFF2E7D32)), contentAlignment = Alignment.Center) {
                             Icon(Icons.Outlined.Add, contentDescription = "Add", tint = Color.White) 
@@ -219,20 +204,14 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                 )
                 NavigationBarItem(
                     selected = selectedTab == 3,
-                    onClick = { 
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        selectedTab = 3; showExpenseHistory = false 
-                    },
+                    onClick = { selectedTab = 3; showExpenseHistory = false },
                     icon = { Icon(Icons.Outlined.PieChart, contentDescription = "Analytics") }, 
                     label = { Text("Analytics") },
                     colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
                 )
                 NavigationBarItem(
                     selected = selectedTab == 4,
-                    onClick = { 
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        selectedTab = 4; showExpenseHistory = false 
-                    },
+                    onClick = { selectedTab = 4; showExpenseHistory = false },
                     icon = { Icon(Icons.Outlined.Person, contentDescription = "Profile") }, 
                     label = { Text("Profile") },
                     colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
@@ -240,7 +219,7 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
             }
         }
     ) { paddingValues ->
-        // NAYA: Crossfade Animation for smooth screen transitions
+        // Visual Transition Animation
         Crossfade(
             targetState = Pair(selectedTab, showExpenseHistory), 
             animationSpec = tween(durationMillis = 400),
