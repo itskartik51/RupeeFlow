@@ -33,7 +33,6 @@ fun AddInvestmentForm(username: String) {
     var date by remember { mutableStateOf("") } 
     var expanded by remember { mutableStateOf(false) }
 
-    // API calls ke variables
     var isSubmitting by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -100,8 +99,8 @@ fun AddInvestmentForm(username: String) {
                     value = buyPrice, 
                     onValueChange = { buyPrice = it },
                     label = { Text("Buy Price") },
-                    // Yahan ₹ ka sign permanently fix kar diya hai
-                    leadingIcon = { Text("₹", fontWeight = FontWeight.Bold, color = Color.Black) },
+                    // FIX: Yahan bhi prefix use kiya hai. Box tap hone par ₹ dikhega.
+                    prefix = { Text("₹ ", fontWeight = FontWeight.Bold, color = Color.Black) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.weight(1f), singleLine = true,
                     shape = RoundedCornerShape(12.dp)
@@ -149,7 +148,7 @@ fun AddInvestmentForm(username: String) {
                                 withContext(Dispatchers.Main) {
                                     isSubmitting = false
                                     Toast.makeText(context, "Investment Saved Successfully!", Toast.LENGTH_SHORT).show()
-                                    assetName = ""; quantity = ""; buyPrice = ""; date = "" // Clear form
+                                    assetName = ""; quantity = ""; buyPrice = ""; date = "" 
                                 }
                             } catch (e: Exception) {
                                 withContext(Dispatchers.Main) {
