@@ -1,29 +1,43 @@
 package com.kartikey.rupeeflow.UI_Screens.Assets
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Info // Changed Icon
-import androidx.compose.material.icons.filled.List // Changed Icon
+import androidx.compose.material.icons.outlined.BarChart
+import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.*
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONObject
+import java.io.IOException
 import java.text.NumberFormat
 import java.util.Locale
+
+// Aapka apna Google Apps Script URL yahan daalein
+const val SCRIPT_URL = "YOUR_GOOGLE_APPS_SCRIPT_URL_HERE" 
 
 data class InvestmentItem(
     val assetName: String,
@@ -35,12 +49,60 @@ data class InvestmentItem(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun InvestmentScreen(onBackClick: () -> Unit) {
-    val investmentList = remember {
-        listOf(
-            InvestmentItem("SBI", 36.0, 950.0, 1036.0, 13.90),
-            InvestmentItem("Jio BlackRock", 150.0, 120.0, 112.5, -2.50) 
-        )
+fun InvestmentScreen(onBackClick: () -> Unit, username: String = "itskartik51") {
+    var investmentList by remember { mutableStateOf(listOf<InvestmentItem>()) }
+    var isLoading by remember { mutableStateOf(true) }
+    var showAddSheet by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
+
+    // API se real data fetch karne ka function
+    fun fetchInvestments() {
+        isLoading = true
+        coroutineScope.launch(Dispatchers.IO) {
+            try {
+                val jsonBody = JSONObject().apply {
+                    put("action", "get_investments")
+                    put("username", username)
+                }
+                val requestBody = jsonBody.toString().toRequestBody("application/json".toMediaTypeOrNull())
+                val request = Request.Builder().url(SCRIPT_URL).post(requestBody).build()
+
+                OkHttpClient().newCall(request).execute().use { response ->
+                    val responseData = response.body?.string()
+                    if (responseData != null) {
+                        val jsonResponse = JSONObject(responseData)
+                        if (jsonResponse.getString("status") == "success") {
+                            val dataArray = jsonResponse.getJSONArray("data")
+                            val fetchedList = mutableListOf<InvestmentItem>()
+                            for (i in 0 until dataArray.length()) {
+                                val item = dataArray.getJSONObject(i)
+                                fetchedList.add(
+                                    InvestmentItem(
+                                        assetName = item.getString("asset_name"),
+                                        quantity = item.getDouble("quantity"),
+                                        avgBuyPrice = item.getDouble("buy_price"),
+                                        currentPrice = item.optDouble("current_price", item.getDouble("buy_price")),
+                                        oneDayChangePrice = item.optDouble("one_day_change", 0.0)
+                                    )
+                                )
+                            }
+                            withContext(Dispatchers.Main) {
+                                investmentList = fetchedList
+                                isLoading = false
+                            }
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("API_ERROR", "Error fetching investments: ${e.message}")
+                withContext(Dispatchers.Main) { isLoading = false }
+            }
+        }
+    }
+
+    // Screen load hote hi API call
+    LaunchedEffect(Unit) {
+        fetchInvestments()
     }
 
     val totalInvested = investmentList.sumOf { it.quantity * it.avgBuyPrice }
@@ -62,7 +124,7 @@ fun InvestmentScreen(onBackClick: () -> Unit) {
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { /* TODO: Open Add Form */ },
+                onClick = { showAddSheet = true },
                 containerColor = Color(0xFF00A36C), 
                 contentColor = Color.White,
                 shape = CircleShape
@@ -72,35 +134,158 @@ fun InvestmentScreen(onBackClick: () -> Unit) {
         },
         containerColor = Color(0xFFF8F9FA)
     ) { paddingValues ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(horizontal = 12.dp)
+        if (isLoading) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = Color(0xFF00A36C))
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .padding(horizontal = 12.dp)
+            ) {
+                item {
+                    InvestmentSummaryCard(
+                        itemCount = investmentList.size,
+                        totalCurrent = totalCurrent,
+                        total1DChange = total1DChange,
+                        total1DPercent = total1DPercent,
+                        totalReturn = totalReturn,
+                        totalReturnPercent = totalReturnPercent,
+                        totalInvested = totalInvested
+                    )
+                    Spacer(modifier = Modifier.height(24.dp))
+                    
+                    ListHeaderRow()
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+
+                items(investmentList) { item ->
+                    InvestmentListItem(item)
+                    HorizontalDivider(color = Color.LightGray.copy(alpha = 0.3f), thickness = 1.dp, modifier = Modifier.padding(vertical = 8.dp))
+                }
+            }
+        }
+    }
+
+    // ==========================================
+    // BOTTOM SHEET FOR ADDING INVESTMENT
+    // ==========================================
+    if (showAddSheet) {
+        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        
+        ModalBottomSheet(
+            onDismissRequest = { showAddSheet = false },
+            sheetState = sheetState,
+            containerColor = Color.White,
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
         ) {
-            item {
-                InvestmentSummaryCard(
-                    itemCount = investmentList.size,
-                    totalCurrent = totalCurrent,
-                    total1DChange = total1DChange,
-                    total1DPercent = total1DPercent,
-                    totalReturn = totalReturn,
-                    totalReturnPercent = totalReturnPercent,
-                    totalInvested = totalInvested
+            var assetName by remember { mutableStateOf("") }
+            var assetType by remember { mutableStateOf("Stock") }
+            var quantity by remember { mutableStateOf("") }
+            var buyPrice by remember { mutableStateOf("") }
+            var date by remember { mutableStateOf("") } // Optional
+            var isSubmitting by remember { mutableStateOf(false) }
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp)
+            ) {
+                Text("Add New Investment", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = Color.Black)
+                Spacer(modifier = Modifier.height(16.dp))
+
+                OutlinedTextField(
+                    value = assetName, onValueChange = { assetName = it },
+                    label = { Text("Asset Name (e.g. SBI)") },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedTextField(
+                        value = quantity, onValueChange = { quantity = it },
+                        label = { Text("Quantity") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f), singleLine = true
+                    )
+                    OutlinedTextField(
+                        value = buyPrice, onValueChange = { buyPrice = it },
+                        label = { Text("Buy Price (₹)") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f), singleLine = true
+                    )
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+
+                OutlinedTextField(
+                    value = date, onValueChange = { date = it },
+                    label = { Text("Date (Optional)") },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true
                 )
                 Spacer(modifier = Modifier.height(24.dp))
-                
-                ListHeaderRow()
-                Spacer(modifier = Modifier.height(8.dp))
-            }
 
-            items(investmentList) { item ->
-                InvestmentListItem(item)
-                HorizontalDivider(color = Color.LightGray.copy(alpha = 0.3f), thickness = 1.dp, modifier = Modifier.padding(vertical = 8.dp))
+                Button(
+                    onClick = {
+                        val qty = quantity.toDoubleOrNull() ?: 0.0
+                        val price = buyPrice.toDoubleOrNull() ?: 0.0
+                        if (assetName.isNotBlank() && qty > 0 && price > 0) {
+                            isSubmitting = true
+                            coroutineScope.launch(Dispatchers.IO) {
+                                try {
+                                    val jsonBody = JSONObject().apply {
+                                        put("action", "add_investment")
+                                        put("username", username)
+                                        put("inv_date", date)
+                                        put("asset_name", assetName)
+                                        put("asset_type", assetType)
+                                        put("quantity", qty)
+                                        put("buy_price", price)
+                                        put("invested_value", qty * price)
+                                        put("current_price", price) // Shuru mein current price same as buy price
+                                        put("current_value", qty * price)
+                                        put("one_day_return", 0.0)
+                                        put("total_return_rupee", 0.0)
+                                        put("total_return_percent", 0.0)
+                                        put("broker", "")
+                                        put("notes", "")
+                                    }
+                                    
+                                    val requestBody = jsonBody.toString().toRequestBody("application/json".toMediaTypeOrNull())
+                                    val request = Request.Builder().url(SCRIPT_URL).post(requestBody).build()
+                                    OkHttpClient().newCall(request).execute()
+
+                                    withContext(Dispatchers.Main) {
+                                        isSubmitting = false
+                                        showAddSheet = false
+                                        fetchInvestments() // Sheet band hone par list refresh hogi
+                                    }
+                                } catch (e: Exception) {
+                                    withContext(Dispatchers.Main) { isSubmitting = false }
+                                }
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth().height(50.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00A36C)),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    if (isSubmitting) {
+                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                    } else {
+                        Text("Save Investment", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+                Spacer(modifier = Modifier.height(32.dp))
             }
         }
     }
 }
+
+// ==========================================
+// PICHLE WALE HI SAME UI COMPONENTS HAIN (No Design Changes)
+// ==========================================
 
 @Composable
 fun InvestmentSummaryCard(
@@ -122,10 +307,10 @@ fun InvestmentSummaryCard(
                 Text("INVESTMENT ($itemCount)", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
                 Row {
                     IconButton(onClick = { }, modifier = Modifier.size(32.dp)) {
-                        Icon(Icons.Default.Info, contentDescription = "Info", tint = Color.DarkGray, modifier = Modifier.size(20.dp))
+                        Icon(Icons.Outlined.Visibility, contentDescription = "Hide", tint = Color.DarkGray, modifier = Modifier.size(20.dp))
                     }
                     IconButton(onClick = { }, modifier = Modifier.size(32.dp)) {
-                        Icon(Icons.Default.List, contentDescription = "Analytics", tint = Color.DarkGray, modifier = Modifier.size(20.dp))
+                        Icon(Icons.Outlined.BarChart, contentDescription = "Analytics", tint = Color.DarkGray, modifier = Modifier.size(20.dp))
                     }
                     IconButton(onClick = { }, modifier = Modifier.size(32.dp)) {
                         Icon(Icons.Default.MoreVert, contentDescription = "More", tint = Color.DarkGray, modifier = Modifier.size(20.dp))
