@@ -41,12 +41,12 @@ fun ProfileScreen(username: String, paddingValues: PaddingValues, onLogout: () -
         
         Spacer(modifier = Modifier.height(32.dp))
 
-        // 2. Options List
+        // 2. Options List (Icons updated here)
         ProfileOptionRow(Icons.Default.Lock, "Security Lock", onClick = { /* TODO: Next step logic */ })
-        ProfileOptionRow(Icons.Default.ArrowDropDown, "Data Download", onClick = { /* TODO: Next step logic */ }) 
-        ProfileOptionRow(Icons.Default.AccountBox, "Currency", onClick = { /* TODO: Next step logic */ }) 
-        ProfileOptionRow(Icons.Default.Settings, "Theme", onClick = { /* TODO: Next step logic */ }) 
-        ProfileOptionRow(Icons.Default.Email, "Help & Support", onClick = { /* TODO: Next step logic */ }) 
+        ProfileOptionRow(Icons.Default.Download, "Data Download", onClick = { /* TODO: Next step logic */ }) 
+        ProfileOptionRow(Icons.Default.CurrencyRupee, "Currency", onClick = { /* TODO: Next step logic */ }) 
+        ProfileOptionRow(Icons.Default.Palette, "Theme", onClick = { /* TODO: Next step logic */ }) 
+        ProfileOptionRow(Icons.Default.SupportAgent, "Help & Support", onClick = { /* TODO: Next step logic */ }) 
         ProfileOptionRow(Icons.Default.Info, "App Update & Info", onClick = { /* TODO: Next step logic */ })
         
         Spacer(modifier = Modifier.height(32.dp))
