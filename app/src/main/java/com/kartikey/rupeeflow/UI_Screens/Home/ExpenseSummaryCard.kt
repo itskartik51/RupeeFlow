@@ -5,7 +5,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-// NAYA IMPORT: Outlined icons ke liye
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.*
@@ -23,7 +22,7 @@ fun ExpenseSummaryCard(
     thisMonthTotal: Double, 
     thisYearTotal: Double, 
     isLoading: Boolean, 
-    onRefresh: () -> Unit = {}, // NAYA: Refresh action ke liye pass kiya
+    onRefresh: () -> Unit = {}, 
     onClick: () -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -32,49 +31,50 @@ fun ExpenseSummaryCard(
     val displayAmount = if (filterText == "Year") thisYearTotal else thisMonthTotal
 
     Card(
-        modifier = Modifier.fillMaxWidth(), // Yahan se .clickable HATA diya
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFCDD2)), 
+        modifier = Modifier.fillMaxWidth(), 
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFCDD2)), // Pink/Red Theme
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(0.dp) 
     ) {
-        Column(modifier = Modifier.padding(20.dp)) {
+        // PADDING KAM KI (20dp -> 16dp) taaki elements right/edges ke paas shift ho jayein
+        Column(modifier = Modifier.padding(16.dp)) {
             
             // --- TOP ROW: Title & Month/Year Dropdown ---
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top
+                verticalAlignment = Alignment.CenterVertically // Dono ki height same kar di
             ) {
-                // Top-Left: Total Expenses (Red Text)
+                // Top-Left: Total Expenses (Ab Black color mein)
                 Text(
                     text = "Total Expenses", 
-                    color = Color(0xFFC62828).copy(alpha = 0.8f), 
+                    color = Color.Black.copy(alpha = 0.8f), 
                     fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(top = 4.dp)
+                    fontWeight = FontWeight.Bold
                 )
 
-                // Top-Right: Dropdown Button 
+                // Top-Right: Dropdown Button (Minimalistic Box)
                 Box {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
+                            .clip(RoundedCornerShape(6.dp)) // Corners thode sharp kiye
                             .clickable { expanded = true }
-                            .background(Color(0xFFC62828).copy(alpha = 0.15f))
-                            .padding(horizontal = 8.dp, vertical = 4.dp) // PADDING KAM KI (Button chota)
+                            .background(Color(0xFFC62828).copy(alpha = 0.08f)) // Background aur light kiya
+                            .padding(horizontal = 8.dp, vertical = 4.dp) // Box ko chota/slim kiya
                     ) {
                         Text(
                             text = filterText, 
                             color = Color.Black, 
-                            fontSize = 11.sp, // TEXT SIZE KAM KIYA
+                            fontSize = 11.sp, 
                             fontWeight = FontWeight.Bold
                         )
+                        Spacer(modifier = Modifier.width(2.dp))
                         Icon(
                             imageVector = Icons.Outlined.KeyboardArrowDown,
                             contentDescription = "Select Filter",
                             tint = Color.Black, 
-                            modifier = Modifier.size(14.dp) // ICON CHOTA KIYA
+                            modifier = Modifier.size(14.dp)
                         )
                     }
 
@@ -95,61 +95,59 @@ fun ExpenseSummaryCard(
                 }
             }
             
-            Spacer(modifier = Modifier.height(6.dp)) // GAP KAM KIYA (Amount ko upar sarkane ke liye)
+            // AMOUNT KO UPAR SHIFT KIYA
+            Spacer(modifier = Modifier.height(10.dp)) 
 
-            // --- BOTTOM ROW: Amount, Refresh & View History Button ---
+            if (isLoading) {
+                CircularProgressIndicator(color = Color.Black, modifier = Modifier.size(24.dp))
+            } else {
+                Text(
+                    text = "₹${displayAmount.toInt()}", 
+                    fontWeight = FontWeight.ExtraBold, 
+                    fontSize = 36.sp, 
+                    color = Color.Black
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp)) // Bottom row ko niche dhakelne ke liye space
+
+            // --- BOTTOM ROW: Refresh/Budget & View History Button ---
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Bottom
+                verticalAlignment = Alignment.CenterVertically // Sabko same height level par la diya
             ) {
-                // Bottom-Left: Amount aur Refresh/Budget Text
-                Column {
-                    if (isLoading) {
-                        CircularProgressIndicator(color = Color.Black, modifier = Modifier.size(24.dp))
-                    } else {
-                        Text(
-                            text = "₹${displayAmount.toInt()}", 
-                            fontWeight = FontWeight.ExtraBold, 
-                            fontSize = 36.sp, 
-                            color = Color.Black
-                        )
-                    }
-                    
-                    Spacer(modifier = Modifier.height(4.dp))
-                    
-                    // NAYA: Refresh Icon aur Budget Limit
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Outlined.Refresh,
-                            contentDescription = "Refresh Data",
-                            tint = Color.Black.copy(alpha = 0.7f),
-                            modifier = Modifier
-                                .size(16.dp)
-                                .clickable { onRefresh() }
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "Budget Limit ₹0.00 (0.0%)",
-                            color = Color.Black.copy(alpha = 0.6f),
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
+                // Bottom-Left: Refresh Icon aur Budget Text
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Outlined.Refresh,
+                        contentDescription = "Refresh Data",
+                        tint = Color.Black.copy(alpha = 0.7f),
+                        modifier = Modifier
+                            .size(18.dp)
+                            .clickable { onRefresh() }
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Budget Limit ₹0.00 (0.0%)",
+                        color = Color.Black.copy(alpha = 0.7f),
+                        fontSize = 11.sp, // Font size badi ki (10 -> 11)
+                        fontWeight = FontWeight.Medium
+                    )
                 }
 
-                // Bottom-Right: View History Button
+                // Bottom-Right: View History Button (Minimalistic Box)
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .clickable { onClick() } // AB SIRF YAHI CLICKABLE HAI
-                        .background(Color(0xFFC62828).copy(alpha = 0.15f))
-                        .padding(horizontal = 10.dp, vertical = 4.dp) // PADDING KAM KI
+                        .clip(RoundedCornerShape(6.dp)) // Corners sharp
+                        .clickable { onClick() } 
+                        .background(Color(0xFFC62828).copy(alpha = 0.08f)) // Background light
+                        .padding(horizontal = 10.dp, vertical = 4.dp) // Box ko slim kiya
                 ) {
                     Text(
                         text = "View History", 
                         color = Color.Black, 
-                        fontSize = 11.sp, // TEXT SIZE KAM KIYA
+                        fontSize = 11.sp, 
                         fontWeight = FontWeight.Bold
                     )
                 }
