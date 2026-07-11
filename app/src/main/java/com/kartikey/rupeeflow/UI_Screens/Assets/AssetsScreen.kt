@@ -1,13 +1,11 @@
 package com.kartikey.rupeeflow.UI_Screens.Assets
 
-import androidx.compose.foundation.BorderStroke // Fix 1: Missing Import Added
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -18,7 +16,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 @Composable
-fun AssetsScreen(paddingValues: PaddingValues) {
+fun AssetsScreen(paddingValues: PaddingValues, username: String) { // FIX: username parameter add kiya
     var currentView by remember { mutableStateOf("Main") }
 
     if (currentView == "Main") {
@@ -76,7 +74,8 @@ fun AssetsScreen(paddingValues: PaddingValues) {
             }
         }
     } else if (currentView == "InvestmentDetails") {
-        InvestmentScreen(onBackClick = { currentView = "Main" })
+        // FIX: username aage InvestmentScreen ko pass kar diya
+        InvestmentScreen(onBackClick = { currentView = "Main" }, username = username)
     }
 }
 
@@ -91,7 +90,7 @@ fun GridItemCard(title: String, amount: String, lineColor: Color) {
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
-            horizontalAlignment = Alignment.Start // Fix 2: Changed from crossAxisAlignment
+            horizontalAlignment = Alignment.Start
         ) {
             Text(text = title, color = Color.Gray, fontSize = 11.sp, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(8.dp))
