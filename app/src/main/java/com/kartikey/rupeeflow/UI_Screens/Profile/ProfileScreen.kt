@@ -20,7 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 @Composable
-fun ProfileScreen(username: String, email: String, paddingValues: PaddingValues) {
+fun ProfileScreen(username: String, paddingValues: PaddingValues, onLogout: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -37,22 +37,22 @@ fun ProfileScreen(username: String, email: String, paddingValues: PaddingValues)
         }
         Spacer(modifier = Modifier.height(16.dp))
         Text(username, fontWeight = FontWeight.ExtraBold, fontSize = 22.sp)
-        Text(email, color = Color.Gray, fontSize = 14.sp)
+        Text("contact@rupeeflow.com", color = Color.Gray, fontSize = 14.sp) // Dummy email for now
         
         Spacer(modifier = Modifier.height(32.dp))
 
         // 2. Options List
         ProfileOptionRow(Icons.Default.Lock, "Security Lock", onClick = { /* TODO: Next step logic */ })
-        ProfileOptionRow(Icons.Default.Download, "Data Download", onClick = { /* TODO: Next step logic */ })
-        ProfileOptionRow(Icons.Default.AttachMoney, "Currency", onClick = { /* TODO: Next step logic */ })
-        ProfileOptionRow(Icons.Default.Palette, "Theme", onClick = { /* TODO: Next step logic */ })
-        ProfileOptionRow(Icons.Default.Support, "Help & Support", onClick = { /* TODO: Next step logic */ })
+        ProfileOptionRow(Icons.Default.ArrowDropDown, "Data Download", onClick = { /* TODO: Next step logic */ }) 
+        ProfileOptionRow(Icons.Default.AccountBox, "Currency", onClick = { /* TODO: Next step logic */ }) 
+        ProfileOptionRow(Icons.Default.Settings, "Theme", onClick = { /* TODO: Next step logic */ }) 
+        ProfileOptionRow(Icons.Default.Email, "Help & Support", onClick = { /* TODO: Next step logic */ }) 
         ProfileOptionRow(Icons.Default.Info, "App Update & Info", onClick = { /* TODO: Next step logic */ })
         
         Spacer(modifier = Modifier.height(32.dp))
 
-        // 3. Logout
-        ProfileOptionRow(Icons.Default.ExitToApp, "Logout", textColor = Color.Red, onClick = { /* TODO: Next step logic */ })
+        // 3. Logout (Isme onLogout() direct connect kar diya hai)
+        ProfileOptionRow(Icons.Default.ExitToApp, "Logout", textColor = Color.Red, onClick = { onLogout() })
     }
 }
 
