@@ -4,177 +4,225 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.outlined.BarChart
+import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import java.text.NumberFormat
+import java.util.Locale
 
-// Ye Dummy Data class hai (Google Sheet ke I2 se U2 columns jaisi)
 data class InvestmentItem(
     val assetName: String,
-    val assetType: String,
     val quantity: Double,
     val avgBuyPrice: Double,
-    val broker: String,
-    val currentPrice: Double // Abhi dummy live price ke liye
+    val currentPrice: Double,
+    val oneDayChangePrice: Double
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun InvestmentScreen(onBackClick: () -> Unit) {
-    var showAddDialog by remember { mutableStateOf(false) }
-
-    // Dummy data (Jab API banegi to ye data Google sheet se aayega)
     val investmentList = remember {
-        mutableStateListOf(
-            InvestmentItem("SBIN", "Stock", 36.0, 900.0, "Zerodha", 1080.0),
-            InvestmentItem("Jio BlackRock Flexi Cap", "Mutual Fund", 150.0, 100.0, "Groww", 112.5)
+        listOf(
+            InvestmentItem("SBI", 36.0, 950.0, 1036.0, 13.90),
+            InvestmentItem("Jio BlackRock", 150.0, 120.0, 112.5, -2.50) 
         )
     }
+
+    val totalInvested = investmentList.sumOf { it.quantity * it.avgBuyPrice }
+    val totalCurrent = investmentList.sumOf { it.quantity * it.currentPrice }
+    val total1DChange = investmentList.sumOf { it.quantity * it.oneDayChangePrice }
+    val totalReturn = totalCurrent - totalInvested
+    val totalReturnPercent = if (totalInvested > 0) (totalReturn / totalInvested) * 100 else 0.0
+    val total1DPercent = if (totalCurrent - total1DChange > 0) (total1DChange / (totalCurrent - total1DChange)) * 100 else 0.0
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("My Investments", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
-                    }
+                    IconButton(onClick = onBackClick) { Icon(Icons.Default.ArrowBack, contentDescription = "Back") }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFFF5F5F5))
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFFF8F9FA))
             )
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { showAddDialog = true },
-                containerColor = Color(0xFF2E7D32),
-                contentColor = Color.White
+                onClick = { /* TODO: Open Add Form */ },
+                containerColor = Color(0xFF00A36C), 
+                contentColor = Color.White,
+                shape = CircleShape
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Add Investment")
+                Icon(Icons.Default.Add, contentDescription = "Add Entry")
             }
         },
-        containerColor = Color(0xFFF5F5F5)
+        containerColor = Color(0xFFF8F9FA)
     ) { paddingValues ->
-        
-        // Investment List
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(horizontal = 16.dp)
+                .padding(horizontal = 12.dp) // Thoda padding kam kiya taaki 4 columns easily fit ho jayein
         ) {
-            items(investmentList) { item ->
-                InvestmentCard(item)
-                Spacer(modifier = Modifier.height(12.dp))
+            item {
+                InvestmentSummaryCard(
+                    itemCount = investmentList.size,
+                    totalCurrent = totalCurrent,
+                    total1DChange = total1DChange,
+                    total1DPercent = total1DPercent,
+                    totalReturn = totalReturn,
+                    totalReturnPercent = totalReturnPercent,
+                    totalInvested = totalInvested
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                ListHeaderRow()
+                Spacer(modifier = Modifier.height(8.dp))
             }
-        }
 
-        // Add Investment Form (Dialog)
-        if (showAddDialog) {
-            AddInvestmentDialog(
-                onDismiss = { showAddDialog = false },
-                onSave = { newItem ->
-                    investmentList.add(newItem)
-                    showAddDialog = false
-                    // TODO: Yahan API call lagayenge Google Sheet me save karne ke liye
-                }
-            )
+            items(investmentList) { item ->
+                InvestmentListItem(item)
+                HorizontalDivider(color = Color.LightGray.copy(alpha = 0.3f), thickness = 1.dp, modifier = Modifier.padding(vertical = 8.dp))
+            }
         }
     }
 }
 
 @Composable
-fun InvestmentCard(item: InvestmentItem) {
-    val investedValue = item.quantity * item.avgBuyPrice
-    val currentValue = item.quantity * item.currentPrice
-    val totalReturn = currentValue - investedValue
-    val returnColor = if (totalReturn >= 0) Color(0xFF2E7D32) else Color(0xFFD32F2F)
-
+fun InvestmentSummaryCard(
+    itemCount: Int, totalCurrent: Double, total1DChange: Double, total1DPercent: Double, 
+    totalReturn: Double, totalReturnPercent: Double, totalInvested: Double
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(2.dp),
-        shape = RoundedCornerShape(12.dp)
+        shape = RoundedCornerShape(16.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(item.assetName, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                Text(item.assetType, color = Color.Gray, fontSize = 12.sp)
+        Column(modifier = Modifier.padding(20.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(), 
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("INVESTMENT ($itemCount)", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                Row {
+                    IconButton(onClick = { }, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Outlined.Visibility, contentDescription = "Hide", tint = Color.DarkGray, modifier = Modifier.size(20.dp))
+                    }
+                    IconButton(onClick = { }, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Outlined.BarChart, contentDescription = "Analytics", tint = Color.DarkGray, modifier = Modifier.size(20.dp))
+                    }
+                    IconButton(onClick = { }, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Default.MoreVert, contentDescription = "More", tint = Color.DarkGray, modifier = Modifier.size(20.dp))
+                    }
+                }
             }
+
+            Text(text = formatRupee(totalCurrent), fontWeight = FontWeight.ExtraBold, fontSize = 32.sp, color = Color.Black)
+            
+            Spacer(modifier = Modifier.height(20.dp))
+            HorizontalDivider(color = Color.LightGray.copy(alpha = 0.4f))
+            Spacer(modifier = Modifier.height(16.dp))
+
+            SummaryRow("1D returns", total1DChange, total1DPercent)
             Spacer(modifier = Modifier.height(12.dp))
+            
+            SummaryRow("Total returns", totalReturn, totalReturnPercent)
+            Spacer(modifier = Modifier.height(12.dp))
+            
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Column {
-                    Text("Invested (₹)", color = Color.Gray, fontSize = 12.sp)
-                    Text("₹${investedValue.toInt()}", fontWeight = FontWeight.SemiBold)
-                }
-                Column(horizontalAlignment = Alignment.End) {
-                    Text("Current (₹)", color = Color.Gray, fontSize = 12.sp)
-                    Text("₹${currentValue.toInt()}", fontWeight = FontWeight.SemiBold)
-                }
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Qty: ${item.quantity} | Avg: ₹${item.avgBuyPrice}", color = Color.Gray, fontSize = 12.sp)
-                Text(
-                    text = "${if (totalReturn >= 0) "+" else ""}₹${totalReturn.toInt()}",
-                    color = returnColor,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp
-                )
+                Text("Invested", color = Color.DarkGray, fontSize = 14.sp)
+                Text(formatRupee(totalInvested), color = Color.Black, fontWeight = FontWeight.Medium, fontSize = 14.sp)
             }
         }
     }
 }
 
 @Composable
-fun AddInvestmentDialog(onDismiss: () -> Unit, onSave: (InvestmentItem) -> Unit) {
-    var assetName by remember { mutableStateOf("") }
-    var assetType by remember { mutableStateOf("Stock") }
-    var quantity by remember { mutableStateOf("") }
-    var buyPrice by remember { mutableStateOf("") }
-    var broker by remember { mutableStateOf("") }
-    var notes by remember { mutableStateOf("") }
+fun SummaryRow(label: String, amount: Double, percent: Double) {
+    val isPositive = amount >= 0
+    val color = if (isPositive) Color(0xFF00A36C) else Color(0xFFD32F2F)
+    val sign = if (isPositive) "+" else ""
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Add Investment", fontWeight = FontWeight.Bold) },
-        text = {
-            Column {
-                OutlinedTextField(value = assetName, onValueChange = { assetName = it }, label = { Text("Asset Name (e.g. SBIN)") }, singleLine = true)
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(value = assetType, onValueChange = { assetType = it }, label = { Text("Type (Stock/MF/ETF)") }, singleLine = true)
-                Spacer(modifier = Modifier.height(8.dp))
-                Row {
-                    OutlinedTextField(value = quantity, onValueChange = { quantity = it }, label = { Text("Qty") }, modifier = Modifier.weight(1f), singleLine = true)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    OutlinedTextField(value = buyPrice, onValueChange = { buyPrice = it }, label = { Text("Avg Price") }, modifier = Modifier.weight(1f), singleLine = true)
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(value = broker, onValueChange = { broker = it }, label = { Text("Broker (e.g. Zerodha)") }, singleLine = true)
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    val qty = quantity.toDoubleOrNull() ?: 0.0
-                    val price = buyPrice.toDoubleOrNull() ?: 0.0
-                    if (assetName.isNotBlank() && qty > 0 && price > 0) {
-                        onSave(InvestmentItem(assetName, assetType, qty, price, broker, price)) // Default current price = buy price
-                    }
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
-            ) { Text("Save") }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel", color = Color.Gray) }
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(label, color = Color.DarkGray, fontSize = 14.sp)
+        Text(
+            text = "$sign${formatRupee(amount)} ($sign${String.format("%.2f", percent)}%)",
+            color = color, fontWeight = FontWeight.Medium, fontSize = 14.sp
+        )
+    }
+}
+
+// Yahan maine header ko exactly aapke screenshots ki tarah single line me kar diya hai
+@Composable
+fun ListHeaderRow() {
+    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
+        Text("Data", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.Gray, modifier = Modifier.weight(0.8f))
+        Text("Market Price (1D %)", fontSize = 10.sp, color = Color.Gray, textAlign = TextAlign.End, maxLines = 1, modifier = Modifier.weight(1.3f))
+        Text("Current (Invested)", fontSize = 10.sp, color = Color.Gray, textAlign = TextAlign.End, maxLines = 1, modifier = Modifier.weight(1.2f))
+        Text("Returns (%)", fontSize = 10.sp, color = Color.Gray, textAlign = TextAlign.End, maxLines = 1, modifier = Modifier.weight(1f))
+    }
+}
+
+// Yahan Data exactly () wale logic ke hisaab se drop ho raha hai
+@Composable
+fun InvestmentListItem(item: InvestmentItem) {
+    val currentVal = item.quantity * item.currentPrice
+    val investedVal = item.quantity * item.avgBuyPrice
+    val totalRet = currentVal - investedVal
+    val totalRetPct = if (investedVal > 0) (totalRet / investedVal) * 100 else 0.0
+    val oneDPct = if (item.currentPrice - item.oneDayChangePrice > 0) (item.oneDayChangePrice / (item.currentPrice - item.oneDayChangePrice)) * 100 else 0.0
+
+    val oneDayColor = if (item.oneDayChangePrice >= 0) Color(0xFF00A36C) else Color(0xFFD32F2F)
+    val oneDaySign = if (item.oneDayChangePrice >= 0) "+" else ""
+    
+    val totalRetColor = if (totalRet >= 0) Color(0xFF00A36C) else Color(0xFFD32F2F)
+    val totalRetSign = if (totalRet >= 0) "+" else ""
+
+    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        // Col 1: Data (Name & Shares)
+        Column(modifier = Modifier.weight(0.8f)) {
+            Text(item.assetName, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color.Black, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text("${item.quantity.toInt()} shares", fontSize = 11.sp, color = Color.Gray)
         }
-    )
+        
+        // Col 2: Market Price \n (1D %) -> Exactly Screenshot #2
+        Column(modifier = Modifier.weight(1.3f), horizontalAlignment = Alignment.End) {
+            Text(formatRupee(item.currentPrice), fontSize = 13.sp, color = Color.Black, fontWeight = FontWeight.Medium)
+            Text("$oneDaySign${item.oneDayChangePrice} ($oneDaySign${String.format("%.2f", oneDPct)}%)", fontSize = 11.sp, color = oneDayColor)
+        }
+        
+        // Col 3: Current \n (Invested) -> Exactly Screenshot #3
+        Column(modifier = Modifier.weight(1.2f), horizontalAlignment = Alignment.End) {
+            Text(formatRupee(currentVal), fontSize = 13.sp, color = Color.Black, fontWeight = FontWeight.Medium)
+            Text("(${formatRupee(investedVal)})", fontSize = 11.sp, color = Color.Gray)
+        }
+        
+        // Col 4: Returns \n (%) -> Exactly Screenshot #4
+        Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.End) {
+            Text("$totalRetSign${formatRupee(totalRet)}", fontSize = 13.sp, color = Color.Black, fontWeight = FontWeight.Medium)
+            Text("($totalRetSign${String.format("%.2f", totalRetPct)}%)", fontSize = 11.sp, color = totalRetColor)
+        }
+    }
+}
+
+fun formatRupee(amount: Double): String {
+    val format = NumberFormat.getCurrencyInstance(Locale("en", "IN"))
+    format.maximumFractionDigits = 2
+    return format.format(amount).replace("-₹", "-₹") 
 }
