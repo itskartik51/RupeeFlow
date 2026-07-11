@@ -12,7 +12,7 @@ import androidx.compose.ui.unit.sp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddInvestmentForm(username: String) { // Yahan username add kiya
+fun AddInvestmentForm(username: String) {
     var assetType by remember { mutableStateOf("Stock") }
     var assetName by remember { mutableStateOf("") }
     var quantity by remember { mutableStateOf("") }
