@@ -19,10 +19,10 @@ import androidx.compose.ui.unit.sp
 fun ExpenseSummaryCard(thisMonthTotal: Double, thisYearTotal: Double, isLoading: Boolean, onClick: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth().clickable { onClick() },
-        // Ye soft light red shade hai jo diagnosis card ki tarah light aur airy lagega
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFEF9A9A)), 
+        // Yahan aapka original proper red hai, bas 85% opacity ke sath taaki airy lage
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFD32F2F).copy(alpha = 0.85f)), 
         shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(4.dp) // Elevation thoda kam kiya hai taki aur light lage
+        elevation = CardDefaults.cardElevation(0.dp) // Elevation 0 kar diya taki flat aur clean (airy) lage
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
             Text("Total Expenses", color = Color.White.copy(alpha = 0.9f), fontSize = 14.sp)
