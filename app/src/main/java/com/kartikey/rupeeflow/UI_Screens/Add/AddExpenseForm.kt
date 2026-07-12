@@ -39,54 +39,150 @@ fun AddExpenseForm(username: String, onExpenseAdded: (TransactionModel) -> Unit)
     var remarks by remember { mutableStateOf("") }
     var amount by remember { mutableStateOf("") }
     var expanded by remember { mutableStateOf(false) }
-    var isSubmitting by remember { mutableStateOf(false) }
     
+    var isSubmitting by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
-    
-    // Click Animation State
-    var pressed by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(if (pressed) 0.95f else 1f)
 
-    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(4.dp), shape = RoundedCornerShape(16.dp)) {
+    // Touch Animation State
+    var isPressed by remember { mutableStateOf(false) }
+    val buttonScale by animateFloatAsState(targetValue = if (isPressed) 0.95f else 1f, label = "ButtonScale")
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(4.dp),
+        shape = RoundedCornerShape(16.dp)
+    ) {
         Column(modifier = Modifier.padding(20.dp)) {
-            ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = !expanded }) {
-                OutlinedTextField(value = category, onValueChange = {}, readOnly = true, label = { Text("Category") }, trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) }, modifier = Modifier.fillMaxWidth().menuAnchor(), shape = RoundedCornerShape(12.dp))
-                ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            
+            ExposedDropdownMenuBox(
+                expanded = expanded,
+                onExpandedChange = { expanded = !expanded }
+            ) {
+                OutlinedTextField(
+                    value = category,
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Category") },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                    modifier = Modifier.fillMaxWidth().menuAnchor(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+                ExposedDropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false }
+                ) {
                     listOf("Food", "Transport", "Shopping", "Bills", "Others").forEach { selectionOption ->
-                        DropdownMenuItem(text = { Text(selectionOption) }, onClick = { category = selectionOption; expanded = false })
+                        DropdownMenuItem(
+                            text = { Text(selectionOption) },
+                            onClick = {
+                                category = selectionOption
+                                expanded = false
+                            }
+                        )
                     }
                 }
             }
+
             Spacer(modifier = Modifier.height(16.dp))
+
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(value = description, onValueChange = { description = it }, label = { Text("Description") }, modifier = Modifier.weight(1f), singleLine = true, shape = RoundedCornerShape(12.dp))
-                OutlinedTextField(value = remarks, onValueChange = { remarks = it }, label = { Text("Remarks") }, modifier = Modifier.weight(1f), singleLine = true, shape = RoundedCornerShape(12.dp))
+                OutlinedTextField(
+                    value = description, onValueChange = { description = it },
+                    label = { Text("Description") },
+                    modifier = Modifier.weight(1f), singleLine = true,
+                    shape = RoundedCornerShape(12.dp)
+                )
+                OutlinedTextField(
+                    value = remarks, onValueChange = { remarks = it },
+                    label = { Text("Remarks") },
+                    modifier = Modifier.weight(1f), singleLine = true,
+                    shape = RoundedCornerShape(12.dp)
+                )
             }
+
             Spacer(modifier = Modifier.height(16.dp))
-            OutlinedTextField(value = amount, onValueChange = { amount = it }, label = { Text("Amount") }, prefix = { Text("₹ ", fontWeight = FontWeight.Bold) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth(), singleLine = true, shape = RoundedCornerShape(12.dp))
-            
-            Button(
-                onClick = {
-                    if (amount.isNotBlank() && category.isNotBlank()) {
-                        isSubmitting = true
-                        // PHASE 3: OPTIMISTIC UPDATE
-                        val newEntry = TransactionModel(SimpleDateFormat("dd-MM-yyyy hh:mm a", Locale.getDefault()).format(Date()), amount.toDoubleOrNull() ?: 0.0, category, description, remarks)
-                        onExpenseAdded(newEntry) 
-                        
-                        coroutineScope.launch(Dispatchers.IO) {
-                            try {
-                                val json = JSONObject().apply { put("action", "add_expense"); put("username", username); put("amount", amount); put("category", category); put("detail1", description); put("detail2", remarks) }
-                                val client = OkHttpClient(); val body = json.toString().toRequestBody("application/json".toMediaType()); val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(body).build()
-                                client.newCall(request).execute()
-                                withContext(Dispatchers.Main) { isSubmitting = false; amount = ""; description = ""; remarks = ""; category = "" }
-                            } catch (e: Exception) { withContext(Dispatchers.Main) { isSubmitting = false } }
+
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = amount, 
+                    onValueChange = { amount = it },
+                    label = { Text("Amount") },
+                    prefix = { Text("₹ ", fontWeight = FontWeight.Bold, color = Color.Black) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.weight(1f), 
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp)
+                )
+                
+                Button(
+                    onClick = {
+                        if (amount.isNotBlank() && category.isNotBlank()) {
+                            isSubmitting = true
+                            
+                            // Phase 3: Optimistic Update (List turant update hogi)
+                            val currentDate = SimpleDateFormat("dd-MM-yyyy hh:mm a", Locale.getDefault()).format(Date())
+                            val expenseAmt = amount.toDoubleOrNull() ?: 0.0
+                            val newEntry = TransactionModel(currentDate, expenseAmt, category, description, remarks)
+                            onExpenseAdded(newEntry)
+
+                            coroutineScope.launch(Dispatchers.IO) {
+                                try {
+                                    val json = JSONObject().apply {
+                                        put("action", "add_expense")
+                                        put("username", username)
+                                        put("amount", amount)
+                                        put("category", category)
+                                        put("detail1", description)
+                                        put("detail2", remarks)
+                                    }
+                                    val client = OkHttpClient()
+                                    val body = json.toString().toRequestBody("application/json".toMediaType())
+                                    val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(body).build()
+                                    client.newCall(request).execute()
+
+                                    withContext(Dispatchers.Main) {
+                                        isSubmitting = false
+                                        Toast.makeText(context, "Expense Added Successfully!", Toast.LENGTH_SHORT).show()
+                                        amount = ""; description = ""; remarks = ""; category = ""
+                                    }
+                                } catch (e: Exception) {
+                                    withContext(Dispatchers.Main) {
+                                        isSubmitting = false
+                                        Toast.makeText(context, "Failed to connect to sheet", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            }
+                        } else {
+                            Toast.makeText(context, "Please enter Amount and Category", Toast.LENGTH_SHORT).show()
                         }
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(56.dp)
+                        .padding(top = 8.dp)
+                        .scale(buttonScale)
+                        .pointerInput(Unit) {
+                            detectTapGestures(
+                                onPress = {
+                                    isPressed = true
+                                    tryAwaitRelease()
+                                    isPressed = false
+                                }
+                            )
+                        },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF388E3C)),
+                    shape = RoundedCornerShape(12.dp),
+                    enabled = !isSubmitting
+                ) {
+                    if (isSubmitting) {
+                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                    } else {
+                        Text("Add", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White)
                     }
-                },
-                modifier = Modifier.fillMaxWidth().padding(top = 16.dp).height(56.dp).scale(scale).pointerInput(Unit) { detectTapGestures(onPress = { pressed = true; tryAwaitRelease(); pressed = false }) },
-                shape = RoundedCornerShape(12.dp), enabled = !isSubmitting
-            ) { Text("Add Expense", fontWeight = FontWeight.Bold) }
+                }
+            }
         }
     }
 }
