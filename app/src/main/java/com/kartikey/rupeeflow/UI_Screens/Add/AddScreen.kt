@@ -31,7 +31,6 @@ fun AddScreen(
             .padding(paddingValues)
             .padding(16.dp)
     ) {
-        // NAYA PREMIUM HEADER (<- Add)
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth()
@@ -42,7 +41,7 @@ fun AddScreen(
                 tint = Color(0xFF2E7D32),
                 modifier = Modifier
                     .size(26.dp)
-                    .clickable { /* Future navigation back hook */ }
+                    .clickable { /* Future back navigation */ }
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
