@@ -14,10 +14,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-// Ye imports ab apne aap classes ko dhundh lenge
-import com.kartikey.rupeeflow.UI_Screens.*
-import com.kartikey.rupeeflow.UI_Screens.Home.*
-
 @Composable
 fun AddScreen(
     paddingValues: PaddingValues, 
@@ -25,7 +21,7 @@ fun AddScreen(
     onExpenseAdded: (TransactionModel) -> Unit,
     onInvestmentAdded: () -> Unit
 ) {
-    var selectedTabIndex by remember { mutableIntStateOf(0) }
+    var selectedTabIndex by remember { mutableStateOf(0) }
     val tabs = listOf("Add Expense", "Add Investment")
 
     Column(
