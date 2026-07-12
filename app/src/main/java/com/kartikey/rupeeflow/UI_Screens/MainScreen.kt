@@ -22,6 +22,7 @@ import com.kartikey.rupeeflow.UI_Screens.AddExpense.ExpenseHistoryScreen
 import com.kartikey.rupeeflow.UI_Screens.AddExpense.TransactionModel
 import com.kartikey.rupeeflow.UI_Screens.Add.AddScreen
 import com.kartikey.rupeeflow.UI_Screens.Assets.AssetsScreen
+import com.kartikey.rupeeflow.UI_Screens.Assets.InvestmentItem
 import com.kartikey.rupeeflow.UI_Screens.Analytics.AnalyticsScreen
 import com.kartikey.rupeeflow.UI_Screens.Profile.ProfileScreen
 import kotlinx.coroutines.Dispatchers
@@ -43,19 +44,41 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
     var thisMonthExpenses by remember { mutableDoubleStateOf(0.0) }
     var thisYearExpenses by remember { mutableDoubleStateOf(0.0) }
     var isLoadingExpenses by remember { mutableStateOf(true) }
-    var transactionList by remember { mutableStateOf(emptyList<TransactionModel>()) }
     
-    var investmentCount by remember { mutableIntStateOf(0) }
-    var isLoadingInvestments by remember { mutableStateOf(true) }
+    // Lists holding data for instant load across app
+    var transactionList by remember { mutableStateOf(emptyList<TransactionModel>()) }
+    var investmentList by remember { mutableStateOf(emptyList<InvestmentItem>()) }
     
     var dNavState by remember { mutableStateOf("Connecting to Sheet...") }
     var dBackPresses by remember { mutableIntStateOf(0) }
     var refreshTrigger by remember { mutableIntStateOf(0) }
 
-    // Logic for loading data (Phase 1)[cite: 4, 7]
+    LaunchedEffect(selectedTab, showExpenseHistory, isLoadingExpenses, transactionList.size, investmentList.size) {
+        if (showExpenseHistory) {
+            dNavState = "Expense History"
+        } else if (selectedTab != 0) {
+            dNavState = "Tab $selectedTab"
+        } else {
+            dNavState = if (isLoadingExpenses) {
+                "Syncing Data... ⏳"
+            } else {
+                "Sheet Sync: Expenses (${transactionList.size}) ✅ | Investments (${investmentList.size}) ✅"
+            }
+        }
+    }
+
+    BackHandler(enabled = showExpenseHistory || selectedTab != 0) {
+        dBackPresses++ 
+        if (showExpenseHistory) {
+            showExpenseHistory = false 
+        } else if (selectedTab != 0) {
+            selectedTab = 0 
+        }
+    }
+
+    // Main Combo API Loader
     LaunchedEffect(refreshTrigger) {
         isLoadingExpenses = true
-        isLoadingInvestments = true
         launch(Dispatchers.IO) {
             try {
                 val cal = Calendar.getInstance()
@@ -72,70 +95,156 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                 if (response.isSuccessful && responseData.trim().startsWith("{")) {
                     val jsonResponse = JSONObject(responseData)
                     if (jsonResponse.optString("status") == "success") {
+                        
+                        // 1. Process Expenses
                         val expensesArray = jsonResponse.optJSONArray("expenses")
                         var tempTotal = 0.0
                         var tempMonth = 0.0
                         var tempYear = 0.0
                         val tempHistory = mutableListOf<TransactionModel>()
 
-                        if (expensesArray != null) {
+                        if (expensesArray != null && expensesArray.length() > 0) {
                             val currMonthStr = String.format(Locale.US, "%02d", currM)
                             val currYearStr = currY.toString()
+
                             for (i in 0 until expensesArray.length()) {
                                 val item = expensesArray.getJSONObject(i)
                                 val rawDate = item.optString("date", "").trim()
                                 val rawAmt = item.optString("amount", "0")
                                 val cleanAmt = rawAmt.replace("[^\\d.]".toRegex(), "")
                                 val amt = cleanAmt.toDoubleOrNull() ?: item.optDouble("amount", 0.0)
+                                
                                 if (amt > 0.0) {
-                                    tempTotal += amt
+                                    tempTotal += amt 
                                     tempHistory.add(TransactionModel(rawDate, amt, item.optString("category", "Unknown"), item.optString("detail1", ""), item.optString("detail2", "")))
+                                    
                                     if (rawDate.contains(currYearStr)) {
                                         tempYear += amt
-                                        if (rawDate.contains("-$currMonthStr-")) tempMonth += amt
+                                        if (rawDate.contains("-$currMonthStr-") || rawDate.contains("/$currMonthStr/") || rawDate.startsWith("$currMonthStr-") || rawDate.startsWith("$currMonthStr/")) {
+                                            tempMonth += amt
+                                        }
                                     }
                                 }
                             }
                         }
+
+                        // 2. Process Investments precisely like original parsing
+                        val dataArray = jsonResponse.optJSONArray("investments")
+                        val fetchedList = mutableListOf<InvestmentItem>()
+                        if (dataArray != null) {
+                            for (i in 0 until dataArray.length()) {
+                                val item = dataArray.getJSONObject(i)
+                                fetchedList.add(
+                                    InvestmentItem(
+                                        assetName = item.optString("asset_name", ""),
+                                        quantity = item.optDouble("quantity", 0.0),
+                                        avgBuyPrice = item.optDouble("buy_price", 0.0),
+                                        currentPrice = item.optDouble("current_price", item.optDouble("buy_price", 0.0)),
+                                        oneDayChangePrice = item.optDouble("one_day_change", 0.0)
+                                    )
+                                )
+                            }
+                        }
+
                         withContext(Dispatchers.Main) {
                             thisMonthExpenses = if (tempMonth > 0) tempMonth else tempTotal 
                             thisYearExpenses = if (tempYear > 0) tempYear else tempTotal
                             transactionList = tempHistory.reversed()
-                            investmentCount = jsonResponse.optJSONArray("investments")?.length() ?: 0
+                            investmentList = fetchedList
                             isLoadingExpenses = false
-                            isLoadingInvestments = false
                         }
+                    } else {
+                        withContext(Dispatchers.Main) { isLoadingExpenses = false }
                     }
+                } else {
+                    withContext(Dispatchers.Main) { isLoadingExpenses = false }
                 }
-            } catch (e: Exception) { withContext(Dispatchers.Main) { isLoadingExpenses = false; isLoadingInvestments = false } }
+            } catch (e: Exception) { 
+                withContext(Dispatchers.Main) { isLoadingExpenses = false } 
+            }
         }
     }
 
     Scaffold(
         bottomBar = {
             NavigationBar(containerColor = Color.White, tonalElevation = 8.dp) {
-                NavigationBarItem(selected = selectedTab == 0 && !showExpenseHistory, onClick = { selectedTab = 0; showExpenseHistory = false }, icon = { Icon(Icons.Outlined.Home, contentDescription = "Home") }, label = { Text("Home") }, colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9)))
-                NavigationBarItem(selected = selectedTab == 1, onClick = { selectedTab = 1; showExpenseHistory = false }, icon = { Icon(Icons.Outlined.AccountBalanceWallet, contentDescription = "Assets") }, label = { Text("Assets") }, colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9)))
-                NavigationBarItem(selected = selectedTab == 2, onClick = { selectedTab = 2; showExpenseHistory = false }, icon = { Box(modifier = Modifier.size(48.dp).clip(RoundedCornerShape(14.dp)).background(Color(0xFF2E7D32)), contentAlignment = Alignment.Center) { Icon(Icons.Outlined.Add, contentDescription = "Add", tint = Color.White) } })
-                NavigationBarItem(selected = selectedTab == 3, onClick = { selectedTab = 3; showExpenseHistory = false }, icon = { Icon(Icons.Outlined.PieChart, contentDescription = "Analytics") }, label = { Text("Analytics") }, colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9)))
-                NavigationBarItem(selected = selectedTab == 4, onClick = { selectedTab = 4; showExpenseHistory = false }, icon = { Icon(Icons.Outlined.Person, contentDescription = "Profile") }, label = { Text("Profile") }, colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9)))
+                NavigationBarItem(
+                    selected = selectedTab == 0 && !showExpenseHistory,
+                    onClick = { selectedTab = 0; showExpenseHistory = false },
+                    icon = { Icon(Icons.Outlined.Home, contentDescription = "Home") }, 
+                    label = { Text("Home") },
+                    colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
+                )
+                NavigationBarItem(
+                    selected = selectedTab == 1,
+                    onClick = { selectedTab = 1; showExpenseHistory = false },
+                    icon = { Icon(Icons.Outlined.AccountBalanceWallet, contentDescription = "Assets") }, 
+                    label = { Text("Assets") },
+                    colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
+                )
+                NavigationBarItem(
+                    selected = selectedTab == 2,
+                    onClick = { selectedTab = 2; showExpenseHistory = false },
+                    icon = {
+                        Box(modifier = Modifier.size(48.dp).clip(RoundedCornerShape(14.dp)).background(Color(0xFF2E7D32)), contentAlignment = Alignment.Center) {
+                            Icon(Icons.Outlined.Add, contentDescription = "Add", tint = Color.White) 
+                        }
+                    }
+                )
+                NavigationBarItem(
+                    selected = selectedTab == 3,
+                    onClick = { selectedTab = 3; showExpenseHistory = false },
+                    icon = { Icon(Icons.Outlined.PieChart, contentDescription = "Analytics") }, 
+                    label = { Text("Analytics") },
+                    colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
+                )
+                NavigationBarItem(
+                    selected = selectedTab == 4,
+                    onClick = { selectedTab = 4; showExpenseHistory = false },
+                    icon = { Icon(Icons.Outlined.Person, contentDescription = "Profile") }, 
+                    label = { Text("Profile") },
+                    colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
+                )
             }
         }
     ) { paddingValues ->
-        Crossfade(targetState = Pair(selectedTab, showExpenseHistory), animationSpec = tween(durationMillis = 400)) { state ->
+        Crossfade(
+            targetState = Pair(selectedTab, showExpenseHistory), 
+            animationSpec = tween(durationMillis = 400),
+            label = "Screen Transition"
+        ) { state ->
             val (currentTab, isHistoryVisible) = state
+            
             if (isHistoryVisible) {
-                ExpenseHistoryScreen(paddingValues = paddingValues, history = transactionList, onBackClick = { showExpenseHistory = false })
+                ExpenseHistoryScreen(
+                    paddingValues = paddingValues, 
+                    history = transactionList,
+                    onBackClick = { showExpenseHistory = false }
+                )
             } else {
                 when (currentTab) {
-                    0 -> HomeDashboardDesign(username = username, paddingValues = paddingValues, thisMonthExpenses = thisMonthExpenses, thisYearExpenses = thisYearExpenses, isLoadingExpenses = isLoadingExpenses, dNavState = dNavState, dBackPresses = dBackPresses, onLogout = onLogout, onRefreshExpenses = { refreshTrigger++ }, onExpenseCardClick = { showExpenseHistory = true })
-                    1 -> AssetsScreen(paddingValues = paddingValues, username = username)
-                    // PHASE 3: OPTIMISTIC UPDATES INTEGRATED HERE
+                    0 -> HomeDashboardDesign(
+                        username = username, paddingValues = paddingValues, 
+                        thisMonthExpenses = thisMonthExpenses, thisYearExpenses = thisYearExpenses, isLoadingExpenses = isLoadingExpenses,
+                        dNavState = dNavState, dBackPresses = dBackPresses, 
+                        onLogout = onLogout,
+                        onRefreshExpenses = { refreshTrigger++ }, 
+                        onExpenseCardClick = { showExpenseHistory = true }
+                    )
+                    1 -> AssetsScreen(
+                        paddingValues = paddingValues, 
+                        username = username, 
+                        investmentList = investmentList
+                    )
                     2 -> AddScreen(
                         paddingValues = paddingValues, 
                         username = username,
-                        onExpenseAdded = { newEntry -> transactionList = listOf(newEntry) + transactionList },
-                        onInvestmentAdded = { investmentCount++ }
+                        onExpenseAdded = { newEntry -> 
+                            transactionList = listOf(newEntry) + transactionList 
+                        },
+                        onInvestmentAdded = { 
+                            refreshTrigger++ 
+                        }
                     )
                     3 -> AnalyticsScreen(paddingValues = paddingValues)
                     4 -> ProfileScreen(username = username, paddingValues = paddingValues, onLogout = onLogout)
