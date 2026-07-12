@@ -69,12 +69,13 @@ fun HomeDashboardDesign(
 
         Spacer(modifier = Modifier.height(16.dp)) 
         
+        // YAHAN PARAMETERS FIX KIYE HAIN 100% MATCH KARNE KE LIYE
         ExpenseSummaryCard(
-            thisMonthTotal = thisMonthExpenses, 
-            thisYearTotal = thisYearExpenses, 
-            isLoading = isLoadingExpenses,
-            onRefresh = onRefreshExpenses, // Yahan connect kar diya
-            onClick = onExpenseCardClick
+            thisMonthExpenses = thisMonthExpenses, 
+            thisYearExpenses = thisYearExpenses, 
+            isLoadingExpenses = isLoadingExpenses,
+            onRefreshExpenses = onRefreshExpenses, 
+            onExpenseCardClick = onExpenseCardClick
         )
         
         Spacer(modifier = Modifier.height(16.dp))
