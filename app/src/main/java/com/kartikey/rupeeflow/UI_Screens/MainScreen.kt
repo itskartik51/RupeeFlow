@@ -38,20 +38,20 @@ import java.util.Locale
 
 @Composable
 fun MainScreen(username: String, onLogout: () -> Unit) {
-    var selectedTab by remember { mutableIntStateOf(0) } 
+    var selectedTab by remember { mutableStateOf(0) } 
     var showExpenseHistory by remember { mutableStateOf(false) }
 
-    var thisMonthExpenses by remember { mutableDoubleStateOf(0.0) }
-    var thisYearExpenses by remember { mutableDoubleStateOf(0.0) }
+    // Double types explicitly declared to fix type inference failure
+    var thisMonthExpenses by remember { mutableStateOf<Double>(0.0) }
+    var thisYearExpenses by remember { mutableStateOf<Double>(0.0) }
     var isLoadingExpenses by remember { mutableStateOf(true) }
     
-    // Lists holding data for instant load across app
     var transactionList by remember { mutableStateOf(emptyList<TransactionModel>()) }
     var investmentList by remember { mutableStateOf(emptyList<InvestmentItem>()) }
     
     var dNavState by remember { mutableStateOf("Connecting to Sheet...") }
-    var dBackPresses by remember { mutableIntStateOf(0) }
-    var refreshTrigger by remember { mutableIntStateOf(0) }
+    var dBackPresses by remember { mutableStateOf(0) }
+    var refreshTrigger by remember { mutableStateOf(0) }
 
     LaunchedEffect(selectedTab, showExpenseHistory, isLoadingExpenses, transactionList.size, investmentList.size) {
         if (showExpenseHistory) {
@@ -76,7 +76,6 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
         }
     }
 
-    // Main Combo API Loader
     LaunchedEffect(refreshTrigger) {
         isLoadingExpenses = true
         launch(Dispatchers.IO) {
@@ -96,7 +95,6 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                     val jsonResponse = JSONObject(responseData)
                     if (jsonResponse.optString("status") == "success") {
                         
-                        // 1. Process Expenses
                         val expensesArray = jsonResponse.optJSONArray("expenses")
                         var tempTotal = 0.0
                         var tempMonth = 0.0
@@ -128,7 +126,6 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                             }
                         }
 
-                        // 2. Process Investments precisely like original parsing
                         val dataArray = jsonResponse.optJSONArray("investments")
                         val fetchedList = mutableListOf<InvestmentItem>()
                         if (dataArray != null) {
