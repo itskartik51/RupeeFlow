@@ -21,7 +21,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kartikey.rupeeflow.Cloud_Database.Constants
-import com.kartikey.rupeeflow.UI_Screens.AddExpense.TransactionModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -37,8 +36,6 @@ import java.util.Locale
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddExpenseForm(username: String, onExpenseAdded: (TransactionModel) -> Unit) {
-    
-    // Premium Material Icons Mapping
     val categories = listOf(
         "Food" to Icons.Outlined.Restaurant,
         "Transport" to Icons.Outlined.DirectionsCar,
@@ -46,7 +43,6 @@ fun AddExpenseForm(username: String, onExpenseAdded: (TransactionModel) -> Unit)
         "Bills" to Icons.Outlined.Receipt,
         "Custom" to Icons.Outlined.Edit
     )
-    
     val paymentModes = listOf(
         "Cash" to Icons.Outlined.Payments,
         "UPI" to Icons.Outlined.QrCodeScanner,
@@ -56,16 +52,12 @@ fun AddExpenseForm(username: String, onExpenseAdded: (TransactionModel) -> Unit)
         "Net Banking" to Icons.Outlined.Computer
     )
     
-    // SMART CURSOR LOGIC VARIABLES
     var categoryText by remember { mutableStateOf("") }
-    var isCategoryEditable by remember { mutableStateOf(false) } // Lock/Unlock Cursor
-    
+    var isCategoryEditable by remember { mutableStateOf(false) } 
     var remark1 by remember { mutableStateOf("") }
     var remark2 by remember { mutableStateOf("") }
-    
     var modeText by remember { mutableStateOf("") }
     var modeExpanded by remember { mutableStateOf(false) }
-    
     var amount by remember { mutableStateOf("") }
     
     val todayDate = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
@@ -87,7 +79,6 @@ fun AddExpenseForm(username: String, onExpenseAdded: (TransactionModel) -> Unit)
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
             
-            // 1. SMART EDITABLE CATEGORY DROPDOWN (Premium Material Icons)
             ExposedDropdownMenuBox(
                 expanded = expanded,
                 onExpandedChange = { expanded = !expanded }
@@ -95,7 +86,7 @@ fun AddExpenseForm(username: String, onExpenseAdded: (TransactionModel) -> Unit)
                 OutlinedTextField(
                     value = categoryText,
                     onValueChange = { categoryText = it },
-                    readOnly = !isCategoryEditable, // Logic: Custom chunoge tabhi type hoga
+                    readOnly = !isCategoryEditable,
                     label = { Text("Category") },
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
                     modifier = Modifier.fillMaxWidth().menuAnchor(),
@@ -117,10 +108,10 @@ fun AddExpenseForm(username: String, onExpenseAdded: (TransactionModel) -> Unit)
                             onClick = {
                                 if (name == "Custom") {
                                     categoryText = "" 
-                                    isCategoryEditable = true // Cursor Unlock
+                                    isCategoryEditable = true 
                                 } else {
                                     categoryText = name
-                                    isCategoryEditable = false // Cursor Lock
+                                    isCategoryEditable = false 
                                 }
                                 expanded = false
                             }
@@ -131,7 +122,6 @@ fun AddExpenseForm(username: String, onExpenseAdded: (TransactionModel) -> Unit)
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // 2. REMARK 1 & REMARK 2
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(
                     value = remark1, onValueChange = { remark1 = it },
@@ -149,10 +139,7 @@ fun AddExpenseForm(username: String, onExpenseAdded: (TransactionModel) -> Unit)
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // 3. PAYMENT MODE & STATUS
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                
-                // Mode Dropdown
                 ExposedDropdownMenuBox(
                     expanded = modeExpanded,
                     onExpandedChange = { modeExpanded = !modeExpanded },
@@ -161,7 +148,7 @@ fun AddExpenseForm(username: String, onExpenseAdded: (TransactionModel) -> Unit)
                     OutlinedTextField(
                         value = modeText,
                         onValueChange = {},
-                        readOnly = true, // Strictly Read-Only
+                        readOnly = true,
                         label = { Text("Mode") },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = modeExpanded) },
                         modifier = Modifier.fillMaxWidth().menuAnchor(),
@@ -189,7 +176,6 @@ fun AddExpenseForm(username: String, onExpenseAdded: (TransactionModel) -> Unit)
                     }
                 }
 
-                // Visual Status Box (Non-editable)
                 OutlinedTextField(
                     value = "Completed ✅", 
                     onValueChange = {},
@@ -199,7 +185,7 @@ fun AddExpenseForm(username: String, onExpenseAdded: (TransactionModel) -> Unit)
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
-                        disabledTextColor = Color(0xFF2E7D32), // Green text to look successful
+                        disabledTextColor = Color(0xFF2E7D32),
                         disabledBorderColor = Color.LightGray,
                         disabledLabelColor = Color.Gray
                     )
@@ -208,7 +194,6 @@ fun AddExpenseForm(username: String, onExpenseAdded: (TransactionModel) -> Unit)
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // 4. DATE & AMOUNT
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(
                     value = expenseDate, 
@@ -233,7 +218,6 @@ fun AddExpenseForm(username: String, onExpenseAdded: (TransactionModel) -> Unit)
             
             Spacer(modifier = Modifier.height(20.dp))
 
-            // 5. THEME GREEN ANIMATED SAVE BUTTON
             Button(
                 onClick = {
                     val finalCategory = categoryText.trim()
@@ -241,7 +225,6 @@ fun AddExpenseForm(username: String, onExpenseAdded: (TransactionModel) -> Unit)
 
                     if (amount.isNotBlank() && finalCategory.isNotBlank() && expenseDate.isNotBlank() && finalMode.isNotBlank()) {
                         isSubmitting = true
-                        
                         val expenseAmt = amount.toDoubleOrNull() ?: 0.0
                         val newEntry = TransactionModel(expenseDate, expenseAmt, finalCategory, remark1, remark2)
                         onExpenseAdded(newEntry)
@@ -266,9 +249,8 @@ fun AddExpenseForm(username: String, onExpenseAdded: (TransactionModel) -> Unit)
                                 withContext(Dispatchers.Main) {
                                     isSubmitting = false
                                     Toast.makeText(context, "Saved Successfully! ✅", Toast.LENGTH_LONG).show()
-                                    // Resetting fields
                                     amount = ""; remark1 = ""; remark2 = ""; categoryText = ""; modeText = ""
-                                    isCategoryEditable = false // Wapas lock
+                                    isCategoryEditable = false 
                                     expenseDate = todayDate
                                 }
                             } catch (e: Exception) {
@@ -295,7 +277,7 @@ fun AddExpenseForm(username: String, onExpenseAdded: (TransactionModel) -> Unit)
                             }
                         )
                     },
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)), // App Theme Green
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
                 shape = RoundedCornerShape(12.dp),
                 enabled = !isSubmitting
             ) {
@@ -308,3 +290,12 @@ fun AddExpenseForm(username: String, onExpenseAdded: (TransactionModel) -> Unit)
         }
     }
 }
+
+// Data Class yahi par define kar diya hai taaki Import Errors na aayein!
+data class TransactionModel(
+    val date: String,
+    val amount: Double,
+    val category: String,
+    val remark1: String,
+    val remark2: String
+)
