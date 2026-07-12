@@ -10,17 +10,21 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
+
+// COMPILER FIX: Ye wildcard import 'getValue' type-inference issues hata dega
 import androidx.compose.runtime.*
+
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.kartikey.rupeeflow.Cloud_Database.Constants
+
+// Sahi Imports
 import com.kartikey.rupeeflow.UI_Screens.Home.HomeDashboardDesign
-import com.kartikey.rupeeflow.UI_Screens.AddExpense.ExpenseHistoryScreen
-import com.kartikey.rupeeflow.UI_Screens.AddExpense.TransactionModel
 import com.kartikey.rupeeflow.UI_Screens.Add.AddScreen
+import com.kartikey.rupeeflow.UI_Screens.Add.TransactionModel
 import com.kartikey.rupeeflow.UI_Screens.Assets.AssetsScreen
 import com.kartikey.rupeeflow.UI_Screens.Assets.InvestmentItem
 import com.kartikey.rupeeflow.UI_Screens.Analytics.AnalyticsScreen
@@ -38,20 +42,20 @@ import java.util.Locale
 
 @Composable
 fun MainScreen(username: String, onLogout: () -> Unit) {
-    var selectedTab by remember { mutableStateOf(0) } 
+    var selectedTab by remember { mutableIntStateOf(0) } 
     var showExpenseHistory by remember { mutableStateOf(false) }
 
-    // Double types explicitly declared to fix type inference failure
-    var thisMonthExpenses by remember { mutableStateOf<Double>(0.0) }
-    var thisYearExpenses by remember { mutableStateOf<Double>(0.0) }
+    // Fix: mutableDoubleStateOf use kiya hai specific type casting ke liye
+    var thisMonthExpenses by remember { mutableDoubleStateOf(0.0) }
+    var thisYearExpenses by remember { mutableDoubleStateOf(0.0) }
     var isLoadingExpenses by remember { mutableStateOf(true) }
     
     var transactionList by remember { mutableStateOf(emptyList<TransactionModel>()) }
     var investmentList by remember { mutableStateOf(emptyList<InvestmentItem>()) }
     
     var dNavState by remember { mutableStateOf("Connecting to Sheet...") }
-    var dBackPresses by remember { mutableStateOf(0) }
-    var refreshTrigger by remember { mutableStateOf(0) }
+    var dBackPresses by remember { mutableIntStateOf(0) }
+    var refreshTrigger by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(selectedTab, showExpenseHistory, isLoadingExpenses, transactionList.size, investmentList.size) {
         if (showExpenseHistory) {
@@ -213,7 +217,8 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
             val (currentTab, isHistoryVisible) = state
             
             if (isHistoryVisible) {
-                ExpenseHistoryScreen(
+                // Ab yahan Android Studio aapko bata dega ki iska sahi import path kya hai.
+                com.kartikey.rupeeflow.UI_Screens.Home.ExpenseHistoryScreen(
                     paddingValues = paddingValues, 
                     history = transactionList,
                     onBackClick = { showExpenseHistory = false }
