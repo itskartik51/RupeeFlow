@@ -1,9 +1,13 @@
 package com.kartikey.rupeeflow.UI_Screens.Add
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -15,8 +19,8 @@ import com.kartikey.rupeeflow.UI_Screens.AddExpense.TransactionModel
 fun AddScreen(
     paddingValues: PaddingValues, 
     username: String,
-    onExpenseAdded: (TransactionModel) -> Unit, // Phase 3 Callback
-    onInvestmentAdded: () -> Unit               // Phase 3 Callback
+    onExpenseAdded: (TransactionModel) -> Unit,
+    onInvestmentAdded: () -> Unit
 ) {
     var selectedTabIndex by remember { mutableStateOf(0) }
     val tabs = listOf("Add Expense", "Add Investment")
@@ -27,7 +31,28 @@ fun AddScreen(
             .padding(paddingValues)
             .padding(16.dp)
     ) {
-        Text("Add New Entry", fontWeight = FontWeight.Bold, fontSize = 24.sp, color = Color(0xFF2E7D32))
+        // NAYA PREMIUM HEADER (<- Add)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(
+                imageVector = Icons.Default.ArrowBack, 
+                contentDescription = "Back",
+                tint = Color(0xFF2E7D32),
+                modifier = Modifier
+                    .size(26.dp)
+                    .clickable { /* Future navigation back hook */ }
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "Add", 
+                fontWeight = FontWeight.Bold, 
+                fontSize = 24.sp, 
+                color = Color(0xFF2E7D32)
+            )
+        }
+
         Spacer(modifier = Modifier.height(16.dp))
 
         TabRow(
