@@ -13,7 +13,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.kartikey.rupeeflow.UI_Screens.AddExpense.TransactionModel
+
+// Ye imports ab apne aap classes ko dhundh lenge
+import com.kartikey.rupeeflow.UI_Screens.*
+import com.kartikey.rupeeflow.UI_Screens.Home.*
 
 @Composable
 fun AddScreen(
@@ -22,7 +25,7 @@ fun AddScreen(
     onExpenseAdded: (TransactionModel) -> Unit,
     onInvestmentAdded: () -> Unit
 ) {
-    var selectedTabIndex by remember { mutableStateOf(0) }
+    var selectedTabIndex by remember { mutableIntStateOf(0) }
     val tabs = listOf("Add Expense", "Add Investment")
 
     Column(
@@ -41,7 +44,7 @@ fun AddScreen(
                 tint = Color(0xFF2E7D32),
                 modifier = Modifier
                     .size(26.dp)
-                    .clickable { /* Future back navigation */ }
+                    .clickable { /* Future navigation back hook */ }
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
