@@ -1,6 +1,5 @@
 package com.kartikey.rupeeflow.UI_Screens.Assets
 
-import android.util.Log
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -20,85 +19,14 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.kartikey.rupeeflow.Cloud_Database.Constants // FIX: Original Database link connect kiya
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import okhttp3.*
-import okhttp3.MediaType.Companion.toMediaTypeOrNull
-import okhttp3.RequestBody.Companion.toRequestBody
-import org.json.JSONObject
 import java.text.NumberFormat
 import java.util.Locale
 
-data class InvestmentItem(
-    val assetName: String,
-    val quantity: Double,
-    val avgBuyPrice: Double,
-    val currentPrice: Double,
-    val oneDayChangePrice: Double
-)
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun InvestmentScreen(onBackClick: () -> Unit, username: String) { // FIX: username parameter use kiya
-    var investmentList by remember { mutableStateOf(listOf<InvestmentItem>()) }
-    var isLoading by remember { mutableStateOf(true) }
-    val coroutineScope = rememberCoroutineScope()
-
-    fun fetchInvestments() {
-        isLoading = true
-        coroutineScope.launch(Dispatchers.IO) {
-            try {
-                val jsonBody = JSONObject().apply {
-                    put("action", "get_investments")
-                    put("username", username)
-                }
-                val requestBody = jsonBody.toString().toRequestBody("application/json".toMediaTypeOrNull())
-                // FIX: Yahan 'Constants.GOOGLE_SHEET_API_URL' ka use kiya
-                val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(requestBody).build()
-
-                OkHttpClient().newCall(request).execute().use { response ->
-                    val responseData = response.body?.string()
-                    if (responseData != null) {
-                        val jsonResponse = JSONObject(responseData)
-                        if (jsonResponse.optString("status") == "success") {
-                            val dataArray = jsonResponse.optJSONArray("data")
-                            val fetchedList = mutableListOf<InvestmentItem>()
-                            if (dataArray != null) {
-                                for (i in 0 until dataArray.length()) {
-                                    val item = dataArray.getJSONObject(i)
-                                    fetchedList.add(
-                                        InvestmentItem(
-                                            assetName = item.optString("asset_name", ""),
-                                            quantity = item.optDouble("quantity", 0.0),
-                                            avgBuyPrice = item.optDouble("buy_price", 0.0),
-                                            currentPrice = item.optDouble("current_price", item.optDouble("buy_price", 0.0)),
-                                            oneDayChangePrice = item.optDouble("one_day_change", 0.0)
-                                        )
-                                    )
-                                }
-                            }
-                            withContext(Dispatchers.Main) {
-                                investmentList = fetchedList
-                                isLoading = false
-                            }
-                        } else {
-                            withContext(Dispatchers.Main) { isLoading = false }
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e("API_ERROR", "Error fetching investments: ${e.message}")
-                withContext(Dispatchers.Main) { isLoading = false }
-            }
-        }
-    }
-
-    LaunchedEffect(Unit) {
-        fetchInvestments()
-    }
-
+fun InvestmentScreen(onBackClick: () -> Unit, username: String, investmentList: List<InvestmentItem>) { 
+    // API loading logic hatakar directly passed list use ki hai for instant load
+    
     val totalInvested = investmentList.sumOf { it.quantity * it.avgBuyPrice }
     val totalCurrent = investmentList.sumOf { it.quantity * it.currentPrice }
     val total1DChange = investmentList.sumOf { it.quantity * it.oneDayChangePrice }
@@ -116,40 +44,33 @@ fun InvestmentScreen(onBackClick: () -> Unit, username: String) { // FIX: userna
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFFF8F9FA))
             )
         },
-        // Floating action button hata diya hai, kyunki ab Add Screen centre wale + se access hogi
         containerColor = Color(0xFFF8F9FA)
     ) { paddingValues ->
-        if (isLoading) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = Color(0xFF00A36C))
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .padding(horizontal = 12.dp)
+        ) {
+            item {
+                InvestmentSummaryCard(
+                    itemCount = investmentList.size,
+                    totalCurrent = totalCurrent,
+                    total1DChange = total1DChange,
+                    total1DPercent = total1DPercent,
+                    totalReturn = totalReturn,
+                    totalReturnPercent = totalReturnPercent,
+                    totalInvested = totalInvested
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                ListHeaderRow()
+                Spacer(modifier = Modifier.height(8.dp))
             }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues)
-                    .padding(horizontal = 12.dp)
-            ) {
-                item {
-                    InvestmentSummaryCard(
-                        itemCount = investmentList.size,
-                        totalCurrent = totalCurrent,
-                        total1DChange = total1DChange,
-                        total1DPercent = total1DPercent,
-                        totalReturn = totalReturn,
-                        totalReturnPercent = totalReturnPercent,
-                        totalInvested = totalInvested
-                    )
-                    Spacer(modifier = Modifier.height(24.dp))
-                    
-                    ListHeaderRow()
-                    Spacer(modifier = Modifier.height(8.dp))
-                }
 
-                items(investmentList) { item ->
-                    InvestmentListItem(item)
-                    HorizontalDivider(color = Color.LightGray.copy(alpha = 0.3f), thickness = 1.dp, modifier = Modifier.padding(vertical = 8.dp))
-                }
+            items(investmentList) { item ->
+                InvestmentListItem(item)
+                HorizontalDivider(color = Color.LightGray.copy(alpha = 0.3f), thickness = 1.dp, modifier = Modifier.padding(vertical = 8.dp))
             }
         }
     }
