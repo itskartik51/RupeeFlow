@@ -2,8 +2,6 @@ package com.kartikey.rupeeflow.UI_Screens.Assets
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -15,8 +13,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
+// Yahan Data Class define ki hai taaki saari files isey easily use kar sakein
+data class InvestmentItem(
+    val assetName: String,
+    val quantity: Double,
+    val avgBuyPrice: Double,
+    val currentPrice: Double,
+    val oneDayChangePrice: Double
+)
+
 @Composable
-fun AssetsScreen(paddingValues: PaddingValues, username: String) { // FIX: username parameter add kiya
+fun AssetsScreen(paddingValues: PaddingValues, username: String, investmentList: List<InvestmentItem>) { 
     var currentView by remember { mutableStateOf("Main") }
 
     if (currentView == "Main") {
@@ -27,6 +34,7 @@ fun AssetsScreen(paddingValues: PaddingValues, username: String) { // FIX: usern
                 .padding(paddingValues)
                 .padding(16.dp)
         ) {
+            // Aapka original Networth Card
             NetworthCard(
                 networthAmount = 79500.0,
                 isLoading = false,
@@ -74,8 +82,28 @@ fun AssetsScreen(paddingValues: PaddingValues, username: String) { // FIX: usern
             }
         }
     } else if (currentView == "InvestmentDetails") {
-        // FIX: username aage InvestmentScreen ko pass kar diya
-        InvestmentScreen(onBackClick = { currentView = "Main" }, username = username)
+        InvestmentScreen(onBackClick = { currentView = "Main" }, username = username, investmentList = investmentList)
+    }
+}
+
+// Aapka Dummy Networth Card (Taki Error na aaye, agar ye kisi aur file me hai to ise hata dena)
+@Composable
+fun NetworthCard(networthAmount: Double, isLoading: Boolean, onClick: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(2.dp),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            Text("NET WORTH", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(8.dp))
+            if (isLoading) {
+                CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color(0xFF2E7D32))
+            } else {
+                Text("₹$networthAmount", fontSize = 32.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
+            }
+        }
     }
 }
 
