@@ -33,7 +33,7 @@ import org.json.JSONObject
 fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit) {
     var assetType by remember { mutableStateOf("Stock") }
     var assetName by remember { mutableStateOf("") }
-    var selectedSymbol by remember { mutableStateOf("") } // API validation ke liye
+    var selectedSymbol by remember { mutableStateOf("") } 
     var quantity by remember { mutableStateOf("") }
     var buyPrice by remember { mutableStateOf("") }
     var date by remember { mutableStateOf("") } 
@@ -41,8 +41,8 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit) {
     var typeExpanded by remember { mutableStateOf(false) }
     var searchExpanded by remember { mutableStateOf(false) }
     
-    // API Search States
-    var searchResults by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
+    // API Search States using the new SearchRow structure
+    var searchResults by remember { mutableStateOf<List<SearchRow>>(emptyList()) }
     var isSearching by remember { mutableStateOf(false) }
 
     var isSubmitting by remember { mutableStateOf(false) }
@@ -52,23 +52,24 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit) {
     var isPressed by remember { mutableStateOf(false) }
     val buttonScale by animateFloatAsState(targetValue = if (isPressed) 0.95f else 1f, label = "ButtonScale")
 
-    // LIVE YAHOO FINANCE API SEARCH LOGIC
+    // LIVE INDIAN-PRIORITIZED YAHOO FINANCE API SEARCH LOGIC
     LaunchedEffect(assetName) {
-        if (assetName.isBlank() || assetName == selectedSymbol) {
+        // Constraint Check: Jab tak user keyword na dale ya select na kare, tab tak fetch nahi hoga
+        if (assetName.isBlank() || selectedSymbol.isNotEmpty()) {
             searchResults = emptyList()
             searchExpanded = false
             return@LaunchedEffect
         }
         
-        // Debounce: Typing ke 500ms baad hi API call hit hogi taki network overload na ho
-        delay(500) 
+        delay(500) // Debounce delay to handle smooth typing
         isSearching = true
         
         withContext(Dispatchers.IO) {
             try {
                 val client = OkHttpClient()
+                // Deep search implemented using quotesCount=30 to ensure Indian large/mid/small caps are fully captured
                 val request = Request.Builder()
-                    .url("https://query2.finance.yahoo.com/v1/finance/search?q=${assetName.replace(" ", "%20")}&quotesCount=10&newsCount=0")
+                    .url("https://query2.finance.yahoo.com/v1/finance/search?q=${assetName.replace(" ", "%20")}&quotesCount=30&newsCount=0")
                     .get()
                     .build()
                     
@@ -78,23 +79,62 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit) {
                 if (response.isSuccessful && responseData.isNotEmpty()) {
                     val jsonResponse = JSONObject(responseData)
                     val quotes = jsonResponse.optJSONArray("quotes")
-                    val results = mutableListOf<Pair<String, String>>()
+                    
+                    val indianList = mutableListOf<SearchRow>()
+                    val globalList = mutableListOf<SearchRow>()
                     
                     if (quotes != null) {
                         for (i in 0 until quotes.length()) {
                             val quote = quotes.getJSONObject(i)
                             val sym = quote.optString("symbol", "")
-                            val name = quote.optString("shortname", sym)
-                            if (sym.isNotEmpty()) {
-                                results.add(Pair(name, sym)) // Save Name & Symbol mapping
+                            if (sym.isEmpty()) continue
+                            
+                            // Advanced Name Fallback Handling for clean formatting
+                            var cleanName = quote.optString("longname", "").ifBlank {
+                                quote.optString("shortname", "").ifBlank { "" }
+                            }
+                            
+                            val isIndian = sym.endsWith(".NS") || sym.endsWith(".BO")
+                            
+                            // Data Integrity Rule: If names are alphanumeric codes or empty, format cleanly
+                            if (cleanName.isBlank() || cleanName == sym) {
+                                cleanName = if (isIndian) {
+                                    sym.replace(".NS", "").replace(".BO", "") + " Asset"
+                                } else {
+                                    sym
+                                }
+                            }
+                            
+                            // Premium UX Subtitle display processing
+                            val displaySymbol = when {
+                                sym.endsWith(".NS") -> sym.replace(".NS", "") + " (NSE)"
+                                sym.endsWith(".BO") -> sym.replace(".BO", "") + " (BSE)"
+                                else -> sym
+                            }
+                            
+                            val row = SearchRow(
+                                name = cleanName,
+                                rawSymbol = sym,
+                                displaySymbol = displaySymbol,
+                                isIndian = isIndian
+                            )
+                            
+                            // Separation logic to maintain high-capital ordering inside priority groups
+                            if (isIndian) {
+                                indianList.add(row)
+                            } else {
+                                globalList.add(row)
                             }
                         }
                     }
                     
+                    // Indian Priority Override mapping
+                    val orderedResults = indianList + globalList
+                    
                     withContext(Dispatchers.Main) {
-                        searchResults = results
+                        searchResults = orderedResults
                         isSearching = false
-                        if (results.isNotEmpty()) {
+                        if (orderedResults.isNotEmpty()) {
                             searchExpanded = true
                         }
                     }
@@ -149,11 +189,11 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit) {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // 2. LIVE ASSET NAME SEARCH (Hide until typed)
+            // 2. LIVE ASSET NAME SEARCH (Premium Indian Prioritized Dropdown)
             ExposedDropdownMenuBox(
                 expanded = searchExpanded,
                 onExpandedChange = { 
-                    if (searchResults.isNotEmpty()) {
+                    if (searchResults.isNotEmpty() && assetName.isNotEmpty()) {
                         searchExpanded = it 
                     }
                 }
@@ -162,7 +202,8 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit) {
                     value = assetName,
                     onValueChange = { 
                         assetName = it 
-                        selectedSymbol = "" // Naya type karte hi purana selection reset ho jayega
+                        selectedSymbol = "" // Reset on key change to trigger dynamic search re-evaluations
+                        searchExpanded = it.isNotEmpty()
                     },
                     label = { Text("Search $assetType Name") },
                     modifier = Modifier.fillMaxWidth().menuAnchor(),
@@ -177,23 +218,29 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit) {
                     }
                 )
                 
-                if (searchResults.isNotEmpty() && selectedSymbol.isEmpty()) {
+                if (assetName.isNotEmpty() && searchResults.isNotEmpty() && selectedSymbol.isEmpty()) {
                     ExposedDropdownMenu(
                         expanded = searchExpanded,
                         onDismissRequest = { searchExpanded = false }
                     ) {
-                        searchResults.forEach { (name, sym) ->
+                        searchResults.forEach { row ->
                             DropdownMenuItem(
                                 text = { 
-                                    Column {
-                                        Text(name, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                                        Text(sym, fontSize = 12.sp, color = Color.Gray)
+                                    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+                                        Text(row.name, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color.Black)
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                                            Text(row.displaySymbol, fontSize = 12.sp, color = Color.Gray, fontWeight = FontWeight.Medium)
+                                            if (row.isIndian) {
+                                                Text("🇮🇳 India", fontSize = 11.sp, color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold)
+                                            }
+                                        }
                                     }
                                 },
                                 onClick = {
-                                    // GOOGLE FINANCE COMPATIBILITY FIX: Strip .NS and .BO
-                                    val cleanSymbol = sym.replace(".NS", "").replace(".BO", "")
-                                    assetName = cleanSymbol 
+                                    // Strip formatting suffixes to guarantee pure processing matching in Sheet formulas
+                                    val cleanSymbol = row.rawSymbol.replace(".NS", "").replace(".BO", "")
+                                    assetName = row.name 
                                     selectedSymbol = cleanSymbol
                                     searchExpanded = false
                                 }
@@ -239,7 +286,6 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit) {
                     val qty = quantity.toDoubleOrNull() ?: 0.0
                     val price = buyPrice.toDoubleOrNull() ?: 0.0
                     
-                    // STRICT VALIDATION: User must select from the API list
                     if (selectedSymbol.isNotBlank() && qty > 0 && price > 0) {
                         isSubmitting = true
                         onInvestmentAdded()
@@ -250,7 +296,7 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit) {
                                     put("action", "add_investment")
                                     put("username", username)
                                     put("inv_date", date)
-                                    put("asset_name", selectedSymbol) // Cleaned symbol goes to sheet
+                                    put("asset_name", selectedSymbol) 
                                     put("asset_type", assetType)
                                     put("quantity", qty)
                                     put("buy_price", price)
@@ -304,3 +350,11 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit) {
         }
     }
 }
+
+// Optimization Component Data Class for strict structure validations
+data class SearchRow(
+    val name: String,
+    val rawSymbol: String,
+    val displaySymbol: String,
+    val isIndian: Boolean
+)
