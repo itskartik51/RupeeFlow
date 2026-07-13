@@ -226,7 +226,8 @@ fun AddExpenseForm(username: String, onExpenseAdded: (TransactionModel) -> Unit)
                     if (amount.isNotBlank() && finalCategory.isNotBlank() && expenseDate.isNotBlank() && finalMode.isNotBlank()) {
                         isSubmitting = true
                         val expenseAmt = amount.toDoubleOrNull() ?: 0.0
-                        val newEntry = TransactionModel(expenseDate, expenseAmt, finalCategory, remark1, remark2)
+                        // UPDATE: Yahan par mode pass ho raha hai local save ke liye
+                        val newEntry = TransactionModel(expenseDate, expenseAmt, finalCategory, remark1, remark2, finalMode)
                         onExpenseAdded(newEntry)
 
                         coroutineScope.launch(Dispatchers.IO) {
@@ -239,7 +240,7 @@ fun AddExpenseForm(username: String, onExpenseAdded: (TransactionModel) -> Unit)
                                     put("date", expenseDate) 
                                     put("detail1", remark1)
                                     put("detail2", remark2)
-                                    put("payment_method", finalMode) 
+                                    put("payment_method", finalMode) // Ye data ab seedha sheet mein jayega
                                 }
                                 val client = OkHttpClient()
                                 val body = json.toString().toRequestBody("application/json".toMediaType())
@@ -291,11 +292,12 @@ fun AddExpenseForm(username: String, onExpenseAdded: (TransactionModel) -> Unit)
     }
 }
 
-// Data Class yahi par define kar diya hai taaki Import Errors na aayein!
+// UPDATE: Yahan pe val mode add kar diya gaya hai
 data class TransactionModel(
     val date: String,
     val amount: Double,
     val category: String,
     val remark1: String,
-    val remark2: String
+    val remark2: String,
+    val mode: String = "" 
 )
