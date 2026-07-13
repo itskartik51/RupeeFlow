@@ -3,6 +3,8 @@ package com.kartikey.rupeeflow.UI_Screens.Assets
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState // NEW IMPORT
+import androidx.compose.foundation.verticalScroll // NEW IMPORT
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountBalance
@@ -28,7 +30,6 @@ data class InvestmentItem(
     val oneDayChangePrice: Double
 )
 
-// NEW: Bank/Finance Data Class
 data class BankAccountItem(
     val bankName: String,
     val accountNo: String,
@@ -43,13 +44,12 @@ fun AssetsScreen(
     paddingValues: PaddingValues, 
     username: String, 
     investmentList: List<InvestmentItem>,
-    bankList: List<BankAccountItem>, // Naya Parameter
+    bankList: List<BankAccountItem>, 
     isLoading: Boolean = false, 
     onRefreshClick: () -> Unit = {}
 ) { 
     var currentView by remember { mutableStateOf("Main") }
     
-    // Auto-calculate Total Bank Balance
     val totalBankBalance = bankList.sumOf { it.currentBalance }
 
     if (currentView == "Main") {
@@ -58,6 +58,7 @@ fun AssetsScreen(
                 .fillMaxSize()
                 .background(Color(0xFFF8F9FA))
                 .padding(paddingValues)
+                .verticalScroll(rememberScrollState()) // YAHAN SCROLL ADD KIYA HAI
                 .padding(16.dp)
         ) {
             NetworthCard(
@@ -99,7 +100,7 @@ fun AssetsScreen(
             Spacer(modifier = Modifier.height(24.dp))
 
             // ==========================================
-            // SECTION 2: MY FINANCE / ACCOUNTS (NAYA)
+            // SECTION 2: MY FINANCE / ACCOUNTS
             // ==========================================
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
@@ -117,7 +118,6 @@ fun AssetsScreen(
             Column(modifier = Modifier.fillMaxWidth()) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Box(modifier = Modifier.weight(1f)) { FinanceGridCard("Cash", "₹0", Icons.Outlined.Money, Color(0xFF388E3C)) }
-                    // Yahan sheet se calculate hua actual Total Bank Balance dikhega
                     Box(modifier = Modifier.weight(1f)) { FinanceGridCard("Bank Balance", "₹${totalBankBalance.toInt()}", Icons.Outlined.AccountBalance, Color(0xFF1976D2)) }
                 }
                 Spacer(modifier = Modifier.height(12.dp))
@@ -136,7 +136,6 @@ fun AssetsScreen(
             onRefreshClick = onRefreshClick
         )
     } else if (currentView == "FinanceDetails") {
-        // Nayi screen open hogi
         FinanceScreen(
             onBackClick = { currentView = "Main" },
             username = username,
@@ -147,7 +146,6 @@ fun AssetsScreen(
     }
 }
 
-// Naya Finance Grid Card Jisme Icon Support Hai
 @Composable
 fun FinanceGridCard(title: String, amount: String, icon: ImageVector, iconColor: Color) {
     Card(
