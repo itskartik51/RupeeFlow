@@ -19,10 +19,12 @@ fun AddScreen(
     paddingValues: PaddingValues, 
     username: String,
     onExpenseAdded: (TransactionModel) -> Unit,
-    onInvestmentAdded: () -> Unit
+    onInvestmentAdded: () -> Unit,
+    onFinanceAdded: () -> Unit // Naya parameter
 ) {
     var selectedTabIndex by remember { mutableStateOf(0) }
-    val tabs = listOf("Add Expense", "Add Investment")
+    // Naya "Add Finance" Tab
+    val tabs = listOf("Add Expense", "Add Investment", "Add Finance")
 
     Column(
         modifier = Modifier
@@ -40,7 +42,7 @@ fun AddScreen(
                 tint = Color(0xFF2E7D32),
                 modifier = Modifier
                     .size(26.dp)
-                    .clickable { /* Future navigation back hook */ }
+                    .clickable { }
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
@@ -53,10 +55,11 @@ fun AddScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        TabRow(
+        ScrollableTabRow( // Changed to ScrollableTabRow for better fit
             selectedTabIndex = selectedTabIndex,
             containerColor = Color.Transparent,
             contentColor = Color(0xFF2E7D32),
+            edgePadding = 0.dp,
             indicator = { tabPositions ->
                 TabRowDefaults.Indicator(
                     Modifier.tabIndicatorOffset(tabPositions[selectedTabIndex]),
@@ -69,7 +72,7 @@ fun AddScreen(
                 Tab(
                     selected = selectedTabIndex == index,
                     onClick = { selectedTabIndex = index },
-                    text = { Text(title, fontWeight = FontWeight.Bold) },
+                    text = { Text(title, fontWeight = FontWeight.Bold, fontSize = 13.sp) },
                     selectedContentColor = Color(0xFF2E7D32),
                     unselectedContentColor = Color.Gray
                 )
@@ -81,6 +84,7 @@ fun AddScreen(
         when (selectedTabIndex) {
             0 -> AddExpenseForm(username = username, onExpenseAdded = onExpenseAdded)
             1 -> AddInvestmentForm(username = username, onInvestmentAdded = onInvestmentAdded)
+            2 -> AddFinanceForm(username = username, onFinanceAdded = onFinanceAdded) // Nayi call
         }
     }
 }
