@@ -236,7 +236,8 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                     1 -> AssetsScreen(
                         paddingValues = paddingValues, 
                         username = username, 
-                        investmentList = investmentList
+                        investmentList = investmentList,
+                        onRefreshClick = { refreshTrigger++ } // YAHAN CLICK TRIGGER CONNECT KIYA HAI
                     )
                     2 -> AddScreen(
                         paddingValues = paddingValues, 
