@@ -43,16 +43,15 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit) {
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
 
-    // Touch Animation State
     var isPressed by remember { mutableStateOf(false) }
     val buttonScale by animateFloatAsState(targetValue = if (isPressed) 0.95f else 1f, label = "ButtonScale")
 
-    // Database Mock (Ise aap baad me sheet se bhi la sakte hain)
+    // Note: Jab hum Live API lagayenge to ye dummy list hat jayegi aur data network se aayega
     val assetDatabase = mapOf(
-        "Stock" to listOf("SBIN", "RELIANCE", "TCS", "HDFCBANK", "INFY", "ITC", "TATAMOTORS", "ZOMATO"),
-        "ETF" to listOf("NIFTYBEES", "BANKBEES", "GOLDBEES", "ITBEES", "LIQUIDBEES"),
-        "Mutual Fund" to listOf("Parag Parikh Flexi Cap", "Quant Small Cap", "SBI Contra", "HDFC Mid-Cap"),
-        "Bond" to listOf("SGB", "NHAI Bond", "RBI Floating Rate Bond")
+        "Stock" to listOf("SBIN", "RELIANCE", "TCS", "HDFCBANK", "INFY", "ITC", "TATAMOTORS", "ZOMATO", "WIPRO", "HINDUNILVR"),
+        "ETF" to listOf("NIFTYBEES", "BANKBEES", "GOLDBEES", "ITBEES", "LIQUIDBEES", "MON100"),
+        "Mutual Fund" to listOf("Parag Parikh Flexi Cap", "Quant Small Cap", "SBI Contra", "HDFC Mid-Cap", "Nippon India Small Cap"),
+        "Bond" to listOf("SGB", "NHAI Bond", "RBI Floating Rate Bond", "REC Bond")
     )
     val currentSuggestions = assetDatabase[assetType] ?: emptyList()
 
@@ -87,7 +86,7 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit) {
                             text = { Text(selectionOption) },
                             onClick = {
                                 assetType = selectionOption
-                                assetName = "" // Type change hone par purana naam clear kar do
+                                assetName = "" 
                                 typeExpanded = false
                             }
                         )
@@ -97,16 +96,22 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit) {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // 2. ASSET NAME SEARCH (AUTOCOMPLETE)
+            // 2. ASSET NAME SEARCH (Hide until typed logic)
             ExposedDropdownMenuBox(
                 expanded = searchExpanded,
-                onExpandedChange = { searchExpanded = !searchExpanded }
+                onExpandedChange = { 
+                    // UPDATE: Sirf tabhi khulega jab textbox me kuch type kiya ho
+                    if (assetName.isNotEmpty()) {
+                        searchExpanded = it 
+                    }
+                }
             ) {
                 OutlinedTextField(
                     value = assetName,
                     onValueChange = { 
                         assetName = it 
-                        searchExpanded = true
+                        // UPDATE: Type karte hi list khulegi, mita dete hi band ho jayegi
+                        searchExpanded = it.isNotEmpty() 
                     },
                     label = { Text("Search $assetType Name") },
                     modifier = Modifier.fillMaxWidth().menuAnchor(),
@@ -115,10 +120,10 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit) {
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = searchExpanded) }
                 )
                 
-                // Filtering Logic
                 val filteredOptions = currentSuggestions.filter { it.contains(assetName, ignoreCase = true) }
                 
-                if (filteredOptions.isNotEmpty()) {
+                // UPDATE: Jab filter hoke options aayein aur textbox khali na ho, tabhi menu dikhana hai
+                if (assetName.isNotEmpty() && filteredOptions.isNotEmpty()) {
                     ExposedDropdownMenu(
                         expanded = searchExpanded,
                         onDismissRequest = { searchExpanded = false }
@@ -171,8 +176,8 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit) {
                 onClick = {
                     val qty = quantity.toDoubleOrNull() ?: 0.0
                     val price = buyPrice.toDoubleOrNull() ?: 0.0
-                    // Validation: Jo type kiya hai wo list me hona chahiye
-                    if (assetName.isNotBlank() && currentSuggestions.contains(assetName) && qty > 0 && price > 0) {
+                    
+                    if (assetName.isNotBlank() && qty > 0 && price > 0) {
                         isSubmitting = true
                         onInvestmentAdded()
                         
@@ -182,11 +187,10 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit) {
                                     put("action", "add_investment")
                                     put("username", username)
                                     put("inv_date", date)
-                                    put("asset_name", assetName) // Perfect validated data jayega sheet me
+                                    put("asset_name", assetName) 
                                     put("asset_type", assetType)
                                     put("quantity", qty)
                                     put("buy_price", price)
-                                    // Baaki calculations ab hum Google sheet pe chhod rahe hain
                                     put("broker", "")
                                     put("notes", "")
                                 }
@@ -208,7 +212,7 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit) {
                             }
                         }
                     } else {
-                        Toast.makeText(context, "Please select a valid Asset Name from the suggestions", Toast.LENGTH_LONG).show()
+                        Toast.makeText(context, "Please enter Asset Name, Quantity & Price correctly", Toast.LENGTH_LONG).show()
                     }
                 },
                 modifier = Modifier
