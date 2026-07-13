@@ -13,7 +13,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-// Yahan Data Class define ki hai taaki saari files isey easily use kar sakein
 data class InvestmentItem(
     val assetName: String,
     val quantity: Double,
@@ -27,6 +26,7 @@ fun AssetsScreen(
     paddingValues: PaddingValues, 
     username: String, 
     investmentList: List<InvestmentItem>,
+    isLoading: Boolean = false, // UPDATE: Parameter added
     onRefreshClick: () -> Unit = {}
 ) { 
     var currentView by remember { mutableStateOf("Main") }
@@ -39,7 +39,6 @@ fun AssetsScreen(
                 .padding(paddingValues)
                 .padding(16.dp)
         ) {
-            // Aapka original Networth Card
             NetworthCard(
                 networthAmount = 79500.0,
                 isLoading = false,
@@ -91,12 +90,12 @@ fun AssetsScreen(
             onBackClick = { currentView = "Main" }, 
             username = username, 
             investmentList = investmentList,
+            isLoading = isLoading, // UPDATE: Pass down to InvestmentScreen
             onRefreshClick = onRefreshClick
         )
     }
 }
 
-// Aapka Dummy Networth Card (Taki Error na aaye, agar ye kisi aur file me hai to ise hata dena)
 @Composable
 fun NetworthCard(networthAmount: Double, isLoading: Boolean, onClick: () -> Unit) {
     Card(
