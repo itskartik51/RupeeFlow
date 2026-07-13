@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kartikey.rupeeflow.Cloud_Database.Constants
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -32,12 +33,17 @@ import org.json.JSONObject
 fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit) {
     var assetType by remember { mutableStateOf("Stock") }
     var assetName by remember { mutableStateOf("") }
+    var selectedSymbol by remember { mutableStateOf("") } // API validation ke liye
     var quantity by remember { mutableStateOf("") }
     var buyPrice by remember { mutableStateOf("") }
     var date by remember { mutableStateOf("") } 
     
     var typeExpanded by remember { mutableStateOf(false) }
     var searchExpanded by remember { mutableStateOf(false) }
+    
+    // API Search States
+    var searchResults by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
+    var isSearching by remember { mutableStateOf(false) }
 
     var isSubmitting by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
@@ -46,14 +52,60 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit) {
     var isPressed by remember { mutableStateOf(false) }
     val buttonScale by animateFloatAsState(targetValue = if (isPressed) 0.95f else 1f, label = "ButtonScale")
 
-    // Note: Jab hum Live API lagayenge to ye dummy list hat jayegi aur data network se aayega
-    val assetDatabase = mapOf(
-        "Stock" to listOf("SBIN", "RELIANCE", "TCS", "HDFCBANK", "INFY", "ITC", "TATAMOTORS", "ZOMATO", "WIPRO", "HINDUNILVR"),
-        "ETF" to listOf("NIFTYBEES", "BANKBEES", "GOLDBEES", "ITBEES", "LIQUIDBEES", "MON100"),
-        "Mutual Fund" to listOf("Parag Parikh Flexi Cap", "Quant Small Cap", "SBI Contra", "HDFC Mid-Cap", "Nippon India Small Cap"),
-        "Bond" to listOf("SGB", "NHAI Bond", "RBI Floating Rate Bond", "REC Bond")
-    )
-    val currentSuggestions = assetDatabase[assetType] ?: emptyList()
+    // LIVE YAHOO FINANCE API SEARCH LOGIC
+    LaunchedEffect(assetName) {
+        if (assetName.isBlank() || assetName == selectedSymbol) {
+            searchResults = emptyList()
+            searchExpanded = false
+            return@LaunchedEffect
+        }
+        
+        // Debounce: Typing ke 500ms baad hi API call hit hogi taki network overload na ho
+        delay(500) 
+        isSearching = true
+        
+        withContext(Dispatchers.IO) {
+            try {
+                val client = OkHttpClient()
+                val request = Request.Builder()
+                    .url("https://query2.finance.yahoo.com/v1/finance/search?q=${assetName.replace(" ", "%20")}&quotesCount=10&newsCount=0")
+                    .get()
+                    .build()
+                    
+                val response = client.newCall(request).execute()
+                val responseData = response.body?.string() ?: ""
+                
+                if (response.isSuccessful && responseData.isNotEmpty()) {
+                    val jsonResponse = JSONObject(responseData)
+                    val quotes = jsonResponse.optJSONArray("quotes")
+                    val results = mutableListOf<Pair<String, String>>()
+                    
+                    if (quotes != null) {
+                        for (i in 0 until quotes.length()) {
+                            val quote = quotes.getJSONObject(i)
+                            val sym = quote.optString("symbol", "")
+                            val name = quote.optString("shortname", sym)
+                            if (sym.isNotEmpty()) {
+                                results.add(Pair(name, sym)) // Save Name & Symbol mapping
+                            }
+                        }
+                    }
+                    
+                    withContext(Dispatchers.Main) {
+                        searchResults = results
+                        isSearching = false
+                        if (results.isNotEmpty()) {
+                            searchExpanded = true
+                        }
+                    }
+                } else {
+                    withContext(Dispatchers.Main) { isSearching = false }
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) { isSearching = false }
+            }
+        }
+    }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -87,6 +139,7 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit) {
                             onClick = {
                                 assetType = selectionOption
                                 assetName = "" 
+                                selectedSymbol = ""
                                 typeExpanded = false
                             }
                         )
@@ -96,12 +149,11 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit) {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // 2. ASSET NAME SEARCH (Hide until typed logic)
+            // 2. LIVE ASSET NAME SEARCH (Hide until typed)
             ExposedDropdownMenuBox(
                 expanded = searchExpanded,
                 onExpandedChange = { 
-                    // UPDATE: Sirf tabhi khulega jab textbox me kuch type kiya ho
-                    if (assetName.isNotEmpty()) {
+                    if (searchResults.isNotEmpty()) {
                         searchExpanded = it 
                     }
                 }
@@ -110,29 +162,39 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit) {
                     value = assetName,
                     onValueChange = { 
                         assetName = it 
-                        // UPDATE: Type karte hi list khulegi, mita dete hi band ho jayegi
-                        searchExpanded = it.isNotEmpty() 
+                        selectedSymbol = "" // Naya type karte hi purana selection reset ho jayega
                     },
                     label = { Text("Search $assetType Name") },
                     modifier = Modifier.fillMaxWidth().menuAnchor(),
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = searchExpanded) }
+                    trailingIcon = { 
+                        if (isSearching) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = Color(0xFF2E7D32))
+                        } else {
+                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = searchExpanded) 
+                        }
+                    }
                 )
                 
-                val filteredOptions = currentSuggestions.filter { it.contains(assetName, ignoreCase = true) }
-                
-                // UPDATE: Jab filter hoke options aayein aur textbox khali na ho, tabhi menu dikhana hai
-                if (assetName.isNotEmpty() && filteredOptions.isNotEmpty()) {
+                if (searchResults.isNotEmpty() && selectedSymbol.isEmpty()) {
                     ExposedDropdownMenu(
                         expanded = searchExpanded,
                         onDismissRequest = { searchExpanded = false }
                     ) {
-                        filteredOptions.forEach { option ->
+                        searchResults.forEach { (name, sym) ->
                             DropdownMenuItem(
-                                text = { Text(option) },
+                                text = { 
+                                    Column {
+                                        Text(name, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                                        Text(sym, fontSize = 12.sp, color = Color.Gray)
+                                    }
+                                },
                                 onClick = {
-                                    assetName = option
+                                    // GOOGLE FINANCE COMPATIBILITY FIX: Strip .NS and .BO
+                                    val cleanSymbol = sym.replace(".NS", "").replace(".BO", "")
+                                    assetName = cleanSymbol 
+                                    selectedSymbol = cleanSymbol
                                     searchExpanded = false
                                 }
                             )
@@ -177,7 +239,8 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit) {
                     val qty = quantity.toDoubleOrNull() ?: 0.0
                     val price = buyPrice.toDoubleOrNull() ?: 0.0
                     
-                    if (assetName.isNotBlank() && qty > 0 && price > 0) {
+                    // STRICT VALIDATION: User must select from the API list
+                    if (selectedSymbol.isNotBlank() && qty > 0 && price > 0) {
                         isSubmitting = true
                         onInvestmentAdded()
                         
@@ -187,7 +250,7 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit) {
                                     put("action", "add_investment")
                                     put("username", username)
                                     put("inv_date", date)
-                                    put("asset_name", assetName) 
+                                    put("asset_name", selectedSymbol) // Cleaned symbol goes to sheet
                                     put("asset_type", assetType)
                                     put("quantity", qty)
                                     put("buy_price", price)
@@ -202,7 +265,7 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit) {
                                 withContext(Dispatchers.Main) {
                                     isSubmitting = false
                                     Toast.makeText(context, "Investment Saved! Sheet will calculate live returns.", Toast.LENGTH_SHORT).show()
-                                    assetName = ""; quantity = ""; buyPrice = ""; date = "" 
+                                    assetName = ""; selectedSymbol = ""; quantity = ""; buyPrice = ""; date = "" 
                                 }
                             } catch (e: Exception) {
                                 withContext(Dispatchers.Main) {
@@ -212,7 +275,7 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit) {
                             }
                         }
                     } else {
-                        Toast.makeText(context, "Please enter Asset Name, Quantity & Price correctly", Toast.LENGTH_LONG).show()
+                        Toast.makeText(context, "Please select an Asset from the search list, and enter valid Quantity & Price", Toast.LENGTH_LONG).show()
                     }
                 },
                 modifier = Modifier
