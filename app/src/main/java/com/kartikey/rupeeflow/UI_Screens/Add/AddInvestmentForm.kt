@@ -35,7 +35,9 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit) {
     var quantity by remember { mutableStateOf("") }
     var buyPrice by remember { mutableStateOf("") }
     var date by remember { mutableStateOf("") } 
-    var expanded by remember { mutableStateOf(false) }
+    
+    var typeExpanded by remember { mutableStateOf(false) }
+    var searchExpanded by remember { mutableStateOf(false) }
 
     var isSubmitting by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
@@ -45,6 +47,15 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit) {
     var isPressed by remember { mutableStateOf(false) }
     val buttonScale by animateFloatAsState(targetValue = if (isPressed) 0.95f else 1f, label = "ButtonScale")
 
+    // Database Mock (Ise aap baad me sheet se bhi la sakte hain)
+    val assetDatabase = mapOf(
+        "Stock" to listOf("SBIN", "RELIANCE", "TCS", "HDFCBANK", "INFY", "ITC", "TATAMOTORS", "ZOMATO"),
+        "ETF" to listOf("NIFTYBEES", "BANKBEES", "GOLDBEES", "ITBEES", "LIQUIDBEES"),
+        "Mutual Fund" to listOf("Parag Parikh Flexi Cap", "Quant Small Cap", "SBI Contra", "HDFC Mid-Cap"),
+        "Bond" to listOf("SGB", "NHAI Bond", "RBI Floating Rate Bond")
+    )
+    val currentSuggestions = assetDatabase[assetType] ?: emptyList()
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -53,29 +64,31 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit) {
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
             
+            // 1. ASSET TYPE SELECTOR
             ExposedDropdownMenuBox(
-                expanded = expanded,
-                onExpandedChange = { expanded = !expanded }
+                expanded = typeExpanded,
+                onExpandedChange = { typeExpanded = !typeExpanded }
             ) {
                 OutlinedTextField(
                     value = assetType,
                     onValueChange = {},
                     readOnly = true,
                     label = { Text("Asset Type") },
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = typeExpanded) },
                     modifier = Modifier.fillMaxWidth().menuAnchor(),
                     shape = RoundedCornerShape(12.dp)
                 )
                 ExposedDropdownMenu(
-                    expanded = expanded,
-                    onDismissRequest = { expanded = false }
+                    expanded = typeExpanded,
+                    onDismissRequest = { typeExpanded = false }
                 ) {
                     listOf("Stock", "Mutual Fund", "ETF", "Bond").forEach { selectionOption ->
                         DropdownMenuItem(
                             text = { Text(selectionOption) },
                             onClick = {
                                 assetType = selectionOption
-                                expanded = false
+                                assetName = "" // Type change hone par purana naam clear kar do
+                                typeExpanded = false
                             }
                         )
                     }
@@ -84,13 +97,48 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit) {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            // 2. ASSET NAME SEARCH (AUTOCOMPLETE)
+            ExposedDropdownMenuBox(
+                expanded = searchExpanded,
+                onExpandedChange = { searchExpanded = !searchExpanded }
+            ) {
                 OutlinedTextField(
-                    value = assetName, onValueChange = { assetName = it },
-                    label = { Text("Asset Name") },
-                    modifier = Modifier.weight(1f), singleLine = true,
-                    shape = RoundedCornerShape(12.dp)
+                    value = assetName,
+                    onValueChange = { 
+                        assetName = it 
+                        searchExpanded = true
+                    },
+                    label = { Text("Search $assetType Name") },
+                    modifier = Modifier.fillMaxWidth().menuAnchor(),
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = searchExpanded) }
                 )
+                
+                // Filtering Logic
+                val filteredOptions = currentSuggestions.filter { it.contains(assetName, ignoreCase = true) }
+                
+                if (filteredOptions.isNotEmpty()) {
+                    ExposedDropdownMenu(
+                        expanded = searchExpanded,
+                        onDismissRequest = { searchExpanded = false }
+                    ) {
+                        filteredOptions.forEach { option ->
+                            DropdownMenuItem(
+                                text = { Text(option) },
+                                onClick = {
+                                    assetName = option
+                                    searchExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(
                     value = quantity, onValueChange = { quantity = it },
                     label = { Text("Quantity") },
@@ -98,38 +146,34 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit) {
                     modifier = Modifier.weight(1f), singleLine = true,
                     shape = RoundedCornerShape(12.dp)
                 )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(
-                    value = buyPrice, 
-                    onValueChange = { buyPrice = it },
+                    value = buyPrice, onValueChange = { buyPrice = it },
                     label = { Text("Buy Price") },
                     prefix = { Text("₹ ", fontWeight = FontWeight.Bold, color = Color.Black) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.weight(1f), singleLine = true,
                     shape = RoundedCornerShape(12.dp)
                 )
-                OutlinedTextField(
-                    value = date, onValueChange = { date = it },
-                    label = { Text("Date (Optional)") },
-                    modifier = Modifier.weight(1f), singleLine = true,
-                    shape = RoundedCornerShape(12.dp)
-                )
             }
 
             Spacer(modifier = Modifier.height(16.dp))
+            
+            OutlinedTextField(
+                value = date, onValueChange = { date = it },
+                label = { Text("Date (Optional)") },
+                modifier = Modifier.fillMaxWidth(), singleLine = true,
+                shape = RoundedCornerShape(12.dp)
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
 
             Button(
                 onClick = {
                     val qty = quantity.toDoubleOrNull() ?: 0.0
                     val price = buyPrice.toDoubleOrNull() ?: 0.0
-                    if (assetName.isNotBlank() && qty > 0 && price > 0) {
+                    // Validation: Jo type kiya hai wo list me hona chahiye
+                    if (assetName.isNotBlank() && currentSuggestions.contains(assetName) && qty > 0 && price > 0) {
                         isSubmitting = true
-                        
-                        // Phase 3: Optimistic Update
                         onInvestmentAdded()
                         
                         coroutineScope.launch(Dispatchers.IO) {
@@ -138,16 +182,11 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit) {
                                     put("action", "add_investment")
                                     put("username", username)
                                     put("inv_date", date)
-                                    put("asset_name", assetName)
+                                    put("asset_name", assetName) // Perfect validated data jayega sheet me
                                     put("asset_type", assetType)
                                     put("quantity", qty)
                                     put("buy_price", price)
-                                    put("invested_value", qty * price)
-                                    put("current_price", price)
-                                    put("current_value", qty * price)
-                                    put("one_day_return", 0.0)
-                                    put("total_return_rupee", 0.0)
-                                    put("total_return_percent", 0.0)
+                                    // Baaki calculations ab hum Google sheet pe chhod rahe hain
                                     put("broker", "")
                                     put("notes", "")
                                 }
@@ -158,7 +197,7 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit) {
 
                                 withContext(Dispatchers.Main) {
                                     isSubmitting = false
-                                    Toast.makeText(context, "Investment Saved Successfully!", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, "Investment Saved! Sheet will calculate live returns.", Toast.LENGTH_SHORT).show()
                                     assetName = ""; quantity = ""; buyPrice = ""; date = "" 
                                 }
                             } catch (e: Exception) {
@@ -169,7 +208,7 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit) {
                             }
                         }
                     } else {
-                        Toast.makeText(context, "Please fill valid Asset Name, Quantity & Price", Toast.LENGTH_LONG).show()
+                        Toast.makeText(context, "Please select a valid Asset Name from the suggestions", Toast.LENGTH_LONG).show()
                     }
                 },
                 modifier = Modifier
