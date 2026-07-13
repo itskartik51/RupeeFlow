@@ -41,6 +41,9 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
     var selectedTab by remember { mutableIntStateOf(0) } 
     var showExpenseHistory by remember { mutableStateOf(false) }
 
+    // State hoisted from AssetsScreen
+    var assetsCurrentView by remember { mutableStateOf("Main") }
+
     var thisMonthExpenses by remember { mutableDoubleStateOf(0.0) }
     var thisYearExpenses by remember { mutableDoubleStateOf(0.0) }
     var isLoadingExpenses by remember { mutableStateOf(true) }
@@ -67,10 +70,13 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
         }
     }
 
-    BackHandler(enabled = showExpenseHistory || selectedTab != 0) {
+    // Smart Back Handler
+    BackHandler(enabled = showExpenseHistory || selectedTab != 0 || assetsCurrentView != "Main") {
         dBackPresses++ 
         if (showExpenseHistory) {
             showExpenseHistory = false 
+        } else if (selectedTab == 1 && assetsCurrentView != "Main") {
+            assetsCurrentView = "Main" // Sub-screen se Assets root par layega
         } else if (selectedTab != 0) {
             selectedTab = 0 
         }
@@ -193,7 +199,14 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                 )
                 NavigationBarItem(
                     selected = selectedTab == 1,
-                    onClick = { selectedTab = 1; showExpenseHistory = false },
+                    onClick = { 
+                        // The magic logic: if already on tab 1, reset the view.
+                        if (selectedTab == 1) {
+                            assetsCurrentView = "Main"
+                        }
+                        selectedTab = 1
+                        showExpenseHistory = false 
+                    },
                     icon = { Icon(Icons.Outlined.AccountBalanceWallet, contentDescription = "Assets") }, 
                     label = { Text("Assets") },
                     colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
@@ -253,7 +266,9 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                         investmentList = investmentList,
                         bankList = bankList, 
                         isLoading = isLoadingExpenses,
-                        onRefreshClick = { refreshTrigger++ }
+                        onRefreshClick = { refreshTrigger++ },
+                        currentView = assetsCurrentView,
+                        onViewChange = { assetsCurrentView = it }
                     )
                     2 -> AddScreen(
                         paddingValues = paddingValues, 
