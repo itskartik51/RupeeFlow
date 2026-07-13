@@ -55,7 +55,9 @@ fun BankAccountsScreen(
             }
         } else {
             LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(paddingValues).padding(16.dp),
+                // YAHAN FIX KIYA HAI: modifier se padding(16.dp) hatakar contentPadding me daala + extra bottom space
+                modifier = Modifier.fillMaxSize().padding(paddingValues),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 120.dp), // 120.dp bottom spacing
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 items(bankList) { bank ->
@@ -124,7 +126,6 @@ fun BankDetailCard(bank: BankAccountItem, onEditClick: (BankAccountItem) -> Unit
     }
 }
 
-// Chhota Helper Composable Box Taki Code Clean Rahe
 @Composable
 fun MetricItem(label: String, value: String, valueColor: Color, alignment: Alignment.Horizontal) {
     Column(horizontalAlignment = alignment) {
