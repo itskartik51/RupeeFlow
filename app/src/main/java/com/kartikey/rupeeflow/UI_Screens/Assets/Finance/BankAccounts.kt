@@ -116,7 +116,9 @@ fun BankDetailCard(bank: BankAccountItem) {
                 }
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(text = "Quarterly Est.", color = Color.Gray, fontSize = 11.sp)
-                    Text(text = "${String.format("%.2f", bank.qtrInterestPct)}%", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color(0xFFF57C00))
+                    // Math formula apply kiya percentage ko rupees me badalne ke liye
+                    val qtrEstRupees = (bank.currentBalance * bank.qtrInterestPct) / 100
+                    Text(text = "+${formatRupeeAmount(qtrEstRupees)}", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color(0xFFF57C00))
                 }
                 Column(horizontalAlignment = Alignment.End) {
                     Text(text = "1-Day Earn", color = Color.Gray, fontSize = 11.sp)
