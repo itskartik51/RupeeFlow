@@ -3,8 +3,8 @@ package com.kartikey.rupeeflow.UI_Screens.Assets
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState // NEW IMPORT
-import androidx.compose.foundation.verticalScroll // NEW IMPORT
+import androidx.compose.foundation.rememberScrollState 
+import androidx.compose.foundation.verticalScroll 
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountBalance
@@ -46,10 +46,10 @@ fun AssetsScreen(
     investmentList: List<InvestmentItem>,
     bankList: List<BankAccountItem>, 
     isLoading: Boolean = false, 
-    onRefreshClick: () -> Unit = {}
+    onRefreshClick: () -> Unit = {},
+    currentView: String, // State hoisted
+    onViewChange: (String) -> Unit // State callback
 ) { 
-    var currentView by remember { mutableStateOf("Main") }
-    
     val totalBankBalance = bankList.sumOf { it.currentBalance }
 
     if (currentView == "Main") {
@@ -58,7 +58,7 @@ fun AssetsScreen(
                 .fillMaxSize()
                 .background(Color(0xFFF8F9FA))
                 .padding(paddingValues)
-                .verticalScroll(rememberScrollState()) // YAHAN SCROLL ADD KIYA HAI
+                .verticalScroll(rememberScrollState()) 
                 .padding(16.dp)
         ) {
             NetworthCard(
@@ -78,7 +78,7 @@ fun AssetsScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(text = "My Investments", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color.Black)
-                TextButton(onClick = { currentView = "InvestmentDetails" }) {
+                TextButton(onClick = { onViewChange("InvestmentDetails") }) {
                     Text("More", color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold)
                 }
             }
@@ -108,7 +108,7 @@ fun AssetsScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(text = "My Finance", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color.Black)
-                TextButton(onClick = { currentView = "FinanceDetails" }) {
+                TextButton(onClick = { onViewChange("FinanceDetails") }) {
                     Text("More", color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold)
                 }
             }
@@ -129,7 +129,7 @@ fun AssetsScreen(
         }
     } else if (currentView == "InvestmentDetails") {
         InvestmentScreen(
-            onBackClick = { currentView = "Main" }, 
+            onBackClick = { onViewChange("Main") }, 
             username = username, 
             investmentList = investmentList,
             isLoading = isLoading, 
@@ -137,7 +137,7 @@ fun AssetsScreen(
         )
     } else if (currentView == "FinanceDetails") {
         FinanceScreen(
-            onBackClick = { currentView = "Main" },
+            onBackClick = { onViewChange("Main") },
             username = username,
             bankList = bankList,
             isLoading = isLoading,
