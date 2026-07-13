@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.outlined.AccountBalance
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -27,7 +28,8 @@ fun BankAccountsScreen(
     onBackClick: () -> Unit,
     bankList: List<BankAccountItem>,
     isLoading: Boolean,
-    onRefreshClick: () -> Unit
+    onRefreshClick: () -> Unit,
+    onEditBankClick: (BankAccountItem) -> Unit // Route Action
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "refresh")
     val angle by infiniteTransition.animateFloat(
@@ -40,18 +42,8 @@ fun BankAccountsScreen(
         topBar = {
             TopAppBar(
                 title = { Text("Linked Banks", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) { Icon(Icons.Default.ArrowBack, contentDescription = "Back") }
-                },
-                actions = {
-                    IconButton(onClick = onRefreshClick) {
-                        Icon(
-                            Icons.Outlined.Refresh, 
-                            contentDescription = "Refresh", 
-                            modifier = Modifier.rotate(if (isLoading) angle else 0f)
-                        )
-                    }
-                },
+                navigationIcon = { IconButton(onClick = onBackClick) { Icon(Icons.Default.ArrowBack, contentDescription = "Back") } },
+                actions = { IconButton(onClick = onRefreshClick) { Icon(Icons.Outlined.Refresh, contentDescription = "Refresh", modifier = Modifier.rotate(if (isLoading) angle else 0f)) } },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFFF8F9FA))
             )
         },
@@ -67,7 +59,7 @@ fun BankAccountsScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 items(bankList) { bank ->
-                    BankDetailCard(bank)
+                    BankDetailCard(bank = bank, onEditClick = onEditBankClick)
                 }
             }
         }
@@ -75,7 +67,7 @@ fun BankAccountsScreen(
 }
 
 @Composable
-fun BankDetailCard(bank: BankAccountItem) {
+fun BankDetailCard(bank: BankAccountItem, onEditClick: (BankAccountItem) -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -83,7 +75,7 @@ fun BankDetailCard(bank: BankAccountItem) {
         shape = RoundedCornerShape(16.dp)
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
-            // Header Row
+            // Header Row: Ab Edit Icon (Pen) ke sath
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     modifier = Modifier.size(40.dp).background(Color(0xFF1976D2).copy(alpha = 0.1f), RoundedCornerShape(8.dp)),
@@ -92,15 +84,19 @@ fun BankDetailCard(bank: BankAccountItem) {
                     Icon(Icons.Outlined.AccountBalance, contentDescription = "Bank", tint = Color(0xFF1976D2))
                 }
                 Spacer(modifier = Modifier.width(12.dp))
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(text = bank.bankName.uppercase(), fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.Black)
                     Text(text = bank.accountNo, color = Color.Gray, fontSize = 12.sp, letterSpacing = 1.sp)
                 }
+                // EDIT BUTTON
+                IconButton(onClick = { onEditClick(bank) }) {
+                    Icon(Icons.Outlined.Edit, contentDescription = "Edit Bank", tint = Color.Gray, modifier = Modifier.size(22.dp))
+                }
             }
             
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(16.dp))
             
-            // Balance
+            // Available Balance
             Text(text = "Available Balance", color = Color.Gray, fontSize = 12.sp)
             Text(text = formatRupeeAmount(bank.currentBalance), fontWeight = FontWeight.ExtraBold, fontSize = 28.sp, color = Color.Black)
             
@@ -108,23 +104,31 @@ fun BankDetailCard(bank: BankAccountItem) {
             HorizontalDivider(color = Color.LightGray.copy(alpha = 0.4f))
             Spacer(modifier = Modifier.height(16.dp))
             
-            // Premium Metrics Grid
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Column(horizontalAlignment = Alignment.Start) {
-                    Text(text = "Interest Rate", color = Color.Gray, fontSize = 11.sp)
-                    Text(text = "${bank.interestRate}% Yr", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color.DarkGray)
+            // Premium 6-Box Grid (2 Rows x 3 Cols)
+            Column(modifier = Modifier.fillMaxWidth()) {
+                // Top Row: Expected Data
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    MetricItem(label = "Interest Rate", value = "${bank.interestRate}% Yr", valueColor = Color.DarkGray, alignment = Alignment.Start)
+                    MetricItem(label = "Exp. Qtr", value = "+${formatRupeeAmount(bank.expQtrInt)}", valueColor = Color(0xFFF57C00), alignment = Alignment.CenterHorizontally)
+                    MetricItem(label = "Exp. Yearly", value = "+${formatRupeeAmount(bank.expYrInt)}", valueColor = Color(0xFF1976D2), alignment = Alignment.End)
                 }
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(text = "Quarterly Est.", color = Color.Gray, fontSize = 11.sp)
-                    // Math formula apply kiya percentage ko rupees me badalne ke liye
-                    val qtrEstRupees = (bank.currentBalance * bank.qtrInterestPct) / 100
-                    Text(text = "+${formatRupeeAmount(qtrEstRupees)}", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color(0xFFF57C00))
-                }
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(text = "1-Day Earn", color = Color.Gray, fontSize = 11.sp)
-                    Text(text = "+${formatRupeeAmount(bank.oneDayInt)}", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color(0xFF388E3C))
+                Spacer(modifier = Modifier.height(16.dp))
+                // Bottom Row: Accrued Data (Live Track)
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    MetricItem(label = "1-Day Earn", value = "+${formatRupeeAmount(bank.oneDayInt)}", valueColor = Color(0xFF388E3C), alignment = Alignment.Start)
+                    MetricItem(label = "Accrued Qtr", value = "+${formatRupeeAmount(bank.accruedQtrInt)}", valueColor = Color(0xFF388E3C), alignment = Alignment.CenterHorizontally)
+                    MetricItem(label = "Accrued Yr", value = "+${formatRupeeAmount(bank.accruedYrInt)}", valueColor = Color(0xFF388E3C), alignment = Alignment.End)
                 }
             }
         }
+    }
+}
+
+// Chhota Helper Composable Box Taki Code Clean Rahe
+@Composable
+fun MetricItem(label: String, value: String, valueColor: Color, alignment: Alignment.Horizontal) {
+    Column(horizontalAlignment = alignment) {
+        Text(text = label, color = Color.Gray, fontSize = 11.sp)
+        Text(text = value, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = valueColor)
     }
 }
