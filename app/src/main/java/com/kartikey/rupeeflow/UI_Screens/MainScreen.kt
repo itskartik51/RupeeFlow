@@ -67,7 +67,7 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
     BackHandler(enabled = showExpenseHistory || selectedTab != 0 || assetsCurrentView != "Main" || bankToEdit != null) {
         dBackPresses++ 
         if (bankToEdit != null) {
-            bankToEdit = null // Pehle edit screen se bahar aayega
+            bankToEdit = null 
         } else if (showExpenseHistory) {
             showExpenseHistory = false 
         } else if (selectedTab == 1 && assetsCurrentView != "Main") {
@@ -139,7 +139,6 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                                         currentBalance = item.optDouble("current_bal", 0.0),
                                         interestRate = item.optDouble("interest_rate", 0.0),
                                         qtrInterestPct = item.optDouble("qtr_interest_pct", 0.0),
-                                        // NAYA DATA YAHAN CATCH HUA HAI
                                         expQtrInt = item.optDouble("exp_qtr_int", 0.0),
                                         accruedQtrInt = item.optDouble("accrued_qtr_int", 0.0),
                                         expYrInt = item.optDouble("exp_yr_int", 0.0),
@@ -164,67 +163,77 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
         }
     }
 
-    Scaffold(
-        bottomBar = {
-            NavigationBar(containerColor = Color.White, tonalElevation = 8.dp) {
-                NavigationBarItem(
-                    selected = selectedTab == 0 && !showExpenseHistory && bankToEdit == null,
-                    onClick = { selectedTab = 0; showExpenseHistory = false; bankToEdit = null },
-                    icon = { Icon(Icons.Outlined.Home, contentDescription = "Home") }, label = { Text("Home") },
-                    colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
-                )
-                NavigationBarItem(
-                    selected = selectedTab == 1 && bankToEdit == null,
-                    onClick = { 
-                        if (selectedTab == 1) assetsCurrentView = "Main"
-                        selectedTab = 1; showExpenseHistory = false; bankToEdit = null
-                    },
-                    icon = { Icon(Icons.Outlined.AccountBalanceWallet, contentDescription = "Assets") }, label = { Text("Assets") },
-                    colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
-                )
-                NavigationBarItem(
-                    selected = selectedTab == 2 && bankToEdit == null,
-                    onClick = { selectedTab = 2; showExpenseHistory = false; bankToEdit = null },
-                    icon = { Box(modifier = Modifier.size(48.dp).clip(RoundedCornerShape(14.dp)).background(Color(0xFF2E7D32)), contentAlignment = Alignment.Center) { Icon(Icons.Outlined.Add, contentDescription = "Add", tint = Color.White) } }
-                )
-                NavigationBarItem(
-                    selected = selectedTab == 3 && bankToEdit == null,
-                    onClick = { selectedTab = 3; showExpenseHistory = false; bankToEdit = null },
-                    icon = { Icon(Icons.Outlined.PieChart, contentDescription = "Analytics") }, label = { Text("Analytics") },
-                    colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
-                )
-                NavigationBarItem(
-                    selected = selectedTab == 4 && bankToEdit == null,
-                    onClick = { selectedTab = 4; showExpenseHistory = false; bankToEdit = null },
-                    icon = { Icon(Icons.Outlined.Person, contentDescription = "Profile") }, label = { Text("Profile") },
-                    colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
-                )
-            }
-        }
-    ) { paddingValues ->
-        Crossfade(targetState = Pair(selectedTab, Pair(showExpenseHistory, bankToEdit)), animationSpec = tween(400), label = "Screen Transition") { state ->
-            val (currentTab, subState) = state
-            val (isHistoryVisible, editTarget) = subState
-            
-            // Edit Bank Route
-            if (editTarget != null) {
-                EditSheetScreen(username = username, onBackClick = { bankToEdit = null })
-            } 
-            else if (isHistoryVisible) {
-                com.kartikey.rupeeflow.UI_Screens.Home.ExpenseHistoryScreen(paddingValues = paddingValues, history = transactionList, onBackClick = { showExpenseHistory = false })
-            } else {
-                when (currentTab) {
-                    0 -> HomeDashboardDesign(username = username, paddingValues = paddingValues, thisMonthExpenses = thisMonthExpenses, thisYearExpenses = thisYearExpenses, isLoadingExpenses = isLoadingExpenses, dNavState = dNavState, dBackPresses = dBackPresses, onLogout = onLogout, onRefreshExpenses = { refreshTrigger++ }, onExpenseCardClick = { showExpenseHistory = true })
-                    1 -> AssetsScreen(
-                        paddingValues = paddingValues, username = username, investmentList = investmentList, bankList = bankList, isLoading = isLoadingExpenses, onRefreshClick = { refreshTrigger++ },
-                        currentView = assetsCurrentView, onViewChange = { assetsCurrentView = it },
-                        onEditBankClick = { bankToEdit = it } // YAHAN SE CLICK CATCH HOGA
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            bottomBar = {
+                NavigationBar(containerColor = Color.White, tonalElevation = 8.dp) {
+                    NavigationBarItem(
+                        selected = selectedTab == 0 && !showExpenseHistory,
+                        onClick = { selectedTab = 0; showExpenseHistory = false },
+                        icon = { Icon(Icons.Outlined.Home, contentDescription = "Home") }, label = { Text("Home") },
+                        colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
                     )
-                    2 -> AddScreen(paddingValues = paddingValues, username = username, onExpenseAdded = { newEntry -> transactionList = listOf(newEntry) + transactionList }, onInvestmentAdded = { refreshTrigger++ }, onFinanceAdded = { refreshTrigger++ })
-                    3 -> AnalyticsScreen(paddingValues = paddingValues)
-                    4 -> ProfileScreen(username = username, paddingValues = paddingValues, onLogout = onLogout)
+                    NavigationBarItem(
+                        selected = selectedTab == 1,
+                        onClick = { 
+                            if (selectedTab == 1) assetsCurrentView = "Main"
+                            selectedTab = 1; showExpenseHistory = false
+                        },
+                        icon = { Icon(Icons.Outlined.AccountBalanceWallet, contentDescription = "Assets") }, label = { Text("Assets") },
+                        colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
+                    )
+                    NavigationBarItem(
+                        selected = selectedTab == 2,
+                        onClick = { selectedTab = 2; showExpenseHistory = false },
+                        icon = { Box(modifier = Modifier.size(48.dp).clip(RoundedCornerShape(14.dp)).background(Color(0xFF2E7D32)), contentAlignment = Alignment.Center) { Icon(Icons.Outlined.Add, contentDescription = "Add", tint = Color.White) } }
+                    )
+                    NavigationBarItem(
+                        selected = selectedTab == 3,
+                        onClick = { selectedTab = 3; showExpenseHistory = false },
+                        icon = { Icon(Icons.Outlined.PieChart, contentDescription = "Analytics") }, label = { Text("Analytics") },
+                        colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
+                    )
+                    NavigationBarItem(
+                        selected = selectedTab == 4,
+                        onClick = { selectedTab = 4; showExpenseHistory = false },
+                        icon = { Icon(Icons.Outlined.Person, contentDescription = "Profile") }, label = { Text("Profile") },
+                        colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
+                    )
                 }
             }
+        ) { paddingValues ->
+            Crossfade(targetState = Pair(selectedTab, showExpenseHistory), animationSpec = tween(400), label = "Screen Transition") { state ->
+                val (currentTab, isHistoryVisible) = state
+                
+                if (isHistoryVisible) {
+                    com.kartikey.rupeeflow.UI_Screens.Home.ExpenseHistoryScreen(paddingValues = paddingValues, history = transactionList, onBackClick = { showExpenseHistory = false })
+                } else {
+                    when (currentTab) {
+                        0 -> HomeDashboardDesign(username = username, paddingValues = paddingValues, thisMonthExpenses = thisMonthExpenses, thisYearExpenses = thisYearExpenses, isLoadingExpenses = isLoadingExpenses, dNavState = dNavState, dBackPresses = dBackPresses, onLogout = onLogout, onRefreshExpenses = { refreshTrigger++ }, onExpenseCardClick = { showExpenseHistory = true })
+                        1 -> AssetsScreen(
+                            paddingValues = paddingValues, username = username, investmentList = investmentList, bankList = bankList, isLoading = isLoadingExpenses, onRefreshClick = { refreshTrigger++ },
+                            currentView = assetsCurrentView, onViewChange = { assetsCurrentView = it },
+                            onEditBankClick = { bankToEdit = it }
+                        )
+                        2 -> AddScreen(paddingValues = paddingValues, username = username, onExpenseAdded = { newEntry -> transactionList = listOf(newEntry) + transactionList }, onInvestmentAdded = { refreshTrigger++ }, onFinanceAdded = { refreshTrigger++ })
+                        3 -> AnalyticsScreen(paddingValues = paddingValues)
+                        4 -> ProfileScreen(username = username, paddingValues = paddingValues, onLogout = onLogout)
+                    }
+                }
+            }
+        }
+
+        // YAHAN MASTER BOSS POP-UP TRIGGER HOGA BEZHIJHAK
+        if (bankToEdit != null) {
+            EditBankDialog(
+                bank = bankToEdit!!,
+                username = username,
+                onDismiss = { bankToEdit = null },
+                onUpdateSuccess = { 
+                    bankToEdit = null 
+                    refreshTrigger++ // Update hote hi naya data layega!
+                }
+            )
         }
     }
 }
