@@ -30,12 +30,17 @@ data class InvestmentItem(
     val oneDayChangePrice: Double
 )
 
+// YAHAN DATA MODEL UPDATE HUA HAI
 data class BankAccountItem(
     val bankName: String,
     val accountNo: String,
     val currentBalance: Double,
     val interestRate: Double,
     val qtrInterestPct: Double,
+    val expQtrInt: Double,
+    val accruedQtrInt: Double,
+    val expYrInt: Double,
+    val accruedYrInt: Double,
     val oneDayInt: Double
 )
 
@@ -47,8 +52,9 @@ fun AssetsScreen(
     bankList: List<BankAccountItem>, 
     isLoading: Boolean = false, 
     onRefreshClick: () -> Unit = {},
-    currentView: String, // State hoisted
-    onViewChange: (String) -> Unit // State callback
+    currentView: String, 
+    onViewChange: (String) -> Unit,
+    onEditBankClick: (BankAccountItem) -> Unit // Edit Route Passing
 ) { 
     val totalBankBalance = bankList.sumOf { it.currentBalance }
 
@@ -61,30 +67,13 @@ fun AssetsScreen(
                 .verticalScroll(rememberScrollState()) 
                 .padding(16.dp)
         ) {
-            NetworthCard(
-                networthAmount = 79500.0,
-                isLoading = isLoading,
-                onClick = { /* History */ }
-            )
-
+            NetworthCard(networthAmount = 79500.0, isLoading = isLoading, onClick = { })
             Spacer(modifier = Modifier.height(24.dp))
-
-            // ==========================================
-            // SECTION 1: MY INVESTMENTS
-            // ==========================================
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Text(text = "My Investments", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color.Black)
-                TextButton(onClick = { onViewChange("InvestmentDetails") }) {
-                    Text("More", color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold)
-                }
+                TextButton(onClick = { onViewChange("InvestmentDetails") }) { Text("More", color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold) }
             }
-
             Spacer(modifier = Modifier.height(8.dp))
-
             Column(modifier = Modifier.fillMaxWidth()) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Box(modifier = Modifier.weight(1f)) { GridItemCard("STOCKS", "₹0", Color(0xFF388E3C)) }
@@ -96,25 +85,12 @@ fun AssetsScreen(
                     Box(modifier = Modifier.weight(1f)) { GridItemCard("BONDS", "₹0", Color(0xFFF57C00)) }
                 }
             }
-            
             Spacer(modifier = Modifier.height(24.dp))
-
-            // ==========================================
-            // SECTION 2: MY FINANCE / ACCOUNTS
-            // ==========================================
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Text(text = "My Finance", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color.Black)
-                TextButton(onClick = { onViewChange("FinanceDetails") }) {
-                    Text("More", color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold)
-                }
+                TextButton(onClick = { onViewChange("FinanceDetails") }) { Text("More", color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold) }
             }
-
             Spacer(modifier = Modifier.height(8.dp))
-
             Column(modifier = Modifier.fillMaxWidth()) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Box(modifier = Modifier.weight(1f)) { FinanceGridCard("Cash", "₹0", Icons.Outlined.Money, Color(0xFF388E3C)) }
@@ -128,20 +104,15 @@ fun AssetsScreen(
             }
         }
     } else if (currentView == "InvestmentDetails") {
-        InvestmentScreen(
-            onBackClick = { onViewChange("Main") }, 
-            username = username, 
-            investmentList = investmentList,
-            isLoading = isLoading, 
-            onRefreshClick = onRefreshClick
-        )
+        InvestmentScreen(onBackClick = { onViewChange("Main") }, username = username, investmentList = investmentList, isLoading = isLoading, onRefreshClick = onRefreshClick)
     } else if (currentView == "FinanceDetails") {
         FinanceScreen(
             onBackClick = { onViewChange("Main") },
             username = username,
             bankList = bankList,
             isLoading = isLoading,
-            onRefreshClick = onRefreshClick
+            onRefreshClick = onRefreshClick,
+            onEditBankClick = onEditBankClick // Passing further down
         )
     }
 }
@@ -149,16 +120,10 @@ fun AssetsScreen(
 @Composable
 fun FinanceGridCard(title: String, amount: String, icon: ImageVector, iconColor: Color) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        shape = RoundedCornerShape(12.dp),
-        elevation = CardDefaults.cardElevation(2.dp),
-        border = BorderStroke(1.dp, Color(0xFFEEEEEE))
+        modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color.White),
+        shape = RoundedCornerShape(12.dp), elevation = CardDefaults.cardElevation(2.dp), border = BorderStroke(1.dp, Color(0xFFEEEEEE))
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            horizontalAlignment = Alignment.Start
-        ) {
+        Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.Start) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(icon, contentDescription = title, tint = iconColor, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(6.dp))
@@ -167,59 +132,32 @@ fun FinanceGridCard(title: String, amount: String, icon: ImageVector, iconColor:
             Spacer(modifier = Modifier.height(8.dp))
             Text(text = amount, color = Color.Black, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
             Spacer(modifier = Modifier.height(12.dp))
-            Box(
-                modifier = Modifier
-                    .height(4.dp)
-                    .fillMaxWidth(0.6f)
-                    .background(iconColor, RoundedCornerShape(2.dp))
-            )
+            Box(modifier = Modifier.height(4.dp).fillMaxWidth(0.6f).background(iconColor, RoundedCornerShape(2.dp)))
         }
     }
 }
 
 @Composable
 fun NetworthCard(networthAmount: Double, isLoading: Boolean, onClick: () -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(2.dp),
-        shape = RoundedCornerShape(16.dp)
-    ) {
+    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(2.dp), shape = RoundedCornerShape(16.dp)) {
         Column(modifier = Modifier.padding(20.dp)) {
             Text("NET WORTH", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(8.dp))
-            if (isLoading) {
-                CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color(0xFF2E7D32))
-            } else {
-                Text("₹$networthAmount", fontSize = 32.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
-            }
+            if (isLoading) CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color(0xFF2E7D32))
+            else Text("₹$networthAmount", fontSize = 32.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
         }
     }
 }
 
 @Composable
 fun GridItemCard(title: String, amount: String, lineColor: Color) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        shape = RoundedCornerShape(12.dp),
-        elevation = CardDefaults.cardElevation(2.dp),
-        border = BorderStroke(1.dp, Color(0xFFEEEEEE))
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            horizontalAlignment = Alignment.Start
-        ) {
+    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color.White), shape = RoundedCornerShape(12.dp), elevation = CardDefaults.cardElevation(2.dp), border = BorderStroke(1.dp, Color(0xFFEEEEEE))) {
+        Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.Start) {
             Text(text = title, color = Color.Gray, fontSize = 11.sp, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(8.dp))
             Text(text = amount, color = Color.Black, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
             Spacer(modifier = Modifier.height(12.dp))
-            Box(
-                modifier = Modifier
-                    .height(4.dp)
-                    .fillMaxWidth(0.6f)
-                    .background(lineColor, RoundedCornerShape(2.dp))
-            )
+            Box(modifier = Modifier.height(4.dp).fillMaxWidth(0.6f).background(lineColor, RoundedCornerShape(2.dp)))
         }
     }
 }
