@@ -129,6 +129,15 @@ fun TransactionItemCard(transaction: TransactionModel) {
         else -> Icons.Outlined.Edit
     }
 
+    // UPDATE: Yahan dynamic Icon set kiya gaya hai payment mode ke basis pe
+    val modeIcon = when (transaction.mode.trim()) {
+        "Cash" -> Icons.Outlined.Payments
+        "UPI" -> Icons.Outlined.QrCodeScanner
+        "NEFT", "Net Banking" -> Icons.Outlined.AccountBalance
+        "Credit Card", "Debit Card" -> Icons.Outlined.CreditCard
+        else -> Icons.Outlined.AccountBalanceWallet
+    }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -178,14 +187,23 @@ fun TransactionItemCard(transaction: TransactionModel) {
                     HorizontalDivider(color = Color.LightGray, thickness = 0.5.dp)
                     Spacer(modifier = Modifier.height(8.dp))
                     
+                    // UPDATE: Mode of Payment With Icon Integration
+                    if (transaction.mode.isNotBlank()) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 6.dp)) {
+                            Icon(imageVector = modeIcon, contentDescription = "Mode", modifier = Modifier.size(16.dp), tint = Color.DarkGray)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(text = "Paid via: ${transaction.mode}", fontSize = 13.sp, color = Color.DarkGray, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+
                     if (transaction.remark1.isNotBlank()) {
                         Text(text = "• Remark 1: ${transaction.remark1}", fontSize = 13.sp, color = Color.DarkGray)
                     }
                     if (transaction.remark2.isNotBlank()) {
                         Text(text = "• Remark 2: ${transaction.remark2}", fontSize = 13.sp, color = Color.DarkGray)
                     }
-                    if (transaction.remark1.isBlank() && transaction.remark2.isBlank()) {
-                        Text(text = "No remarks added.", fontSize = 13.sp, color = Color.Gray)
+                    if (transaction.remark1.isBlank() && transaction.remark2.isBlank() && transaction.mode.isBlank()) {
+                        Text(text = "No remarks or mode added.", fontSize = 13.sp, color = Color.Gray)
                     }
                 }
             }
