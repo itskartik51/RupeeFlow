@@ -1,5 +1,6 @@
 package com.kartikey.rupeeflow.UI_Screens.Assets
 
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -13,6 +14,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -28,6 +30,7 @@ fun InvestmentScreen(
     onBackClick: () -> Unit, 
     username: String, 
     investmentList: List<InvestmentItem>,
+    isLoading: Boolean = false, // UPDATE: Loading state aagayi
     onRefreshClick: () -> Unit = {}
 ) { 
     val totalInvested = investmentList.sumOf { it.quantity * it.avgBuyPrice }
@@ -64,6 +67,7 @@ fun InvestmentScreen(
                     totalReturn = totalReturn,
                     totalReturnPercent = totalReturnPercent,
                     totalInvested = totalInvested,
+                    isLoading = isLoading, // UPDATE: Passed to card
                     onRefreshClick = onRefreshClick
                 )
                 Spacer(modifier = Modifier.height(24.dp))
@@ -84,8 +88,21 @@ fun InvestmentScreen(
 fun InvestmentSummaryCard(
     itemCount: Int, totalCurrent: Double, total1DChange: Double, total1DPercent: Double, 
     totalReturn: Double, totalReturnPercent: Double, totalInvested: Double,
+    isLoading: Boolean, 
     onRefreshClick: () -> Unit = {}
 ) {
+    // UPDATE: Smooth continuous rotation animation jab isLoading true ho
+    val infiniteTransition = rememberInfiniteTransition(label = "refreshAnim")
+    val angle by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "spinAnim"
+    )
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -103,9 +120,16 @@ fun InvestmentSummaryCard(
                     IconButton(onClick = { }, modifier = Modifier.size(32.dp)) {
                         Icon(Icons.Outlined.Visibility, contentDescription = "Hide", tint = Color.DarkGray, modifier = Modifier.size(20.dp))
                     }
-                    // YAHAN GRAPH KI JAGAH REFRESH ICON ADD KIYA GAYA HAI
                     IconButton(onClick = onRefreshClick, modifier = Modifier.size(32.dp)) {
-                        Icon(Icons.Outlined.Refresh, contentDescription = "Refresh", tint = Color.DarkGray, modifier = Modifier.size(20.dp))
+                        Icon(
+                            Icons.Outlined.Refresh, 
+                            contentDescription = "Refresh", 
+                            tint = Color.DarkGray, 
+                            modifier = Modifier
+                                .size(20.dp)
+                                // UPDATE: Yahan Modifier.rotate use hua hai
+                                .rotate(if (isLoading) angle else 0f) 
+                        )
                     }
                     IconButton(onClick = { }, modifier = Modifier.size(32.dp)) {
                         Icon(Icons.Default.MoreVert, contentDescription = "More", tint = Color.DarkGray, modifier = Modifier.size(20.dp))
