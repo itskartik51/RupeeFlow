@@ -45,7 +45,6 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
     var selectedTab by remember { mutableIntStateOf(0) } 
     var showExpenseHistory by remember { mutableStateOf(false) }
 
-    // Fix: mutableDoubleStateOf use kiya hai specific type casting ke liye
     var thisMonthExpenses by remember { mutableDoubleStateOf(0.0) }
     var thisYearExpenses by remember { mutableDoubleStateOf(0.0) }
     var isLoadingExpenses by remember { mutableStateOf(true) }
@@ -217,7 +216,6 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
             val (currentTab, isHistoryVisible) = state
             
             if (isHistoryVisible) {
-                // Ab yahan Android Studio aapko bata dega ki iska sahi import path kya hai.
                 com.kartikey.rupeeflow.UI_Screens.Home.ExpenseHistoryScreen(
                     paddingValues = paddingValues, 
                     history = transactionList,
@@ -237,7 +235,8 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                         paddingValues = paddingValues, 
                         username = username, 
                         investmentList = investmentList,
-                        onRefreshClick = { refreshTrigger++ } // YAHAN CLICK TRIGGER CONNECT KIYA HAI
+                        isLoading = isLoadingExpenses, // UPDATE: Pass loading state
+                        onRefreshClick = { refreshTrigger++ }
                     )
                     2 -> AddScreen(
                         paddingValues = paddingValues, 
