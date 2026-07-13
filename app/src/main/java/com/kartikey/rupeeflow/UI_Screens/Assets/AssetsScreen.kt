@@ -23,7 +23,12 @@ data class InvestmentItem(
 )
 
 @Composable
-fun AssetsScreen(paddingValues: PaddingValues, username: String, investmentList: List<InvestmentItem>) { 
+fun AssetsScreen(
+    paddingValues: PaddingValues, 
+    username: String, 
+    investmentList: List<InvestmentItem>,
+    onRefreshClick: () -> Unit = {}
+) { 
     var currentView by remember { mutableStateOf("Main") }
 
     if (currentView == "Main") {
@@ -82,7 +87,12 @@ fun AssetsScreen(paddingValues: PaddingValues, username: String, investmentList:
             }
         }
     } else if (currentView == "InvestmentDetails") {
-        InvestmentScreen(onBackClick = { currentView = "Main" }, username = username, investmentList = investmentList)
+        InvestmentScreen(
+            onBackClick = { currentView = "Main" }, 
+            username = username, 
+            investmentList = investmentList,
+            onRefreshClick = onRefreshClick
+        )
     }
 }
 
