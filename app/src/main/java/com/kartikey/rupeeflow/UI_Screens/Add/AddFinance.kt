@@ -1,0 +1,168 @@
+package com.kartikey.rupeeflow.UI_Screens.Add
+
+import android.widget.Toast
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.kartikey.rupeeflow.Cloud_Database.Constants
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONObject
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit) {
+    var bankName by remember { mutableStateOf("") }
+    var accountNo by remember { mutableStateOf("") }
+    var currentBalance by remember { mutableStateOf("") }
+    var interestRate by remember { mutableStateOf("") }
+    
+    var isSubmitting by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
+    val context = LocalContext.current
+
+    var isPressed by remember { mutableStateOf(false) }
+    val buttonScale by animateFloatAsState(targetValue = if (isPressed) 0.95f else 1f, label = "ButtonScale")
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(4.dp),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            
+            OutlinedTextField(
+                value = bankName,
+                onValueChange = { bankName = it },
+                label = { Text("Bank Name (e.g. SBI, HDFC)") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp)
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            OutlinedTextField(
+                value = accountNo,
+                onValueChange = { accountNo = it },
+                label = { Text("Account No. (Last 3 or 4 digits)") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp)
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = currentBalance, 
+                    onValueChange = { currentBalance = it },
+                    label = { Text("Current Balance") },
+                    prefix = { Text("₹ ", fontWeight = FontWeight.Bold, color = Color.Black) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.weight(1f), 
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp)
+                )
+                OutlinedTextField(
+                    value = interestRate, 
+                    onValueChange = { interestRate = it },
+                    label = { Text("Interest Rate (%)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.weight(1f), 
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Button(
+                onClick = {
+                    val bal = currentBalance.toDoubleOrNull() ?: 0.0
+                    val rate = interestRate.toDoubleOrNull() ?: 0.0
+                    
+                    if (bankName.isNotBlank() && accountNo.isNotBlank() && bal > 0) {
+                        isSubmitting = true
+                        onFinanceAdded()
+                        
+                        // Masking Logic (XXXXX + Digits)
+                        val formattedAcc = if (accountNo.startsWith("X")) accountNo else "XXXXX$accountNo"
+                        
+                        coroutineScope.launch(Dispatchers.IO) {
+                            try {
+                                val jsonBody = JSONObject().apply {
+                                    put("action", "add_bank")
+                                    put("username", username)
+                                    put("bank_name", bankName) 
+                                    put("account_no", formattedAcc)
+                                    put("current_bal", bal)
+                                    put("interest_rate", rate)
+                                }
+                                val client = OkHttpClient()
+                                val body = jsonBody.toString().toRequestBody("application/json".toMediaType())
+                                val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(body).build()
+                                client.newCall(request).execute()
+
+                                withContext(Dispatchers.Main) {
+                                    isSubmitting = false
+                                    Toast.makeText(context, "Bank Account Added to Vault!", Toast.LENGTH_SHORT).show()
+                                    bankName = ""; accountNo = ""; currentBalance = ""; interestRate = "" 
+                                }
+                            } catch (e: Exception) {
+                                withContext(Dispatchers.Main) {
+                                    isSubmitting = false
+                                    Toast.makeText(context, "Error saving account", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        }
+                    } else {
+                        Toast.makeText(context, "Please enter valid Bank Details", Toast.LENGTH_LONG).show()
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp)
+                    .scale(buttonScale)
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onPress = {
+                                isPressed = true
+                                tryAwaitRelease()
+                                isPressed = false
+                            }
+                        )
+                    },
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF388E3C)),
+                shape = RoundedCornerShape(12.dp),
+                enabled = !isSubmitting
+            ) {
+                if (isSubmitting) {
+                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                } else {
+                    Text("Add Account", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White)
+                }
+            }
+        }
+    }
+}
