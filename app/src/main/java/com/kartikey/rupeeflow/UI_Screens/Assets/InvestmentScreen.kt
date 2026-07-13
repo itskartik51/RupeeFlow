@@ -7,7 +7,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.outlined.BarChart
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -24,9 +24,12 @@ import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun InvestmentScreen(onBackClick: () -> Unit, username: String, investmentList: List<InvestmentItem>) { 
-    // API loading logic hatakar directly passed list use ki hai for instant load
-    
+fun InvestmentScreen(
+    onBackClick: () -> Unit, 
+    username: String, 
+    investmentList: List<InvestmentItem>,
+    onRefreshClick: () -> Unit = {}
+) { 
     val totalInvested = investmentList.sumOf { it.quantity * it.avgBuyPrice }
     val totalCurrent = investmentList.sumOf { it.quantity * it.currentPrice }
     val total1DChange = investmentList.sumOf { it.quantity * it.oneDayChangePrice }
@@ -60,7 +63,8 @@ fun InvestmentScreen(onBackClick: () -> Unit, username: String, investmentList: 
                     total1DPercent = total1DPercent,
                     totalReturn = totalReturn,
                     totalReturnPercent = totalReturnPercent,
-                    totalInvested = totalInvested
+                    totalInvested = totalInvested,
+                    onRefreshClick = onRefreshClick
                 )
                 Spacer(modifier = Modifier.height(24.dp))
                 
@@ -79,7 +83,8 @@ fun InvestmentScreen(onBackClick: () -> Unit, username: String, investmentList: 
 @Composable
 fun InvestmentSummaryCard(
     itemCount: Int, totalCurrent: Double, total1DChange: Double, total1DPercent: Double, 
-    totalReturn: Double, totalReturnPercent: Double, totalInvested: Double
+    totalReturn: Double, totalReturnPercent: Double, totalInvested: Double,
+    onRefreshClick: () -> Unit = {}
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -98,8 +103,9 @@ fun InvestmentSummaryCard(
                     IconButton(onClick = { }, modifier = Modifier.size(32.dp)) {
                         Icon(Icons.Outlined.Visibility, contentDescription = "Hide", tint = Color.DarkGray, modifier = Modifier.size(20.dp))
                     }
-                    IconButton(onClick = { }, modifier = Modifier.size(32.dp)) {
-                        Icon(Icons.Outlined.BarChart, contentDescription = "Analytics", tint = Color.DarkGray, modifier = Modifier.size(20.dp))
+                    // YAHAN GRAPH KI JAGAH REFRESH ICON ADD KIYA GAYA HAI
+                    IconButton(onClick = onRefreshClick, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Outlined.Refresh, contentDescription = "Refresh", tint = Color.DarkGray, modifier = Modifier.size(20.dp))
                     }
                     IconButton(onClick = { }, modifier = Modifier.size(32.dp)) {
                         Icon(Icons.Default.MoreVert, contentDescription = "More", tint = Color.DarkGray, modifier = Modifier.size(20.dp))
