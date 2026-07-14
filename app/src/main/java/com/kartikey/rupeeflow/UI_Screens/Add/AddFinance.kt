@@ -32,7 +32,7 @@ import org.json.JSONObject
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -> Unit) { // Added onDismiss
+fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -> Unit) { 
     var bankName by remember { mutableStateOf("") }
     var accountNo by remember { mutableStateOf("") }
     var currentBalance by remember { mutableStateOf("") }
@@ -58,12 +58,11 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
     val buttonScale by animateFloatAsState(targetValue = if (isPressed) 0.95f else 1f, label = "ButtonScale")
 
     Card(
-        modifier = Modifier.fillMaxWidth().heightIn(max = 600.dp),
+        modifier = Modifier.fillMaxWidth(), // FIX: Height restriction removed
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(0.dp),
         shape = RoundedCornerShape(16.dp)
     ) {
-        // ADDED: verticalScroll physics
         Column(modifier = Modifier.padding(20.dp).verticalScroll(rememberScrollState())) {
             
             ExposedDropdownMenuBox(
@@ -190,7 +189,7 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                                     isSubmitting = false
                                     Toast.makeText(context, "Bank Account Added to Vault!", Toast.LENGTH_SHORT).show()
                                     bankName = ""; accountNo = ""; currentBalance = ""; interestRate = "" 
-                                    onDismiss() // ADDED: Auto close sheet
+                                    onDismiss() 
                                 }
                             } catch (e: Exception) {
                                 withContext(Dispatchers.Main) {
