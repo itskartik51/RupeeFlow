@@ -20,7 +20,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.kartikey.rupeeflow.Cloud_Database.Constants
 import com.kartikey.rupeeflow.UI_Screens.Home.HomeDashboardDesign
-import com.kartikey.rupeeflow.UI_Screens.Add.AddScreen // Boss file import ki
+import com.kartikey.rupeeflow.UI_Screens.Add.AddScreen 
 import com.kartikey.rupeeflow.UI_Screens.Add.TransactionModel
 import com.kartikey.rupeeflow.UI_Screens.Assets.AssetsScreen
 import com.kartikey.rupeeflow.UI_Screens.Assets.InvestmentItem
@@ -46,8 +46,12 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
 
     var bankToEdit by remember { mutableStateOf<BankAccountItem?>(null) }
     
-    // Add Menu State (Boss file ko control dene ke liye)
+    // Add Menu State
     var showAddMenu by remember { mutableStateOf(false) }
+
+    // PERFECT CONNECTION: Profile data states added here
+    var userFullName by remember { mutableStateOf("Kartikey") } 
+    var userEmail by remember { mutableStateOf("") } 
 
     var thisMonthExpenses by remember { mutableDoubleStateOf(0.0) }
     var thisYearExpenses by remember { mutableDoubleStateOf(0.0) }
@@ -185,7 +189,7 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                         colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
                     )
                     
-                    // ADD BUTTON: Toggle Boss Overlay
+                    // ADD BUTTON
                     NavigationBarItem(
                         selected = false,
                         onClick = { showAddMenu = !showAddMenu },
@@ -231,17 +235,20 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                             currentView = assetsCurrentView, onViewChange = { assetsCurrentView = it },
                             onEditBankClick = { bankToEdit = it }
                         )
-                        // Tab 2 (Purana AddScreen) is empty in bottom nav, overlay will handle it.
                         3 -> AnalyticsScreen(paddingValues = paddingValues)
-                        4 -> ProfileScreen(username = username, paddingValues = paddingValues, onLogout = onLogout)
+                        // PERFECT CONNECTION: Ab ProfileScreen ko data pass ho raha hai
+                        4 -> ProfileScreen(
+                            username = username, 
+                            name = userFullName, 
+                            email = userEmail, 
+                            paddingValues = paddingValues, 
+                            onLogout = onLogout
+                        )
                     }
                 }
             }
         }
 
-        // ==========================================
-        // CALLING THE BOSS FILE (AddScreen)
-        // ==========================================
         AddScreen(
             username = username,
             showMenu = showAddMenu,
@@ -253,7 +260,6 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
             onFinanceAdded = { refreshTrigger++ }
         )
 
-        // EDIT BANK POPUP
         if (bankToEdit != null) {
             EditBankDialog(
                 bank = bankToEdit!!,
