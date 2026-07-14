@@ -3,6 +3,7 @@ package com.kartikey.rupeeflow.UI_Screens
 import android.widget.Toast
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -22,6 +23,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.kartikey.rupeeflow.Cloud_Database.Constants
+import com.kartikey.rupeeflow.UI_Screens.Add.IndianBanksList // Master List Import ki
 import com.kartikey.rupeeflow.UI_Screens.Assets.BankAccountItem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -40,16 +42,18 @@ fun EditBankDialog(
     onDismiss: () -> Unit,
     onUpdateSuccess: () -> Unit
 ) {
-    // State variables pre-filled with existing bank data
     var bankName by remember { mutableStateOf(bank.bankName) }
     var bankBalance by remember { mutableStateOf(bank.currentBalance.toString()) }
     var interestRate by remember { mutableStateOf(bank.interestRate.toString()) }
+    
+    // Dropdown state for Edit Pop-up
+    var expanded by remember { mutableStateOf(false) }
+    val filteredBanks = IndianBanksList.filter { it.contains(bankName, ignoreCase = true) }
     
     var isSubmitting by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
 
-    // Touch animations
     var isUpdatePressed by remember { mutableStateOf(false) }
     val updateButtonScale by animateFloatAsState(targetValue = if (isUpdatePressed) 0.95f else 1f, label = "UpdateAnim")
     
@@ -79,23 +83,48 @@ fun EditBankDialog(
                 
                 Spacer(modifier = Modifier.height(20.dp))
                 
-                // Row 1: Full width Bank Name
-                OutlinedTextField(
-                    value = bankName,
-                    onValueChange = { bankName = it },
-                    label = { Text("Bank Name") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color(0xFF2E7D32),
-                        focusedLabelColor = Color(0xFF2E7D32)
+                // Searchable Premium Dropdown in Edit Pop-up
+                ExposedDropdownMenuBox(
+                    expanded = expanded,
+                    onExpandedChange = { expanded = it }
+                ) {
+                    OutlinedTextField(
+                        value = bankName,
+                        onValueChange = { 
+                            bankName = it
+                            expanded = true 
+                        },
+                        label = { Text("Bank Name") },
+                        modifier = Modifier.fillMaxWidth().menuAnchor(),
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color(0xFF2E7D32),
+                            focusedLabelColor = Color(0xFF2E7D32)
+                        )
                     )
-                )
+                    if (filteredBanks.isNotEmpty()) {
+                        ExposedDropdownMenu(
+                            expanded = expanded,
+                            onDismissRequest = { expanded = false },
+                            modifier = Modifier.background(Color.White)
+                        ) {
+                            filteredBanks.forEach { selectionOption ->
+                                DropdownMenuItem(
+                                    text = { Text(selectionOption, color = Color.Black) },
+                                    onClick = {
+                                        bankName = selectionOption
+                                        expanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
                 
                 Spacer(modifier = Modifier.height(16.dp))
                 
-                // Row 2: Balance and Interest Rate side-by-side
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedTextField(
                         value = bankBalance,
@@ -129,9 +158,7 @@ fun EditBankDialog(
 
                 Spacer(modifier = Modifier.height(28.dp))
 
-                // Row 3: Buttons
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    // Cancel Button (White color)
                     OutlinedButton(
                         onClick = { if (!isSubmitting) onDismiss() },
                         modifier = Modifier
@@ -148,13 +175,19 @@ fun EditBankDialog(
                         Text("Cancel", fontWeight = FontWeight.Bold)
                     }
 
-                    // Update Button (Green color)
                     Button(
                         onClick = {
                             val newBal = bankBalance.toDoubleOrNull()
                             val newRate = interestRate.toDoubleOrNull()
                             
                             if (bankName.isNotBlank() && newBal != null && newRate != null) {
+                                
+                                // STRICT VALIDATION in Edit Mode
+                                if (!IndianBanksList.contains(bankName)) {
+                                    Toast.makeText(context, "Please select a valid bank from the dropdown!", Toast.LENGTH_SHORT).show()
+                                    return@Button
+                                }
+
                                 isSubmitting = true
                                 coroutineScope.launch(Dispatchers.IO) {
                                     try {
@@ -163,7 +196,7 @@ fun EditBankDialog(
                                             put("username", username)
                                             put("original_account_no", bank.accountNo)
                                             put("new_bank_name", bankName)
-                                            put("new_account_no", bank.accountNo) // Account no unchanged
+                                            put("new_account_no", bank.accountNo)
                                             put("new_current_bal", newBal)
                                             put("new_interest_rate", newRate)
                                         }
@@ -178,7 +211,7 @@ fun EditBankDialog(
                                             isSubmitting = false
                                             if (resData.contains("success")) {
                                                 Toast.makeText(context, "Bank Details Updated!", Toast.LENGTH_SHORT).show()
-                                                onUpdateSuccess() // Success par pop-up hat jayega aur data refresh hoga
+                                                onUpdateSuccess()
                                             } else {
                                                 Toast.makeText(context, "Update Failed!", Toast.LENGTH_SHORT).show()
                                             }
