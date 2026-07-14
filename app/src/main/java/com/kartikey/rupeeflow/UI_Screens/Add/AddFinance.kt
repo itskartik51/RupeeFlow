@@ -37,7 +37,19 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit) {
     var interestRate by remember { mutableStateOf("") }
     
     var expanded by remember { mutableStateOf(false) }
-    val filteredBanks = Constants.IndianBanksList.filter { it.contains(bankName, ignoreCase = true) }
+    
+    // SMART FILTER: Jab tak type nahi karega tab tak list empty rahegi.
+    // Exact match hone par bhi list gayab ho jayegi.
+    val filteredBanks = if (bankName.isNotBlank()) {
+        Constants.IndianBanksList.filter { 
+            it.contains(bankName, ignoreCase = true) && !it.equals(bankName, ignoreCase = true) 
+        }
+    } else {
+        emptyList()
+    }
+    
+    // Dropdown tabhi dikhega jab filtered list me kuch ho
+    val showDropdown = expanded && filteredBanks.isNotEmpty()
     
     var isSubmitting by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
@@ -55,7 +67,7 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit) {
         Column(modifier = Modifier.padding(20.dp)) {
             
             ExposedDropdownMenuBox(
-                expanded = expanded,
+                expanded = showDropdown,
                 onExpandedChange = { expanded = it }
             ) {
                 OutlinedTextField(
@@ -64,19 +76,18 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit) {
                         bankName = it
                         expanded = true 
                     },
-                    label = { Text("Select or Type Bank Name") },
+                    label = { Text("Type Bank Name (e.g. SBI)") },
                     modifier = Modifier.fillMaxWidth().menuAnchor(),
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = Color(0xFF2E7D32),
                         focusedLabelColor = Color(0xFF2E7D32)
                     )
                 )
-                if (filteredBanks.isNotEmpty()) {
+                if (showDropdown) {
                     ExposedDropdownMenu(
-                        expanded = expanded,
+                        expanded = showDropdown,
                         onDismissRequest = { expanded = false },
                         modifier = Modifier.background(Color.White)
                     ) {
