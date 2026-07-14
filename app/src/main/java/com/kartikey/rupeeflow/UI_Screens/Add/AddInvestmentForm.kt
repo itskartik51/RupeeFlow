@@ -33,7 +33,7 @@ import org.json.JSONObject
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss: () -> Unit) { // Added onDismiss
+fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss: () -> Unit) { 
     var assetType by remember { mutableStateOf("Stock") }
     var assetName by remember { mutableStateOf("") }
     var selectedSymbol by remember { mutableStateOf("") } 
@@ -142,12 +142,11 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
     }
 
     Card(
-        modifier = Modifier.fillMaxWidth().heightIn(max = 600.dp),
+        modifier = Modifier.fillMaxWidth(), // FIX: Height restriction removed
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(0.dp),
         shape = RoundedCornerShape(16.dp)
     ) {
-        // ADDED: verticalScroll physics
         Column(modifier = Modifier.padding(20.dp).verticalScroll(rememberScrollState())) {
             
             ExposedDropdownMenuBox(
@@ -304,7 +303,7 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                                     isSubmitting = false
                                     Toast.makeText(context, "Investment Saved! Sheet will calculate live returns.", Toast.LENGTH_SHORT).show()
                                     assetName = ""; selectedSymbol = ""; quantity = ""; buyPrice = ""; date = "" 
-                                    onDismiss() // ADDED: Auto close sheet
+                                    onDismiss() 
                                 }
                             } catch (e: Exception) {
                                 withContext(Dispatchers.Main) {
