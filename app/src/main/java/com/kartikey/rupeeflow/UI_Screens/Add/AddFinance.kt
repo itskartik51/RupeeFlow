@@ -2,6 +2,7 @@ package com.kartikey.rupeeflow.UI_Screens.Add
 
 import android.widget.Toast
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -27,6 +28,17 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 
+// The Master List of Indian Banks (Is list ko app me kही bhi use kar sakte hai)
+val IndianBanksList = listOf(
+    "State Bank of India (SBI)", "HDFC Bank", "ICICI Bank", "Axis Bank", "Kotak Mahindra Bank",
+    "Punjab National Bank (PNB)", "Bank of Baroda", "Bank of India", "Union Bank of India",
+    "Canara Bank", "Central Bank of India", "Indian Bank", "Indian Overseas Bank", "UCO Bank",
+    "Bank of Maharashtra", "IDBI Bank", "Yes Bank", "IndusInd Bank", "Federal Bank",
+    "South Indian Bank", "IDFC First Bank", "Bandhan Bank", "RBL Bank", "AU Small Finance Bank",
+    "Equitas Small Finance Bank", "Ujjivan Small Finance Bank", "Paytm Payments Bank",
+    "Airtel Payments Bank", "India Post Payments Bank", "Standard Chartered Bank", "Citi Bank", "HSBC Bank", "Other Bank"
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit) {
@@ -34,6 +46,11 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit) {
     var accountNo by remember { mutableStateOf("") }
     var currentBalance by remember { mutableStateOf("") }
     var interestRate by remember { mutableStateOf("") }
+    
+    // Dropdown state
+    var expanded by remember { mutableStateOf(false) }
+    // Real-time filtering based on what user types
+    val filteredBanks = IndianBanksList.filter { it.contains(bankName, ignoreCase = true) }
     
     var isSubmitting by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
@@ -50,14 +67,45 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit) {
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
             
-            OutlinedTextField(
-                value = bankName,
-                onValueChange = { bankName = it },
-                label = { Text("Bank Name (e.g. SBI, HDFC)") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                shape = RoundedCornerShape(12.dp)
-            )
+            // Searchable Premium Dropdown
+            ExposedDropdownMenuBox(
+                expanded = expanded,
+                onExpandedChange = { expanded = it }
+            ) {
+                OutlinedTextField(
+                    value = bankName,
+                    onValueChange = { 
+                        bankName = it
+                        expanded = true 
+                    },
+                    label = { Text("Select or Type Bank Name") },
+                    modifier = Modifier.fillMaxWidth().menuAnchor(),
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color(0xFF2E7D32),
+                        focusedLabelColor = Color(0xFF2E7D32)
+                    )
+                )
+                if (filteredBanks.isNotEmpty()) {
+                    ExposedDropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false },
+                        modifier = Modifier.background(Color.White)
+                    ) {
+                        filteredBanks.forEach { selectionOption ->
+                            DropdownMenuItem(
+                                text = { Text(selectionOption, color = Color.Black) },
+                                onClick = {
+                                    bankName = selectionOption
+                                    expanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -68,7 +116,11 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit) {
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = Color(0xFF2E7D32),
+                    focusedLabelColor = Color(0xFF2E7D32)
+                )
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -82,7 +134,11 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit) {
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.weight(1f), 
                     singleLine = true,
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color(0xFF2E7D32),
+                        focusedLabelColor = Color(0xFF2E7D32)
+                    )
                 )
                 OutlinedTextField(
                     value = interestRate, 
@@ -91,7 +147,11 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit) {
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.weight(1f), 
                     singleLine = true,
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color(0xFF2E7D32),
+                        focusedLabelColor = Color(0xFF2E7D32)
+                    )
                 )
             }
 
@@ -103,10 +163,16 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit) {
                     val rate = interestRate.toDoubleOrNull() ?: 0.0
                     
                     if (bankName.isNotBlank() && accountNo.isNotBlank() && bal > 0) {
+                        
+                        // STRICT VALIDATION: Fake bank name block karega
+                        if (!IndianBanksList.contains(bankName)) {
+                            Toast.makeText(context, "Please select a valid bank from the dropdown!", Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
+
                         isSubmitting = true
                         onFinanceAdded()
                         
-                        // Masking Logic (XXXXX + Digits)
                         val formattedAcc = if (accountNo.startsWith("X")) accountNo else "XXXXX$accountNo"
                         
                         coroutineScope.launch(Dispatchers.IO) {
@@ -137,7 +203,7 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit) {
                             }
                         }
                     } else {
-                        Toast.makeText(context, "Please enter valid Bank Details", Toast.LENGTH_LONG).show()
+                        Toast.makeText(context, "Please fill all details correctly", Toast.LENGTH_LONG).show()
                     }
                 },
                 modifier = Modifier
