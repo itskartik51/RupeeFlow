@@ -28,17 +28,6 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 
-// The Master List of Indian Banks (Is list ko app me kही bhi use kar sakte hai)
-val IndianBanksList = listOf(
-    "State Bank of India (SBI)", "HDFC Bank", "ICICI Bank", "Axis Bank", "Kotak Mahindra Bank",
-    "Punjab National Bank (PNB)", "Bank of Baroda", "Bank of India", "Union Bank of India",
-    "Canara Bank", "Central Bank of India", "Indian Bank", "Indian Overseas Bank", "UCO Bank",
-    "Bank of Maharashtra", "IDBI Bank", "Yes Bank", "IndusInd Bank", "Federal Bank",
-    "South Indian Bank", "IDFC First Bank", "Bandhan Bank", "RBL Bank", "AU Small Finance Bank",
-    "Equitas Small Finance Bank", "Ujjivan Small Finance Bank", "Paytm Payments Bank",
-    "Airtel Payments Bank", "India Post Payments Bank", "Standard Chartered Bank", "Citi Bank", "HSBC Bank", "Other Bank"
-)
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit) {
@@ -47,10 +36,8 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit) {
     var currentBalance by remember { mutableStateOf("") }
     var interestRate by remember { mutableStateOf("") }
     
-    // Dropdown state
     var expanded by remember { mutableStateOf(false) }
-    // Real-time filtering based on what user types
-    val filteredBanks = IndianBanksList.filter { it.contains(bankName, ignoreCase = true) }
+    val filteredBanks = Constants.IndianBanksList.filter { it.contains(bankName, ignoreCase = true) }
     
     var isSubmitting by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
@@ -67,7 +54,6 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit) {
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
             
-            // Searchable Premium Dropdown
             ExposedDropdownMenuBox(
                 expanded = expanded,
                 onExpandedChange = { expanded = it }
@@ -164,8 +150,7 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit) {
                     
                     if (bankName.isNotBlank() && accountNo.isNotBlank() && bal > 0) {
                         
-                        // STRICT VALIDATION: Fake bank name block karega
-                        if (!IndianBanksList.contains(bankName)) {
+                        if (!Constants.IndianBanksList.contains(bankName)) {
                             Toast.makeText(context, "Please select a valid bank from the dropdown!", Toast.LENGTH_SHORT).show()
                             return@Button
                         }
