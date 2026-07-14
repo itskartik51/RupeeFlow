@@ -49,4 +49,7 @@ dependencies {
     
     // Google Sheets se connect karne ke liye
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
+    // Nayi Library: Coil (Bank ke HD Logos fetch aur render karne ke liye)
+    implementation("io.coil-kt:coil-compose:2.4.0")
 }
