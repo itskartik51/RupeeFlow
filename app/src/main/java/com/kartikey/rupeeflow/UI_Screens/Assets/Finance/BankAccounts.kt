@@ -78,14 +78,14 @@ fun BankAccountsScreen(
 fun BankDetailCard(bank: BankAccountItem, onEditClick: (BankAccountItem) -> Unit) {
     val context = LocalContext.current
     
-    // SMART MATCHER: Purane uppercase naam aur naye list naam dono ko handle karega
     val domain = Constants.BankDomainMap.entries.firstOrNull { 
         it.key.equals(bank.bankName.trim(), ignoreCase = true) || 
         it.key.contains(bank.bankName.trim(), ignoreCase = true) ||
         bank.bankName.trim().contains(it.key, ignoreCase = true)
     }?.value
 
-    val logoUrl = if (domain != null) "https://logo.clearbit.com/$domain" else null
+    // FIX: Clearbit ki jagah ab Google Favicon API (sz=128 for High Res) lagaya hai. Ye kabhi block nahi karta.
+    val logoUrl = if (domain != null) "https://www.google.com/s2/favicons?sz=128&domain=$domain" else null
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -96,7 +96,6 @@ fun BankDetailCard(bank: BankAccountItem, onEditClick: (BankAccountItem) -> Unit
         Column(modifier = Modifier.padding(20.dp)) {
             
             Row(verticalAlignment = Alignment.CenterVertically) {
-                // HD Logo Frame Box
                 Box(
                     modifier = Modifier
                         .size(40.dp)
@@ -105,7 +104,6 @@ fun BankDetailCard(bank: BankAccountItem, onEditClick: (BankAccountItem) -> Unit
                 ) {
                     if (logoUrl != null) {
                         SubcomposeAsyncImage(
-                            // CACHING LOGIC: App fast rakhne ke liye Memory aur Disk Cache ON
                             model = ImageRequest.Builder(context)
                                 .data(logoUrl)
                                 .crossfade(true)
@@ -123,7 +121,6 @@ fun BankDetailCard(bank: BankAccountItem, onEditClick: (BankAccountItem) -> Unit
                             }
                         )
                     } else {
-                        // Failsafe icon
                         Icon(Icons.Outlined.AccountBalance, contentDescription = "Bank", tint = Color(0xFF1976D2), modifier = Modifier.size(20.dp))
                     }
                 }
