@@ -24,6 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.SubcomposeAsyncImage
+import coil.request.CachePolicy
 import coil.request.ImageRequest
 import com.kartikey.rupeeflow.Cloud_Database.Constants
 import com.kartikey.rupeeflow.UI_Screens.Assets.BankAccountItem
@@ -75,9 +76,15 @@ fun BankAccountsScreen(
 
 @Composable
 fun BankDetailCard(bank: BankAccountItem, onEditClick: (BankAccountItem) -> Unit) {
-    // Dynamic HD Logo Logic via Clearbit API
     val context = LocalContext.current
-    val domain = Constants.BankDomainMap[bank.bankName]
+    
+    // SMART MATCHER: Purane uppercase naam aur naye list naam dono ko handle karega
+    val domain = Constants.BankDomainMap.entries.firstOrNull { 
+        it.key.equals(bank.bankName.trim(), ignoreCase = true) || 
+        it.key.contains(bank.bankName.trim(), ignoreCase = true) ||
+        bank.bankName.trim().contains(it.key, ignoreCase = true)
+    }?.value
+
     val logoUrl = if (domain != null) "https://logo.clearbit.com/$domain" else null
 
     Card(
@@ -98,9 +105,12 @@ fun BankDetailCard(bank: BankAccountItem, onEditClick: (BankAccountItem) -> Unit
                 ) {
                     if (logoUrl != null) {
                         SubcomposeAsyncImage(
+                            // CACHING LOGIC: App fast rakhne ke liye Memory aur Disk Cache ON
                             model = ImageRequest.Builder(context)
                                 .data(logoUrl)
                                 .crossfade(true)
+                                .memoryCachePolicy(CachePolicy.ENABLED) 
+                                .diskCachePolicy(CachePolicy.ENABLED)   
                                 .build(),
                             contentDescription = bank.bankName,
                             modifier = Modifier.size(28.dp).clip(RoundedCornerShape(4.dp)),
@@ -113,7 +123,7 @@ fun BankDetailCard(bank: BankAccountItem, onEditClick: (BankAccountItem) -> Unit
                             }
                         )
                     } else {
-                        // Failsafe if bank domain is not in our map
+                        // Failsafe icon
                         Icon(Icons.Outlined.AccountBalance, contentDescription = "Bank", tint = Color(0xFF1976D2), modifier = Modifier.size(20.dp))
                     }
                 }
