@@ -8,6 +8,8 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -46,9 +48,21 @@ fun EditBankDialog(
     var interestRate by remember { mutableStateOf(bank.interestRate.toString()) }
     
     var expanded by remember { mutableStateOf(false) }
-    val filteredBanks = Constants.IndianBanksList.filter { it.contains(bankName, ignoreCase = true) }
+    
+    val filteredBanks = if (bankName.isNotBlank()) {
+        Constants.IndianBanksList.filter { 
+            it.contains(bankName, ignoreCase = true) && !it.equals(bankName, ignoreCase = true) 
+        }
+    } else {
+        emptyList()
+    }
+    
+    val showDropdown = expanded && filteredBanks.isNotEmpty()
     
     var isSubmitting by remember { mutableStateOf(false) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+    var isDeleting by remember { mutableStateOf(false) }
+    
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
 
@@ -58,8 +72,67 @@ fun EditBankDialog(
     var isCancelPressed by remember { mutableStateOf(false) }
     val cancelButtonScale by animateFloatAsState(targetValue = if (isCancelPressed) 0.95f else 1f, label = "CancelAnim")
 
+    // DELETE CONFIRMATION DIALOG
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { if (!isDeleting) showDeleteConfirm = false },
+            title = { Text("Delete Bank Account", fontWeight = FontWeight.Bold, color = Color.Black) },
+            text = { Text("Are you sure you want to permanently remove this bank account? This action cannot be undone.", color = Color.DarkGray) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        isDeleting = true
+                        coroutineScope.launch(Dispatchers.IO) {
+                            try {
+                                val jsonBody = JSONObject().apply {
+                                    put("action", "delete_data")
+                                    put("username", username)
+                                    put("data_type", "bank")
+                                    put("identifier", bank.accountNo)
+                                }
+                                val client = OkHttpClient()
+                                val body = jsonBody.toString().toRequestBody("application/json".toMediaType())
+                                val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(body).build()
+                                val response = client.newCall(request).execute()
+                                val resData = response.body?.string() ?: ""
+
+                                withContext(Dispatchers.Main) {
+                                    isDeleting = false
+                                    if (resData.contains("success")) {
+                                        Toast.makeText(context, "Bank Account Removed!", Toast.LENGTH_SHORT).show()
+                                        showDeleteConfirm = false
+                                        onUpdateSuccess()
+                                    } else {
+                                        Toast.makeText(context, "Failed to delete account!", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                withContext(Dispatchers.Main) {
+                                    isDeleting = false
+                                    Toast.makeText(context, "Error deleting bank", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F))
+                ) {
+                    if (isDeleting) {
+                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                    } else {
+                        Text("Delete", color = Color.White, fontWeight = FontWeight.Bold)
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { if (!isDeleting) showDeleteConfirm = false }) {
+                    Text("Cancel", color = Color.Gray, fontWeight = FontWeight.Bold)
+                }
+            }
+        )
+    }
+
     Dialog(
-        onDismissRequest = { if (!isSubmitting) onDismiss() },
+        onDismissRequest = { if (!isSubmitting && !isDeleting) onDismiss() },
         properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = false)
     ) {
         Card(
@@ -72,17 +145,23 @@ fun EditBankDialog(
                 modifier = Modifier.padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(
-                    text = "Edit Bank Details",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = Color.Black
-                )
+                // Header with Delete Icon (BIN)
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "Edit Bank Details",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color.Black
+                    )
+                    IconButton(onClick = { showDeleteConfirm = true }) {
+                        Icon(Icons.Outlined.Delete, contentDescription = "Delete Bank", tint = Color(0xFFD32F2F))
+                    }
+                }
                 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(16.dp))
                 
                 ExposedDropdownMenuBox(
-                    expanded = expanded,
+                    expanded = showDropdown,
                     onExpandedChange = { expanded = it }
                 ) {
                     OutlinedTextField(
@@ -95,15 +174,14 @@ fun EditBankDialog(
                         modifier = Modifier.fillMaxWidth().menuAnchor(),
                         singleLine = true,
                         shape = RoundedCornerShape(12.dp),
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = Color(0xFF2E7D32),
                             focusedLabelColor = Color(0xFF2E7D32)
                         )
                     )
-                    if (filteredBanks.isNotEmpty()) {
+                    if (showDropdown) {
                         ExposedDropdownMenu(
-                            expanded = expanded,
+                            expanded = showDropdown,
                             onDismissRequest = { expanded = false },
                             modifier = Modifier.background(Color.White)
                         ) {
