@@ -1,5 +1,8 @@
 package com.kartikey.rupeeflow.UI_Screens.Profile
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -9,7 +12,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -21,11 +24,61 @@ import androidx.compose.ui.unit.sp
 
 @Composable
 fun ProfileScreen(
-    name: String, // Naya variable: Asli naam ke liye
-    email: String, // Naya variable: Email ke liye
+    username: String,
+    name: String, 
+    email: String, 
     paddingValues: PaddingValues, 
-    onNameClick: () -> Unit, // Name/Email par click handle karega
-    onOptionClick: (String) -> Unit, // Teeno files ke routing ke liye
+    onLogout: () -> Unit
+) {
+    // Mini-Navigator State (Boss Script Routing)
+    var currentProfileView by remember { mutableStateOf("Main") }
+    var selectedOptionTitle by remember { mutableStateOf("") }
+
+    // BOSS BACK PHYSICS: Agar Main pe nahi hai, toh back aane par Main pe laayega
+    BackHandler(enabled = currentProfileView != "Main") {
+        currentProfileView = "Main"
+    }
+
+    Crossfade(targetState = currentProfileView, animationSpec = tween(300), label = "Profile Nav") { view ->
+        when (view) {
+            "Main" -> {
+                ProfileMainContent(
+                    name = name,
+                    email = email,
+                    paddingValues = paddingValues,
+                    onNameClick = { currentProfileView = "Details" },
+                    onOptionClick = { option ->
+                        selectedOptionTitle = option
+                        if (option in listOf("Security Lock", "Currency", "Theme")) {
+                            currentProfileView = "Preference"
+                        } else if (option in listOf("Data Download", "Help & Support", "App Update & Info")) {
+                            currentProfileView = "Utility"
+                        }
+                    },
+                    onLogout = onLogout
+                )
+            }
+            "Details" -> {
+                ProfileDetailsScreen(onBackClick = { currentProfileView = "Main" })
+            }
+            "Preference" -> {
+                PreferenceScreen(optionType = selectedOptionTitle, onBackClick = { currentProfileView = "Main" })
+            }
+            "Utility" -> {
+                ProfileUtility(optionType = selectedOptionTitle, onBackClick = { currentProfileView = "Main" })
+            }
+        }
+    }
+}
+
+// Internal UI function
+@Composable
+private fun ProfileMainContent(
+    name: String,
+    email: String,
+    paddingValues: PaddingValues,
+    onNameClick: () -> Unit,
+    onOptionClick: (String) -> Unit,
     onLogout: () -> Unit
 ) {
     Column(
@@ -38,8 +91,7 @@ fun ProfileScreen(
     ) {
         Spacer(modifier = Modifier.height(24.dp))
 
-        // 1. Profile Header (Strict Logic applied)
-        // Agar name khali hai toh '?' dikhega, warna first letter
+        // Profile Header
         val displayLetter = if (name.isNotBlank()) name.take(1).uppercase() else "?"
         val displayEmail = if (email.isNotBlank()) email else "Add Mail"
 
@@ -49,7 +101,6 @@ fun ProfileScreen(
         
         Spacer(modifier = Modifier.height(16.dp))
         
-        // Name (Clickable)
         Text(
             text = name.ifBlank { "User" }, 
             fontWeight = FontWeight.ExtraBold, 
@@ -57,7 +108,6 @@ fun ProfileScreen(
             modifier = Modifier.clickable { onNameClick() }
         )
         
-        // Email or "Add Mail" (Clickable)
         Text(
             text = displayEmail, 
             color = Color.Gray, 
@@ -67,27 +117,25 @@ fun ProfileScreen(
         
         Spacer(modifier = Modifier.height(32.dp))
 
-        // 2. Options List (Updated Sorting Order)
-        
-        // --- GROUP 2 (Preferences: Upar rakha gaya hai) ---
+        // GROUP 2 (Preferences)
         ProfileOptionRow(Icons.Default.Lock, "Security Lock", onClick = { onOptionClick("Security Lock") })
         ProfileOptionRow(Icons.Default.CurrencyRupee, "Currency", onClick = { onOptionClick("Currency") }) 
         ProfileOptionRow(Icons.Default.Palette, "Theme", onClick = { onOptionClick("Theme") }) 
         
-        // --- GROUP 1 (Utilities: Niche rakha gaya hai) ---
+        // GROUP 1 (Utilities)
         ProfileOptionRow(Icons.Default.Download, "Data Download", onClick = { onOptionClick("Data Download") }) 
         ProfileOptionRow(Icons.Default.SupportAgent, "Help & Support", onClick = { onOptionClick("Help & Support") }) 
         ProfileOptionRow(Icons.Default.Info, "App Update & Info", onClick = { onOptionClick("App Update & Info") })
         
         Spacer(modifier = Modifier.height(32.dp))
 
-        // 3. Logout
+        // Logout
         ProfileOptionRow(Icons.Default.ExitToApp, "Logout", textColor = Color.Red, onClick = { onLogout() })
     }
 }
 
 @Composable
-fun ProfileOptionRow(icon: ImageVector, title: String, textColor: Color = Color.Black, onClick: () -> Unit) {
+private fun ProfileOptionRow(icon: ImageVector, title: String, textColor: Color = Color.Black, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
