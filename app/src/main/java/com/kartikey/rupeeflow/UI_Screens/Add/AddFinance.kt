@@ -5,8 +5,10 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -30,7 +32,7 @@ import org.json.JSONObject
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit) {
+fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -> Unit) { // Added onDismiss
     var bankName by remember { mutableStateOf("") }
     var accountNo by remember { mutableStateOf("") }
     var currentBalance by remember { mutableStateOf("") }
@@ -38,8 +40,6 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit) {
     
     var expanded by remember { mutableStateOf(false) }
     
-    // SMART FILTER: Jab tak type nahi karega tab tak list empty rahegi.
-    // Exact match hone par bhi list gayab ho jayegi.
     val filteredBanks = if (bankName.isNotBlank()) {
         Constants.IndianBanksList.filter { 
             it.contains(bankName, ignoreCase = true) && !it.equals(bankName, ignoreCase = true) 
@@ -48,7 +48,6 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit) {
         emptyList()
     }
     
-    // Dropdown tabhi dikhega jab filtered list me kuch ho
     val showDropdown = expanded && filteredBanks.isNotEmpty()
     
     var isSubmitting by remember { mutableStateOf(false) }
@@ -59,12 +58,13 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit) {
     val buttonScale by animateFloatAsState(targetValue = if (isPressed) 0.95f else 1f, label = "ButtonScale")
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().heightIn(max = 600.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(4.dp),
+        elevation = CardDefaults.cardElevation(0.dp),
         shape = RoundedCornerShape(16.dp)
     ) {
-        Column(modifier = Modifier.padding(20.dp)) {
+        // ADDED: verticalScroll physics
+        Column(modifier = Modifier.padding(20.dp).verticalScroll(rememberScrollState())) {
             
             ExposedDropdownMenuBox(
                 expanded = showDropdown,
@@ -190,6 +190,7 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit) {
                                     isSubmitting = false
                                     Toast.makeText(context, "Bank Account Added to Vault!", Toast.LENGTH_SHORT).show()
                                     bankName = ""; accountNo = ""; currentBalance = ""; interestRate = "" 
+                                    onDismiss() // ADDED: Auto close sheet
                                 }
                             } catch (e: Exception) {
                                 withContext(Dispatchers.Main) {
@@ -222,7 +223,7 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit) {
                 if (isSubmitting) {
                     CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
                 } else {
-                    Text("Add Account", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White)
+                    Text("Save Account", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White)
                 }
             }
         }
