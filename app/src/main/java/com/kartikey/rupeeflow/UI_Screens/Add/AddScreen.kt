@@ -35,15 +35,13 @@ fun AddScreen(
     onInvestmentAdded: () -> Unit,
     onFinanceAdded: () -> Unit
 ) {
-    // Ye variable decide karega kaunsi form wali bottom sheet khulegi
     var activeAddForm by remember { mutableStateOf<String?>(null) } 
     
-    // BACK PHYSICS: Boss overlay ki back handling
     BackHandler(enabled = showMenu || activeAddForm != null) {
         if (activeAddForm != null) {
-            activeAddForm = null // Pehle sheet band hogi
+            activeAddForm = null 
         } else if (showMenu) {
-            onCloseMenu() // Phir popup band hoga
+            onCloseMenu() 
         }
     }
 
@@ -60,7 +58,7 @@ fun AddScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(bottom = 90.dp), // Height above navbar
+                .padding(bottom = 90.dp), 
             contentAlignment = Alignment.BottomCenter
         ) {
             AnimatedVisibility(
@@ -92,7 +90,6 @@ fun AddScreen(
                             }
                         }
                     }
-                    // The Premium Tail pointing to button
                     Box(
                         modifier = Modifier
                             .offset(y = (-8).dp)
@@ -105,9 +102,10 @@ fun AddScreen(
         }
     }
 
-    // 2. MODAL BOTTOM SHEETS FOR FORMS
+    // 2. MODAL BOTTOM SHEETS FOR FORMS (WITH KEYBOARD PHYSICS)
     if (activeAddForm != null) {
-        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        // FIX: false kiya taaki sheet pehle niche rahe aur handle se poori upar khinchi ja sake
+        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false) 
         ModalBottomSheet(
             onDismissRequest = { activeAddForm = null },
             sheetState = sheetState,
@@ -116,10 +114,10 @@ fun AddScreen(
         ) {
             Column(
                 modifier = Modifier
+                    .fillMaxHeight(0.90f) // FIX: Sheet ko 90% tak upar le jane ki azaadi (niche blank space bachega)
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp)
-                    // Keyboard safe padding
-                    .padding(bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 20.dp) 
+                    .imePadding() // MASTER FIX: Keyboard khulte hi ye poori form ko upar push karega
             ) {
                 Text(
                     text = "Add $activeAddForm",
@@ -128,7 +126,6 @@ fun AddScreen(
                     color = Color.Black,
                     modifier = Modifier.padding(bottom = 16.dp, top = 8.dp)
                 )
-                // Forms call here
                 when (activeAddForm) {
                     "Expense" -> AddExpenseForm(username, onExpenseAdded = { onExpenseAdded(it) }, onDismiss = { activeAddForm = null })
                     "Investment" -> AddInvestmentForm(username, onInvestmentAdded = { onInvestmentAdded() }, onDismiss = { activeAddForm = null })
@@ -139,7 +136,6 @@ fun AddScreen(
     }
 }
 
-// Minimalistic Menu Item design
 @Composable
 fun AddMenuItem(title: String, icon: ImageVector, onClick: () -> Unit) {
     Row(
