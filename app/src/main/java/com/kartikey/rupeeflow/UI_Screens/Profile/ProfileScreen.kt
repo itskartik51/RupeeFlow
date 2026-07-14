@@ -20,7 +20,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 @Composable
-fun ProfileScreen(username: String, paddingValues: PaddingValues, onLogout: () -> Unit) {
+fun ProfileScreen(
+    name: String, // Naya variable: Asli naam ke liye
+    email: String, // Naya variable: Email ke liye
+    paddingValues: PaddingValues, 
+    onNameClick: () -> Unit, // Name/Email par click handle karega
+    onOptionClick: (String) -> Unit, // Teeno files ke routing ke liye
+    onLogout: () -> Unit
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -31,27 +38,50 @@ fun ProfileScreen(username: String, paddingValues: PaddingValues, onLogout: () -
     ) {
         Spacer(modifier = Modifier.height(24.dp))
 
-        // 1. Profile Header
+        // 1. Profile Header (Strict Logic applied)
+        // Agar name khali hai toh '?' dikhega, warna first letter
+        val displayLetter = if (name.isNotBlank()) name.take(1).uppercase() else "?"
+        val displayEmail = if (email.isNotBlank()) email else "Add Mail"
+
         Box(modifier = Modifier.size(100.dp).clip(CircleShape).background(Color(0xFF2E7D32)), contentAlignment = Alignment.Center) {
-            Text(username.take(2).uppercase(), color = Color.White, fontSize = 40.sp, fontWeight = FontWeight.Bold)
+            Text(displayLetter, color = Color.White, fontSize = 40.sp, fontWeight = FontWeight.Bold)
         }
+        
         Spacer(modifier = Modifier.height(16.dp))
-        Text(username, fontWeight = FontWeight.ExtraBold, fontSize = 22.sp)
-        Text("contact@rupeeflow.com", color = Color.Gray, fontSize = 14.sp) // Dummy email for now
+        
+        // Name (Clickable)
+        Text(
+            text = name.ifBlank { "User" }, 
+            fontWeight = FontWeight.ExtraBold, 
+            fontSize = 22.sp,
+            modifier = Modifier.clickable { onNameClick() }
+        )
+        
+        // Email or "Add Mail" (Clickable)
+        Text(
+            text = displayEmail, 
+            color = Color.Gray, 
+            fontSize = 14.sp,
+            modifier = Modifier.clickable { onNameClick() }
+        )
         
         Spacer(modifier = Modifier.height(32.dp))
 
-        // 2. Options List (Icons updated here)
-        ProfileOptionRow(Icons.Default.Lock, "Security Lock", onClick = { /* TODO: Next step logic */ })
-        ProfileOptionRow(Icons.Default.Download, "Data Download", onClick = { /* TODO: Next step logic */ }) 
-        ProfileOptionRow(Icons.Default.CurrencyRupee, "Currency", onClick = { /* TODO: Next step logic */ }) 
-        ProfileOptionRow(Icons.Default.Palette, "Theme", onClick = { /* TODO: Next step logic */ }) 
-        ProfileOptionRow(Icons.Default.SupportAgent, "Help & Support", onClick = { /* TODO: Next step logic */ }) 
-        ProfileOptionRow(Icons.Default.Info, "App Update & Info", onClick = { /* TODO: Next step logic */ })
+        // 2. Options List (Updated Sorting Order)
+        
+        // --- GROUP 2 (Preferences: Upar rakha gaya hai) ---
+        ProfileOptionRow(Icons.Default.Lock, "Security Lock", onClick = { onOptionClick("Security Lock") })
+        ProfileOptionRow(Icons.Default.CurrencyRupee, "Currency", onClick = { onOptionClick("Currency") }) 
+        ProfileOptionRow(Icons.Default.Palette, "Theme", onClick = { onOptionClick("Theme") }) 
+        
+        // --- GROUP 1 (Utilities: Niche rakha gaya hai) ---
+        ProfileOptionRow(Icons.Default.Download, "Data Download", onClick = { onOptionClick("Data Download") }) 
+        ProfileOptionRow(Icons.Default.SupportAgent, "Help & Support", onClick = { onOptionClick("Help & Support") }) 
+        ProfileOptionRow(Icons.Default.Info, "App Update & Info", onClick = { onOptionClick("App Update & Info") })
         
         Spacer(modifier = Modifier.height(32.dp))
 
-        // 3. Logout (Isme onLogout() direct connect kar diya hai)
+        // 3. Logout
         ProfileOptionRow(Icons.Default.ExitToApp, "Logout", textColor = Color.Red, onClick = { onLogout() })
     }
 }
