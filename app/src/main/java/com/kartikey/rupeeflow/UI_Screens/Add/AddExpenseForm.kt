@@ -37,7 +37,7 @@ import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddExpenseForm(username: String, onExpenseAdded: (TransactionModel) -> Unit, onDismiss: () -> Unit) { // Added onDismiss
+fun AddExpenseForm(username: String, onExpenseAdded: (TransactionModel) -> Unit, onDismiss: () -> Unit) {
     val categories = listOf(
         "Food" to Icons.Outlined.Restaurant,
         "Transport" to Icons.Outlined.DirectionsCar,
@@ -74,12 +74,11 @@ fun AddExpenseForm(username: String, onExpenseAdded: (TransactionModel) -> Unit,
     val buttonScale by animateFloatAsState(targetValue = if (isPressed) 0.95f else 1f, label = "ButtonScale")
 
     Card(
-        modifier = Modifier.fillMaxWidth().heightIn(max = 600.dp), // Keeps it inside screen
+        modifier = Modifier.fillMaxWidth(), // FIX: Height restriction removed for natural scrolling
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(0.dp),
         shape = RoundedCornerShape(16.dp)
     ) {
-        // ADDED: verticalScroll physics so keyboard doesn't overlap
         Column(modifier = Modifier.padding(20.dp).verticalScroll(rememberScrollState())) {
             
             ExposedDropdownMenuBox(
@@ -255,7 +254,7 @@ fun AddExpenseForm(username: String, onExpenseAdded: (TransactionModel) -> Unit,
                                     amount = ""; remark1 = ""; remark2 = ""; categoryText = ""; modeText = ""
                                     isCategoryEditable = false 
                                     expenseDate = todayDate
-                                    onDismiss() // ADDED: Close sheet automatically
+                                    onDismiss() 
                                 }
                             } catch (e: Exception) {
                                 withContext(Dispatchers.Main) {
