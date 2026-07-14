@@ -23,7 +23,6 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.kartikey.rupeeflow.Cloud_Database.Constants
-import com.kartikey.rupeeflow.UI_Screens.Add.IndianBanksList // Master List Import ki
 import com.kartikey.rupeeflow.UI_Screens.Assets.BankAccountItem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -46,9 +45,8 @@ fun EditBankDialog(
     var bankBalance by remember { mutableStateOf(bank.currentBalance.toString()) }
     var interestRate by remember { mutableStateOf(bank.interestRate.toString()) }
     
-    // Dropdown state for Edit Pop-up
     var expanded by remember { mutableStateOf(false) }
-    val filteredBanks = IndianBanksList.filter { it.contains(bankName, ignoreCase = true) }
+    val filteredBanks = Constants.IndianBanksList.filter { it.contains(bankName, ignoreCase = true) }
     
     var isSubmitting by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
@@ -83,7 +81,6 @@ fun EditBankDialog(
                 
                 Spacer(modifier = Modifier.height(20.dp))
                 
-                // Searchable Premium Dropdown in Edit Pop-up
                 ExposedDropdownMenuBox(
                     expanded = expanded,
                     onExpandedChange = { expanded = it }
@@ -182,8 +179,7 @@ fun EditBankDialog(
                             
                             if (bankName.isNotBlank() && newBal != null && newRate != null) {
                                 
-                                // STRICT VALIDATION in Edit Mode
-                                if (!IndianBanksList.contains(bankName)) {
+                                if (!Constants.IndianBanksList.contains(bankName)) {
                                     Toast.makeText(context, "Please select a valid bank from the dropdown!", Toast.LENGTH_SHORT).show()
                                     return@Button
                                 }
