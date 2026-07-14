@@ -2,10 +2,13 @@ package com.kartikey.rupeeflow.UI_Screens.Add
 
 import android.widget.Toast
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -30,7 +33,7 @@ import org.json.JSONObject
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit) {
+fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss: () -> Unit) { // Added onDismiss
     var assetType by remember { mutableStateOf("Stock") }
     var assetName by remember { mutableStateOf("") }
     var selectedSymbol by remember { mutableStateOf("") } 
@@ -41,7 +44,6 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit) {
     var typeExpanded by remember { mutableStateOf(false) }
     var searchExpanded by remember { mutableStateOf(false) }
     
-    // API Search States using the new SearchRow structure
     var searchResults by remember { mutableStateOf<List<SearchRow>>(emptyList()) }
     var isSearching by remember { mutableStateOf(false) }
 
@@ -52,22 +54,19 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit) {
     var isPressed by remember { mutableStateOf(false) }
     val buttonScale by animateFloatAsState(targetValue = if (isPressed) 0.95f else 1f, label = "ButtonScale")
 
-    // LIVE INDIAN-PRIORITIZED YAHOO FINANCE API SEARCH LOGIC
     LaunchedEffect(assetName) {
-        // Constraint Check: Jab tak user keyword na dale ya select na kare, tab tak fetch nahi hoga
         if (assetName.isBlank() || selectedSymbol.isNotEmpty()) {
             searchResults = emptyList()
             searchExpanded = false
             return@LaunchedEffect
         }
         
-        delay(500) // Debounce delay to handle smooth typing
+        delay(500) 
         isSearching = true
         
         withContext(Dispatchers.IO) {
             try {
                 val client = OkHttpClient()
-                // Deep search implemented using quotesCount=30 to ensure Indian large/mid/small caps are fully captured
                 val request = Request.Builder()
                     .url("https://query2.finance.yahoo.com/v1/finance/search?q=${assetName.replace(" ", "%20")}&quotesCount=30&newsCount=0")
                     .get()
@@ -89,14 +88,12 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit) {
                             val sym = quote.optString("symbol", "")
                             if (sym.isEmpty()) continue
                             
-                            // Advanced Name Fallback Handling for clean formatting
                             var cleanName = quote.optString("longname", "").ifBlank {
                                 quote.optString("shortname", "").ifBlank { "" }
                             }
                             
                             val isIndian = sym.endsWith(".NS") || sym.endsWith(".BO")
                             
-                            // Data Integrity Rule: If names are alphanumeric codes or empty, format cleanly
                             if (cleanName.isBlank() || cleanName == sym) {
                                 cleanName = if (isIndian) {
                                     sym.replace(".NS", "").replace(".BO", "") + " Asset"
@@ -105,7 +102,6 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit) {
                                 }
                             }
                             
-                            // Premium UX Subtitle display processing
                             val displaySymbol = when {
                                 sym.endsWith(".NS") -> sym.replace(".NS", "") + " (NSE)"
                                 sym.endsWith(".BO") -> sym.replace(".BO", "") + " (BSE)"
@@ -119,7 +115,6 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit) {
                                 isIndian = isIndian
                             )
                             
-                            // Separation logic to maintain high-capital ordering inside priority groups
                             if (isIndian) {
                                 indianList.add(row)
                             } else {
@@ -128,7 +123,6 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit) {
                         }
                     }
                     
-                    // Indian Priority Override mapping
                     val orderedResults = indianList + globalList
                     
                     withContext(Dispatchers.Main) {
@@ -148,14 +142,14 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit) {
     }
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().heightIn(max = 600.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(4.dp),
+        elevation = CardDefaults.cardElevation(0.dp),
         shape = RoundedCornerShape(16.dp)
     ) {
-        Column(modifier = Modifier.padding(20.dp)) {
+        // ADDED: verticalScroll physics
+        Column(modifier = Modifier.padding(20.dp).verticalScroll(rememberScrollState())) {
             
-            // 1. ASSET TYPE SELECTOR
             ExposedDropdownMenuBox(
                 expanded = typeExpanded,
                 onExpandedChange = { typeExpanded = !typeExpanded }
@@ -189,7 +183,6 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit) {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // 2. LIVE ASSET NAME SEARCH (Premium Indian Prioritized Dropdown)
             ExposedDropdownMenuBox(
                 expanded = searchExpanded,
                 onExpandedChange = { 
@@ -202,7 +195,7 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit) {
                     value = assetName,
                     onValueChange = { 
                         assetName = it 
-                        selectedSymbol = "" // Reset on key change to trigger dynamic search re-evaluations
+                        selectedSymbol = "" 
                         searchExpanded = it.isNotEmpty()
                     },
                     label = { Text("Search $assetType Name") },
@@ -238,7 +231,6 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit) {
                                     }
                                 },
                                 onClick = {
-                                    // Strip formatting suffixes to guarantee pure processing matching in Sheet formulas
                                     val cleanSymbol = row.rawSymbol.replace(".NS", "").replace(".BO", "")
                                     assetName = row.name 
                                     selectedSymbol = cleanSymbol
@@ -312,6 +304,7 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit) {
                                     isSubmitting = false
                                     Toast.makeText(context, "Investment Saved! Sheet will calculate live returns.", Toast.LENGTH_SHORT).show()
                                     assetName = ""; selectedSymbol = ""; quantity = ""; buyPrice = ""; date = "" 
+                                    onDismiss() // ADDED: Auto close sheet
                                 }
                             } catch (e: Exception) {
                                 withContext(Dispatchers.Main) {
@@ -344,14 +337,13 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit) {
                 if (isSubmitting) {
                     CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
                 } else {
-                    Text("Add Investment", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White)
+                    Text("Save Investment", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White)
                 }
             }
         }
     }
 }
 
-// Optimization Component Data Class for strict structure validations
 data class SearchRow(
     val name: String,
     val rawSymbol: String,
