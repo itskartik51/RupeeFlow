@@ -1,90 +1,160 @@
 package com.kartikey.rupeeflow.UI_Screens.Add
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.outlined.AccountBalance
+import androidx.compose.material.icons.outlined.ChevronRight
+import androidx.compose.material.icons.outlined.Receipt
+import androidx.compose.material.icons.outlined.TrendingUp
 import androidx.compose.material3.*
-import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddScreen(
-    paddingValues: PaddingValues, 
     username: String,
+    showMenu: Boolean,
+    onCloseMenu: () -> Unit,
     onExpenseAdded: (TransactionModel) -> Unit,
     onInvestmentAdded: () -> Unit,
-    onFinanceAdded: () -> Unit // Naya parameter
+    onFinanceAdded: () -> Unit
 ) {
-    var selectedTabIndex by remember { mutableStateOf(0) }
-    // Naya "Add Finance" Tab
-    val tabs = listOf("Add Expense", "Add Investment", "Add Finance")
+    // Ye variable decide karega kaunsi form wali bottom sheet khulegi
+    var activeAddForm by remember { mutableStateOf<String?>(null) } 
+    
+    // BACK PHYSICS: Boss overlay ki back handling
+    BackHandler(enabled = showMenu || activeAddForm != null) {
+        if (activeAddForm != null) {
+            activeAddForm = null // Pehle sheet band hogi
+        } else if (showMenu) {
+            onCloseMenu() // Phir popup band hoga
+        }
+    }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(paddingValues)
-            .padding(16.dp)
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth()
+    // 1. ADD MENU POPUP (WITH TAIL PHYSICS)
+    val dimAlpha by animateFloatAsState(targetValue = if (showMenu) 0.4f else 0f, label = "dimBg")
+    if (showMenu || dimAlpha > 0f) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = dimAlpha))
+                .pointerInput(Unit) { detectTapGestures(onTap = { onCloseMenu() }) }
+        )
+        
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(bottom = 90.dp), // Height above navbar
+            contentAlignment = Alignment.BottomCenter
         ) {
-            Icon(
-                imageVector = Icons.Default.ArrowBack, 
-                contentDescription = "Back",
-                tint = Color(0xFF2E7D32),
+            AnimatedVisibility(
+                visible = showMenu,
+                enter = scaleIn(transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 1f), animationSpec = spring(dampingRatio = 0.7f, stiffness = 400f)) + fadeIn(),
+                exit = scaleOut(transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 1f)) + fadeOut()
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Card(
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        elevation = CardDefaults.cardElevation(8.dp),
+                        modifier = Modifier.width(220.dp)
+                    ) {
+                        Column {
+                            AddMenuItem("Add Expense", Icons.Outlined.Receipt) {
+                                activeAddForm = "Expense"
+                                onCloseMenu()
+                            }
+                            HorizontalDivider(color = Color(0xFFEEEEEE))
+                            AddMenuItem("Add Investment", Icons.Outlined.TrendingUp) {
+                                activeAddForm = "Investment"
+                                onCloseMenu()
+                            }
+                            HorizontalDivider(color = Color(0xFFEEEEEE))
+                            AddMenuItem("Add Finance", Icons.Outlined.AccountBalance) {
+                                activeAddForm = "Finance"
+                                onCloseMenu()
+                            }
+                        }
+                    }
+                    // The Premium Tail pointing to button
+                    Box(
+                        modifier = Modifier
+                            .offset(y = (-8).dp)
+                            .size(16.dp)
+                            .rotate(45f)
+                            .background(Color.White)
+                    )
+                }
+            }
+        }
+    }
+
+    // 2. MODAL BOTTOM SHEETS FOR FORMS
+    if (activeAddForm != null) {
+        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ModalBottomSheet(
+            onDismissRequest = { activeAddForm = null },
+            sheetState = sheetState,
+            containerColor = Color(0xFFF8F9FA),
+            dragHandle = { BottomSheetDefaults.DragHandle(color = Color.LightGray) }
+        ) {
+            Column(
                 modifier = Modifier
-                    .size(26.dp)
-                    .clickable { }
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = "Add", 
-                fontWeight = FontWeight.Bold, 
-                fontSize = 24.sp, 
-                color = Color(0xFF2E7D32)
-            )
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        ScrollableTabRow( // Changed to ScrollableTabRow for better fit
-            selectedTabIndex = selectedTabIndex,
-            containerColor = Color.Transparent,
-            contentColor = Color(0xFF2E7D32),
-            edgePadding = 0.dp,
-            indicator = { tabPositions ->
-                TabRowDefaults.Indicator(
-                    Modifier.tabIndicatorOffset(tabPositions[selectedTabIndex]),
-                    color = Color(0xFF2E7D32),
-                    height = 3.dp
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    // Keyboard safe padding
+                    .padding(bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 20.dp) 
+            ) {
+                Text(
+                    text = "Add $activeAddForm",
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color.Black,
+                    modifier = Modifier.padding(bottom = 16.dp, top = 8.dp)
                 )
-            }
-        ) {
-            tabs.forEachIndexed { index, title ->
-                Tab(
-                    selected = selectedTabIndex == index,
-                    onClick = { selectedTabIndex = index },
-                    text = { Text(title, fontWeight = FontWeight.Bold, fontSize = 13.sp) },
-                    selectedContentColor = Color(0xFF2E7D32),
-                    unselectedContentColor = Color.Gray
-                )
+                // Forms call here
+                when (activeAddForm) {
+                    "Expense" -> AddExpenseForm(username, onExpenseAdded = { onExpenseAdded(it) }, onDismiss = { activeAddForm = null })
+                    "Investment" -> AddInvestmentForm(username, onInvestmentAdded = { onInvestmentAdded() }, onDismiss = { activeAddForm = null })
+                    "Finance" -> AddFinanceForm(username, onFinanceAdded = { onFinanceAdded() }, onDismiss = { activeAddForm = null })
+                }
             }
         }
+    }
+}
 
-        Spacer(modifier = Modifier.height(24.dp))
-
-        when (selectedTabIndex) {
-            0 -> AddExpenseForm(username = username, onExpenseAdded = onExpenseAdded)
-            1 -> AddInvestmentForm(username = username, onInvestmentAdded = onInvestmentAdded)
-            2 -> AddFinanceForm(username = username, onFinanceAdded = onFinanceAdded) // Nayi call
+// Minimalistic Menu Item design
+@Composable
+fun AddMenuItem(title: String, icon: ImageVector, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, contentDescription = title, tint = Color(0xFF2E7D32))
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(title, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color.Black)
         }
+        Icon(Icons.Outlined.ChevronRight, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(20.dp))
     }
 }
