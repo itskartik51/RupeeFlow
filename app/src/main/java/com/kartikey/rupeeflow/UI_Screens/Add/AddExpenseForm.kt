@@ -4,8 +4,10 @@ import android.widget.Toast
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -35,7 +37,7 @@ import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddExpenseForm(username: String, onExpenseAdded: (TransactionModel) -> Unit) {
+fun AddExpenseForm(username: String, onExpenseAdded: (TransactionModel) -> Unit, onDismiss: () -> Unit) { // Added onDismiss
     val categories = listOf(
         "Food" to Icons.Outlined.Restaurant,
         "Transport" to Icons.Outlined.DirectionsCar,
@@ -72,12 +74,13 @@ fun AddExpenseForm(username: String, onExpenseAdded: (TransactionModel) -> Unit)
     val buttonScale by animateFloatAsState(targetValue = if (isPressed) 0.95f else 1f, label = "ButtonScale")
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().heightIn(max = 600.dp), // Keeps it inside screen
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(4.dp),
+        elevation = CardDefaults.cardElevation(0.dp),
         shape = RoundedCornerShape(16.dp)
     ) {
-        Column(modifier = Modifier.padding(20.dp)) {
+        // ADDED: verticalScroll physics so keyboard doesn't overlap
+        Column(modifier = Modifier.padding(20.dp).verticalScroll(rememberScrollState())) {
             
             ExposedDropdownMenuBox(
                 expanded = expanded,
@@ -226,7 +229,6 @@ fun AddExpenseForm(username: String, onExpenseAdded: (TransactionModel) -> Unit)
                     if (amount.isNotBlank() && finalCategory.isNotBlank() && expenseDate.isNotBlank() && finalMode.isNotBlank()) {
                         isSubmitting = true
                         val expenseAmt = amount.toDoubleOrNull() ?: 0.0
-                        // UPDATE: Yahan par mode pass ho raha hai local save ke liye
                         val newEntry = TransactionModel(expenseDate, expenseAmt, finalCategory, remark1, remark2, finalMode)
                         onExpenseAdded(newEntry)
 
@@ -240,7 +242,7 @@ fun AddExpenseForm(username: String, onExpenseAdded: (TransactionModel) -> Unit)
                                     put("date", expenseDate) 
                                     put("detail1", remark1)
                                     put("detail2", remark2)
-                                    put("payment_method", finalMode) // Ye data ab seedha sheet mein jayega
+                                    put("payment_method", finalMode) 
                                 }
                                 val client = OkHttpClient()
                                 val body = json.toString().toRequestBody("application/json".toMediaType())
@@ -253,6 +255,7 @@ fun AddExpenseForm(username: String, onExpenseAdded: (TransactionModel) -> Unit)
                                     amount = ""; remark1 = ""; remark2 = ""; categoryText = ""; modeText = ""
                                     isCategoryEditable = false 
                                     expenseDate = todayDate
+                                    onDismiss() // ADDED: Close sheet automatically
                                 }
                             } catch (e: Exception) {
                                 withContext(Dispatchers.Main) {
@@ -285,14 +288,13 @@ fun AddExpenseForm(username: String, onExpenseAdded: (TransactionModel) -> Unit)
                 if (isSubmitting) {
                     CircularProgressIndicator(color = Color.White, modifier = Modifier.size(26.dp), strokeWidth = 3.dp)
                 } else {
-                    Text("Add Expense", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White)
+                    Text("Save Expense", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White)
                 }
             }
         }
     }
 }
 
-// UPDATE: Yahan pe val mode add kar diya gaya hai
 data class TransactionModel(
     val date: String,
     val amount: Double,
