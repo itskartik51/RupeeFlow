@@ -74,7 +74,7 @@ fun AddExpenseForm(username: String, onExpenseAdded: (TransactionModel) -> Unit,
     val buttonScale by animateFloatAsState(targetValue = if (isPressed) 0.95f else 1f, label = "ButtonScale")
 
     Card(
-        modifier = Modifier.fillMaxWidth(), // FIX: Height restriction removed for natural scrolling
+        modifier = Modifier.fillMaxWidth(), 
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(0.dp),
         shape = RoundedCornerShape(16.dp)
@@ -218,7 +218,7 @@ fun AddExpenseForm(username: String, onExpenseAdded: (TransactionModel) -> Unit,
                 )
             }
             
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
             Button(
                 onClick = {
@@ -290,6 +290,9 @@ fun AddExpenseForm(username: String, onExpenseAdded: (TransactionModel) -> Unit,
                     Text("Save Expense", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White)
                 }
             }
+            
+            // FIX: Extra buffer taaki form ke neeche ka UI space empty aur clean rahe
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }
