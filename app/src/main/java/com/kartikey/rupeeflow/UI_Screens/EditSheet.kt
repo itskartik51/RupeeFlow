@@ -72,7 +72,6 @@ fun EditBankDialog(
     var isCancelPressed by remember { mutableStateOf(false) }
     val cancelButtonScale by animateFloatAsState(targetValue = if (isCancelPressed) 0.95f else 1f, label = "CancelAnim")
 
-    // DELETE CONFIRMATION DIALOG
     if (showDeleteConfirm) {
         AlertDialog(
             onDismissRequest = { if (!isDeleting) showDeleteConfirm = false },
@@ -324,7 +323,7 @@ fun EditBankDialog(
 }
 
 // =======================================================
-// NAYA FUNCTION: USER PROFILE EDIT KARNE KA API ENGINE
+// UPDATED FUNCTION: API ENGINE WITH DYNAMIC ERROR HANDLING
 // =======================================================
 suspend fun updateUserProfile(
     oldUsername: String,
@@ -335,7 +334,7 @@ suspend fun updateUserProfile(
     newPassword: String,
     newDob: String,
     onSuccess: () -> Unit,
-    onError: () -> Unit
+    onError: (String) -> Unit // Ab String Type parameter expect karega
 ) {
     withContext(Dispatchers.IO) {
         try {
@@ -360,12 +359,20 @@ suspend fun updateUserProfile(
                 if (resData.contains("success")) {
                     onSuccess()
                 } else {
-                    onError()
+                    // Try to parse the specific error type from JSON (Aapki Next script me hum bhejenge isse)
+                    var errorType = "unknown"
+                    try {
+                        val jsonObj = JSONObject(resData)
+                        errorType = jsonObj.optString("error_type", "unknown")
+                    } catch (e: Exception) {
+                        // ignored
+                    }
+                    onError(errorType)
                 }
             }
         } catch (e: Exception) {
             withContext(Dispatchers.Main) {
-                onError()
+                onError("network_error")
             }
         }
     }
