@@ -59,7 +59,8 @@ fun ProfileScreen(
                 )
             }
             "Details" -> {
-                ProfileDetailsScreen(onBackClick = { currentProfileView = "Main" })
+                // EDIT: Yahan 'username = username' pass kiya gaya hai
+                ProfileDetailsScreen(username = username, onBackClick = { currentProfileView = "Main" })
             }
             "Preference" -> {
                 PreferenceScreen(optionType = selectedOptionTitle, onBackClick = { currentProfileView = "Main" })
