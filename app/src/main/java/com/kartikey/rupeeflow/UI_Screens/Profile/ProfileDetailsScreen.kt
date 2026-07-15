@@ -38,6 +38,10 @@ fun ProfileDetailsScreen(username: String, onBackClick: () -> Unit) {
     var currentDob by remember { mutableStateOf("") }
 
     var passwordVisible by remember { mutableStateOf(false) }
+    
+    // NAYA STATE: Username check ke liye
+    var usernameError by remember { mutableStateOf(false) }
+    
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
@@ -62,7 +66,7 @@ fun ProfileDetailsScreen(username: String, onBackClick: () -> Unit) {
                             if (isEditing) {
                                 isSubmitting = true
                                 coroutineScope.launch {
-                                    // Ye function EditSheet.kt ke andar hai
+                                    // Modified Engine call with custom error handling
                                     updateUserProfile(
                                         oldUsername = username,
                                         newName = currentName,
@@ -74,16 +78,21 @@ fun ProfileDetailsScreen(username: String, onBackClick: () -> Unit) {
                                         onSuccess = {
                                             isSubmitting = false
                                             isEditing = false
+                                            usernameError = false
                                             Toast.makeText(context, "Profile Details Updated!", Toast.LENGTH_SHORT).show()
                                         },
-                                        onError = {
+                                        onError = { errorType ->
                                             isSubmitting = false
-                                            Toast.makeText(context, "Update Failed!", Toast.LENGTH_SHORT).show()
+                                            if (errorType == "username_taken") {
+                                                usernameError = true // Lal error trigger
+                                            } else {
+                                                Toast.makeText(context, "Update Failed!", Toast.LENGTH_SHORT).show()
+                                            }
                                         }
                                     )
                                 }
                             } else {
-                                isEditing = true // Pen Icon par click karte hi editable banega
+                                isEditing = true // Edit mode on
                             }
                         }) {
                             Icon(
@@ -109,7 +118,6 @@ fun ProfileDetailsScreen(username: String, onBackClick: () -> Unit) {
         ) {
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Premium Line-based TextField Component
             @Composable
             fun DetailField(
                 label: String,
@@ -117,14 +125,15 @@ fun ProfileDetailsScreen(username: String, onBackClick: () -> Unit) {
                 onValueChange: (String) -> Unit,
                 icon: ImageVector,
                 keyboardType: KeyboardType = KeyboardType.Text,
-                isPassword: Boolean = false
+                isPassword: Boolean = false,
+                isErrorState: Boolean = false // Error boundary check
             ) {
                 TextField(
                     value = value,
                     onValueChange = onValueChange,
-                    readOnly = !isEditing, // Lock/Unlock magic yahin se hoga
-                    label = { Text(label, color = Color.Gray) },
-                    leadingIcon = { Icon(icon, contentDescription = label, tint = Color(0xFF2E7D32)) },
+                    readOnly = !isEditing,
+                    label = { Text(label, color = if (isErrorState) Color.Red else Color.Gray) },
+                    leadingIcon = { Icon(icon, contentDescription = label, tint = if (isErrorState) Color.Red else Color(0xFF2E7D32)) },
                     trailingIcon = {
                         if (isPassword) {
                             val image = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff
@@ -140,19 +149,43 @@ fun ProfileDetailsScreen(username: String, onBackClick: () -> Unit) {
                         focusedContainerColor = Color.Transparent,
                         unfocusedContainerColor = Color.Transparent,
                         disabledContainerColor = Color.Transparent,
-                        focusedIndicatorColor = Color(0xFF2E7D32),
-                        unfocusedIndicatorColor = Color.LightGray,
+                        focusedIndicatorColor = if (isErrorState) Color.Red else Color(0xFF2E7D32),
+                        unfocusedIndicatorColor = if (isErrorState) Color.Red else Color.LightGray,
                         disabledIndicatorColor = Color.LightGray,
                         focusedTextColor = Color.Black,
                         unfocusedTextColor = Color.Black,
                         disabledTextColor = Color.Black
                     ),
-                    singleLine = true
+                    singleLine = true,
+                    isError = isErrorState
                 )
             }
 
             DetailField("Name", currentName, { currentName = it }, Icons.Outlined.Person)
-            DetailField("Username", currentUsername, { currentUsername = it }, Icons.Outlined.Badge)
+            
+            // Username Field wrapped with error logic
+            Column {
+                DetailField(
+                    label = "Username", 
+                    value = currentUsername, 
+                    onValueChange = { 
+                        currentUsername = it
+                        usernameError = false // Type karte hi error hata do
+                    }, 
+                    icon = Icons.Outlined.Badge,
+                    isErrorState = usernameError
+                )
+                if (usernameError) {
+                    Text(
+                        text = "This username is already used by someone.",
+                        color = Color.Red,
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(start = 48.dp, top = 4.dp),
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+
             DetailField("Mobile No.", currentMobile, { currentMobile = it }, Icons.Outlined.Phone, KeyboardType.Phone)
             DetailField("Password", currentPassword, { currentPassword = it }, Icons.Outlined.Lock, isPassword = true)
             DetailField("Email ID", currentEmail, { currentEmail = it }, Icons.Outlined.Email, KeyboardType.Email)
