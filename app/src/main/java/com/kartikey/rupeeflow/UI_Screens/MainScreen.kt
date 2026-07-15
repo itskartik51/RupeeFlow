@@ -2,22 +2,14 @@ package com.kartikey.rupeeflow.UI_Screens
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.Crossfade
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.kartikey.rupeeflow.Cloud_Database.Constants
@@ -50,7 +42,7 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
     
     var showAddMenu by remember { mutableStateOf(false) }
 
-    // FULL PROFILE DATA STATES (Ab inme data automatically ayega)
+    // FULL PROFILE DATA STATES 
     var userFullName by remember { mutableStateOf("") } 
     var userEmail by remember { mutableStateOf("") } 
     var userMobile by remember { mutableStateOf("") }
@@ -105,7 +97,6 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                     val jsonResponse = JSONObject(responseData)
                     if (jsonResponse.optString("status") == "success") {
                         
-                        // PARSE PROFILE DATA HERE
                         val profileObj = jsonResponse.optJSONObject("profile")
                         var tempName = ""
                         var tempEmail = ""
@@ -176,7 +167,6 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                         }
 
                         withContext(Dispatchers.Main) {
-                            // Assign profile details to States
                             userFullName = tempName
                             userEmail = tempEmail
                             userMobile = tempMobile
@@ -216,21 +206,11 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                         colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
                     )
                     
+                    // Invisible Placeholder for Add Button
                     NavigationBarItem(
                         selected = false,
                         onClick = { showAddMenu = !showAddMenu },
-                        icon = { 
-                            Box(
-                                modifier = Modifier
-                                    .size(48.dp)
-                                    .clip(RoundedCornerShape(14.dp))
-                                    .background(Color(0xFF2E7D32)), 
-                                contentAlignment = Alignment.Center
-                            ) { 
-                                val rotation by animateFloatAsState(targetValue = if (showAddMenu) 45f else 0f, label = "iconRotate")
-                                Icon(Icons.Outlined.Add, contentDescription = "Add", tint = Color.White, modifier = Modifier.rotate(rotation)) 
-                            } 
-                        }
+                        icon = { Spacer(modifier = Modifier.size(48.dp)) } 
                     )
                     
                     NavigationBarItem(
@@ -271,17 +251,18 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                             dob = userDob,
                             paddingValues = paddingValues, 
                             onLogout = onLogout,
-                            onProfileRefresh = { refreshTrigger++ } // Add this so edit triggers a reload
+                            onProfileRefresh = { refreshTrigger++ } 
                         )
                     }
                 }
             }
         }
 
+        // The Master Overlay Engine
         AddScreen(
             username = username,
             showMenu = showAddMenu,
-            onCloseMenu = { showAddMenu = false },
+            onToggleMenu = { showAddMenu = !showAddMenu },
             onExpenseAdded = { newEntry -> 
                 transactionList = listOf(newEntry) + transactionList 
             },
