@@ -58,7 +58,7 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
     val buttonScale by animateFloatAsState(targetValue = if (isPressed) 0.95f else 1f, label = "ButtonScale")
 
     Card(
-        modifier = Modifier.fillMaxWidth(), // FIX: Height restriction removed
+        modifier = Modifier.fillMaxWidth(), 
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(0.dp),
         shape = RoundedCornerShape(16.dp)
@@ -204,7 +204,7 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(50.dp)
+                    .height(56.dp)
                     .scale(buttonScale)
                     .pointerInput(Unit) {
                         detectTapGestures(
@@ -225,6 +225,9 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                     Text("Save Account", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White)
                 }
             }
+            
+            // FIX: Padding Buffer
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }
