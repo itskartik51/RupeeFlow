@@ -5,6 +5,8 @@ import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -46,12 +48,14 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
 
     var bankToEdit by remember { mutableStateOf<BankAccountItem?>(null) }
     
-    // Add Menu State
     var showAddMenu by remember { mutableStateOf(false) }
 
-    // PERFECT CONNECTION: Profile data states added here
-    var userFullName by remember { mutableStateOf("Kartikey") } 
+    // FULL PROFILE DATA STATES (Ab inme data automatically ayega)
+    var userFullName by remember { mutableStateOf("") } 
     var userEmail by remember { mutableStateOf("") } 
+    var userMobile by remember { mutableStateOf("") }
+    var userPassword by remember { mutableStateOf("") }
+    var userDob by remember { mutableStateOf("") }
 
     var thisMonthExpenses by remember { mutableDoubleStateOf(0.0) }
     var thisYearExpenses by remember { mutableDoubleStateOf(0.0) }
@@ -72,7 +76,6 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
         else dNavState = if (isLoadingExpenses) "Syncing Data... ⏳" else "Tab $selectedTab ✅"
     }
 
-    // MAIN SCREEN BACK PHYSICS
     BackHandler(enabled = showExpenseHistory || selectedTab != 0 || assetsCurrentView != "Main" || bankToEdit != null) {
         dBackPresses++ 
         when {
@@ -101,6 +104,23 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                 if (response.isSuccessful && responseData.trim().startsWith("{")) {
                     val jsonResponse = JSONObject(responseData)
                     if (jsonResponse.optString("status") == "success") {
+                        
+                        // PARSE PROFILE DATA HERE
+                        val profileObj = jsonResponse.optJSONObject("profile")
+                        var tempName = ""
+                        var tempEmail = ""
+                        var tempMobile = ""
+                        var tempPass = ""
+                        var tempDob = ""
+                        
+                        if (profileObj != null) {
+                            tempName = profileObj.optString("name", "")
+                            tempEmail = profileObj.optString("email", "")
+                            tempMobile = profileObj.optString("mobile", "")
+                            tempPass = profileObj.optString("password", "")
+                            tempDob = profileObj.optString("dob", "")
+                        }
+
                         val expensesArray = jsonResponse.optJSONArray("expenses")
                         var tempTotal = 0.0; var tempMonth = 0.0; var tempYear = 0.0
                         val tempHistory = mutableListOf<TransactionModel>()
@@ -156,6 +176,13 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                         }
 
                         withContext(Dispatchers.Main) {
+                            // Assign profile details to States
+                            userFullName = tempName
+                            userEmail = tempEmail
+                            userMobile = tempMobile
+                            userPassword = tempPass
+                            userDob = tempDob
+
                             thisMonthExpenses = if (tempMonth > 0) tempMonth else tempTotal 
                             thisYearExpenses = if (tempYear > 0) tempYear else tempTotal
                             transactionList = tempHistory.reversed()
@@ -189,7 +216,6 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                         colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
                     )
                     
-                    // ADD BUTTON
                     NavigationBarItem(
                         selected = false,
                         onClick = { showAddMenu = !showAddMenu },
@@ -236,13 +262,16 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                             onEditBankClick = { bankToEdit = it }
                         )
                         3 -> AnalyticsScreen(paddingValues = paddingValues)
-                        // PERFECT CONNECTION: Ab ProfileScreen ko data pass ho raha hai
                         4 -> ProfileScreen(
                             username = username, 
                             name = userFullName, 
-                            email = userEmail, 
+                            email = userEmail,
+                            mobile = userMobile,
+                            password = userPassword,
+                            dob = userDob,
                             paddingValues = paddingValues, 
-                            onLogout = onLogout
+                            onLogout = onLogout,
+                            onProfileRefresh = { refreshTrigger++ } // Add this so edit triggers a reload
                         )
                     }
                 }
