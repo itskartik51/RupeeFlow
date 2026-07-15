@@ -26,15 +26,17 @@ import androidx.compose.ui.unit.sp
 fun ProfileScreen(
     username: String,
     name: String, 
-    email: String, 
+    email: String,
+    mobile: String,
+    password: String,
+    dob: String, 
     paddingValues: PaddingValues, 
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    onProfileRefresh: () -> Unit
 ) {
-    // Mini-Navigator State (Boss Script Routing)
     var currentProfileView by remember { mutableStateOf("Main") }
     var selectedOptionTitle by remember { mutableStateOf("") }
 
-    // BOSS BACK PHYSICS: Agar Main pe nahi hai, toh back aane par Main pe laayega
     BackHandler(enabled = currentProfileView != "Main") {
         currentProfileView = "Main"
     }
@@ -59,8 +61,16 @@ fun ProfileScreen(
                 )
             }
             "Details" -> {
-                // EDIT: Yahan 'username = username' pass kiya gaya hai
-                ProfileDetailsScreen(username = username, onBackClick = { currentProfileView = "Main" })
+                ProfileDetailsScreen(
+                    username = username,
+                    name = name,
+                    email = email,
+                    mobile = mobile,
+                    password = password,
+                    dob = dob,
+                    onBackClick = { currentProfileView = "Main" },
+                    onProfileUpdated = { onProfileRefresh() } // Sheet update reload
+                )
             }
             "Preference" -> {
                 PreferenceScreen(optionType = selectedOptionTitle, onBackClick = { currentProfileView = "Main" })
@@ -72,7 +82,6 @@ fun ProfileScreen(
     }
 }
 
-// Internal UI function
 @Composable
 private fun ProfileMainContent(
     name: String,
@@ -92,7 +101,6 @@ private fun ProfileMainContent(
     ) {
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Profile Header
         val displayLetter = if (name.isNotBlank()) name.take(1).uppercase() else "?"
         val displayEmail = if (email.isNotBlank()) email else "Add Mail"
 
@@ -118,19 +126,16 @@ private fun ProfileMainContent(
         
         Spacer(modifier = Modifier.height(32.dp))
 
-        // GROUP 2 (Preferences)
         ProfileOptionRow(Icons.Default.Lock, "Security Lock", onClick = { onOptionClick("Security Lock") })
         ProfileOptionRow(Icons.Default.CurrencyRupee, "Currency", onClick = { onOptionClick("Currency") }) 
         ProfileOptionRow(Icons.Default.Palette, "Theme", onClick = { onOptionClick("Theme") }) 
         
-        // GROUP 1 (Utilities)
         ProfileOptionRow(Icons.Default.Download, "Data Download", onClick = { onOptionClick("Data Download") }) 
         ProfileOptionRow(Icons.Default.SupportAgent, "Help & Support", onClick = { onOptionClick("Help & Support") }) 
         ProfileOptionRow(Icons.Default.Info, "App Update & Info", onClick = { onOptionClick("App Update & Info") })
         
         Spacer(modifier = Modifier.height(32.dp))
 
-        // Logout
         ProfileOptionRow(Icons.Default.ExitToApp, "Logout", textColor = Color.Red, onClick = { onLogout() })
     }
 }
