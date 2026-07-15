@@ -145,7 +145,6 @@ fun EditBankDialog(
                 modifier = Modifier.padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Header with Delete Icon (BIN)
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = "Edit Bank Details",
@@ -319,6 +318,54 @@ fun EditBankDialog(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+// =======================================================
+// NAYA FUNCTION: USER PROFILE EDIT KARNE KA API ENGINE
+// =======================================================
+suspend fun updateUserProfile(
+    oldUsername: String,
+    newName: String,
+    newUsername: String,
+    newMobile: String,
+    newEmail: String,
+    newPassword: String,
+    newDob: String,
+    onSuccess: () -> Unit,
+    onError: () -> Unit
+) {
+    withContext(Dispatchers.IO) {
+        try {
+            val jsonBody = JSONObject().apply {
+                put("action", "edit_profile")
+                put("username", oldUsername)
+                if (newName.isNotBlank()) put("new_name", newName)
+                if (newUsername.isNotBlank()) put("new_username", newUsername)
+                if (newMobile.isNotBlank()) put("new_mobile", newMobile)
+                if (newEmail.isNotBlank()) put("new_email", newEmail)
+                if (newPassword.isNotBlank()) put("new_password", newPassword)
+                if (newDob.isNotBlank()) put("new_dob", newDob)
+            }
+            
+            val client = OkHttpClient()
+            val body = jsonBody.toString().toRequestBody("application/json".toMediaType())
+            val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(body).build()
+            val response = client.newCall(request).execute()
+            val resData = response.body?.string() ?: ""
+
+            withContext(Dispatchers.Main) {
+                if (resData.contains("success")) {
+                    onSuccess()
+                } else {
+                    onError()
+                }
+            }
+        } catch (e: Exception) {
+            withContext(Dispatchers.Main) {
+                onError()
             }
         }
     }
