@@ -25,21 +25,28 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ProfileDetailsScreen(username: String, onBackClick: () -> Unit) {
+fun ProfileDetailsScreen(
+    username: String, 
+    name: String,
+    email: String,
+    mobile: String,
+    password: String,
+    dob: String,
+    onBackClick: () -> Unit,
+    onProfileUpdated: () -> Unit
+) {
     var isEditing by remember { mutableStateOf(false) }
     var isSubmitting by remember { mutableStateOf(false) }
 
-    // States for Form
-    var currentName by remember { mutableStateOf("") }
+    // Pre-fill fields with backend data
+    var currentName by remember { mutableStateOf(name) }
     var currentUsername by remember { mutableStateOf(username) }
-    var currentMobile by remember { mutableStateOf("") }
-    var currentPassword by remember { mutableStateOf("") }
-    var currentEmail by remember { mutableStateOf("") }
-    var currentDob by remember { mutableStateOf("") }
+    var currentMobile by remember { mutableStateOf(mobile) }
+    var currentPassword by remember { mutableStateOf(password) }
+    var currentEmail by remember { mutableStateOf(email) }
+    var currentDob by remember { mutableStateOf(dob) }
 
     var passwordVisible by remember { mutableStateOf(false) }
-    
-    // NAYA STATE: Username check ke liye
     var usernameError by remember { mutableStateOf(false) }
     
     val context = LocalContext.current
@@ -66,7 +73,6 @@ fun ProfileDetailsScreen(username: String, onBackClick: () -> Unit) {
                             if (isEditing) {
                                 isSubmitting = true
                                 coroutineScope.launch {
-                                    // Modified Engine call with custom error handling
                                     updateUserProfile(
                                         oldUsername = username,
                                         newName = currentName,
@@ -79,12 +85,13 @@ fun ProfileDetailsScreen(username: String, onBackClick: () -> Unit) {
                                             isSubmitting = false
                                             isEditing = false
                                             usernameError = false
+                                            onProfileUpdated() // Fetch latest changes globally
                                             Toast.makeText(context, "Profile Details Updated!", Toast.LENGTH_SHORT).show()
                                         },
                                         onError = { errorType ->
                                             isSubmitting = false
                                             if (errorType == "username_taken") {
-                                                usernameError = true // Lal error trigger
+                                                usernameError = true 
                                             } else {
                                                 Toast.makeText(context, "Update Failed!", Toast.LENGTH_SHORT).show()
                                             }
@@ -92,7 +99,7 @@ fun ProfileDetailsScreen(username: String, onBackClick: () -> Unit) {
                                     )
                                 }
                             } else {
-                                isEditing = true // Edit mode on
+                                isEditing = true 
                             }
                         }) {
                             Icon(
@@ -126,7 +133,7 @@ fun ProfileDetailsScreen(username: String, onBackClick: () -> Unit) {
                 icon: ImageVector,
                 keyboardType: KeyboardType = KeyboardType.Text,
                 isPassword: Boolean = false,
-                isErrorState: Boolean = false // Error boundary check
+                isErrorState: Boolean = false 
             ) {
                 TextField(
                     value = value,
@@ -163,14 +170,13 @@ fun ProfileDetailsScreen(username: String, onBackClick: () -> Unit) {
 
             DetailField("Name", currentName, { currentName = it }, Icons.Outlined.Person)
             
-            // Username Field wrapped with error logic
             Column {
                 DetailField(
                     label = "Username", 
                     value = currentUsername, 
                     onValueChange = { 
                         currentUsername = it
-                        usernameError = false // Type karte hi error hata do
+                        usernameError = false
                     }, 
                     icon = Icons.Outlined.Badge,
                     isErrorState = usernameError
