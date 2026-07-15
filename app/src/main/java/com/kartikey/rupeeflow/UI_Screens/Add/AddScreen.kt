@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountBalance
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Receipt
 import androidx.compose.material.icons.outlined.TrendingUp
@@ -17,6 +18,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -30,7 +32,7 @@ import androidx.compose.ui.unit.sp
 fun AddScreen(
     username: String,
     showMenu: Boolean,
-    onCloseMenu: () -> Unit,
+    onToggleMenu: () -> Unit,
     onExpenseAdded: (TransactionModel) -> Unit,
     onInvestmentAdded: () -> Unit,
     onFinanceAdded: () -> Unit
@@ -41,18 +43,18 @@ fun AddScreen(
         if (activeAddForm != null) {
             activeAddForm = null 
         } else if (showMenu) {
-            onCloseMenu() 
+            onToggleMenu() 
         }
     }
 
-    // 1. ADD MENU POPUP (WITH TAIL PHYSICS)
+    // 1. ADD MENU POPUP (WITH DIM BACKGROUND)
     val dimAlpha by animateFloatAsState(targetValue = if (showMenu) 0.4f else 0f, label = "dimBg")
     if (showMenu || dimAlpha > 0f) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black.copy(alpha = dimAlpha))
-                .pointerInput(Unit) { detectTapGestures(onTap = { onCloseMenu() }) }
+                .pointerInput(Unit) { detectTapGestures(onTap = { onToggleMenu() }) }
         )
         
         Box(
@@ -76,17 +78,17 @@ fun AddScreen(
                         Column {
                             AddMenuItem("Add Expense", Icons.Outlined.Receipt) {
                                 activeAddForm = "Expense"
-                                onCloseMenu()
+                                onToggleMenu()
                             }
                             HorizontalDivider(color = Color(0xFFEEEEEE))
                             AddMenuItem("Add Investment", Icons.Outlined.TrendingUp) {
                                 activeAddForm = "Investment"
-                                onCloseMenu()
+                                onToggleMenu()
                             }
                             HorizontalDivider(color = Color(0xFFEEEEEE))
                             AddMenuItem("Add Finance", Icons.Outlined.AccountBalance) {
                                 activeAddForm = "Finance"
-                                onCloseMenu()
+                                onToggleMenu()
                             }
                         }
                     }
@@ -102,10 +104,34 @@ fun AddScreen(
         }
     }
 
-    // 2. MODAL BOTTOM SHEETS FOR FORMS (WITH KEYBOARD PHYSICS)
+    // 2. THE HIGHLIGHTED FLOATING BUTTON (Over the dim layer)
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.BottomCenter
+    ) {
+        Box(
+            modifier = Modifier
+                .windowInsetsPadding(WindowInsets.navigationBars)
+                .padding(bottom = 16.dp)
+                .size(48.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(Color(0xFF2E7D32))
+                .clickable { onToggleMenu() },
+            contentAlignment = Alignment.Center
+        ) {
+            val rotation by animateFloatAsState(
+                targetValue = if (showMenu) 45f else 0f, 
+                animationSpec = tween(300),
+                label = "iconRotate"
+            )
+            Icon(Icons.Outlined.Add, contentDescription = "Add", tint = Color.White, modifier = Modifier.rotate(rotation))
+        }
+    }
+
+    // 3. MODAL BOTTOM SHEETS FOR FORMS
     if (activeAddForm != null) {
-        // FIX: false kiya taaki sheet pehle niche rahe aur handle se poori upar khinchi ja sake
-        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false) 
+        // FIX: skipPartiallyExpanded = true karte hi popup aadhi nahi, poori khulegi
+        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true) 
         ModalBottomSheet(
             onDismissRequest = { activeAddForm = null },
             sheetState = sheetState,
@@ -114,10 +140,10 @@ fun AddScreen(
         ) {
             Column(
                 modifier = Modifier
-                    .fillMaxHeight(0.90f) // FIX: Sheet ko 90% tak upar le jane ki azaadi (niche blank space bachega)
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp)
-                    .imePadding() // MASTER FIX: Keyboard khulte hi ye poori form ko upar push karega
+                    .imePadding() // MASTER FIX: Keyboard khulte hi ye poori form ko upar slide karega
+                    .navigationBarsPadding() 
             ) {
                 Text(
                     text = "Add $activeAddForm",
