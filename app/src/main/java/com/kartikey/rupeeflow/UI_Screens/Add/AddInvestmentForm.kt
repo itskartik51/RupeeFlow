@@ -142,7 +142,7 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
     }
 
     Card(
-        modifier = Modifier.fillMaxWidth(), // FIX: Height restriction removed
+        modifier = Modifier.fillMaxWidth(), 
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(0.dp),
         shape = RoundedCornerShape(16.dp)
@@ -270,7 +270,7 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                 shape = RoundedCornerShape(12.dp)
             )
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
             Button(
                 onClick = {
@@ -318,7 +318,7 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(50.dp)
+                    .height(56.dp)
                     .scale(buttonScale)
                     .pointerInput(Unit) {
                         detectTapGestures(
@@ -339,6 +339,9 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                     Text("Save Investment", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White)
                 }
             }
+            
+            // FIX: Padding Buffer
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }
