@@ -36,6 +36,7 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 
+// Date Formatter (Crash-Free Version)
 class DateMaskTransformation : VisualTransformation {
     override fun filter(text: AnnotatedString): TransformedText {
         val trimmed = if (text.text.length >= 8) text.text.substring(0..7) else text.text
@@ -72,6 +73,7 @@ class DateMaskTransformation : VisualTransformation {
 fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -> Unit) { 
     val financeTypes = listOf("Cash", "Bank Account", "FD : Fixed Deposit", "Credit Card")
     
+    // Default state empty
     var selectedType by remember { mutableStateOf("") }
     var expandedType by remember { mutableStateOf(false) }
 
@@ -79,9 +81,9 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
         (Constants.IndianBanksList + "Utkarsh Small Finance Bank").distinct().sorted() 
     }
 
+    // Input States
     var bankName by remember { mutableStateOf("") }
     var expandedBank by remember { mutableStateOf(false) }
-    
     var bankAccountNo by remember { mutableStateOf("") }
     var currentBalance by remember { mutableStateOf("") }
     var bankInterestRate by remember { mutableStateOf("") }
@@ -104,6 +106,178 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
 
     var isPressed by remember { mutableStateOf(false) }
     val buttonScale by animateFloatAsState(targetValue = if (isPressed) 0.95f else 1f, label = "ButtonScale")
+
+    // ==========================================
+    // MODULAR LOGIC BLOCKS (To prevent Compiler Crash)
+    // ==========================================
+
+    val submitBankAccount = {
+        val bal = currentBalance.toDoubleOrNull() ?: 0.0
+        val rate = bankInterestRate.toDoubleOrNull() ?: 0.0
+        
+        if (bankName.isBlank() || bankAccountNo.isBlank() || bal <= 0) {
+            Toast.makeText(context, "Fill all details correctly", Toast.LENGTH_SHORT).show()
+        } else if (!dynamicBankList.contains(bankName)) {
+            Toast.makeText(context, "Select a valid bank from dropdown!", Toast.LENGTH_SHORT).show()
+        } else {
+            isSubmitting = true
+            val formattedAcc = "XXXXX$bankAccountNo"
+            
+            coroutineScope.launch(Dispatchers.IO) {
+                try {
+                    val client = OkHttpClient()
+                    val jsonBody = JSONObject()
+                    jsonBody.put("action", "add_bank")
+                    jsonBody.put("username", username)
+                    jsonBody.put("bank_name", bankName) 
+                    jsonBody.put("account_no", formattedAcc)
+                    jsonBody.put("current_bal", bal)
+                    jsonBody.put("interest_rate", rate)
+                    
+                    val mediaType = "application/json".toMediaType()
+                    val request = Request.Builder()
+                        .url(Constants.GOOGLE_SHEET_API_URL)
+                        .post(jsonBody.toString().toRequestBody(mediaType))
+                        .build()
+                    
+                    client.newCall(request).execute()
+                    
+                    withContext(Dispatchers.Main) {
+                        isSubmitting = false
+                        Toast.makeText(context, "Bank Account Added!", Toast.LENGTH_SHORT).show()
+                        onFinanceAdded()
+                        onDismiss()
+                    }
+                } catch (e: Exception) { 
+                    withContext(Dispatchers.Main) { 
+                        isSubmitting = false
+                        Toast.makeText(context, "Network Error", Toast.LENGTH_SHORT).show() 
+                    } 
+                }
+            }
+        }
+    }
+
+    val submitFixedDeposit = {
+        val invAmt = fdAmount.toDoubleOrNull() ?: 0.0
+        val rate = fdInterestRate.toDoubleOrNull() ?: 0.0
+        
+        if (bankName.isBlank() || fdAccountNo.isBlank() || invAmt <= 0 || createDate.length != 8 || maturityDate.length != 8) {
+            Toast.makeText(context, "Check details. Dates must be DD/MM/YYYY.", Toast.LENGTH_LONG).show()
+        } else if (!dynamicBankList.contains(bankName)) {
+            Toast.makeText(context, "Select a valid institution from dropdown!", Toast.LENGTH_SHORT).show()
+        } else {
+            isSubmitting = true
+            val fCreate = "${createDate.substring(0,2)}/${createDate.substring(2,4)}/${createDate.substring(4,8)}"
+            val fMat = "${maturityDate.substring(0,2)}/${maturityDate.substring(2,4)}/${maturityDate.substring(4,8)}"
+            
+            coroutineScope.launch(Dispatchers.IO) {
+                try {
+                    val client = OkHttpClient()
+                    val jsonBody = JSONObject()
+                    jsonBody.put("action", "add_fd")
+                    jsonBody.put("username", username)
+                    jsonBody.put("bank_name", bankName) 
+                    jsonBody.put("account_no", fdAccountNo)
+                    jsonBody.put("invested_amount", invAmt)
+                    jsonBody.put("interest_rate", rate)
+                    jsonBody.put("create_date", fCreate)
+                    jsonBody.put("maturity_date", fMat)
+                    
+                    val mediaType = "application/json".toMediaType()
+                    val request = Request.Builder()
+                        .url(Constants.GOOGLE_SHEET_API_URL)
+                        .post(jsonBody.toString().toRequestBody(mediaType))
+                        .build()
+                    
+                    client.newCall(request).execute()
+                    
+                    withContext(Dispatchers.Main) {
+                        isSubmitting = false
+                        Toast.makeText(context, "FD Added Successfully!", Toast.LENGTH_SHORT).show()
+                        onFinanceAdded()
+                        onDismiss()
+                    }
+                } catch (e: Exception) { 
+                    withContext(Dispatchers.Main) { 
+                        isSubmitting = false
+                        Toast.makeText(context, "Network Error", Toast.LENGTH_SHORT).show() 
+                    } 
+                }
+            }
+        }
+    }
+
+    val submitCashData = {
+        val cAmt = cashAmount.toDoubleOrNull()
+        
+        if (cAmt == null || cAmt <= 0) {
+            Toast.makeText(context, "Enter valid cash amount", Toast.LENGTH_SHORT).show()
+        } else {
+            isSubmitting = true
+            coroutineScope.launch(Dispatchers.IO) {
+                try {
+                    val client = OkHttpClient()
+                    val mediaType = "application/json".toMediaType()
+                    
+                    // Fetch existing cash
+                    val fetchJson = JSONObject()
+                    fetchJson.put("action", "get_all_data")
+                    fetchJson.put("username", username)
+                    
+                    val fetchReq = Request.Builder()
+                        .url(Constants.GOOGLE_SHEET_API_URL)
+                        .post(fetchJson.toString().toRequestBody(mediaType))
+                        .build()
+                    
+                    val res = client.newCall(fetchReq).execute()
+                    val resData = res.body?.string() ?: "{}"
+                    
+                    var existingCash = 0.0
+                    try {
+                        val parsed = JSONObject(resData)
+                        val cashObj = parsed.optJSONObject("cash")
+                        if (cashObj != null) {
+                            existingCash = cashObj.optDouble("amount", 0.0)
+                        }
+                    } catch (e: Exception) { 
+                        existingCash = 0.0
+                    }
+                    
+                    // Add new amount and update
+                    val finalAmount = existingCash + cAmt
+                    
+                    val updateJson = JSONObject()
+                    updateJson.put("action", "update_cash")
+                    updateJson.put("username", username)
+                    updateJson.put("amount", finalAmount)
+                    
+                    val updateReq = Request.Builder()
+                        .url(Constants.GOOGLE_SHEET_API_URL)
+                        .post(updateJson.toString().toRequestBody(mediaType))
+                        .build()
+                    
+                    client.newCall(updateReq).execute()
+                    
+                    withContext(Dispatchers.Main) {
+                        isSubmitting = false
+                        Toast.makeText(context, "Cash Added Successfully!", Toast.LENGTH_SHORT).show()
+                        onFinanceAdded()
+                        onDismiss()
+                    }
+                } catch (e: Exception) { 
+                    withContext(Dispatchers.Main) { 
+                        isSubmitting = false
+                        Toast.makeText(context, "Network Error", Toast.LENGTH_SHORT).show() 
+                    } 
+                }
+            }
+        }
+    }
+
+    // ==========================================
+    // UI RENDERING BLOCK
+    // ==========================================
 
     Card(
         modifier = Modifier.fillMaxWidth(), 
@@ -142,6 +316,7 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                 HorizontalDivider(color = Color(0xFFEEEEEE))
                 Spacer(modifier = Modifier.height(16.dp))
 
+                // --- BANK ACCOUNT UI ---
                 if (selectedType == "Bank Account") {
                     ExposedDropdownMenuBox(expanded = expandedBank && filteredBanks.isNotEmpty(), onExpandedChange = { expandedBank = it }) {
                         OutlinedTextField(
@@ -200,6 +375,7 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                     }
                 }
 
+                // --- FIXED DEPOSIT UI ---
                 if (selectedType == "FD : Fixed Deposit") {
                     ExposedDropdownMenuBox(expanded = expandedBank && filteredBanks.isNotEmpty(), onExpandedChange = { expandedBank = it }) {
                         OutlinedTextField(
@@ -222,123 +398,4 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                     Spacer(modifier = Modifier.height(16.dp))
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         OutlinedTextField(
-                            value = fdAccountNo,
-                            onValueChange = { fdAccountNo = it },
-                            label = { Text("FD Account No.") },
-                            modifier = Modifier.weight(0.6f),
-                            singleLine = true,
-                            shape = RoundedCornerShape(12.dp),
-                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF2E7D32), focusedLabelColor = Color(0xFF2E7D32))
-                        )
-                        OutlinedTextField(
-                            value = fdInterestRate, 
-                            onValueChange = { fdInterestRate = it },
-                            label = { Text("Interest") },
-                            suffix = { Text("%", fontWeight = FontWeight.Bold, color = Color.Black) },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            modifier = Modifier.weight(0.4f),
-                            singleLine = true,
-                            shape = RoundedCornerShape(12.dp),
-                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF2E7D32), focusedLabelColor = Color(0xFF2E7D32))
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(16.dp))
-                    OutlinedTextField(
-                        value = fdAmount,
-                        onValueChange = { fdAmount = it },
-                        label = { Text("Invested Amount") },
-                        prefix = { Text("₹ ", fontWeight = FontWeight.Bold, color = Color.Black) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF2E7D32), focusedLabelColor = Color(0xFF2E7D32))
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        OutlinedTextField(
-                            value = createDate, 
-                            onValueChange = { if (it.length <= 8) createDate = it.filter { char -> char.isDigit() } },
-                            label = { Text("Start Date") },
-                            placeholder = { Text("DD/MM/YYYY", color = Color.LightGray) },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            visualTransformation = DateMaskTransformation(),
-                            modifier = Modifier.weight(1f),
-                            singleLine = true,
-                            shape = RoundedCornerShape(12.dp),
-                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF2E7D32), focusedLabelColor = Color(0xFF2E7D32))
-                        )
-                        OutlinedTextField(
-                            value = maturityDate, 
-                            onValueChange = { if (it.length <= 8) maturityDate = it.filter { char -> char.isDigit() } },
-                            label = { Text("End Date") },
-                            placeholder = { Text("DD/MM/YYYY", color = Color.LightGray) },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            visualTransformation = DateMaskTransformation(),
-                            modifier = Modifier.weight(1f),
-                            singleLine = true,
-                            shape = RoundedCornerShape(12.dp),
-                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF2E7D32), focusedLabelColor = Color(0xFF2E7D32))
-                        )
-                    }
-                }
-
-                if (selectedType == "Cash") {
-                    OutlinedTextField(
-                        value = cashAmount,
-                        onValueChange = { cashAmount = it },
-                        label = { Text("Amount to Add") },
-                        prefix = { Text("₹ ", fontWeight = FontWeight.Bold, color = Color.Black) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF2E7D32), focusedLabelColor = Color(0xFF2E7D32))
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text("This amount will be added to your current cash balance automatically.", color = Color.Gray, fontSize = 11.sp, modifier = Modifier.padding(horizontal = 4.dp))
-                }
-
-                if (selectedType == "Credit Card") {
-                    Box(modifier = Modifier.fillMaxWidth().height(100.dp).background(Color(0xFFF8F9FA), RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
-                        Text("Credit Card Integration\nComing Soon...", color = Color.Gray, fontWeight = FontWeight.Bold, fontSize = 14.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                AnimatedVisibility(visible = selectedType != "Credit Card") {
-                    Button(
-                        onClick = {
-                            if (selectedType == "Bank Account") {
-                                val bal = currentBalance.toDoubleOrNull() ?: 0.0
-                                val rate = bankInterestRate.toDoubleOrNull() ?: 0.0
-                                
-                                if (bankName.isBlank() || bankAccountNo.isBlank() || bal <= 0) {
-                                    Toast.makeText(context, "Fill all details correctly", Toast.LENGTH_SHORT).show()
-                                    return@Button
-                                }
-                                if (!dynamicBankList.contains(bankName)) {
-                                    Toast.makeText(context, "Select a valid bank from dropdown!", Toast.LENGTH_SHORT).show()
-                                    return@Button
-                                }
-                                
-                                isSubmitting = true
-                                val formattedAcc = "XXXXX$bankAccountNo"
-                                
-                                coroutineScope.launch(Dispatchers.IO) {
-                                    try {
-                                        val client = OkHttpClient()
-                                        
-                                        val jsonBody = JSONObject()
-                                        jsonBody.put("action", "add_bank")
-                                        jsonBody.put("username", username)
-                                        jsonBody.put("bank_name", bankName) 
-                                        jsonBody.put("account_no", formattedAcc)
-                                        jsonBody.put("current_bal", bal)
-                                        jsonBody.put("interest_rate", rate)
-                                        
-                                        val mediaType = "application/json".toMediaType()
-                                        val requestBody = jsonBody.toString().toRequestBody(mediaType)
-                                        val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(requestBody).build()
-          
+                            value = fdAccoun
