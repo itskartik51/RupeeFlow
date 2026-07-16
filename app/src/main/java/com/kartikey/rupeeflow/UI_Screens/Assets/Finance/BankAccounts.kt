@@ -1,12 +1,15 @@
 package com.kartikey.rupeeflow.UI_Screens.Assets.Finance
 
+import android.widget.Toast
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.outlined.AccountBalance
 import androidx.compose.material.icons.outlined.Edit
@@ -21,18 +24,30 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import coil.compose.SubcomposeAsyncImage
 import coil.request.CachePolicy
 import coil.request.ImageRequest
 import com.kartikey.rupeeflow.Cloud_Database.Constants
 import com.kartikey.rupeeflow.UI_Screens.Assets.BankAccountItem
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONObject
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BankAccountsScreen(
     onBackClick: () -> Unit,
+    username: String, // Username passed down for API
     bankList: List<BankAccountItem>,
     isLoading: Boolean,
     onRefreshClick: () -> Unit,
@@ -62,12 +77,12 @@ fun BankAccountsScreen(
             }
         } else {
             LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(paddingValues),
+                modifier = Modifier.fillMaxSize().padding(paddingValues).imePadding(), // Safety check
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 120.dp), 
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 items(bankList) { bank ->
-                    BankDetailCard(bank = bank, onEditClick = onEditBankClick)
+                    BankDetailCard(bank = bank, username = username, onEditClick = onEditBankClick, onRefreshRequest = onRefreshClick)
                 }
             }
         }
@@ -75,8 +90,9 @@ fun BankAccountsScreen(
 }
 
 @Composable
-fun BankDetailCard(bank: BankAccountItem, onEditClick: (BankAccountItem) -> Unit) {
+fun BankDetailCard(bank: BankAccountItem, username: String, onEditClick: (BankAccountItem) -> Unit, onRefreshRequest: () -> Unit) {
     val context = LocalContext.current
+    var showQuickUpdate by remember { mutableStateOf(false) }
     
     val domain = Constants.BankDomainMap.entries.firstOrNull { 
         it.key.equals(bank.bankName.trim(), ignoreCase = true) || 
@@ -84,8 +100,8 @@ fun BankDetailCard(bank: BankAccountItem, onEditClick: (BankAccountItem) -> Unit
         bank.bankName.trim().contains(it.key, ignoreCase = true)
     }?.value
 
-    // FIX: Clearbit ki jagah ab Google Favicon API (sz=128 for High Res) lagaya hai. Ye kabhi block nahi karta.
-    val logoUrl = if (domain != null) "https://www.google.com/s2/favicons?sz=128&domain=$domain" else null
+    // FIX: Switched to Clearbit HD Logos for crisp quality
+    val logoUrl = if (domain != null) "https://logo.clearbit.com/$domain" else null
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -98,8 +114,8 @@ fun BankDetailCard(bank: BankAccountItem, onEditClick: (BankAccountItem) -> Unit
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     modifier = Modifier
-                        .size(40.dp)
-                        .background(Color(0xFF1976D2).copy(alpha = 0.1f), RoundedCornerShape(8.dp)),
+                        .size(44.dp)
+                        .background(Color(0xFF1976D2).copy(alpha = 0.05f), RoundedCornerShape(10.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     if (logoUrl != null) {
@@ -111,7 +127,7 @@ fun BankDetailCard(bank: BankAccountItem, onEditClick: (BankAccountItem) -> Unit
                                 .diskCachePolicy(CachePolicy.ENABLED)   
                                 .build(),
                             contentDescription = bank.bankName,
-                            modifier = Modifier.size(28.dp).clip(RoundedCornerShape(4.dp)),
+                            modifier = Modifier.size(28.dp).clip(RoundedCornerShape(6.dp)),
                             contentScale = ContentScale.Fit,
                             loading = { 
                                 CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Color(0xFF1976D2)) 
@@ -127,7 +143,7 @@ fun BankDetailCard(bank: BankAccountItem, onEditClick: (BankAccountItem) -> Unit
                 
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(text = bank.bankName.uppercase(), fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.Black)
+                    Text(text = bank.bankName.uppercase(), fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color.Black)
                     Text(text = bank.accountNo, color = Color.Gray, fontSize = 12.sp, letterSpacing = 1.sp)
                 }
                 
@@ -139,7 +155,18 @@ fun BankDetailCard(bank: BankAccountItem, onEditClick: (BankAccountItem) -> Unit
             Spacer(modifier = Modifier.height(16.dp))
             
             Text(text = "Available Balance", color = Color.Gray, fontSize = 12.sp)
-            Text(text = formatRupeeAmount(bank.currentBalance), fontWeight = FontWeight.ExtraBold, fontSize = 28.sp, color = Color.Black)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(text = formatRupeeAmount(bank.currentBalance), fontWeight = FontWeight.ExtraBold, fontSize = 28.sp, color = Color.Black)
+                Spacer(modifier = Modifier.width(8.dp))
+                
+                // QUICK ACTION PLUS BUTTON
+                IconButton(
+                    onClick = { showQuickUpdate = true },
+                    modifier = Modifier.size(28.dp).background(Color(0xFFE8F5E9), RoundedCornerShape(8.dp))
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Update Balance", tint = Color(0xFF2E7D32), modifier = Modifier.size(18.dp))
+                }
+            }
             
             Spacer(modifier = Modifier.height(16.dp))
             HorizontalDivider(color = Color.LightGray.copy(alpha = 0.4f))
@@ -156,6 +183,127 @@ fun BankDetailCard(bank: BankAccountItem, onEditClick: (BankAccountItem) -> Unit
                     MetricItem(label = "1-Day Earn", value = "+${formatRupeeAmount(bank.oneDayInt)}", valueColor = Color(0xFF388E3C), alignment = Alignment.Start)
                     MetricItem(label = "Accrued Qtr", value = "+${formatRupeeAmount(bank.accruedQtrInt)}", valueColor = Color(0xFF388E3C), alignment = Alignment.CenterHorizontally)
                     MetricItem(label = "Accrued Yr", value = "+${formatRupeeAmount(bank.accruedYrInt)}", valueColor = Color(0xFF388E3C), alignment = Alignment.End)
+                }
+            }
+        }
+    }
+    
+    // THE SMART MATH POPUP ENGINE
+    if (showQuickUpdate) {
+        QuickUpdateDialog(
+            bank = bank,
+            username = username,
+            onDismiss = { showQuickUpdate = false },
+            onSuccess = {
+                showQuickUpdate = false
+                onRefreshRequest()
+            }
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun QuickUpdateDialog(bank: BankAccountItem, username: String, onDismiss: () -> Unit, onSuccess: () -> Unit) {
+    var updateAmount by remember { mutableStateOf("") }
+    var isUpdating by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
+    val context = LocalContext.current
+    
+    Dialog(
+        onDismissRequest = { if (!isUpdating) onDismiss() },
+        properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = false, usePlatformDefaultWidth = false)
+    ) {
+        // imePadding ensures the dialog floats above the keyboard
+        Card(
+            modifier = Modifier.fillMaxWidth(0.9f).imePadding(),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(8.dp)
+        ) {
+            Column(modifier = Modifier.padding(24.dp)) {
+                Text("Quick Update Balance", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = Color.Black)
+                Text("Add or deduct amount for ${bank.bankName}", color = Color.Gray, fontSize = 13.sp)
+                
+                Spacer(modifier = Modifier.height(20.dp))
+                
+                OutlinedTextField(
+                    value = updateAmount,
+                    onValueChange = { updateAmount = it },
+                    label = { Text("Amount (+ or -)") },
+                    prefix = { Text("₹ ", fontWeight = FontWeight.Bold, color = Color.Black) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF2E7D32), focusedLabelColor = Color(0xFF2E7D32))
+                )
+                
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedButton(
+                        onClick = { if (!isUpdating) onDismiss() },
+                        modifier = Modifier.weight(1f).height(50.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Black)
+                    ) {
+                        Text("Cancel", fontWeight = FontWeight.Bold)
+                    }
+                    
+                    Button(
+                        onClick = {
+                            val amountEntered = updateAmount.toDoubleOrNull()
+                            if (amountEntered != null && amountEntered != 0.0) {
+                                isUpdating = true
+                                val newCalculatedBalance = bank.currentBalance + amountEntered
+                                
+                                coroutineScope.launch(Dispatchers.IO) {
+                                    try {
+                                        val jsonBody = JSONObject().apply {
+                                            put("action", "edit_bank")
+                                            put("username", username)
+                                            put("original_account_no", bank.accountNo)
+                                            put("new_account_no", bank.accountNo)
+                                            put("new_bank_name", bank.bankName)
+                                            put("new_interest_rate", bank.interestRate)
+                                            put("new_current_bal", newCalculatedBalance)
+                                        }
+                                        
+                                        val client = OkHttpClient()
+                                        val body = jsonBody.toString().toRequestBody("application/json".toMediaType())
+                                        val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(body).build()
+                                        val response = client.newCall(request).execute()
+                                        val resData = response.body?.string() ?: ""
+
+                                        withContext(Dispatchers.Main) {
+                                            isUpdating = false
+                                            if (resData.contains("success")) {
+                                                Toast.makeText(context, "Balance Updated Successfully!", Toast.LENGTH_SHORT).show()
+                                                onSuccess()
+                                            } else {
+                                                Toast.makeText(context, "Update Failed!", Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
+                                    } catch (e: Exception) {
+                                        withContext(Dispatchers.Main) {
+                                            isUpdating = false
+                                            Toast.makeText(context, "Network Error", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                }
+                            } else {
+                                Toast.makeText(context, "Enter a valid amount", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        modifier = Modifier.weight(1f).height(50.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF388E3C)),
+                        enabled = !isUpdating
+                    ) {
+                        if (isUpdating) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp), strokeWidth = 3.dp)
+                        else Text("Add Amount", fontWeight = FontWeight.Bold, color = Color.White)
+                    }
                 }
             }
         }
