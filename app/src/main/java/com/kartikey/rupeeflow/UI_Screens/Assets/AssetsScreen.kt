@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountBalance
 import androidx.compose.material.icons.outlined.CreditCard
+import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.Money
 import androidx.compose.material.icons.outlined.Savings
 import androidx.compose.material3.*
@@ -96,7 +97,7 @@ fun AssetsScreen(
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Box(modifier = Modifier.weight(1f)) { FinanceGridCard("Cash", "₹0", null, Icons.Outlined.Money, Color(0xFF388E3C)) }
                     Box(modifier = Modifier.weight(1f)) { 
-                        FinanceGridCard("Bank Balance", "₹${totalBankBalance.toInt()}", "${bankList.size} Accounts Linked", Icons.Outlined.AccountBalance, Color(0xFF1976D2)) {
+                        FinanceGridCard("Bank Balance", "₹${totalBankBalance.toInt()}", "${bankList.size}", Icons.Outlined.AccountBalance, Color(0xFF1976D2)) {
                             onViewChange("DirectBankAccounts") 
                         } 
                     }
@@ -120,7 +121,6 @@ fun AssetsScreen(
             onEditBankClick = onEditBankClick 
         )
     } else if (currentView == "DirectBankAccounts") {
-        // Direct routing fix for small card click
         BankAccountsScreen(
             onBackClick = { onViewChange("Main") },
             username = username,
@@ -133,7 +133,7 @@ fun AssetsScreen(
 }
 
 @Composable
-fun FinanceGridCard(title: String, amount: String, subtitle: String?, icon: ImageVector, iconColor: Color, onClick: () -> Unit = {}) {
+fun FinanceGridCard(title: String, amount: String, linkCount: String?, icon: ImageVector, iconColor: Color, onClick: () -> Unit = {}) {
     Card(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick), 
         colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -148,10 +148,19 @@ fun FinanceGridCard(title: String, amount: String, subtitle: String?, icon: Imag
                 Text(text = title, color = Color.Gray, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
             }
             Spacer(modifier = Modifier.height(8.dp))
-            Text(text = amount, color = Color.Black, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
-            if (subtitle != null) {
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(text = subtitle, color = Color.Gray, fontSize = 10.sp, fontWeight = FontWeight.Medium)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(text = amount, color = Color.Black, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
+                if (linkCount != null) {
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Row(
+                        modifier = Modifier.background(Color(0xFFE3F2FD), RoundedCornerShape(4.dp)).padding(horizontal = 4.dp, vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Outlined.Link, contentDescription = "Link", tint = Color(0xFF1976D2), modifier = Modifier.size(10.dp))
+                        Spacer(modifier = Modifier.width(2.dp))
+                        Text(linkCount, color = Color(0xFF1976D2), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
             }
         }
     }
