@@ -2,6 +2,7 @@ package com.kartikey.rupeeflow.UI_Screens.Assets
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState 
 import androidx.compose.foundation.verticalScroll 
@@ -20,6 +21,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.BankAccountsScreen
 import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.FinanceScreen
 
 data class InvestmentItem(
@@ -30,7 +32,6 @@ data class InvestmentItem(
     val oneDayChangePrice: Double
 )
 
-// YAHAN DATA MODEL UPDATE HUA HAI
 data class BankAccountItem(
     val bankName: String,
     val accountNo: String,
@@ -54,7 +55,7 @@ fun AssetsScreen(
     onRefreshClick: () -> Unit = {},
     currentView: String, 
     onViewChange: (String) -> Unit,
-    onEditBankClick: (BankAccountItem) -> Unit // Edit Route Passing
+    onEditBankClick: (BankAccountItem) -> Unit 
 ) { 
     val totalBankBalance = bankList.sumOf { it.currentBalance }
 
@@ -76,13 +77,13 @@ fun AssetsScreen(
             Spacer(modifier = Modifier.height(8.dp))
             Column(modifier = Modifier.fillMaxWidth()) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Box(modifier = Modifier.weight(1f)) { GridItemCard("STOCKS", "₹0", Color(0xFF388E3C)) }
-                    Box(modifier = Modifier.weight(1f)) { GridItemCard("MUTUAL FUNDS", "₹0", Color(0xFF1976D2)) }
+                    Box(modifier = Modifier.weight(1f)) { GridItemCard("STOCKS", "₹0") }
+                    Box(modifier = Modifier.weight(1f)) { GridItemCard("MUTUAL FUNDS", "₹0") }
                 }
                 Spacer(modifier = Modifier.height(12.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Box(modifier = Modifier.weight(1f)) { GridItemCard("ETF", "₹0", Color(0xFF7B1FA2)) }
-                    Box(modifier = Modifier.weight(1f)) { GridItemCard("BONDS", "₹0", Color(0xFFF57C00)) }
+                    Box(modifier = Modifier.weight(1f)) { GridItemCard("ETF", "₹0") }
+                    Box(modifier = Modifier.weight(1f)) { GridItemCard("BONDS", "₹0") }
                 }
             }
             Spacer(modifier = Modifier.height(24.dp))
@@ -93,13 +94,17 @@ fun AssetsScreen(
             Spacer(modifier = Modifier.height(8.dp))
             Column(modifier = Modifier.fillMaxWidth()) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Box(modifier = Modifier.weight(1f)) { FinanceGridCard("Cash", "₹0", Icons.Outlined.Money, Color(0xFF388E3C)) }
-                    Box(modifier = Modifier.weight(1f)) { FinanceGridCard("Bank Balance", "₹${totalBankBalance.toInt()}", Icons.Outlined.AccountBalance, Color(0xFF1976D2)) }
+                    Box(modifier = Modifier.weight(1f)) { FinanceGridCard("Cash", "₹0", null, Icons.Outlined.Money, Color(0xFF388E3C)) }
+                    Box(modifier = Modifier.weight(1f)) { 
+                        FinanceGridCard("Bank Balance", "₹${totalBankBalance.toInt()}", "${bankList.size} Accounts Linked", Icons.Outlined.AccountBalance, Color(0xFF1976D2)) {
+                            onViewChange("DirectBankAccounts") 
+                        } 
+                    }
                 }
                 Spacer(modifier = Modifier.height(12.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Box(modifier = Modifier.weight(1f)) { FinanceGridCard("Credit Card", "₹0", Icons.Outlined.CreditCard, Color(0xFFD32F2F)) }
-                    Box(modifier = Modifier.weight(1f)) { FinanceGridCard("FD : Fixed Deposit", "₹0", Icons.Outlined.Savings, Color(0xFFF57C00)) }
+                    Box(modifier = Modifier.weight(1f)) { FinanceGridCard("Credit Card", "₹0", null, Icons.Outlined.CreditCard, Color(0xFFD32F2F)) }
+                    Box(modifier = Modifier.weight(1f)) { FinanceGridCard("FD : Fixed Deposit", "₹0", null, Icons.Outlined.Savings, Color(0xFFF57C00)) }
                 }
             }
         }
@@ -112,16 +117,29 @@ fun AssetsScreen(
             bankList = bankList,
             isLoading = isLoading,
             onRefreshClick = onRefreshClick,
-            onEditBankClick = onEditBankClick // Passing further down
+            onEditBankClick = onEditBankClick 
+        )
+    } else if (currentView == "DirectBankAccounts") {
+        // Direct routing fix for small card click
+        BankAccountsScreen(
+            onBackClick = { onViewChange("Main") },
+            username = username,
+            bankList = bankList,
+            isLoading = isLoading,
+            onRefreshClick = onRefreshClick,
+            onEditBankClick = onEditBankClick
         )
     }
 }
 
 @Composable
-fun FinanceGridCard(title: String, amount: String, icon: ImageVector, iconColor: Color) {
+fun FinanceGridCard(title: String, amount: String, subtitle: String?, icon: ImageVector, iconColor: Color, onClick: () -> Unit = {}) {
     Card(
-        modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color.White),
-        shape = RoundedCornerShape(12.dp), elevation = CardDefaults.cardElevation(2.dp), border = BorderStroke(1.dp, Color(0xFFEEEEEE))
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick), 
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        shape = RoundedCornerShape(12.dp), 
+        elevation = CardDefaults.cardElevation(2.dp), 
+        border = BorderStroke(1.dp, Color(0xFFEEEEEE))
     ) {
         Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.Start) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -131,8 +149,10 @@ fun FinanceGridCard(title: String, amount: String, icon: ImageVector, iconColor:
             }
             Spacer(modifier = Modifier.height(8.dp))
             Text(text = amount, color = Color.Black, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
-            Spacer(modifier = Modifier.height(12.dp))
-            Box(modifier = Modifier.height(4.dp).fillMaxWidth(0.6f).background(iconColor, RoundedCornerShape(2.dp)))
+            if (subtitle != null) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(text = subtitle, color = Color.Gray, fontSize = 10.sp, fontWeight = FontWeight.Medium)
+            }
         }
     }
 }
@@ -150,14 +170,12 @@ fun NetworthCard(networthAmount: Double, isLoading: Boolean, onClick: () -> Unit
 }
 
 @Composable
-fun GridItemCard(title: String, amount: String, lineColor: Color) {
+fun GridItemCard(title: String, amount: String) {
     Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color.White), shape = RoundedCornerShape(12.dp), elevation = CardDefaults.cardElevation(2.dp), border = BorderStroke(1.dp, Color(0xFFEEEEEE))) {
         Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.Start) {
             Text(text = title, color = Color.Gray, fontSize = 11.sp, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(8.dp))
             Text(text = amount, color = Color.Black, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
-            Spacer(modifier = Modifier.height(12.dp))
-            Box(modifier = Modifier.height(4.dp).fillMaxWidth(0.6f).background(lineColor, RoundedCornerShape(2.dp)))
         }
     }
 }
