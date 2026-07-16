@@ -34,7 +34,7 @@ fun FinanceScreen(
     bankList: List<BankAccountItem>,
     isLoading: Boolean,
     onRefreshClick: () -> Unit,
-    onEditBankClick: (BankAccountItem) -> Unit // Route Catch
+    onEditBankClick: (BankAccountItem) -> Unit 
 ) {
     var currentFinanceView by remember { mutableStateOf("Main") }
 
@@ -63,10 +63,11 @@ fun FinanceScreen(
     } else if (currentFinanceView == "BankAccounts") {
         BankAccountsScreen(
             onBackClick = { currentFinanceView = "Main" },
+            username = username, // Bypass username parameter
             bankList = bankList,
             isLoading = isLoading,
             onRefreshClick = onRefreshClick,
-            onEditBankClick = onEditBankClick // Route Passed to Final Screen
+            onEditBankClick = onEditBankClick 
         )
     }
 }
