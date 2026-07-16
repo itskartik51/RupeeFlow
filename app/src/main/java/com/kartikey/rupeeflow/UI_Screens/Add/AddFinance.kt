@@ -310,34 +310,35 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                 AnimatedVisibility(visible = selectedType != "Credit Card") {
                     Button(
                         onClick = {
-                            val client = OkHttpClient()
-                            
-                            when (selectedType) {
-                                "Bank Account" -> {
-                                    val bal = currentBalance.toDoubleOrNull() ?: 0.0
-                                    val rate = bankInterestRate.toDoubleOrNull() ?: 0.0
-                                    
-                                    if (bankName.isBlank() || bankAccountNo.isBlank() || bal <= 0) {
-                                        Toast.makeText(context, "Fill all details correctly", Toast.LENGTH_SHORT).show()
-                                        return@Button
-                                    }
-                                    if (!dynamicBankList.contains(bankName)) {
-                                        Toast.makeText(context, "Select a valid bank from dropdown!", Toast.LENGTH_SHORT).show()
-                                        return@Button
-                                    }
-                                    
-                                    isSubmitting = true
-                                    val formattedAcc = "XXXXX$bankAccountNo"
-                                    
-                                    coroutineScope.launch(Dispatchers.IO) {
-                                        try {
-                                            val jsonBody = JSONObject().apply {
-                                                put("action", "add_bank")
-                                                put("username", username)
-                                                put("bank_name", bankName) 
-                                                put("account_no", formattedAcc)
-                                                put("current_bal", bal)
-                                                put("interest_rate", rate)
-                                            }
-                                            val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(jsonBody.toString().toRequestBody("application/json".toMediaType())).build()
-                                            client.
+                            if (selectedType == "Bank Account") {
+                                val bal = currentBalance.toDoubleOrNull() ?: 0.0
+                                val rate = bankInterestRate.toDoubleOrNull() ?: 0.0
+                                
+                                if (bankName.isBlank() || bankAccountNo.isBlank() || bal <= 0) {
+                                    Toast.makeText(context, "Fill all details correctly", Toast.LENGTH_SHORT).show()
+                                    return@Button
+                                }
+                                if (!dynamicBankList.contains(bankName)) {
+                                    Toast.makeText(context, "Select a valid bank from dropdown!", Toast.LENGTH_SHORT).show()
+                                    return@Button
+                                }
+                                
+                                isSubmitting = true
+                                val formattedAcc = "XXXXX$bankAccountNo"
+                                
+                                coroutineScope.launch(Dispatchers.IO) {
+                                    try {
+                                        val client = OkHttpClient()
+                                        
+                                        val jsonBody = JSONObject()
+                                        jsonBody.put("action", "add_bank")
+                                        jsonBody.put("username", username)
+                                        jsonBody.put("bank_name", bankName) 
+                                        jsonBody.put("account_no", formattedAcc)
+                                        jsonBody.put("current_bal", bal)
+                                        jsonBody.put("interest_rate", rate)
+                                        
+                                        val mediaType = "application/json".toMediaType()
+                                        val requestBody = jsonBody.toString().toRequestBody(mediaType)
+                                        val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(requestBody).build()
+          
