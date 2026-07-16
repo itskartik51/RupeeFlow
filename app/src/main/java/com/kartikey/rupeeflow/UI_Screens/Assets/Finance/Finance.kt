@@ -23,8 +23,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kartikey.rupeeflow.UI_Screens.Assets.BankAccountItem
-import java.text.NumberFormat
-import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -63,7 +61,7 @@ fun FinanceScreen(
     } else if (currentFinanceView == "BankAccounts") {
         BankAccountsScreen(
             onBackClick = { currentFinanceView = "Main" },
-            username = username, // Bypass username parameter
+            username = username, 
             bankList = bankList,
             isLoading = isLoading,
             onRefreshClick = onRefreshClick,
@@ -94,10 +92,4 @@ fun BigFinanceCard(title: String, amount: String, icon: ImageVector, iconColor: 
             }
         }
     }
-}
-
-fun formatRupeeAmount(amount: Double): String {
-    val format = NumberFormat.getCurrencyInstance(Locale("en", "IN"))
-    format.maximumFractionDigits = 2
-    return format.format(amount).replace("-₹", "-₹ ")
 }
