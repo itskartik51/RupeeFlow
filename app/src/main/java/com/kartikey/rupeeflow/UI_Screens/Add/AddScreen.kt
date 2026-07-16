@@ -104,7 +104,7 @@ fun AddScreen(
         }
     }
 
-    // 2. THE HIGHLIGHTED FLOATING BUTTON (Over the dim layer)
+    // 2. THE HIGHLIGHTED FLOATING BUTTON (Always remains bright and on top)
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.BottomCenter
@@ -130,7 +130,6 @@ fun AddScreen(
 
     // 3. MODAL BOTTOM SHEETS FOR FORMS
     if (activeAddForm != null) {
-        // FIX: skipPartiallyExpanded = true karte hi popup aadhi nahi, poori khulegi
         val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true) 
         ModalBottomSheet(
             onDismissRequest = { activeAddForm = null },
@@ -142,7 +141,7 @@ fun AddScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp)
-                    .imePadding() // MASTER FIX: Keyboard khulte hi ye poori form ko upar slide karega
+                    .imePadding() 
                     .navigationBarsPadding() 
             ) {
                 Text(
