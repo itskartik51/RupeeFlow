@@ -26,8 +26,6 @@ import coil.compose.SubcomposeAsyncImage
 import coil.request.CachePolicy
 import coil.request.ImageRequest
 import com.kartikey.rupeeflow.Cloud_Database.Constants
-import java.text.NumberFormat
-import java.util.Locale
 
 data class FDItem(
     val bankName: String,
@@ -189,10 +187,4 @@ fun MetricCol(label: String, value: String, color: Color, align: Alignment.Horiz
         Text(text = label, color = Color.Gray, fontSize = 11.sp)
         Text(text = value, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = color)
     }
-}
-
-private fun formatRupeeAmount(amount: Double): String {
-    val format = NumberFormat.getCurrencyInstance(Locale("en", "IN"))
-    format.maximumFractionDigits = 2
-    return format.format(amount).replace("-₹", "-₹ ")
 }
