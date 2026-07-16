@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -42,12 +43,14 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
+import java.text.NumberFormat
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BankAccountsScreen(
     onBackClick: () -> Unit,
-    username: String, // Username passed down for API
+    username: String, 
     bankList: List<BankAccountItem>,
     isLoading: Boolean,
     onRefreshClick: () -> Unit,
@@ -77,7 +80,7 @@ fun BankAccountsScreen(
             }
         } else {
             LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(paddingValues).imePadding(), // Safety check
+                modifier = Modifier.fillMaxSize().padding(paddingValues),
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 120.dp), 
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
@@ -100,8 +103,8 @@ fun BankDetailCard(bank: BankAccountItem, username: String, onEditClick: (BankAc
         bank.bankName.trim().contains(it.key, ignoreCase = true)
     }?.value
 
-    // FIX: Switched to Clearbit HD Logos for crisp quality
-    val logoUrl = if (domain != null) "https://logo.clearbit.com/$domain" else null
+    // FIX: Switched to icon.horse for high quality crisp logos without limits
+    val logoUrl = if (domain != null) "https://icon.horse/icon/$domain" else null
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -155,14 +158,13 @@ fun BankDetailCard(bank: BankAccountItem, username: String, onEditClick: (BankAc
             Spacer(modifier = Modifier.height(16.dp))
             
             Text(text = "Available Balance", color = Color.Gray, fontSize = 12.sp)
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(text = formatRupeeAmount(bank.currentBalance), fontWeight = FontWeight.ExtraBold, fontSize = 28.sp, color = Color.Black)
-                Spacer(modifier = Modifier.width(8.dp))
                 
-                // QUICK ACTION PLUS BUTTON
+                // QUICK ACTION PLUS BUTTON (Right aligned & Circular)
                 IconButton(
                     onClick = { showQuickUpdate = true },
-                    modifier = Modifier.size(28.dp).background(Color(0xFFE8F5E9), RoundedCornerShape(8.dp))
+                    modifier = Modifier.size(32.dp).background(Color(0xFFE8F5E9), CircleShape)
                 ) {
                     Icon(Icons.Default.Add, contentDescription = "Update Balance", tint = Color(0xFF2E7D32), modifier = Modifier.size(18.dp))
                 }
@@ -188,7 +190,6 @@ fun BankDetailCard(bank: BankAccountItem, username: String, onEditClick: (BankAc
         }
     }
     
-    // THE SMART MATH POPUP ENGINE
     if (showQuickUpdate) {
         QuickUpdateDialog(
             bank = bank,
@@ -214,16 +215,15 @@ fun QuickUpdateDialog(bank: BankAccountItem, username: String, onDismiss: () -> 
         onDismissRequest = { if (!isUpdating) onDismiss() },
         properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = false, usePlatformDefaultWidth = false)
     ) {
-        // imePadding ensures the dialog floats above the keyboard
         Card(
-            modifier = Modifier.fillMaxWidth(0.9f).imePadding(),
+            modifier = Modifier.fillMaxWidth(0.9f).imePadding(), // Safety check for keyboard
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(containerColor = Color.White),
             elevation = CardDefaults.cardElevation(8.dp)
         ) {
             Column(modifier = Modifier.padding(24.dp)) {
-                Text("Quick Update Balance", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = Color.Black)
-                Text("Add or deduct amount for ${bank.bankName}", color = Color.Gray, fontSize = 13.sp)
+                Text("Update Balance", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = Color.Black)
+                Text("Add or deduct amount from ${bank.bankName}", color = Color.Gray, fontSize = 13.sp)
                 
                 Spacer(modifier = Modifier.height(20.dp))
                 
@@ -231,7 +231,7 @@ fun QuickUpdateDialog(bank: BankAccountItem, username: String, onDismiss: () -> 
                     value = updateAmount,
                     onValueChange = { updateAmount = it },
                     label = { Text("Amount (+ or -)") },
-                    prefix = { Text("₹ ", fontWeight = FontWeight.Bold, color = Color.Black) },
+                    prefix = { Text("₹ ", fontWeight = FontWeight.Bold, color = Color.Black) }, // ₹ Icon added
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
@@ -256,7 +256,8 @@ fun QuickUpdateDialog(bank: BankAccountItem, username: String, onDismiss: () -> 
                             val amountEntered = updateAmount.toDoubleOrNull()
                             if (amountEntered != null && amountEntered != 0.0) {
                                 isUpdating = true
-                                val newCalculatedBalance = bank.currentBalance + amountEntered
+                                // Backend logic handling addition and deduction automatically
+                                val newCalculatedBalance = bank.currentBalance + amountEntered 
                                 
                                 coroutineScope.launch(Dispatchers.IO) {
                                     try {
@@ -302,7 +303,7 @@ fun QuickUpdateDialog(bank: BankAccountItem, username: String, onDismiss: () -> 
                         enabled = !isUpdating
                     ) {
                         if (isUpdating) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp), strokeWidth = 3.dp)
-                        else Text("Add Amount", fontWeight = FontWeight.Bold, color = Color.White)
+                        else Text("Update", fontWeight = FontWeight.Bold, color = Color.White)
                     }
                 }
             }
@@ -316,4 +317,10 @@ fun MetricItem(label: String, value: String, valueColor: Color, alignment: Align
         Text(text = label, color = Color.Gray, fontSize = 11.sp)
         Text(text = value, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = valueColor)
     }
+}
+
+fun formatRupeeAmount(amount: Double): String {
+    val format = NumberFormat.getCurrencyInstance(Locale("en", "IN"))
+    format.maximumFractionDigits = 2
+    return format.format(amount).replace("-₹", "-₹ ")
 }
