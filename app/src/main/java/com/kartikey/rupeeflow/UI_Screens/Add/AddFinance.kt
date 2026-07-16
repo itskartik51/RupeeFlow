@@ -36,7 +36,6 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 
-// Date Formatter (Crash-Free Version)
 class DateMaskTransformation : VisualTransformation {
     override fun filter(text: AnnotatedString): TransformedText {
         val trimmed = if (text.text.length >= 8) text.text.substring(0..7) else text.text
@@ -73,7 +72,6 @@ class DateMaskTransformation : VisualTransformation {
 fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -> Unit) { 
     val financeTypes = listOf("Cash", "Bank Account", "FD : Fixed Deposit", "Credit Card")
     
-    // Default state empty
     var selectedType by remember { mutableStateOf("") }
     var expandedType by remember { mutableStateOf(false) }
 
@@ -81,7 +79,6 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
         (Constants.IndianBanksList + "Utkarsh Small Finance Bank").distinct().sorted() 
     }
 
-    // Input States
     var bankName by remember { mutableStateOf("") }
     var expandedBank by remember { mutableStateOf(false) }
     var bankAccountNo by remember { mutableStateOf("") }
@@ -106,10 +103,6 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
 
     var isPressed by remember { mutableStateOf(false) }
     val buttonScale by animateFloatAsState(targetValue = if (isPressed) 0.95f else 1f, label = "ButtonScale")
-
-    // ==========================================
-    // MODULAR LOGIC BLOCKS (To prevent Compiler Crash)
-    // ==========================================
 
     val submitBankAccount = {
         val bal = currentBalance.toDoubleOrNull() ?: 0.0
@@ -168,8 +161,9 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
             Toast.makeText(context, "Select a valid institution from dropdown!", Toast.LENGTH_SHORT).show()
         } else {
             isSubmitting = true
-            val fCreate = "${createDate.substring(0,2)}/${createDate.substring(2,4)}/${createDate.substring(4,8)}"
-            val fMat = "${maturityDate.substring(0,2)}/${maturityDate.substring(2,4)}/${maturityDate.substring(4,8)}"
+            // FIX: Google Sheets par ab hamesha YYYY-MM-DD format me jayega (08-06-2026 vs 06-08-2026 confusion khatam)
+            val fCreate = "${createDate.substring(4,8)}-${createDate.substring(2,4)}-${createDate.substring(0,2)}"
+            val fMat = "${maturityDate.substring(4,8)}-${maturityDate.substring(2,4)}-${maturityDate.substring(0,2)}"
             
             coroutineScope.launch(Dispatchers.IO) {
                 try {
@@ -220,7 +214,6 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                     val client = OkHttpClient()
                     val mediaType = "application/json".toMediaType()
                     
-                    // Fetch existing cash
                     val fetchJson = JSONObject()
                     fetchJson.put("action", "get_all_data")
                     fetchJson.put("username", username)
@@ -244,7 +237,6 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                         existingCash = 0.0
                     }
                     
-                    // Add new amount and update
                     val finalAmount = existingCash + cAmt
                     
                     val updateJson = JSONObject()
@@ -274,10 +266,6 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
             }
         }
     }
-
-    // ==========================================
-    // UI RENDERING BLOCK
-    // ==========================================
 
     Card(
         modifier = Modifier.fillMaxWidth(), 
@@ -316,7 +304,6 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                 HorizontalDivider(color = Color(0xFFEEEEEE))
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // --- BANK ACCOUNT UI ---
                 if (selectedType == "Bank Account") {
                     ExposedDropdownMenuBox(expanded = expandedBank && filteredBanks.isNotEmpty(), onExpandedChange = { expandedBank = it }) {
                         OutlinedTextField(
@@ -375,7 +362,6 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                     }
                 }
 
-                // --- FIXED DEPOSIT UI ---
                 if (selectedType == "FD : Fixed Deposit") {
                     ExposedDropdownMenuBox(expanded = expandedBank && filteredBanks.isNotEmpty(), onExpandedChange = { expandedBank = it }) {
                         OutlinedTextField(
@@ -459,7 +445,6 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                     }
                 }
 
-                // --- CASH UI ---
                 if (selectedType == "Cash") {
                     OutlinedTextField(
                         value = cashAmount,
@@ -476,7 +461,6 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                     Text("This amount will be added to your current cash balance automatically.", color = Color.Gray, fontSize = 11.sp, modifier = Modifier.padding(horizontal = 4.dp))
                 }
 
-                // --- CREDIT CARD UI ---
                 if (selectedType == "Credit Card") {
                     Box(modifier = Modifier.fillMaxWidth().height(100.dp).background(Color(0xFFF8F9FA), RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
                         Text("Credit Card Integration\nComing Soon...", color = Color.Gray, fontWeight = FontWeight.Bold, fontSize = 14.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
@@ -485,7 +469,6 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // ================== SMART SUBMIT BUTTON ==================
                 AnimatedVisibility(visible = selectedType != "Credit Card") {
                     Button(
                         onClick = {
