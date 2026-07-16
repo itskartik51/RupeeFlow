@@ -398,4 +398,128 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                     Spacer(modifier = Modifier.height(16.dp))
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         OutlinedTextField(
-                            value = fdAccoun
+                            value = fdAccountNo,
+                            onValueChange = { fdAccountNo = it },
+                            label = { Text("FD Account No.") },
+                            modifier = Modifier.weight(0.6f),
+                            singleLine = true,
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF2E7D32), focusedLabelColor = Color(0xFF2E7D32))
+                        )
+                        OutlinedTextField(
+                            value = fdInterestRate, 
+                            onValueChange = { fdInterestRate = it },
+                            label = { Text("Interest") },
+                            suffix = { Text("%", fontWeight = FontWeight.Bold, color = Color.Black) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.weight(0.4f),
+                            singleLine = true,
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF2E7D32), focusedLabelColor = Color(0xFF2E7D32))
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
+                    OutlinedTextField(
+                        value = fdAmount,
+                        onValueChange = { fdAmount = it },
+                        label = { Text("Invested Amount") },
+                        prefix = { Text("₹ ", fontWeight = FontWeight.Bold, color = Color.Black) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF2E7D32), focusedLabelColor = Color(0xFF2E7D32))
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        OutlinedTextField(
+                            value = createDate, 
+                            onValueChange = { if (it.length <= 8) createDate = it.filter { char -> char.isDigit() } },
+                            label = { Text("Start Date") },
+                            placeholder = { Text("DD/MM/YYYY", color = Color.LightGray) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            visualTransformation = DateMaskTransformation(),
+                            modifier = Modifier.weight(1f),
+                            singleLine = true,
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF2E7D32), focusedLabelColor = Color(0xFF2E7D32))
+                        )
+                        OutlinedTextField(
+                            value = maturityDate, 
+                            onValueChange = { if (it.length <= 8) maturityDate = it.filter { char -> char.isDigit() } },
+                            label = { Text("End Date") },
+                            placeholder = { Text("DD/MM/YYYY", color = Color.LightGray) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            visualTransformation = DateMaskTransformation(),
+                            modifier = Modifier.weight(1f),
+                            singleLine = true,
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF2E7D32), focusedLabelColor = Color(0xFF2E7D32))
+                        )
+                    }
+                }
+
+                // --- CASH UI ---
+                if (selectedType == "Cash") {
+                    OutlinedTextField(
+                        value = cashAmount,
+                        onValueChange = { cashAmount = it },
+                        label = { Text("Amount to Add") },
+                        prefix = { Text("₹ ", fontWeight = FontWeight.Bold, color = Color.Black) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF2E7D32), focusedLabelColor = Color(0xFF2E7D32))
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("This amount will be added to your current cash balance automatically.", color = Color.Gray, fontSize = 11.sp, modifier = Modifier.padding(horizontal = 4.dp))
+                }
+
+                // --- CREDIT CARD UI ---
+                if (selectedType == "Credit Card") {
+                    Box(modifier = Modifier.fillMaxWidth().height(100.dp).background(Color(0xFFF8F9FA), RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
+                        Text("Credit Card Integration\nComing Soon...", color = Color.Gray, fontWeight = FontWeight.Bold, fontSize = 14.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // ================== SMART SUBMIT BUTTON ==================
+                AnimatedVisibility(visible = selectedType != "Credit Card") {
+                    Button(
+                        onClick = {
+                            if (selectedType == "Bank Account") {
+                                submitBankAccount()
+                            } else if (selectedType == "FD : Fixed Deposit") {
+                                submitFixedDeposit()
+                            } else if (selectedType == "Cash") {
+                                submitCashData()
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth().height(56.dp).scale(buttonScale).pointerInput(Unit) {
+                            detectTapGestures(
+                                onPress = {
+                                    isPressed = true
+                                    tryAwaitRelease()
+                                    isPressed = false
+                                }
+                            )
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF388E3C)),
+                        shape = RoundedCornerShape(12.dp),
+                        enabled = !isSubmitting
+                    ) {
+                        if (isSubmitting) {
+                            CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                        } else {
+                            val btnText = when (selectedType) { "Bank Account" -> "Add to Vault"; "Cash" -> "Add Cash"; else -> "Create FD" }
+                            Text(btnText, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White)
+                        }
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(24.dp))
+        }
+    }
+}
