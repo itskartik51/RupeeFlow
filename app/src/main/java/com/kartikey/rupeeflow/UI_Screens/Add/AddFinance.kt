@@ -310,11 +310,17 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                 AnimatedVisibility(visible = selectedType != "Credit Card") {
                     Button(
                         onClick = {
-                            if (selectedType == "Bank Account") {
-                                val bal = currentBalance.toDoubleOrNull() ?: 0.0
-                                val rate = bankInterestRate.toDoubleOrNull() ?: 0.0
-                                
-                                if (bankName.isNotBlank() && bankAccountNo.isNotBlank() && bal > 0) {
+                            val client = OkHttpClient()
+                            
+                            when (selectedType) {
+                                "Bank Account" -> {
+                                    val bal = currentBalance.toDoubleOrNull() ?: 0.0
+                                    val rate = bankInterestRate.toDoubleOrNull() ?: 0.0
+                                    
+                                    if (bankName.isBlank() || bankAccountNo.isBlank() || bal <= 0) {
+                                        Toast.makeText(context, "Fill all details correctly", Toast.LENGTH_SHORT).show()
+                                        return@Button
+                                    }
                                     if (!dynamicBankList.contains(bankName)) {
                                         Toast.makeText(context, "Select a valid bank from dropdown!", Toast.LENGTH_SHORT).show()
                                         return@Button
@@ -325,7 +331,6 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                                     
                                     coroutineScope.launch(Dispatchers.IO) {
                                         try {
-                                            val client = OkHttpClient()
                                             val jsonBody = JSONObject().apply {
                                                 put("action", "add_bank")
                                                 put("username", username)
@@ -335,8 +340,4 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                                                 put("interest_rate", rate)
                                             }
                                             val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(jsonBody.toString().toRequestBody("application/json".toMediaType())).build()
-                                            client.newCall(request).execute()
-                                            
-                                            withContext(Dispatchers.Main) {
-                                                isSubmitting = false
-                                                Toast.ma
+                                            client.
