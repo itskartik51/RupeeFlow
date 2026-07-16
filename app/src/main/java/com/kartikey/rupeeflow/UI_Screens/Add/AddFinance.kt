@@ -36,13 +36,13 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 
-// FIX: Crash-Free Date Formatter
+// FIX: Bullet-proof Date Formatter (No more crashes!)
 class DateMaskTransformation : VisualTransformation {
     override fun filter(text: AnnotatedString): TransformedText {
         val trimmed = if (text.text.length >= 8) text.text.substring(0..7) else text.text
         var out = ""
-        for (i in trimmed.indices) {
-            out += trimmed[i]
+        for (i in 0 until 8) {
+            out += if (i < trimmed.length) trimmed[i] else "_"
             if (i == 1 || i == 3) out += "/"
         }
 
@@ -51,14 +51,18 @@ class DateMaskTransformation : VisualTransformation {
                 if (offset <= 1) return offset
                 if (offset <= 3) return offset + 1
                 if (offset <= 8) return offset + 2
-                return out.length
+                return 10
             }
 
             override fun transformedToOriginal(offset: Int): Int {
-                if (offset <= 2) return offset
-                if (offset <= 5) return offset - 1
-                if (offset <= 10) return offset - 2
-                return trimmed.length
+                val originalOffset = when {
+                    offset <= 2 -> offset
+                    offset <= 5 -> offset - 1
+                    offset <= 10 -> offset - 2
+                    else -> 8
+                }
+                // Prevents IndexOutOfBoundsException crash when tapping empty placeholders
+                return if (originalOffset > text.text.length) text.text.length else originalOffset
             }
         }
         return TransformedText(AnnotatedString(out), offsetMapping)
@@ -70,11 +74,11 @@ class DateMaskTransformation : VisualTransformation {
 fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -> Unit) { 
     val financeTypes = listOf("Cash", "Bank Account", "FD : Fixed Deposit", "Credit Card")
     
-    // FIX: Default state is now empty, forcing the user to select
+    // Default state empty
     var selectedType by remember { mutableStateOf("") }
     var expandedType by remember { mutableStateOf(false) }
 
-    // DYNAMIC BANK LIST (Utkarsh Small Finance Bank Added here directly)
+    // Dynamic Bank List
     val dynamicBankList = remember { 
         (Constants.IndianBanksList + "Utkarsh Small Finance Bank").distinct().sorted() 
     }
@@ -142,7 +146,6 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                 }
             }
 
-            // ONLY LOAD FORM IF A TYPE IS SELECTED
             if (selectedType.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(24.dp))
                 HorizontalDivider(color = Color(0xFFEEEEEE))
@@ -268,7 +271,7 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                             value = createDate, 
                             onValueChange = { if (it.length <= 8) createDate = it.filter { char -> char.isDigit() } },
                             label = { Text("Start Date") },
-                            placeholder = { Text("DD/MM/YYYY", color = Color.LightGray) },
+                            placeholder = { Text("__/__/____", color = Color.LightGray) },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             visualTransformation = DateMaskTransformation(),
                             modifier = Modifier.weight(1f),
@@ -280,7 +283,7 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                             value = maturityDate, 
                             onValueChange = { if (it.length <= 8) maturityDate = it.filter { char -> char.isDigit() } },
                             label = { Text("End Date") },
-                            placeholder = { Text("DD/MM/YYYY", color = Color.LightGray) },
+                            placeholder = { Text("__/__/____", color = Color.LightGray) },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             visualTransformation = DateMaskTransformation(),
                             modifier = Modifier.weight(1f),
@@ -341,6 +344,4 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                                                 put("username", username)
                                                 put("bank_name", bankName) 
                                                 put("account_no", formattedAcc)
-                                                put("current_bal", bal)
-                                                put("interest_rate", rate)
-                    
+                                      
