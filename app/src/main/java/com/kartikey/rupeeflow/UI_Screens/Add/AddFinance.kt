@@ -36,13 +36,12 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 
-// FIX: Bullet-proof Date Formatter (No more crashes!)
 class DateMaskTransformation : VisualTransformation {
     override fun filter(text: AnnotatedString): TransformedText {
         val trimmed = if (text.text.length >= 8) text.text.substring(0..7) else text.text
         var out = ""
-        for (i in 0 until 8) {
-            out += if (i < trimmed.length) trimmed[i] else "_"
+        for (i in trimmed.indices) {
+            out += trimmed[i]
             if (i == 1 || i == 3) out += "/"
         }
 
@@ -51,7 +50,7 @@ class DateMaskTransformation : VisualTransformation {
                 if (offset <= 1) return offset
                 if (offset <= 3) return offset + 1
                 if (offset <= 8) return offset + 2
-                return 10
+                return out.length
             }
 
             override fun transformedToOriginal(offset: Int): Int {
@@ -61,7 +60,6 @@ class DateMaskTransformation : VisualTransformation {
                     offset <= 10 -> offset - 2
                     else -> 8
                 }
-                // Prevents IndexOutOfBoundsException crash when tapping empty placeholders
                 return if (originalOffset > text.text.length) text.text.length else originalOffset
             }
         }
@@ -74,32 +72,26 @@ class DateMaskTransformation : VisualTransformation {
 fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -> Unit) { 
     val financeTypes = listOf("Cash", "Bank Account", "FD : Fixed Deposit", "Credit Card")
     
-    // Default state empty
     var selectedType by remember { mutableStateOf("") }
     var expandedType by remember { mutableStateOf(false) }
 
-    // Dynamic Bank List
     val dynamicBankList = remember { 
         (Constants.IndianBanksList + "Utkarsh Small Finance Bank").distinct().sorted() 
     }
 
-    // Shared Fields
     var bankName by remember { mutableStateOf("") }
     var expandedBank by remember { mutableStateOf(false) }
     
-    // Bank Specific
     var bankAccountNo by remember { mutableStateOf("") }
     var currentBalance by remember { mutableStateOf("") }
     var bankInterestRate by remember { mutableStateOf("") }
     
-    // FD Specific
     var fdAccountNo by remember { mutableStateOf("") }
     var fdAmount by remember { mutableStateOf("") }
     var fdInterestRate by remember { mutableStateOf("") }
     var createDate by remember { mutableStateOf("") }
     var maturityDate by remember { mutableStateOf("") }
     
-    // Cash Specific
     var cashAmount by remember { mutableStateOf("") }
 
     val filteredBanks = if (bankName.isNotBlank()) {
@@ -121,7 +113,6 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
     ) {
         Column(modifier = Modifier.padding(20.dp).verticalScroll(rememberScrollState())) {
             
-            // 1. MASTER DROPDOWN
             Text(text = "Choose Finance Type", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(4.dp))
             ExposedDropdownMenuBox(expanded = expandedType, onExpandedChange = { expandedType = it }) {
@@ -151,7 +142,6 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                 HorizontalDivider(color = Color(0xFFEEEEEE))
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // ================== BANK ACCOUNT UI ==================
                 if (selectedType == "Bank Account") {
                     ExposedDropdownMenuBox(expanded = expandedBank && filteredBanks.isNotEmpty(), onExpandedChange = { expandedBank = it }) {
                         OutlinedTextField(
@@ -210,7 +200,6 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                     }
                 }
 
-                // ================== FIXED DEPOSIT UI ==================
                 if (selectedType == "FD : Fixed Deposit") {
                     ExposedDropdownMenuBox(expanded = expandedBank && filteredBanks.isNotEmpty(), onExpandedChange = { expandedBank = it }) {
                         OutlinedTextField(
@@ -271,7 +260,7 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                             value = createDate, 
                             onValueChange = { if (it.length <= 8) createDate = it.filter { char -> char.isDigit() } },
                             label = { Text("Start Date") },
-                            placeholder = { Text("__/__/____", color = Color.LightGray) },
+                            placeholder = { Text("DD/MM/YYYY", color = Color.LightGray) },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             visualTransformation = DateMaskTransformation(),
                             modifier = Modifier.weight(1f),
@@ -283,7 +272,7 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                             value = maturityDate, 
                             onValueChange = { if (it.length <= 8) maturityDate = it.filter { char -> char.isDigit() } },
                             label = { Text("End Date") },
-                            placeholder = { Text("__/__/____", color = Color.LightGray) },
+                            placeholder = { Text("DD/MM/YYYY", color = Color.LightGray) },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             visualTransformation = DateMaskTransformation(),
                             modifier = Modifier.weight(1f),
@@ -294,7 +283,6 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                     }
                 }
 
-                // ================== CASH UI ==================
                 if (selectedType == "Cash") {
                     OutlinedTextField(
                         value = cashAmount,
@@ -311,7 +299,6 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                     Text("This amount will be added to your current cash balance automatically.", color = Color.Gray, fontSize = 11.sp, modifier = Modifier.padding(horizontal = 4.dp))
                 }
 
-                // ================== CREDIT CARD UI (Placeholder) ==================
                 if (selectedType == "Credit Card") {
                     Box(modifier = Modifier.fillMaxWidth().height(100.dp).background(Color(0xFFF8F9FA), RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
                         Text("Credit Card Integration\nComing Soon...", color = Color.Gray, fontWeight = FontWeight.Bold, fontSize = 14.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
@@ -320,28 +307,36 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // ================== SMART SUBMIT BUTTON ==================
                 AnimatedVisibility(visible = selectedType != "Credit Card") {
                     Button(
                         onClick = {
-                            val client = OkHttpClient()
-                            
-                            // 1. BANK ACCOUNT SUBMISSION
                             if (selectedType == "Bank Account") {
                                 val bal = currentBalance.toDoubleOrNull() ?: 0.0
                                 val rate = bankInterestRate.toDoubleOrNull() ?: 0.0
+                                
                                 if (bankName.isNotBlank() && bankAccountNo.isNotBlank() && bal > 0) {
                                     if (!dynamicBankList.contains(bankName)) {
                                         Toast.makeText(context, "Select a valid bank from dropdown!", Toast.LENGTH_SHORT).show()
                                         return@Button
                                     }
+                                    
                                     isSubmitting = true
                                     val formattedAcc = "XXXXX$bankAccountNo"
+                                    
                                     coroutineScope.launch(Dispatchers.IO) {
                                         try {
+                                            val client = OkHttpClient()
                                             val jsonBody = JSONObject().apply {
                                                 put("action", "add_bank")
                                                 put("username", username)
                                                 put("bank_name", bankName) 
                                                 put("account_no", formattedAcc)
-                                      
+                                                put("current_bal", bal)
+                                                put("interest_rate", rate)
+                                            }
+                                            val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(jsonBody.toString().toRequestBody("application/json".toMediaType())).build()
+                                            client.newCall(request).execute()
+                                            
+                                            withContext(Dispatchers.Main) {
+                                                isSubmitting = false
+                                                Toast.ma
