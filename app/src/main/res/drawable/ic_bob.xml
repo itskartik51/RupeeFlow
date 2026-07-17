@@ -1,0 +1,10 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="100dp" android:height="100dp"
+    android:viewportWidth="200" android:viewportHeight="200">
+    <!-- BOB Vermillion Orange Background -->
+    <path android:fillColor="#F05A28" 
+          android:pathData="M20,20 H180 C191.05,20 200,28.95 200,40 V160 C200,171.05 191.05,180 180,180 H20 C8.95,180 0,171.05 0,160 V40 C0,28.95 8.95,20 20,20 Z"/>
+    <!-- The Baroda Sun (Symmetrical Dual B Layout) -->
+    <path android:fillColor="#FFFFFF" 
+          android:pathData="M50,45 H115 C139.8,45 160,60.2 160,80 C160,93.5 148.5,105 130,110 C152.5,115 165,128.5 165,145 C165,167.5 142.5,185 115,185 H50 V45 Z M80,72.5 V102.5 H115 C128.8,102.5 135,97.5 135,87.5 C135,77.5 128.8,72.5 115,72.5 H80 Z M80,127.5 V157.5 H120 C135,157.5 140,152.5 140,142.5 C140,132.5 135,127.5 120,127.5 H80 Z"/>
+</vector>
