@@ -5,7 +5,6 @@ import com.kartikey.rupeeflow.R
 object Constants {
     const val GOOGLE_SHEET_API_URL = "https://script.google.com/macros/s/AKfycbxq6GiNwSEDI85iWu8Zl1mMokr0TPidrIKyM5eHfnnPumnhq4Z1szCLjg-JcuTK_gr6Aw/exec"
 
-    // Massive list of 56 Indian Banks + Wallets
     val IndianBanksList = listOf(
         "State Bank of India (SBI)", "HDFC Bank", "ICICI Bank", "Axis Bank", "Kotak Mahindra Bank",
         "Punjab National Bank (PNB)", "Bank of Baroda", "Bank of India", "Union Bank of India",
@@ -22,7 +21,7 @@ object Constants {
         "North East Small Finance Bank", "Saraswat Cooperative Bank", "Cosmos Cooperative Bank", "Other Bank"
     )
 
-    // Local HD Drawable Resources Mapping
+    // Local HD Drawable Resources Mapping (Priority 1)
     val BankLogoMap = mapOf(
         "State Bank of India (SBI)" to R.drawable.ic_sbi,
         "HDFC Bank" to R.drawable.ic_hdfc,
@@ -41,5 +40,34 @@ object Constants {
         "UCO Bank" to R.drawable.ic_uco,
         "Bank of Maharashtra" to R.drawable.ic_bom,
         "IDBI Bank" to R.drawable.ic_idbi
+    )
+
+    // Domains for Clearbit API (Priority 2)
+    val BankDomainMap = mapOf(
+        "State Bank of India (SBI)" to "onlinesbi.sbi", "HDFC Bank" to "hdfcbank.com",
+        "ICICI Bank" to "icicibank.com", "Axis Bank" to "axisbank.com", "Kotak Mahindra Bank" to "kotak.com",
+        "Punjab National Bank (PNB)" to "pnbindia.in", "Bank of Baroda" to "bankofbaroda.in",
+        "Bank of India" to "bankofindia.co.in", "Union Bank of India" to "unionbankofindia.co.in",
+        "Canara Bank" to "canarabank.com", "Central Bank of India" to "centralbankofindia.co.in",
+        "Indian Bank" to "indianbank.in", "Indian Overseas Bank" to "iob.in", "UCO Bank" to "ucobank.com",
+        "Bank of Maharashtra" to "bankofmaharashtra.in", "IDBI Bank" to "idbibank.in",
+        "Yes Bank" to "yesbank.in", "IndusInd Bank" to "indusind.com", "Federal Bank" to "federalbank.co.in",
+        "South Indian Bank" to "southindianbank.com", "IDFC First Bank" to "idfcfirstbank.com",
+        "Bandhan Bank" to "bandhanbank.com", "RBL Bank" to "rblbank.com", "AU Small Finance Bank" to "aubank.in",
+        "Equitas Small Finance Bank" to "equitasbank.com", "Ujjivan Small Finance Bank" to "ujjivansfb.in",
+        "Utkarsh Small Finance Bank" to "utkarsh.bank", "Paytm Payments Bank" to "paytmbank.com",
+        "Airtel Payments Bank" to "airtel.in/bank", "India Post Payments Bank" to "ippbonline.com",
+        "Jio Payments Bank" to "jiopaymentsbank.com", "Fino Payments Bank" to "finobank.com",
+        "Standard Chartered Bank" to "sc.com", "Citi Bank" to "citibank.co.in",
+        "HSBC Bank" to "hsbc.co.in", "DBS Bank" to "dbs.com/in", "Barclays Bank" to "barclays.in",
+        "Deutsche Bank" to "db.com/india", "J&K Bank" to "jkbank.com", "Karnataka Bank" to "karnatakabank.com",
+        "Karur Vysya Bank" to "kvb.co.in", "City Union Bank" to "cityunionbank.com",
+        "Dhanlaxmi Bank" to "dhanbank.com", "CSB Bank" to "csb.co.in", "Nainital Bank" to "nainitalbank.co.in",
+        "Tamilnad Mercantile Bank" to "tmb.in", "Suryoday Small Finance Bank" to "suryodaybank.com",
+        "Shivalik Small Finance Bank" to "shivalikbank.com", "Capital Small Finance Bank" to "capitalbank.co.in",
+        "Jana Small Finance Bank" to "janabank.com", "Unity Small Finance Bank" to "theunitybank.com",
+        "ESAF Small Finance Bank" to "esafbank.com", "North East Small Finance Bank" to "nesfb.com",
+        "Saraswat Cooperative Bank" to "saraswatbank.com", "Cosmos Cooperative Bank" to "cosmosbank.com",
+        "Other Bank" to "rbi.org.in"
     )
 }
