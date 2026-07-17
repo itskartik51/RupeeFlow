@@ -1,0 +1,14 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="100dp" android:height="100dp"
+    android:viewportWidth="200" android:viewportHeight="200">
+    <!-- Canara Blue Background -->
+    <path android:fillColor="#0055A5" 
+          android:pathData="M20,20 H180 C191.05,20 200,28.95 200,40 V160 C200,171.05 191.05,180 180,180 H20 C8.95,180 0,171.05 0,160 V40 C0,28.95 8.95,20 20,20 Z"/>
+    <!-- Golden Base Circle -->
+    <path android:fillColor="#F6A01A" 
+          android:pathData="M100,40 C133.1,40 160,66.9 160,100 C160,133.1 133.1,160 100,160 C66.9,160 40,133.1 40,100 C40,66.9 66.9,40 100,40 Z"/>
+    <!-- Blue Upward Triangle -->
+    <path android:fillColor="#0055A5" android:pathData="M100,55 L135,125 H65 Z"/>
+    <!-- Blue Downward Triangle (Creates the star) -->
+    <path android:fillColor="#0055A5" android:pathData="M100,145 L65,75 H135 Z"/>
+</vector>
