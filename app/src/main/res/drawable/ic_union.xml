@@ -1,0 +1,12 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="100dp" android:height="100dp"
+    android:viewportWidth="200" android:viewportHeight="200">
+    <path android:fillColor="#FFFFFF" 
+          android:pathData="M20,20 H180 C191.05,20 200,28.95 200,40 V160 C200,171.05 191.05,180 180,180 H20 C8.95,180 0,171.05 0,160 V40 C0,28.95 8.95,20 20,20 Z"/>
+    <!-- Red Outer U shape -->
+    <path android:fillColor="#E31837" 
+          android:pathData="M45,35 V115 C45,145.3 70.7,170 101,170 C131.3,170 157,145.3 157,115 V35 H127 V115 C127,129.3 115.3,141 101,141 C86.7,141 75,129.3 75,115 V35 H45 Z"/>
+    <!-- Blue Inner Interlocking U -->
+    <path android:fillColor="#003A70" 
+          android:pathData="M70,15 V95 C70,112.1 83.9,126 101,126 C118.1,126 132,112.1 132,95 V15 H112 V95 C112,101.1 107.1,106 101,106 C94.9,106 90,101.1 90,95 V15 H70 Z"/>
+</vector>
