@@ -1,16 +1,16 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="24dp" android:height="24dp"
-    android:viewportWidth="24" android:viewportHeight="24">
-    <!-- Blue Background Border -->
-    <path android:fillColor="#004a8f" android:pathData="M2,2 H22 V22 H2 Z"/>
-    <!-- Inner White Cutout -->
-    <path android:fillColor="#FFFFFF" android:pathData="M6,6 H18 V18 H6 Z"/>
-    <!-- Center Red Square -->
-    <path android:fillColor="#ed232a" android:pathData="M8,8 H16 V16 H8 Z"/>
-    <!-- Blue Inner Block 1 -->
-    <path android:fillColor="#004a8f" android:pathData="M9,9 H11 V15 H9 Z"/>
-    <!-- Blue Inner Block 2 -->
-    <path android:fillColor="#004a8f" android:pathData="M13,9 H15 V15 H13 Z"/>
-    <!-- Blue Crossbar -->
-    <path android:fillColor="#004a8f" android:pathData="M11,11 H13 V13 H11 Z"/>
+    android:width="100dp" android:height="100dp"
+    android:viewportWidth="200" android:viewportHeight="200">
+    <!-- HDFC White Background Base -->
+    <path android:fillColor="#FFFFFF" android:pathData="M0,0 H200 V200 H0 Z"/>
+    <!-- Left Blue Bar -->
+    <path android:fillColor="#004C8F" android:pathData="M0,0 H55 V200 H0 Z"/>
+    <!-- Right Blue Bar -->
+    <path android:fillColor="#004C8F" android:pathData="M145,0 H200 V200 H145 Z"/>
+    <!-- Top Blue Bar -->
+    <path android:fillColor="#004C8F" android:pathData="M75,0 H125 V55 H75 Z"/>
+    <!-- Bottom Blue Bar -->
+    <path android:fillColor="#004C8F" android:pathData="M75,145 H125 V200 H75 Z"/>
+    <!-- Exact Center Red Square -->
+    <path android:fillColor="#ED232A" android:pathData="M75,75 H125 V125 H75 Z"/>
 </vector>
