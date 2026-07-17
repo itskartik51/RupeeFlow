@@ -27,6 +27,13 @@ object Constants {
         "State Bank of India (SBI)" to R.drawable.ic_sbi,
         "HDFC Bank" to R.drawable.ic_hdfc,
         "ICICI Bank" to R.drawable.ic_icici,
-        "Kotak Mahindra Bank" to R.drawable.ic_kotak
+        "Kotak Mahindra Bank" to R.drawable.ic_kotak,
+        "Axis Bank" to R.drawable.ic_axis,
+        "Punjab National Bank (PNB)" to R.drawable.ic_pnb,
+        "Bank of Baroda" to R.drawable.ic_bob,
+        "Bank of India" to R.drawable.ic_boi,
+        "Union Bank of India" to R.drawable.ic_union,
+        "Canara Bank" to R.drawable.ic_canara,
+        "Utkarsh Small Finance Bank" to R.drawable.ic_utkarsh
     )
 }
