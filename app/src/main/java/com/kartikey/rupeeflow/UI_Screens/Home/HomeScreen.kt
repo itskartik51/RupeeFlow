@@ -58,15 +58,14 @@ fun HomeDashboardDesign(
         
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Fully Updated Hybrid Architecture Diagnosis
         SystemDiagnosisCard(
-            testName = "Hybrid Logo Engine",
+            testName = "Hybrid Logo Engine (Google HD API)",
             isExpanded = showDiagnostics,
             onToggle = { showDiagnostics = !showDiagnostics }
         ) {
             Column(modifier = Modifier.padding(top = 12.dp).fillMaxWidth()) {
                 Text(
-                    text = "Engine: Local XML + Clearbit API Active",
+                    text = "Engine: Local XML + Google HD API Active",
                     fontSize = 12.sp,
                     fontWeight = FontWeight.ExtraBold,
                     color = Color.DarkGray
@@ -77,6 +76,7 @@ fun HomeDashboardDesign(
                     val logoRes = Constants.BankLogoMap[bankName]
                     val domain = Constants.BankDomainMap[bankName] ?: "rbi.org.in"
                     val isOfflineMapped = logoRes != null
+                    val googleLogoUrl = "https://www.google.com/s2/favicons?domain=$domain&sz=128"
                     
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -97,7 +97,7 @@ fun HomeDashboardDesign(
                                 )
                             } else {
                                 SubcomposeAsyncImage(
-                                    model = "https://logo.clearbit.com/$domain",
+                                    model = googleLogoUrl,
                                     contentDescription = bankName,
                                     modifier = Modifier.size(18.dp).clip(RoundedCornerShape(4.dp)),
                                     contentScale = ContentScale.Fit,
@@ -126,7 +126,7 @@ fun HomeDashboardDesign(
                                 fontWeight = if (isOfflineMapped) FontWeight.Bold else FontWeight.Medium
                             )
                             Text(
-                                text = if (isOfflineMapped) "Source: Local XML (0ms)" else "Source: Clearbit API ($domain)",
+                                text = if (isOfflineMapped) "Source: Local XML (0ms)" else "Source: Google API ($domain)",
                                 fontSize = 10.sp,
                                 color = if (isOfflineMapped) Color(0xFF388E3C) else Color(0xFFF57C00),
                                 fontWeight = FontWeight.Medium
@@ -171,7 +171,6 @@ fun HomeDashboardDesign(
     }
 }
 
-// Universal Component (Remains unchanged)
 @Composable
 fun SystemDiagnosisCard(
     testName: String,
