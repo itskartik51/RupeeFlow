@@ -1,6 +1,7 @@
 package com.kartikey.rupeeflow.UI_Screens.Assets.Finance
 
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -14,11 +15,16 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.SubcomposeAsyncImage
+import com.kartikey.rupeeflow.Cloud_Database.Constants
 
 data class FDItem(
     val bankName: String,
@@ -81,6 +87,10 @@ fun FixedDepositsScreen(
 
 @Composable
 fun FDetailCard(fd: FDItem) {
+    val logoRes = Constants.BankLogoMap[fd.bankName]
+    val domain = Constants.BankDomainMap[fd.bankName] ?: "rbi.org.in"
+    val clearbitUrl = "https://logo.clearbit.com/$domain"
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -88,20 +98,39 @@ fun FDetailCard(fd: FDItem) {
         shape = RoundedCornerShape(16.dp)
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
-            // Header Row (Logo & Details)
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                 
-                // 100% Offline Premium Bank Icon Placeholder
+                // Hybrid Logo Engine
                 Box(
                     modifier = Modifier.size(44.dp).background(Color(0xFFF57C00).copy(alpha = 0.08f), RoundedCornerShape(10.dp)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = Icons.Outlined.AccountBalance, 
-                        contentDescription = "Bank", 
-                        tint = Color(0xFFF57C00), 
-                        modifier = Modifier.size(24.dp)
-                    )
+                    if (logoRes != null) {
+                        Image(
+                            painter = painterResource(id = logoRes),
+                            contentDescription = fd.bankName,
+                            modifier = Modifier.size(28.dp).clip(RoundedCornerShape(6.dp)),
+                            contentScale = ContentScale.Fit
+                        )
+                    } else {
+                        SubcomposeAsyncImage(
+                            model = clearbitUrl,
+                            contentDescription = fd.bankName,
+                            modifier = Modifier.size(28.dp).clip(RoundedCornerShape(6.dp)),
+                            contentScale = ContentScale.Fit,
+                            loading = {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Color.Gray)
+                            },
+                            error = {
+                                Icon(
+                                    imageVector = Icons.Outlined.AccountBalance, 
+                                    contentDescription = "Bank", 
+                                    tint = Color(0xFFF57C00), 
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        )
+                    }
                 }
                 
                 Spacer(modifier = Modifier.width(12.dp))
@@ -110,7 +139,6 @@ fun FDetailCard(fd: FDItem) {
                     Text(text = "A/C: ${fd.accountNo}", color = Color.Gray, fontSize = 12.sp, letterSpacing = 1.sp)
                 }
                 
-                // Status Pill (Matured or Days Left)
                 val isMatured = fd.daysToMaturity <= 0
                 val pillColor = if (isMatured) Color(0xFF388E3C) else Color(0xFF1976D2)
                 Box(
@@ -127,7 +155,6 @@ fun FDetailCard(fd: FDItem) {
             
             Spacer(modifier = Modifier.height(20.dp))
             
-            // Financial Status Block
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
                 Column {
                     Text(text = "Current Value", color = Color.Gray, fontSize = 12.sp)
@@ -146,7 +173,6 @@ fun FDetailCard(fd: FDItem) {
             HorizontalDivider(color = Color.LightGray.copy(alpha = 0.4f))
             Spacer(modifier = Modifier.height(16.dp))
             
-            // Detailed Metrics Grid
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 MetricCol(label = "Invested", value = formatRupeeAmount(fd.investedAmt), color = Color.DarkGray)
                 MetricCol(label = "Maturity Amt", value = formatRupeeAmount(fd.maturityValue), color = Color(0xFF1976D2), align = Alignment.CenterHorizontally)
