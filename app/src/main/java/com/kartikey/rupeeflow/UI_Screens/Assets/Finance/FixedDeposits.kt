@@ -89,7 +89,7 @@ fun FixedDepositsScreen(
 fun FDetailCard(fd: FDItem) {
     val logoRes = Constants.BankLogoMap[fd.bankName]
     val domain = Constants.BankDomainMap[fd.bankName] ?: "rbi.org.in"
-    val clearbitUrl = "https://logo.clearbit.com/$domain"
+    val googleLogoUrl = "https://www.google.com/s2/favicons?domain=$domain&sz=128"
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -100,7 +100,6 @@ fun FDetailCard(fd: FDItem) {
         Column(modifier = Modifier.padding(20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                 
-                // Hybrid Logo Engine
                 Box(
                     modifier = Modifier.size(44.dp).background(Color(0xFFF57C00).copy(alpha = 0.08f), RoundedCornerShape(10.dp)),
                     contentAlignment = Alignment.Center
@@ -114,7 +113,7 @@ fun FDetailCard(fd: FDItem) {
                         )
                     } else {
                         SubcomposeAsyncImage(
-                            model = clearbitUrl,
+                            model = googleLogoUrl,
                             contentDescription = fd.bankName,
                             modifier = Modifier.size(28.dp).clip(RoundedCornerShape(6.dp)),
                             contentScale = ContentScale.Fit,
