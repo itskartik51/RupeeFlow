@@ -2,6 +2,7 @@ package com.kartikey.rupeeflow.UI_Screens.Assets.Finance
 
 import android.widget.Toast
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -19,9 +20,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -90,6 +94,7 @@ fun BankAccountsScreen(
 @Composable
 fun BankDetailCard(bank: BankAccountItem, username: String, onEditClick: (BankAccountItem) -> Unit, onRefreshRequest: () -> Unit) {
     var showQuickUpdate by remember { mutableStateOf(false) }
+    val logoRes = Constants.BankLogoMap[bank.bankName]
     
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -101,19 +106,29 @@ fun BankDetailCard(bank: BankAccountItem, username: String, onEditClick: (BankAc
             
             Row(verticalAlignment = Alignment.CenterVertically) {
                 
-                // 100% Offline Premium Bank Icon Placeholder
+                // 100% Offline HD Image Loading Logic
                 Box(
                     modifier = Modifier
                         .size(44.dp)
-                        .background(Color(0xFF1976D2).copy(alpha = 0.08f), RoundedCornerShape(10.dp)),
+                        .background(Color(0xFF1976D2).copy(alpha = 0.05f), RoundedCornerShape(10.dp)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = Icons.Outlined.AccountBalance, 
-                        contentDescription = "Bank", 
-                        tint = Color(0xFF1976D2), 
-                        modifier = Modifier.size(24.dp)
-                    )
+                    if (logoRes != null) {
+                        Image(
+                            painter = painterResource(id = logoRes),
+                            contentDescription = bank.bankName,
+                            modifier = Modifier.size(28.dp).clip(RoundedCornerShape(6.dp)),
+                            contentScale = ContentScale.Fit
+                        )
+                    } else {
+                        // Premium Placeholder for banks without HD logos yet
+                        Icon(
+                            imageVector = Icons.Outlined.AccountBalance, 
+                            contentDescription = "Bank", 
+                            tint = Color(0xFF1976D2), 
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
                 }
                 
                 Spacer(modifier = Modifier.width(12.dp))
