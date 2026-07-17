@@ -1,0 +1,13 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="100dp" android:height="100dp"
+    android:viewportWidth="200" android:viewportHeight="200">
+    <!-- CBI Blue Background -->
+    <path android:fillColor="#0073C0" 
+          android:pathData="M20,20 H180 C191.05,20 200,28.95 200,40 V160 C200,171.05 191.05,180 180,180 H20 C8.95,180 0,171.05 0,160 V40 C0,28.95 8.95,20 20,20 Z"/>
+    <!-- Outer Starburst/Flower Geometric Shape -->
+    <path android:fillColor="#FFFFFF" 
+          android:pathData="M100,35 C110,35 115,45 125,48 C135,50 145,45 150,55 C155,65 145,75 148,85 C150,95 165,100 165,100 C165,100 150,105 148,115 C145,125 155,135 150,145 C145,155 135,150 125,152 C115,155 110,165 100,165 C90,165 85,155 75,152 C65,150 55,155 50,145 C45,135 55,125 52,115 C50,105 35,100 35,100 C35,100 50,95 52,85 C55,75 45,65 50,55 C55,45 65,50 75,48 C85,45 90,35 100,35 Z"/>
+    <!-- Inner Blue Core -->
+    <path android:fillColor="#0073C0" 
+          android:pathData="M100,60 C122.1,60 140,77.9 140,100 C140,122.1 122.1,140 100,140 C77.9,140 60,122.1 60,100 C60,77.9 77.9,60 100,60 Z"/>
+</vector>
