@@ -1,0 +1,18 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="100dp" android:height="100dp"
+    android:viewportWidth="200" android:viewportHeight="200">
+    <!-- IOB Deep Blue -->
+    <path android:fillColor="#163961" 
+          android:pathData="M20,20 H180 C191.05,20 200,28.95 200,40 V160 C200,171.05 191.05,180 180,180 H20 C8.95,180 0,171.05 0,160 V40 C0,28.95 8.95,20 20,20 Z"/>
+    <!-- IOB Golden Globe Base -->
+    <path android:fillColor="#F9A12B" 
+          android:pathData="M100,45 C130.4,45 155,69.6 155,100 C155,130.4 130.4,155 100,155 C69.6,155 45,130.4 45,100 C45,69.6 69.6,45 100,45 Z"/>
+    <!-- Globe Grid Lines (Horizontal & Vertical cuts) -->
+    <path android:fillColor="#163961" android:pathData="M45,95 H155 V105 H45 Z"/>
+    <path android:fillColor="#163961" android:pathData="M95,45 H105 V155 H95 Z"/>
+    <!-- Curved Longitude Lines -->
+    <path android:fillColor="#00000000" android:strokeColor="#163961" android:strokeWidth="10"
+          android:pathData="M100,45 C125,75 125,125 100,155"/>
+    <path android:fillColor="#00000000" android:strokeColor="#163961" android:strokeWidth="10"
+          android:pathData="M100,45 C75,75 75,125 100,155"/>
+</vector>
