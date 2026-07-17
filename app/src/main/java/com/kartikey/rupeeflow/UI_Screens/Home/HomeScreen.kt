@@ -24,6 +24,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.SubcomposeAsyncImage
 import com.kartikey.rupeeflow.Cloud_Database.Constants
 import com.kartikey.rupeeflow.R
 
@@ -57,15 +58,15 @@ fun HomeDashboardDesign(
         
         Spacer(modifier = Modifier.height(16.dp))
 
-        // UPDATE: Automated Bank Logo System Diagnosis
+        // Fully Updated Hybrid Architecture Diagnosis
         SystemDiagnosisCard(
-            testName = "Bank Logo Engine Status",
+            testName = "Hybrid Logo Engine",
             isExpanded = showDiagnostics,
             onToggle = { showDiagnostics = !showDiagnostics }
         ) {
             Column(modifier = Modifier.padding(top = 12.dp).fillMaxWidth()) {
                 Text(
-                    text = "Total Banks Monitored: ${Constants.IndianBanksList.size}",
+                    text = "Engine: Local XML + Clearbit API Active",
                     fontSize = 12.sp,
                     fontWeight = FontWeight.ExtraBold,
                     color = Color.DarkGray
@@ -74,7 +75,8 @@ fun HomeDashboardDesign(
                 
                 Constants.IndianBanksList.forEach { bankName ->
                     val logoRes = Constants.BankLogoMap[bankName]
-                    val isMapped = logoRes != null
+                    val domain = Constants.BankDomainMap[bankName] ?: "rbi.org.in"
+                    val isOfflineMapped = logoRes != null
                     
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -86,7 +88,7 @@ fun HomeDashboardDesign(
                                 .background(Color(0xFF1976D2).copy(alpha = 0.08f), RoundedCornerShape(6.dp)),
                             contentAlignment = Alignment.Center
                         ) {
-                            if (isMapped) {
+                            if (isOfflineMapped) {
                                 Image(
                                     painter = painterResource(id = logoRes!!),
                                     contentDescription = bankName,
@@ -94,11 +96,22 @@ fun HomeDashboardDesign(
                                     contentScale = ContentScale.Fit
                                 )
                             } else {
-                                Icon(
-                                    imageVector = Icons.Outlined.AccountBalance,
-                                    contentDescription = "Unmapped",
-                                    tint = Color(0xFF1976D2),
-                                    modifier = Modifier.size(16.dp)
+                                SubcomposeAsyncImage(
+                                    model = "https://logo.clearbit.com/$domain",
+                                    contentDescription = bankName,
+                                    modifier = Modifier.size(18.dp).clip(RoundedCornerShape(4.dp)),
+                                    contentScale = ContentScale.Fit,
+                                    loading = {
+                                        CircularProgressIndicator(modifier = Modifier.size(10.dp), strokeWidth = 2.dp, color = Color.Gray)
+                                    },
+                                    error = {
+                                        Icon(
+                                            imageVector = Icons.Outlined.AccountBalance,
+                                            contentDescription = "API Fallback",
+                                            tint = Color(0xFF1976D2),
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
                                 )
                             }
                         }
@@ -109,13 +122,13 @@ fun HomeDashboardDesign(
                             Text(
                                 text = bankName,
                                 fontSize = 13.sp,
-                                color = if (isMapped) Color.Black else Color.Gray,
-                                fontWeight = if (isMapped) FontWeight.Bold else FontWeight.Normal
+                                color = Color.Black,
+                                fontWeight = if (isOfflineMapped) FontWeight.Bold else FontWeight.Medium
                             )
                             Text(
-                                text = if (isMapped) "HD Logo Active ✅" else "Awaiting Mapping ⏳",
+                                text = if (isOfflineMapped) "Source: Local XML (0ms)" else "Source: Clearbit API ($domain)",
                                 fontSize = 10.sp,
-                                color = if (isMapped) Color(0xFF388E3C) else Color(0xFFF57C00),
+                                color = if (isOfflineMapped) Color(0xFF388E3C) else Color(0xFFF57C00),
                                 fontWeight = FontWeight.Medium
                             )
                         }
@@ -158,7 +171,7 @@ fun HomeDashboardDesign(
     }
 }
 
-// Universal Component
+// Universal Component (Remains unchanged)
 @Composable
 fun SystemDiagnosisCard(
     testName: String,
