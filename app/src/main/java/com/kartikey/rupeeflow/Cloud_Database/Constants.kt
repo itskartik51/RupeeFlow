@@ -34,6 +34,12 @@ object Constants {
         "Bank of India" to R.drawable.ic_boi,
         "Union Bank of India" to R.drawable.ic_union,
         "Canara Bank" to R.drawable.ic_canara,
-        "Utkarsh Small Finance Bank" to R.drawable.ic_utkarsh
+        "Utkarsh Small Finance Bank" to R.drawable.ic_utkarsh,
+        "Central Bank of India" to R.drawable.ic_central,
+        "Indian Bank" to R.drawable.ic_indian,
+        "Indian Overseas Bank" to R.drawable.ic_iob,
+        "UCO Bank" to R.drawable.ic_uco,
+        "Bank of Maharashtra" to R.drawable.ic_bom,
+        "IDBI Bank" to R.drawable.ic_idbi
     )
 }
