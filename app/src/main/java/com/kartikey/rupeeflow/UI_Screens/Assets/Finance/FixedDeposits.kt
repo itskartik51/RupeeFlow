@@ -1,7 +1,6 @@
 package com.kartikey.rupeeflow.UI_Screens.Assets.Finance
 
 import androidx.compose.animation.core.*
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -19,7 +18,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -87,7 +85,6 @@ fun FixedDepositsScreen(
 
 @Composable
 fun FDetailCard(fd: FDItem) {
-    val logoRes = Constants.BankLogoMap[fd.bankName]
     val domain = Constants.BankDomainMap[fd.bankName] ?: "rbi.org.in"
     val googleLogoUrl = "https://www.google.com/s2/favicons?domain=$domain&sz=128"
 
@@ -104,32 +101,23 @@ fun FDetailCard(fd: FDItem) {
                     modifier = Modifier.size(44.dp).background(Color(0xFFF57C00).copy(alpha = 0.08f), RoundedCornerShape(10.dp)),
                     contentAlignment = Alignment.Center
                 ) {
-                    if (logoRes != null) {
-                        Image(
-                            painter = painterResource(id = logoRes),
-                            contentDescription = fd.bankName,
-                            modifier = Modifier.size(28.dp).clip(RoundedCornerShape(6.dp)),
-                            contentScale = ContentScale.Fit
-                        )
-                    } else {
-                        SubcomposeAsyncImage(
-                            model = googleLogoUrl,
-                            contentDescription = fd.bankName,
-                            modifier = Modifier.size(28.dp).clip(RoundedCornerShape(6.dp)),
-                            contentScale = ContentScale.Fit,
-                            loading = {
-                                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Color.Gray)
-                            },
-                            error = {
-                                Icon(
-                                    imageVector = Icons.Outlined.AccountBalance, 
-                                    contentDescription = "Bank", 
-                                    tint = Color(0xFFF57C00), 
-                                    modifier = Modifier.size(24.dp)
-                                )
-                            }
-                        )
-                    }
+                    SubcomposeAsyncImage(
+                        model = googleLogoUrl,
+                        contentDescription = fd.bankName,
+                        modifier = Modifier.size(28.dp).clip(RoundedCornerShape(6.dp)),
+                        contentScale = ContentScale.Fit,
+                        loading = {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Color.Gray)
+                        },
+                        error = {
+                            Icon(
+                                imageVector = Icons.Outlined.AccountBalance, 
+                                contentDescription = "Bank", 
+                                tint = Color(0xFFF57C00), 
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    )
                 }
                 
                 Spacer(modifier = Modifier.width(12.dp))
