@@ -18,15 +18,12 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.OffsetMapping
-import androidx.compose.ui.text.input.TransformedText
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kartikey.rupeeflow.Cloud_Database.Constants
+import com.kartikey.rupeeflow.UI_Screens.CustomDatePicker // Linked our new component
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -35,37 +32,9 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
-
-class DateMaskTransformation : VisualTransformation {
-    override fun filter(text: AnnotatedString): TransformedText {
-        val trimmed = if (text.text.length >= 8) text.text.substring(0..7) else text.text
-        var out = ""
-        for (i in trimmed.indices) {
-            out += trimmed[i]
-            if (i == 1 || i == 3) out += "/"
-        }
-
-        val offsetMapping = object : OffsetMapping {
-            override fun originalToTransformed(offset: Int): Int {
-                if (offset <= 1) return offset
-                if (offset <= 3) return offset + 1
-                if (offset <= 8) return offset + 2
-                return out.length
-            }
-
-            override fun transformedToOriginal(offset: Int): Int {
-                val originalOffset = when {
-                    offset <= 2 -> offset
-                    offset <= 5 -> offset - 1
-                    offset <= 10 -> offset - 2
-                    else -> 8
-                }
-                return if (originalOffset > text.text.length) text.text.length else originalOffset
-            }
-        }
-        return TransformedText(AnnotatedString(out), offsetMapping)
-    }
-}
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -88,8 +57,10 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
     var fdAccountNo by remember { mutableStateOf("") }
     var fdAmount by remember { mutableStateOf("") }
     var fdInterestRate by remember { mutableStateOf("") }
-    var createDate by remember { mutableStateOf("") }
-    var maturityDate by remember { mutableStateOf("") }
+    
+    // Modern Date State linked to CustomDatePicker
+    var createDateMillis by remember { mutableStateOf<Long?>(null) }
+    var maturityDateMillis by remember { mutableStateOf<Long?>(null) }
     
     var cashAmount by remember { mutableStateOf("") }
 
@@ -100,9 +71,17 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
     var isSubmitting by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
-
     var isPressed by remember { mutableStateOf(false) }
     val buttonScale by animateFloatAsState(targetValue = if (isPressed) 0.95f else 1f, label = "ButtonScale")
+
+    // Helper to format date for Sheet Backend (YYYY-MM-DD)
+    fun formatForSheet(millis: Long?): String {
+        return if (millis == null) "" else SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date(millis))
+    }
+
+    // ==========================================
+    // MODULAR LOGIC BLOCKS
+    // ==========================================
 
     val submitBankAccount = {
         val bal = currentBalance.toDoubleOrNull() ?: 0.0
@@ -128,11 +107,7 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                     jsonBody.put("interest_rate", rate)
                     
                     val mediaType = "application/json".toMediaType()
-                    val request = Request.Builder()
-                        .url(Constants.GOOGLE_SHEET_API_URL)
-                        .post(jsonBody.toString().toRequestBody(mediaType))
-                        .build()
-                    
+                    val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(jsonBody.toString().toRequestBody(mediaType)).build()
                     client.newCall(request).execute()
                     
                     withContext(Dispatchers.Main) {
@@ -155,15 +130,12 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
         val invAmt = fdAmount.toDoubleOrNull() ?: 0.0
         val rate = fdInterestRate.toDoubleOrNull() ?: 0.0
         
-        if (bankName.isBlank() || fdAccountNo.isBlank() || invAmt <= 0 || createDate.length != 8 || maturityDate.length != 8) {
-            Toast.makeText(context, "Check details. Dates must be DD/MM/YYYY.", Toast.LENGTH_LONG).show()
+        if (bankName.isBlank() || fdAccountNo.isBlank() || invAmt <= 0 || createDateMillis == null || maturityDateMillis == null) {
+            Toast.makeText(context, "Check details and select both dates.", Toast.LENGTH_LONG).show()
         } else if (!dynamicBankList.contains(bankName)) {
             Toast.makeText(context, "Select a valid institution from dropdown!", Toast.LENGTH_SHORT).show()
         } else {
             isSubmitting = true
-            // FIX: Google Sheets par ab hamesha YYYY-MM-DD format me jayega (08-06-2026 vs 06-08-2026 confusion khatam)
-            val fCreate = "${createDate.substring(4,8)}-${createDate.substring(2,4)}-${createDate.substring(0,2)}"
-            val fMat = "${maturityDate.substring(4,8)}-${maturityDate.substring(2,4)}-${maturityDate.substring(0,2)}"
             
             coroutineScope.launch(Dispatchers.IO) {
                 try {
@@ -175,15 +147,11 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                     jsonBody.put("account_no", fdAccountNo)
                     jsonBody.put("invested_amount", invAmt)
                     jsonBody.put("interest_rate", rate)
-                    jsonBody.put("create_date", fCreate)
-                    jsonBody.put("maturity_date", fMat)
+                    jsonBody.put("create_date", formatForSheet(createDateMillis))
+                    jsonBody.put("maturity_date", formatForSheet(maturityDateMillis))
                     
                     val mediaType = "application/json".toMediaType()
-                    val request = Request.Builder()
-                        .url(Constants.GOOGLE_SHEET_API_URL)
-                        .post(jsonBody.toString().toRequestBody(mediaType))
-                        .build()
-                    
+                    val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(jsonBody.toString().toRequestBody(mediaType)).build()
                     client.newCall(request).execute()
                     
                     withContext(Dispatchers.Main) {
@@ -218,21 +186,14 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                     fetchJson.put("action", "get_all_data")
                     fetchJson.put("username", username)
                     
-                    val fetchReq = Request.Builder()
-                        .url(Constants.GOOGLE_SHEET_API_URL)
-                        .post(fetchJson.toString().toRequestBody(mediaType))
-                        .build()
-                    
+                    val fetchReq = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(fetchJson.toString().toRequestBody(mediaType)).build()
                     val res = client.newCall(fetchReq).execute()
                     val resData = res.body?.string() ?: "{}"
                     
                     var existingCash = 0.0
                     try {
                         val parsed = JSONObject(resData)
-                        val cashObj = parsed.optJSONObject("cash")
-                        if (cashObj != null) {
-                            existingCash = cashObj.optDouble("amount", 0.0)
-                        }
+                        existingCash = parsed.optJSONObject("cash")?.optDouble("amount", 0.0) ?: 0.0
                     } catch (e: Exception) { 
                         existingCash = 0.0
                     }
@@ -244,11 +205,7 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                     updateJson.put("username", username)
                     updateJson.put("amount", finalAmount)
                     
-                    val updateReq = Request.Builder()
-                        .url(Constants.GOOGLE_SHEET_API_URL)
-                        .post(updateJson.toString().toRequestBody(mediaType))
-                        .build()
-                    
+                    val updateReq = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(updateJson.toString().toRequestBody(mediaType)).build()
                     client.newCall(updateReq).execute()
                     
                     withContext(Dispatchers.Main) {
@@ -266,6 +223,10 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
             }
         }
     }
+
+    // ==========================================
+    // UI RENDERING BLOCK
+    // ==========================================
 
     Card(
         modifier = Modifier.fillMaxWidth(), 
@@ -304,6 +265,7 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                 HorizontalDivider(color = Color(0xFFEEEEEE))
                 Spacer(modifier = Modifier.height(16.dp))
 
+                // --- BANK ACCOUNT UI ---
                 if (selectedType == "Bank Account") {
                     ExposedDropdownMenuBox(expanded = expandedBank && filteredBanks.isNotEmpty(), onExpandedChange = { expandedBank = it }) {
                         OutlinedTextField(
@@ -362,6 +324,7 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                     }
                 }
 
+                // --- FIXED DEPOSIT UI ---
                 if (selectedType == "FD : Fixed Deposit") {
                     ExposedDropdownMenuBox(expanded = expandedBank && filteredBanks.isNotEmpty(), onExpandedChange = { expandedBank = it }) {
                         OutlinedTextField(
@@ -417,34 +380,25 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                         colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF2E7D32), focusedLabelColor = Color(0xFF2E7D32))
                     )
                     Spacer(modifier = Modifier.height(16.dp))
+                    
+                    // --- MAGIC HAPPENS HERE: Linking the CustomDatePicker ---
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        OutlinedTextField(
-                            value = createDate, 
-                            onValueChange = { if (it.length <= 8) createDate = it.filter { char -> char.isDigit() } },
-                            label = { Text("Start Date") },
-                            placeholder = { Text("DD/MM/YYYY", color = Color.LightGray) },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            visualTransformation = DateMaskTransformation(),
-                            modifier = Modifier.weight(1f),
-                            singleLine = true,
-                            shape = RoundedCornerShape(12.dp),
-                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF2E7D32), focusedLabelColor = Color(0xFF2E7D32))
+                        CustomDatePicker(
+                            label = "Start Date",
+                            selectedDateMillis = createDateMillis,
+                            onDateSelected = { createDateMillis = it },
+                            modifier = Modifier.weight(1f)
                         )
-                        OutlinedTextField(
-                            value = maturityDate, 
-                            onValueChange = { if (it.length <= 8) maturityDate = it.filter { char -> char.isDigit() } },
-                            label = { Text("End Date") },
-                            placeholder = { Text("DD/MM/YYYY", color = Color.LightGray) },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            visualTransformation = DateMaskTransformation(),
-                            modifier = Modifier.weight(1f),
-                            singleLine = true,
-                            shape = RoundedCornerShape(12.dp),
-                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF2E7D32), focusedLabelColor = Color(0xFF2E7D32))
+                        CustomDatePicker(
+                            label = "End Date",
+                            selectedDateMillis = maturityDateMillis,
+                            onDateSelected = { maturityDateMillis = it },
+                            modifier = Modifier.weight(1f)
                         )
                     }
                 }
 
+                // --- CASH UI ---
                 if (selectedType == "Cash") {
                     OutlinedTextField(
                         value = cashAmount,
@@ -461,6 +415,7 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                     Text("This amount will be added to your current cash balance automatically.", color = Color.Gray, fontSize = 11.sp, modifier = Modifier.padding(horizontal = 4.dp))
                 }
 
+                // --- CREDIT CARD UI ---
                 if (selectedType == "Credit Card") {
                     Box(modifier = Modifier.fillMaxWidth().height(100.dp).background(Color(0xFFF8F9FA), RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
                         Text("Credit Card Integration\nComing Soon...", color = Color.Gray, fontWeight = FontWeight.Bold, fontSize = 14.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
@@ -469,6 +424,7 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
 
                 Spacer(modifier = Modifier.height(24.dp))
 
+                // ================== SMART SUBMIT BUTTON ==================
                 AnimatedVisibility(visible = selectedType != "Credit Card") {
                     Button(
                         onClick = {
