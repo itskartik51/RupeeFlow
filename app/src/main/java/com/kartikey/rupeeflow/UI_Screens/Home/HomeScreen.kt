@@ -10,7 +10,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-// Outlined icons ke liye
+import androidx.compose.material.icons.outlined.AccountBalance
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.KeyboardArrowUp
 import androidx.compose.material3.*
@@ -19,10 +19,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.kartikey.rupeeflow.Cloud_Database.Constants
 import com.kartikey.rupeeflow.R
 
 @Composable
@@ -55,16 +57,71 @@ fun HomeDashboardDesign(
         
         Spacer(modifier = Modifier.height(16.dp))
 
-        // UPDATE: Yahan naya Diagnosis check lagaya gaya hai Mode Feature ke liye
+        // UPDATE: Automated Bank Logo System Diagnosis
         SystemDiagnosisCard(
-            testName = "Payment Mode Feature",
+            testName = "Bank Logo Engine Status",
             isExpanded = showDiagnostics,
             onToggle = { showDiagnostics = !showDiagnostics }
         ) {
-            Column(modifier = Modifier.padding(top = 12.dp)) {
-                Text("1. Payment Mode UI: Integrated ✅", fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                Text("2. Cloud Sync (Column F): Active ☁️", fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                Text("3. History Icons Rendering: Stable", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2E7D32))
+            Column(modifier = Modifier.padding(top = 12.dp).fillMaxWidth()) {
+                Text(
+                    text = "Total Banks Monitored: ${Constants.IndianBanksList.size}",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color.DarkGray
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Constants.IndianBanksList.forEach { bankName ->
+                    val logoRes = Constants.BankLogoMap[bankName]
+                    val isMapped = logoRes != null
+                    
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .background(Color(0xFF1976D2).copy(alpha = 0.08f), RoundedCornerShape(6.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (isMapped) {
+                                Image(
+                                    painter = painterResource(id = logoRes!!),
+                                    contentDescription = bankName,
+                                    modifier = Modifier.size(18.dp).clip(RoundedCornerShape(4.dp)),
+                                    contentScale = ContentScale.Fit
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Outlined.AccountBalance,
+                                    contentDescription = "Unmapped",
+                                    tint = Color(0xFF1976D2),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                        
+                        Spacer(modifier = Modifier.width(12.dp))
+                        
+                        Column {
+                            Text(
+                                text = bankName,
+                                fontSize = 13.sp,
+                                color = if (isMapped) Color.Black else Color.Gray,
+                                fontWeight = if (isMapped) FontWeight.Bold else FontWeight.Normal
+                            )
+                            Text(
+                                text = if (isMapped) "HD Logo Active ✅" else "Awaiting Mapping ⏳",
+                                fontSize = 10.sp,
+                                color = if (isMapped) Color(0xFF388E3C) else Color(0xFFF57C00),
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                    HorizontalDivider(color = Color.LightGray.copy(alpha = 0.3f))
+                }
             }
         }
 
