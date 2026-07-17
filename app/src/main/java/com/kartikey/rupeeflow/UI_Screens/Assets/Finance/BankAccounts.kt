@@ -97,7 +97,7 @@ fun BankDetailCard(bank: BankAccountItem, username: String, onEditClick: (BankAc
     var showQuickUpdate by remember { mutableStateOf(false) }
     val logoRes = Constants.BankLogoMap[bank.bankName]
     val domain = Constants.BankDomainMap[bank.bankName] ?: "rbi.org.in"
-    val clearbitUrl = "https://logo.clearbit.com/$domain"
+    val googleLogoUrl = "https://www.google.com/s2/favicons?domain=$domain&sz=128"
     
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -109,7 +109,6 @@ fun BankDetailCard(bank: BankAccountItem, username: String, onEditClick: (BankAc
             
             Row(verticalAlignment = Alignment.CenterVertically) {
                 
-                // Hybrid Logo Engine
                 Box(
                     modifier = Modifier
                         .size(44.dp)
@@ -117,7 +116,6 @@ fun BankDetailCard(bank: BankAccountItem, username: String, onEditClick: (BankAc
                     contentAlignment = Alignment.Center
                 ) {
                     if (logoRes != null) {
-                        // Priority 1: Load HD Offline XML directly
                         Image(
                             painter = painterResource(id = logoRes),
                             contentDescription = bank.bankName,
@@ -125,9 +123,8 @@ fun BankDetailCard(bank: BankAccountItem, username: String, onEditClick: (BankAc
                             contentScale = ContentScale.Fit
                         )
                     } else {
-                        // Priority 2: Clearbit API with Smart Fallback (Safety Net)
                         SubcomposeAsyncImage(
-                            model = clearbitUrl,
+                            model = googleLogoUrl,
                             contentDescription = bank.bankName,
                             modifier = Modifier.size(28.dp).clip(RoundedCornerShape(6.dp)),
                             contentScale = ContentScale.Fit,
