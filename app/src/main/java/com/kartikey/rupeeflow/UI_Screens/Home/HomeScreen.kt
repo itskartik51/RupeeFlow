@@ -59,13 +59,13 @@ fun HomeDashboardDesign(
         Spacer(modifier = Modifier.height(16.dp))
 
         SystemDiagnosisCard(
-            testName = "Hybrid Logo Engine (Google HD API)",
+            testName = "Google HD API Logo Engine",
             isExpanded = showDiagnostics,
             onToggle = { showDiagnostics = !showDiagnostics }
         ) {
             Column(modifier = Modifier.padding(top = 12.dp).fillMaxWidth()) {
                 Text(
-                    text = "Engine: Local XML + Google HD API Active",
+                    text = "Engine: 100% Cloud Connected",
                     fontSize = 12.sp,
                     fontWeight = FontWeight.ExtraBold,
                     color = Color.DarkGray
@@ -73,9 +73,7 @@ fun HomeDashboardDesign(
                 Spacer(modifier = Modifier.height(8.dp))
                 
                 Constants.IndianBanksList.forEach { bankName ->
-                    val logoRes = Constants.BankLogoMap[bankName]
                     val domain = Constants.BankDomainMap[bankName] ?: "rbi.org.in"
-                    val isOfflineMapped = logoRes != null
                     val googleLogoUrl = "https://www.google.com/s2/favicons?domain=$domain&sz=128"
                     
                     Row(
@@ -88,32 +86,23 @@ fun HomeDashboardDesign(
                                 .background(Color(0xFF1976D2).copy(alpha = 0.08f), RoundedCornerShape(6.dp)),
                             contentAlignment = Alignment.Center
                         ) {
-                            if (isOfflineMapped) {
-                                Image(
-                                    painter = painterResource(id = logoRes!!),
-                                    contentDescription = bankName,
-                                    modifier = Modifier.size(18.dp).clip(RoundedCornerShape(4.dp)),
-                                    contentScale = ContentScale.Fit
-                                )
-                            } else {
-                                SubcomposeAsyncImage(
-                                    model = googleLogoUrl,
-                                    contentDescription = bankName,
-                                    modifier = Modifier.size(18.dp).clip(RoundedCornerShape(4.dp)),
-                                    contentScale = ContentScale.Fit,
-                                    loading = {
-                                        CircularProgressIndicator(modifier = Modifier.size(10.dp), strokeWidth = 2.dp, color = Color.Gray)
-                                    },
-                                    error = {
-                                        Icon(
-                                            imageVector = Icons.Outlined.AccountBalance,
-                                            contentDescription = "API Fallback",
-                                            tint = Color(0xFF1976D2),
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                    }
-                                )
-                            }
+                            SubcomposeAsyncImage(
+                                model = googleLogoUrl,
+                                contentDescription = bankName,
+                                modifier = Modifier.size(18.dp).clip(RoundedCornerShape(4.dp)),
+                                contentScale = ContentScale.Fit,
+                                loading = {
+                                    CircularProgressIndicator(modifier = Modifier.size(10.dp), strokeWidth = 2.dp, color = Color.Gray)
+                                },
+                                error = {
+                                    Icon(
+                                        imageVector = Icons.Outlined.AccountBalance,
+                                        contentDescription = "API Fallback",
+                                        tint = Color(0xFF1976D2),
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            )
                         }
                         
                         Spacer(modifier = Modifier.width(12.dp))
@@ -123,12 +112,12 @@ fun HomeDashboardDesign(
                                 text = bankName,
                                 fontSize = 13.sp,
                                 color = Color.Black,
-                                fontWeight = if (isOfflineMapped) FontWeight.Bold else FontWeight.Medium
+                                fontWeight = FontWeight.Medium
                             )
                             Text(
-                                text = if (isOfflineMapped) "Source: Local XML (0ms)" else "Source: Google API ($domain)",
+                                text = "Domain API Hit: $domain",
                                 fontSize = 10.sp,
-                                color = if (isOfflineMapped) Color(0xFF388E3C) else Color(0xFFF57C00),
+                                color = Color(0xFFF57C00),
                                 fontWeight = FontWeight.Medium
                             )
                         }
