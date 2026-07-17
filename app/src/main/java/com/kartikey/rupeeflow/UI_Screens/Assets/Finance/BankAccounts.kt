@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import coil.compose.SubcomposeAsyncImage
 import com.kartikey.rupeeflow.Cloud_Database.Constants
 import com.kartikey.rupeeflow.UI_Screens.Assets.BankAccountItem
 import kotlinx.coroutines.Dispatchers
@@ -95,6 +96,8 @@ fun BankAccountsScreen(
 fun BankDetailCard(bank: BankAccountItem, username: String, onEditClick: (BankAccountItem) -> Unit, onRefreshRequest: () -> Unit) {
     var showQuickUpdate by remember { mutableStateOf(false) }
     val logoRes = Constants.BankLogoMap[bank.bankName]
+    val domain = Constants.BankDomainMap[bank.bankName] ?: "rbi.org.in"
+    val clearbitUrl = "https://logo.clearbit.com/$domain"
     
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -106,7 +109,7 @@ fun BankDetailCard(bank: BankAccountItem, username: String, onEditClick: (BankAc
             
             Row(verticalAlignment = Alignment.CenterVertically) {
                 
-                // 100% Offline HD Image Loading Logic
+                // Hybrid Logo Engine
                 Box(
                     modifier = Modifier
                         .size(44.dp)
@@ -114,6 +117,7 @@ fun BankDetailCard(bank: BankAccountItem, username: String, onEditClick: (BankAc
                     contentAlignment = Alignment.Center
                 ) {
                     if (logoRes != null) {
+                        // Priority 1: Load HD Offline XML directly
                         Image(
                             painter = painterResource(id = logoRes),
                             contentDescription = bank.bankName,
@@ -121,12 +125,23 @@ fun BankDetailCard(bank: BankAccountItem, username: String, onEditClick: (BankAc
                             contentScale = ContentScale.Fit
                         )
                     } else {
-                        // Premium Placeholder for banks without HD logos yet
-                        Icon(
-                            imageVector = Icons.Outlined.AccountBalance, 
-                            contentDescription = "Bank", 
-                            tint = Color(0xFF1976D2), 
-                            modifier = Modifier.size(24.dp)
+                        // Priority 2: Clearbit API with Smart Fallback (Safety Net)
+                        SubcomposeAsyncImage(
+                            model = clearbitUrl,
+                            contentDescription = bank.bankName,
+                            modifier = Modifier.size(28.dp).clip(RoundedCornerShape(6.dp)),
+                            contentScale = ContentScale.Fit,
+                            loading = {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Color.Gray)
+                            },
+                            error = {
+                                Icon(
+                                    imageVector = Icons.Outlined.AccountBalance, 
+                                    contentDescription = "Bank", 
+                                    tint = Color(0xFF1976D2), 
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
                         )
                     }
                 }
