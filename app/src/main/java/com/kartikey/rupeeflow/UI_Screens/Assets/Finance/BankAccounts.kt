@@ -2,7 +2,6 @@ package com.kartikey.rupeeflow.UI_Screens.Assets.Finance
 
 import android.widget.Toast
 import androidx.compose.animation.core.*
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -25,7 +24,6 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -95,7 +93,6 @@ fun BankAccountsScreen(
 @Composable
 fun BankDetailCard(bank: BankAccountItem, username: String, onEditClick: (BankAccountItem) -> Unit, onRefreshRequest: () -> Unit) {
     var showQuickUpdate by remember { mutableStateOf(false) }
-    val logoRes = Constants.BankLogoMap[bank.bankName]
     val domain = Constants.BankDomainMap[bank.bankName] ?: "rbi.org.in"
     val googleLogoUrl = "https://www.google.com/s2/favicons?domain=$domain&sz=128"
     
@@ -115,32 +112,23 @@ fun BankDetailCard(bank: BankAccountItem, username: String, onEditClick: (BankAc
                         .background(Color(0xFF1976D2).copy(alpha = 0.05f), RoundedCornerShape(10.dp)),
                     contentAlignment = Alignment.Center
                 ) {
-                    if (logoRes != null) {
-                        Image(
-                            painter = painterResource(id = logoRes),
-                            contentDescription = bank.bankName,
-                            modifier = Modifier.size(28.dp).clip(RoundedCornerShape(6.dp)),
-                            contentScale = ContentScale.Fit
-                        )
-                    } else {
-                        SubcomposeAsyncImage(
-                            model = googleLogoUrl,
-                            contentDescription = bank.bankName,
-                            modifier = Modifier.size(28.dp).clip(RoundedCornerShape(6.dp)),
-                            contentScale = ContentScale.Fit,
-                            loading = {
-                                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Color.Gray)
-                            },
-                            error = {
-                                Icon(
-                                    imageVector = Icons.Outlined.AccountBalance, 
-                                    contentDescription = "Bank", 
-                                    tint = Color(0xFF1976D2), 
-                                    modifier = Modifier.size(24.dp)
-                                )
-                            }
-                        )
-                    }
+                    SubcomposeAsyncImage(
+                        model = googleLogoUrl,
+                        contentDescription = bank.bankName,
+                        modifier = Modifier.size(28.dp).clip(RoundedCornerShape(6.dp)),
+                        contentScale = ContentScale.Fit,
+                        loading = {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Color.Gray)
+                        },
+                        error = {
+                            Icon(
+                                imageVector = Icons.Outlined.AccountBalance, 
+                                contentDescription = "Bank", 
+                                tint = Color(0xFF1976D2), 
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    )
                 }
                 
                 Spacer(modifier = Modifier.width(12.dp))
