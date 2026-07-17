@@ -1,5 +1,7 @@
 package com.kartikey.rupeeflow.Cloud_Database
 
+import com.kartikey.rupeeflow.R
+
 object Constants {
     const val GOOGLE_SHEET_API_URL = "https://script.google.com/macros/s/AKfycbxq6GiNwSEDI85iWu8Zl1mMokr0TPidrIKyM5eHfnnPumnhq4Z1szCLjg-JcuTK_gr6Aw/exec"
 
@@ -18,5 +20,13 @@ object Constants {
         "Suryoday Small Finance Bank", "Shivalik Small Finance Bank", "Capital Small Finance Bank",
         "Jana Small Finance Bank", "Unity Small Finance Bank", "ESAF Small Finance Bank",
         "North East Small Finance Bank", "Saraswat Cooperative Bank", "Cosmos Cooperative Bank", "Other Bank"
+    )
+
+    // Local HD Drawable Resources Mapping
+    val BankLogoMap = mapOf(
+        "State Bank of India (SBI)" to R.drawable.ic_sbi,
+        "HDFC Bank" to R.drawable.ic_hdfc,
+        "ICICI Bank" to R.drawable.ic_icici,
+        "Kotak Mahindra Bank" to R.drawable.ic_kotak
     )
 }
