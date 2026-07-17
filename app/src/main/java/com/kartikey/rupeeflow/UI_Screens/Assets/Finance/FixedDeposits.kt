@@ -14,18 +14,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.SubcomposeAsyncImage
-import coil.request.CachePolicy
-import coil.request.ImageRequest
-import com.kartikey.rupeeflow.Cloud_Database.Constants
 
 data class FDItem(
     val bankName: String,
@@ -88,13 +81,6 @@ fun FixedDepositsScreen(
 
 @Composable
 fun FDetailCard(fd: FDItem) {
-    val context = LocalContext.current
-    val domain = Constants.BankDomainMap.entries.firstOrNull { 
-        it.key.equals(fd.bankName.trim(), ignoreCase = true) || 
-        fd.bankName.trim().contains(it.key, ignoreCase = true)
-    }?.value
-    val logoUrl = if (domain != null) "https://icon.horse/icon/$domain" else null
-
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -104,22 +90,18 @@ fun FDetailCard(fd: FDItem) {
         Column(modifier = Modifier.padding(20.dp)) {
             // Header Row (Logo & Details)
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                
+                // 100% Offline Premium Bank Icon Placeholder
                 Box(
-                    modifier = Modifier.size(44.dp).background(Color(0xFFF57C00).copy(alpha = 0.1f), RoundedCornerShape(10.dp)),
+                    modifier = Modifier.size(44.dp).background(Color(0xFFF57C00).copy(alpha = 0.08f), RoundedCornerShape(10.dp)),
                     contentAlignment = Alignment.Center
                 ) {
-                    if (logoUrl != null) {
-                        SubcomposeAsyncImage(
-                            model = ImageRequest.Builder(context).data(logoUrl).crossfade(true).memoryCachePolicy(CachePolicy.ENABLED).diskCachePolicy(CachePolicy.ENABLED).build(),
-                            contentDescription = fd.bankName,
-                            modifier = Modifier.size(28.dp).clip(RoundedCornerShape(6.dp)),
-                            contentScale = ContentScale.Fit,
-                            loading = { CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Color(0xFFF57C00)) },
-                            error = { Icon(Icons.Outlined.AccountBalance, contentDescription = "Bank", tint = Color(0xFFF57C00), modifier = Modifier.size(20.dp)) }
-                        )
-                    } else {
-                        Icon(Icons.Outlined.AccountBalance, contentDescription = "Bank", tint = Color(0xFFF57C00), modifier = Modifier.size(20.dp))
-                    }
+                    Icon(
+                        imageVector = Icons.Outlined.AccountBalance, 
+                        contentDescription = "Bank", 
+                        tint = Color(0xFFF57C00), 
+                        modifier = Modifier.size(24.dp)
+                    )
                 }
                 
                 Spacer(modifier = Modifier.width(12.dp))
