@@ -1,5 +1,6 @@
 import os
 import urllib.request
+import time
 
 # Aapke Android project ka drawable path
 output_dir = "app/src/main/res/drawable"
@@ -43,11 +44,11 @@ banks = {
 
 req_headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
 
-print("Downloading 128px Offline PNG Logos using Google API...\n")
+print("Downloading 128px HD Offline PNG Logos using Clearbit API...\n")
 
 for name, domain in banks.items():
-    # Clearbit ki jagah Google Favicon API (Blocks bypass)
-    url = f"https://www.google.com/s2/favicons?domain={domain}&sz=128"
+    # Wapas original Clearbit HD API laga di gayi hai
+    url = f"https://logo.clearbit.com/{domain}?size=128"
     file_path = f"{output_dir}/{name}.png"
     
     try:
@@ -55,8 +56,11 @@ for name, domain in banks.items():
         with urllib.request.urlopen(req) as response:
             with open(file_path, "wb") as out_file:
                 out_file.write(response.read())
-        print(f"✅ Saved: {name}.png")
+        print(f"✅ Saved HD: {name}.png")
     except Exception as e:
-        print(f"❌ Failed: {name}.png (Domain not found)")
+        print(f"❌ Failed: {name}.png (Domain not found or manual verification needed)")
 
-print("\n🎉 Sabhi Offline Logos successfully drawable folder mein download ho gaye hain!")
+    # Anti-Bot Bypass: 2 second ka pause taaki server block na kare
+    time.sleep(2)
+
+print("\n🎉 Sabhi HD Offline Logos successfully drawable folder mein download ho gaye hain!")
