@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.SubcomposeAsyncImage
+import coil.request.ImageRequest
 import com.kartikey.rupeeflow.Cloud_Database.Constants
 import com.kartikey.rupeeflow.UI_Screens.Assets.BankAccountItem
 import kotlinx.coroutines.Dispatchers
@@ -94,7 +95,14 @@ fun BankAccountsScreen(
 fun BankDetailCard(bank: BankAccountItem, username: String, onEditClick: (BankAccountItem) -> Unit, onRefreshRequest: () -> Unit) {
     var showQuickUpdate by remember { mutableStateOf(false) }
     val domain = Constants.BankDomainMap[bank.bankName] ?: "rbi.org.in"
-    val googleLogoUrl = "https://www.google.com/s2/favicons?domain=$domain&sz=512"
+    val context = LocalContext.current
+    
+    // Clearbit API Request with Browser Bypass Header
+    val clearbitRequest = ImageRequest.Builder(context)
+        .data("https://logo.clearbit.com/$domain")
+        .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+        .crossfade(true)
+        .build()
     
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -113,7 +121,7 @@ fun BankDetailCard(bank: BankAccountItem, username: String, onEditClick: (BankAc
                     contentAlignment = Alignment.Center
                 ) {
                     SubcomposeAsyncImage(
-                        model = googleLogoUrl,
+                        model = clearbitRequest,
                         contentDescription = bank.bankName,
                         modifier = Modifier.size(28.dp).clip(RoundedCornerShape(6.dp)),
                         contentScale = ContentScale.Fit,
