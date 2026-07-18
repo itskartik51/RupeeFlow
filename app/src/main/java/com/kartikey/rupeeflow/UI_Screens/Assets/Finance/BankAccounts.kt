@@ -2,6 +2,7 @@ package com.kartikey.rupeeflow.UI_Screens.Assets.Finance
 
 import android.widget.Toast
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -24,14 +25,13 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import coil.compose.SubcomposeAsyncImage
-import coil.request.ImageRequest
 import com.kartikey.rupeeflow.Cloud_Database.Constants
 import com.kartikey.rupeeflow.UI_Screens.Assets.BankAccountItem
 import kotlinx.coroutines.Dispatchers
@@ -94,15 +94,7 @@ fun BankAccountsScreen(
 @Composable
 fun BankDetailCard(bank: BankAccountItem, username: String, onEditClick: (BankAccountItem) -> Unit, onRefreshRequest: () -> Unit) {
     var showQuickUpdate by remember { mutableStateOf(false) }
-    val domain = Constants.BankDomainMap[bank.bankName] ?: "rbi.org.in"
-    val context = LocalContext.current
-    
-    // Clearbit API Request with Browser Bypass Header
-    val clearbitRequest = ImageRequest.Builder(context)
-        .data("https://logo.clearbit.com/$domain")
-        .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
-        .crossfade(true)
-        .build()
+    val logoRes = Constants.BankLogoMap[bank.bankName]
     
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -120,23 +112,21 @@ fun BankDetailCard(bank: BankAccountItem, username: String, onEditClick: (BankAc
                         .background(Color(0xFF1976D2).copy(alpha = 0.05f), RoundedCornerShape(10.dp)),
                     contentAlignment = Alignment.Center
                 ) {
-                    SubcomposeAsyncImage(
-                        model = clearbitRequest,
-                        contentDescription = bank.bankName,
-                        modifier = Modifier.size(28.dp).clip(RoundedCornerShape(6.dp)),
-                        contentScale = ContentScale.Fit,
-                        loading = {
-                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Color.Gray)
-                        },
-                        error = {
-                            Icon(
-                                imageVector = Icons.Outlined.AccountBalance, 
-                                contentDescription = "Bank", 
-                                tint = Color(0xFF1976D2), 
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-                    )
+                    if (logoRes != null) {
+                        Image(
+                            painter = painterResource(id = logoRes),
+                            contentDescription = bank.bankName,
+                            modifier = Modifier.size(28.dp).clip(RoundedCornerShape(6.dp)),
+                            contentScale = ContentScale.Fit
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Outlined.AccountBalance, 
+                            contentDescription = "Bank Fallback", 
+                            tint = Color(0xFF1976D2), 
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
                 }
                 
                 Spacer(modifier = Modifier.width(12.dp))
