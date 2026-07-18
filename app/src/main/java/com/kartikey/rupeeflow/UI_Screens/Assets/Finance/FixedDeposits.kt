@@ -86,7 +86,7 @@ fun FixedDepositsScreen(
 @Composable
 fun FDetailCard(fd: FDItem) {
     val domain = Constants.BankDomainMap[fd.bankName] ?: "rbi.org.in"
-    val googleLogoUrl = "https://www.google.com/s2/favicons?domain=$domain&sz=128"
+    val googleLogoUrl = "https://www.google.com/s2/favicons?domain=$domain&sz=512"
 
     Card(
         modifier = Modifier.fillMaxWidth(),
