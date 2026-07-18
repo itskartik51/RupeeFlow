@@ -1,6 +1,7 @@
 package com.kartikey.rupeeflow.UI_Screens.Assets.Finance
 
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -18,12 +19,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.SubcomposeAsyncImage
-import coil.request.ImageRequest
 import com.kartikey.rupeeflow.Cloud_Database.Constants
 
 data class FDItem(
@@ -87,14 +86,7 @@ fun FixedDepositsScreen(
 
 @Composable
 fun FDetailCard(fd: FDItem) {
-    val domain = Constants.BankDomainMap[fd.bankName] ?: "rbi.org.in"
-    val context = LocalContext.current
-    
-    val clearbitRequest = ImageRequest.Builder(context)
-        .data("https://logo.clearbit.com/$domain")
-        .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
-        .crossfade(true)
-        .build()
+    val logoRes = Constants.BankLogoMap[fd.bankName]
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -109,23 +101,21 @@ fun FDetailCard(fd: FDItem) {
                     modifier = Modifier.size(44.dp).background(Color(0xFFF57C00).copy(alpha = 0.08f), RoundedCornerShape(10.dp)),
                     contentAlignment = Alignment.Center
                 ) {
-                    SubcomposeAsyncImage(
-                        model = clearbitRequest,
-                        contentDescription = fd.bankName,
-                        modifier = Modifier.size(28.dp).clip(RoundedCornerShape(6.dp)),
-                        contentScale = ContentScale.Fit,
-                        loading = {
-                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Color.Gray)
-                        },
-                        error = {
-                            Icon(
-                                imageVector = Icons.Outlined.AccountBalance, 
-                                contentDescription = "Bank", 
-                                tint = Color(0xFFF57C00), 
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-                    )
+                    if (logoRes != null) {
+                        Image(
+                            painter = painterResource(id = logoRes),
+                            contentDescription = fd.bankName,
+                            modifier = Modifier.size(28.dp).clip(RoundedCornerShape(6.dp)),
+                            contentScale = ContentScale.Fit
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Outlined.AccountBalance, 
+                            contentDescription = "Bank Fallback", 
+                            tint = Color(0xFFF57C00), 
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
                 }
                 
                 Spacer(modifier = Modifier.width(12.dp))
