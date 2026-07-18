@@ -1,95 +1,193 @@
 package com.kartikey.rupeeflow.UI_Screens.Assets.Finance
 
-import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.outlined.AccountBalance
-import androidx.compose.material.icons.outlined.CreditCard
-import androidx.compose.material.icons.outlined.Money
-import androidx.compose.material.icons.outlined.Savings
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.kartikey.rupeeflow.UI_Screens.Assets.BankAccountItem
+import coil.compose.SubcomposeAsyncImage
+import coil.request.ImageRequest
+import com.kartikey.rupeeflow.Cloud_Database.Constants
+
+data class FDItem(
+    val bankName: String,
+    val accountNo: String,
+    val createDate: String,
+    val maturityDate: String,
+    val daysToMaturity: Int,
+    val investedAmt: Double,
+    val interestRate: Double,
+    val maturityValue: Double,
+    val accruedValue: Double,
+    val accruedInt: Double,
+    val oneDayInt: Double
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FinanceScreen(
+fun FixedDepositsScreen(
     onBackClick: () -> Unit,
     username: String,
-    bankList: List<BankAccountItem>,
+    fdList: List<FDItem>,
     isLoading: Boolean,
-    onRefreshClick: () -> Unit,
-    onEditBankClick: (BankAccountItem) -> Unit 
+    onRefreshClick: () -> Unit
 ) {
-    var currentFinanceView by remember { mutableStateOf("Main") }
+    val infiniteTransition = rememberInfiniteTransition(label = "refresh")
+    val angle by infiniteTransition.animateFloat(
+        initialValue = 0f, targetValue = 360f,
+        animationSpec = infiniteRepeatable(animation = tween(1000, easing = LinearEasing), repeatMode = RepeatMode.Restart),
+        label = "spin"
+    )
 
-    if (currentFinanceView == "Main") {
-        Scaffold(
-            topBar = {
-                TopAppBar(
-                    title = { Text("My Finance Vault", fontWeight = FontWeight.Bold) },
-                    navigationIcon = { IconButton(onClick = onBackClick) { Icon(Icons.Default.ArrowBack, contentDescription = "Back") } },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFFF8F9FA))
-                )
-            },
-            containerColor = Color(0xFFF8F9FA)
-        ) { paddingValues ->
-            Column(
-                modifier = Modifier.fillMaxSize().padding(paddingValues).padding(16.dp),
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Fixed Deposits", fontWeight = FontWeight.Bold) },
+                navigationIcon = { IconButton(onClick = onBackClick) { Icon(Icons.Default.ArrowBack, contentDescription = "Back") } },
+                actions = { IconButton(onClick = onRefreshClick) { Icon(Icons.Outlined.Refresh, contentDescription = "Refresh", modifier = Modifier.rotate(if (isLoading) angle else 0f)) } },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFFF8F9FA))
+            )
+        },
+        containerColor = Color(0xFFF8F9FA)
+    ) { paddingValues ->
+        if (fdList.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize().padding(paddingValues), contentAlignment = Alignment.Center) {
+                Text("No Fixed Deposits Available", color = Color.Gray)
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize().padding(paddingValues),
+                contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                BigFinanceCard("Cash", "₹0.00", Icons.Outlined.Money, Color(0xFF388E3C), isClickable = false) {}
-                val totalBank = bankList.sumOf { it.currentBalance }
-                BigFinanceCard("Bank Accounts", formatRupeeAmount(totalBank), Icons.Outlined.AccountBalance, Color(0xFF1976D2), isClickable = true) { currentFinanceView = "BankAccounts" }
-                BigFinanceCard("Credit Card", "₹0.00", Icons.Outlined.CreditCard, Color(0xFFD32F2F), isClickable = false) {}
-                BigFinanceCard("FD : Fixed Deposit", "₹0.00", Icons.Outlined.Savings, Color(0xFFF57C00), isClickable = false) {}
+                items(fdList) { fd ->
+                    FDetailCard(fd = fd)
+                }
             }
         }
-    } else if (currentFinanceView == "BankAccounts") {
-        BankAccountsScreen(
-            onBackClick = { currentFinanceView = "Main" },
-            username = username, 
-            bankList = bankList,
-            isLoading = isLoading,
-            onRefreshClick = onRefreshClick,
-            onEditBankClick = onEditBankClick 
-        )
     }
 }
 
 @Composable
-fun BigFinanceCard(title: String, amount: String, icon: ImageVector, iconColor: Color, isClickable: Boolean, onClick: () -> Unit) {
-    var isPressed by remember { mutableStateOf(false) }
-    val cardScale by animateFloatAsState(targetValue = if (isPressed && isClickable) 0.97f else 1f, label = "ScaleAnim")
+fun FDetailCard(fd: FDItem) {
+    val domain = Constants.BankDomainMap[fd.bankName] ?: "rbi.org.in"
+    val context = LocalContext.current
+    
+    val clearbitRequest = ImageRequest.Builder(context)
+        .data("https://logo.clearbit.com/$domain")
+        .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+        .crossfade(true)
+        .build()
+
     Card(
-        modifier = Modifier.fillMaxWidth().height(100.dp).scale(cardScale).pointerInput(Unit) {
-            if (isClickable) { detectTapGestures(onPress = { isPressed = true; tryAwaitRelease(); isPressed = false; onClick() }) }
-        },
-        colors = CardDefaults.cardColors(containerColor = Color.White), shape = RoundedCornerShape(16.dp), elevation = CardDefaults.cardElevation(if (isClickable) 4.dp else 1.dp)
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(2.dp),
+        shape = RoundedCornerShape(16.dp)
     ) {
-        Row(modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(modifier = Modifier.size(50.dp).background(iconColor.copy(alpha = 0.1f), RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
-                Icon(icon, contentDescription = title, tint = iconColor, modifier = Modifier.size(28.dp))
+        Column(modifier = Modifier.padding(20.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                
+                Box(
+                    modifier = Modifier.size(44.dp).background(Color(0xFFF57C00).copy(alpha = 0.08f), RoundedCornerShape(10.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    SubcomposeAsyncImage(
+                        model = clearbitRequest,
+                        contentDescription = fd.bankName,
+                        modifier = Modifier.size(28.dp).clip(RoundedCornerShape(6.dp)),
+                        contentScale = ContentScale.Fit,
+                        loading = {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Color.Gray)
+                        },
+                        error = {
+                            Icon(
+                                imageVector = Icons.Outlined.AccountBalance, 
+                                contentDescription = "Bank", 
+                                tint = Color(0xFFF57C00), 
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    )
+                }
+                
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(text = fd.bankName.uppercase(), fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color.Black)
+                    Text(text = "A/C: ${fd.accountNo}", color = Color.Gray, fontSize = 12.sp, letterSpacing = 1.sp)
+                }
+                
+                val isMatured = fd.daysToMaturity <= 0
+                val pillColor = if (isMatured) Color(0xFF388E3C) else Color(0xFF1976D2)
+                Box(
+                    modifier = Modifier.background(pillColor.copy(alpha = 0.1f), RoundedCornerShape(20.dp)).padding(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        text = if (isMatured) "Matured" else "${fd.daysToMaturity} Days Left", 
+                        color = pillColor, 
+                        fontWeight = FontWeight.Bold, 
+                        fontSize = 11.sp
+                    )
+                }
             }
-            Spacer(modifier = Modifier.width(20.dp))
-            Column {
-                Text(text = title, color = Color.Gray, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(text = amount, color = Color.Black, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
+            
+            Spacer(modifier = Modifier.height(20.dp))
+            
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
+                Column {
+                    Text(text = "Current Value", color = Color.Gray, fontSize = 12.sp)
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(text = formatRupeeAmount(fd.accruedValue), fontWeight = FontWeight.ExtraBold, fontSize = 26.sp, color = Color.Black)
+                }
+                
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(text = "Interest Rate", color = Color.Gray, fontSize = 12.sp)
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(text = "${fd.interestRate}% Yr", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color(0xFFF57C00))
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            HorizontalDivider(color = Color.LightGray.copy(alpha = 0.4f))
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                MetricCol(label = "Invested", value = formatRupeeAmount(fd.investedAmt), color = Color.DarkGray)
+                MetricCol(label = "Maturity Amt", value = formatRupeeAmount(fd.maturityValue), color = Color(0xFF1976D2), align = Alignment.CenterHorizontally)
+                MetricCol(label = "Total Int. Earned", value = "+${formatRupeeAmount(fd.accruedInt)}", color = Color(0xFF388E3C), align = Alignment.End)
+            }
+            
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                MetricCol(label = "Start Date", value = fd.createDate, color = Color.DarkGray)
+                MetricCol(label = "End Date", value = fd.maturityDate, color = Color.DarkGray, align = Alignment.CenterHorizontally)
+                MetricCol(label = "1-Day Earn", value = if(fd.daysToMaturity <= 0) "₹0.00" else "+${formatRupeeAmount(fd.oneDayInt)}", color = if(fd.daysToMaturity <= 0) Color.Gray else Color(0xFF388E3C), align = Alignment.End)
             }
         }
+    }
+}
+
+@Composable
+fun MetricCol(label: String, value: String, color: Color, align: Alignment.Horizontal = Alignment.Start) {
+    Column(horizontalAlignment = align) {
+        Text(text = label, color = Color.Gray, fontSize = 11.sp)
+        Text(text = value, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = color)
     }
 }
