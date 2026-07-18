@@ -20,13 +20,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.SubcomposeAsyncImage
-import coil.request.ImageRequest
 import com.kartikey.rupeeflow.Cloud_Database.Constants
 import com.kartikey.rupeeflow.R
 
@@ -40,7 +37,6 @@ fun HomeDashboardDesign(
     onExpenseCardClick: () -> Unit
 ) {
     var showDiagnostics by remember { mutableStateOf(false) }
-    val context = LocalContext.current
 
     Column(modifier = Modifier.fillMaxSize().padding(paddingValues).padding(horizontal = 16.dp).verticalScroll(rememberScrollState())) {
         Spacer(modifier = Modifier.height(16.dp))
@@ -62,13 +58,13 @@ fun HomeDashboardDesign(
         Spacer(modifier = Modifier.height(16.dp))
 
         SystemDiagnosisCard(
-            testName = "Clearbit HD Logo Engine",
+            testName = "Offline HD Logo Engine",
             isExpanded = showDiagnostics,
             onToggle = { showDiagnostics = !showDiagnostics }
         ) {
             Column(modifier = Modifier.padding(top = 12.dp).fillMaxWidth()) {
                 Text(
-                    text = "Engine: Clearbit API (Bypass Header Active)",
+                    text = "Engine: 100% Local Storage (Zero Lag)",
                     fontSize = 12.sp,
                     fontWeight = FontWeight.ExtraBold,
                     color = Color.DarkGray
@@ -76,13 +72,7 @@ fun HomeDashboardDesign(
                 Spacer(modifier = Modifier.height(8.dp))
                 
                 Constants.IndianBanksList.forEach { bankName ->
-                    val domain = Constants.BankDomainMap[bankName] ?: "rbi.org.in"
-                    
-                    val clearbitRequest = ImageRequest.Builder(context)
-                        .data("https://logo.clearbit.com/$domain")
-                        .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
-                        .crossfade(true)
-                        .build()
+                    val logoRes = Constants.BankLogoMap[bankName]
                     
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -94,23 +84,21 @@ fun HomeDashboardDesign(
                                 .background(Color(0xFF1976D2).copy(alpha = 0.08f), RoundedCornerShape(6.dp)),
                             contentAlignment = Alignment.Center
                         ) {
-                            SubcomposeAsyncImage(
-                                model = clearbitRequest,
-                                contentDescription = bankName,
-                                modifier = Modifier.size(18.dp).clip(RoundedCornerShape(4.dp)),
-                                contentScale = ContentScale.Fit,
-                                loading = {
-                                    CircularProgressIndicator(modifier = Modifier.size(10.dp), strokeWidth = 2.dp, color = Color.Gray)
-                                },
-                                error = {
-                                    Icon(
-                                        imageVector = Icons.Outlined.AccountBalance,
-                                        contentDescription = "API Fallback",
-                                        tint = Color(0xFF1976D2),
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                }
-                            )
+                            if (logoRes != null) {
+                                Image(
+                                    painter = painterResource(id = logoRes),
+                                    contentDescription = bankName,
+                                    modifier = Modifier.size(18.dp).clip(RoundedCornerShape(4.dp)),
+                                    contentScale = ContentScale.Fit
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Outlined.AccountBalance,
+                                    contentDescription = "Fallback",
+                                    tint = Color(0xFF1976D2),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
                         }
                         
                         Spacer(modifier = Modifier.width(12.dp))
@@ -123,9 +111,9 @@ fun HomeDashboardDesign(
                                 fontWeight = FontWeight.Medium
                             )
                             Text(
-                                text = "Brand Domain: $domain",
+                                text = if (logoRes != null) "Source: Local Storage (0ms)" else "Source: System Fallback",
                                 fontSize = 10.sp,
-                                color = Color(0xFF2E7D32),
+                                color = if (logoRes != null) Color(0xFF388E3C) else Color(0xFFF57C00),
                                 fontWeight = FontWeight.Medium
                             )
                         }
