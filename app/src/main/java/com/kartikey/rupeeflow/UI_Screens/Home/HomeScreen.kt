@@ -20,11 +20,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.SubcomposeAsyncImage
+import coil.request.ImageRequest
 import com.kartikey.rupeeflow.Cloud_Database.Constants
 import com.kartikey.rupeeflow.R
 
@@ -38,6 +40,7 @@ fun HomeDashboardDesign(
     onExpenseCardClick: () -> Unit
 ) {
     var showDiagnostics by remember { mutableStateOf(false) }
+    val context = LocalContext.current
 
     Column(modifier = Modifier.fillMaxSize().padding(paddingValues).padding(horizontal = 16.dp).verticalScroll(rememberScrollState())) {
         Spacer(modifier = Modifier.height(16.dp))
@@ -59,13 +62,13 @@ fun HomeDashboardDesign(
         Spacer(modifier = Modifier.height(16.dp))
 
         SystemDiagnosisCard(
-            testName = "Google HD API Logo Engine",
+            testName = "Clearbit HD Logo Engine",
             isExpanded = showDiagnostics,
             onToggle = { showDiagnostics = !showDiagnostics }
         ) {
             Column(modifier = Modifier.padding(top = 12.dp).fillMaxWidth()) {
                 Text(
-                    text = "Engine: 100% Cloud Connected",
+                    text = "Engine: Clearbit API (Bypass Header Active)",
                     fontSize = 12.sp,
                     fontWeight = FontWeight.ExtraBold,
                     color = Color.DarkGray
@@ -74,7 +77,12 @@ fun HomeDashboardDesign(
                 
                 Constants.IndianBanksList.forEach { bankName ->
                     val domain = Constants.BankDomainMap[bankName] ?: "rbi.org.in"
-                    val googleLogoUrl = "https://www.google.com/s2/favicons?domain=$domain&sz=512"
+                    
+                    val clearbitRequest = ImageRequest.Builder(context)
+                        .data("https://logo.clearbit.com/$domain")
+                        .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+                        .crossfade(true)
+                        .build()
                     
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -87,7 +95,7 @@ fun HomeDashboardDesign(
                             contentAlignment = Alignment.Center
                         ) {
                             SubcomposeAsyncImage(
-                                model = googleLogoUrl,
+                                model = clearbitRequest,
                                 contentDescription = bankName,
                                 modifier = Modifier.size(18.dp).clip(RoundedCornerShape(4.dp)),
                                 contentScale = ContentScale.Fit,
@@ -115,9 +123,9 @@ fun HomeDashboardDesign(
                                 fontWeight = FontWeight.Medium
                             )
                             Text(
-                                text = "Domain API Hit: $domain",
+                                text = "Brand Domain: $domain",
                                 fontSize = 10.sp,
-                                color = Color(0xFFF57C00),
+                                color = Color(0xFF2E7D32),
                                 fontWeight = FontWeight.Medium
                             )
                         }
