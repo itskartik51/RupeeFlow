@@ -18,10 +18,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.SubcomposeAsyncImage
+import coil.request.ImageRequest
 import com.kartikey.rupeeflow.Cloud_Database.Constants
 
 data class FDItem(
@@ -86,7 +88,13 @@ fun FixedDepositsScreen(
 @Composable
 fun FDetailCard(fd: FDItem) {
     val domain = Constants.BankDomainMap[fd.bankName] ?: "rbi.org.in"
-    val googleLogoUrl = "https://www.google.com/s2/favicons?domain=$domain&sz=512"
+    val context = LocalContext.current
+    
+    val clearbitRequest = ImageRequest.Builder(context)
+        .data("https://logo.clearbit.com/$domain")
+        .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+        .crossfade(true)
+        .build()
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -102,7 +110,7 @@ fun FDetailCard(fd: FDItem) {
                     contentAlignment = Alignment.Center
                 ) {
                     SubcomposeAsyncImage(
-                        model = googleLogoUrl,
+                        model = clearbitRequest,
                         contentDescription = fd.bankName,
                         modifier = Modifier.size(28.dp).clip(RoundedCornerShape(6.dp)),
                         contentScale = ContentScale.Fit,
