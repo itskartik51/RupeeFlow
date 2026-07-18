@@ -44,11 +44,11 @@ banks = {
 
 req_headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
 
-print("Downloading 128px HD Offline PNG Logos using Clearbit API...\n")
+print("Downloading HD Offline PNG Logos using Icon.Horse API (No Login Required)...\n")
 
 for name, domain in banks.items():
-    # Wapas original Clearbit HD API laga di gayi hai
-    url = f"https://logo.clearbit.com/{domain}?size=128"
+    # Active & Free Icon.Horse API Endpoint
+    url = f"https://icon.horse/icon/{domain}"
     file_path = f"{output_dir}/{name}.png"
     
     try:
@@ -58,9 +58,9 @@ for name, domain in banks.items():
                 out_file.write(response.read())
         print(f"✅ Saved HD: {name}.png")
     except Exception as e:
-        print(f"❌ Failed: {name}.png (Domain not found or manual verification needed)")
+        print(f"❌ Failed: {name}.png (Domain not found)")
 
-    # Anti-Bot Bypass: 2 second ka pause taaki server block na kare
+    # Rate Limit Bypass: 2 second ka pause taaki server block na kare
     time.sleep(2)
 
 print("\n🎉 Sabhi HD Offline Logos successfully drawable folder mein download ho gaye hain!")
