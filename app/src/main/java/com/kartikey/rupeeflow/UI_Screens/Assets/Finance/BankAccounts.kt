@@ -94,7 +94,7 @@ fun BankAccountsScreen(
 fun BankDetailCard(bank: BankAccountItem, username: String, onEditClick: (BankAccountItem) -> Unit, onRefreshRequest: () -> Unit) {
     var showQuickUpdate by remember { mutableStateOf(false) }
     val domain = Constants.BankDomainMap[bank.bankName] ?: "rbi.org.in"
-    val googleLogoUrl = "https://www.google.com/s2/favicons?domain=$domain&sz=128"
+    val googleLogoUrl = "https://www.google.com/s2/favicons?domain=$domain&sz=512"
     
     Card(
         modifier = Modifier.fillMaxWidth(),
