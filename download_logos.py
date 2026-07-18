@@ -43,10 +43,11 @@ banks = {
 
 req_headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
 
-print("Downloading 128px Offline PNG Logos...\n")
+print("Downloading 128px Offline PNG Logos using Google API...\n")
 
 for name, domain in banks.items():
-    url = f"https://logo.clearbit.com/{domain}?size=128"
+    # Clearbit ki jagah Google Favicon API (Blocks bypass)
+    url = f"https://www.google.com/s2/favicons?domain={domain}&sz=128"
     file_path = f"{output_dir}/{name}.png"
     
     try:
@@ -56,6 +57,6 @@ for name, domain in banks.items():
                 out_file.write(response.read())
         print(f"✅ Saved: {name}.png")
     except Exception as e:
-        print(f"❌ Failed: {name}.png (Domain not found or blocked)")
+        print(f"❌ Failed: {name}.png (Domain not found)")
 
 print("\n🎉 Sabhi Offline Logos successfully drawable folder mein download ho gaye hain!")
