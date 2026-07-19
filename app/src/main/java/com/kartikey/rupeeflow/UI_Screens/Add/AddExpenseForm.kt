@@ -52,10 +52,10 @@ import java.util.Locale
 @Composable
 fun AddExpenseForm(
     username: String,
-    bankList: List<BankAccountItem>, 
-    ccList: List<CreditCardItem>, 
-    cashData: CashItem?, 
-    onExpenseAdded: (TransactionModel) -> Unit, 
+    bankList: List<BankAccountItem>,
+    ccList: List<CreditCardItem>,
+    cashData: CashItem?,
+    onExpenseAdded: (TransactionModel) -> Unit,
     onDismiss: () -> Unit
 ) {
     val categories = listOf(
@@ -78,11 +78,10 @@ fun AddExpenseForm(
     var isCategoryEditable by remember { mutableStateOf(false) } 
     var remark1 by remember { mutableStateOf("") }
     var remark2 by remember { mutableStateOf("") }
-    
     var modeText by remember { mutableStateOf("") }
     var modeExpanded by remember { mutableStateOf(false) }
 
-    // Auto-Deduct Linking States
+    // Auto-Deduct States
     var paidByExpanded by remember { mutableStateOf(false) }
     var selectedSourceType by remember { mutableStateOf("") }
     var selectedSourceId by remember { mutableStateOf("") }
@@ -170,9 +169,8 @@ fun AddExpenseForm(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // --- SMART MODE & PAID BY ROW (Replaced Status Cell) ---
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                
+            // SMART MODE & PAID BY ROW (35% & 65%)
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 // Mode Dropdown (35%)
                 ExposedDropdownMenuBox(
                     expanded = modeExpanded,
@@ -192,26 +190,23 @@ fun AddExpenseForm(
                     )
                     ExposedDropdownMenu(
                         expanded = modeExpanded,
-                        onDismissRequest = { modeExpanded = false },
-                        modifier = Modifier.background(Color.White)
+                        onDismissRequest = { modeExpanded = false }
                     ) {
                         paymentModes.forEach { (name, icon) ->
                             DropdownMenuItem(
                                 text = { 
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(icon, null, tint = Color.DarkGray, modifier = Modifier.size(16.dp))
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(name, fontSize = 13.sp)
+                                        Icon(imageVector = icon, contentDescription = name, tint = Color.DarkGray, modifier = Modifier.size(20.dp))
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Text(name, fontSize = 14.sp)
                                     }
                                 },
                                 onClick = {
                                     modeText = name
                                     modeExpanded = false
-                                    // Reset the Source Link
                                     selectedSourceId = ""
                                     selectedSourceName = ""
-                                    selectedSourceLogo = null
-                                    
+                                    selectedSourceLogo = null // Reset
                                     if (name == "Cash") {
                                         selectedSourceType = "Cash"
                                         selectedSourceId = "Cash"
@@ -239,7 +234,7 @@ fun AddExpenseForm(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(56.dp) 
+                            .height(56.dp)
                             .border(1.dp, if(paidByExpanded) Color(0xFF2E7D32) else Color.Gray, RoundedCornerShape(12.dp))
                             .menuAnchor()
                             .background(if (!isPaidByActive && selectedSourceType != "Cash") Color(0xFFF5F5F5) else Color.Transparent, RoundedCornerShape(12.dp)),
@@ -247,23 +242,24 @@ fun AddExpenseForm(
                     ) {
                         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                             if (selectedSourceType.isEmpty()) {
-                                Text("Select Mode First", color = Color.Gray, fontSize = 14.sp)
+                                Text("Select Mode", color = Color.Gray, fontSize = 14.sp)
                             } else if (selectedSourceId.isEmpty()) {
                                 Text(if(selectedSourceType == "Bank") "Choose Bank" else "Choose Card", color = Color.Gray, fontSize = 14.sp)
                             } else {
-                                Icon(modeIcon, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(16.dp))
+                                Icon(modeIcon, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
                                 if (selectedSourceLogo != null) {
-                                    Image(painterResource(id = selectedSourceLogo!!), contentDescription = null, modifier = Modifier.size(18.dp).clip(RoundedCornerShape(4.dp)), contentScale = ContentScale.Fit)
+                                    Image(painterResource(id = selectedSourceLogo!!), contentDescription = null, modifier = Modifier.size(20.dp).clip(RoundedCornerShape(4.dp)), contentScale = ContentScale.Fit)
                                     Spacer(modifier = Modifier.width(6.dp))
                                 } else if (selectedSourceType != "Cash") {
-                                    Icon(Icons.Outlined.AccountBalance, contentDescription = null, tint = Color.DarkGray, modifier = Modifier.size(16.dp))
+                                    Icon(Icons.Outlined.AccountBalance, contentDescription = null, tint = Color.DarkGray, modifier = Modifier.size(18.dp))
                                     Spacer(modifier = Modifier.width(6.dp))
                                 }
                                 Text(selectedSourceName, color = if(selectedSourceType == "Cash") Color(0xFF2E7D32) else Color.Black, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                             }
                             if (isPaidByActive) {
-                                Icon(Icons.Outlined.ArrowDropDown, null, tint = Color.Gray, modifier = Modifier.size(20.dp).rotate(if (paidByExpanded) 180f else 0f))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Icon(Icons.Outlined.ArrowDropDown, null, tint = Color.Gray, modifier = Modifier.rotate(if (paidByExpanded) 180f else 0f))
                             }
                         }
                     }
@@ -280,7 +276,7 @@ fun AddExpenseForm(
                                     text = { 
                                         Row(verticalAlignment = Alignment.CenterVertically) {
                                             val logo = Constants.BankLogoMap[bank.bankName]
-                                            if(logo != null) Image(painterResource(logo), null, modifier = Modifier.size(20.dp).clip(RoundedCornerShape(4.dp)))
+                                            if(logo != null) Image(painterResource(logo), null, modifier = Modifier.size(24.dp).clip(RoundedCornerShape(4.dp)))
                                             Spacer(modifier = Modifier.width(8.dp))
                                             val shortAcc = if(bank.accountNo.length >= 4) bank.accountNo.takeLast(4) else bank.accountNo
                                             Text("${bank.bankName} • $shortAcc", maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -302,7 +298,7 @@ fun AddExpenseForm(
                                     text = { 
                                         Row(verticalAlignment = Alignment.CenterVertically) {
                                             val logo = Constants.BankLogoMap[cc.issuer]
-                                            if(logo != null) Image(painterResource(logo), null, modifier = Modifier.size(20.dp).clip(RoundedCornerShape(4.dp)))
+                                            if(logo != null) Image(painterResource(logo), null, modifier = Modifier.size(24.dp).clip(RoundedCornerShape(4.dp)))
                                             Spacer(modifier = Modifier.width(8.dp))
                                             val shortAcc = if(cc.cardNo.length >= 4) cc.cardNo.takeLast(4) else cc.cardNo
                                             Text("${cc.issuer} • $shortAcc", maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -355,7 +351,6 @@ fun AddExpenseForm(
 
                     if (amount.isNotBlank() && finalCategory.isNotBlank() && expenseDate.isNotBlank() && finalMode.isNotBlank()) {
                         
-                        // Stop if source is not selected properly
                         if (selectedSourceType.isNotEmpty() && selectedSourceId.isEmpty()) {
                             Toast.makeText(context, "Please select exact Paid By account/card", Toast.LENGTH_SHORT).show()
                             return@Button
@@ -376,9 +371,9 @@ fun AddExpenseForm(
                                     put("date", expenseDate) 
                                     put("detail1", remark1)
                                     put("detail2", remark2)
-                                    put("payment_method", finalMode)
+                                    put("payment_method", finalMode) 
                                     put("source_type", selectedSourceType) 
-                                    put("source_identifier", selectedSourceId)
+                                    put("source_identifier", selectedSourceId) 
                                 }
                                 val client = OkHttpClient()
                                 val body = json.toString().toRequestBody("application/json".toMediaType())
