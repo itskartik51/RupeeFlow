@@ -13,8 +13,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import java.util.TimeZone
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -22,10 +24,33 @@ fun CustomDatePicker(
     label: String,
     selectedDateMillis: Long?,
     onDateSelected: (Long) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    restrictToCurrentMonth: Boolean = false // NEW FEATURE
 ) {
     var showDialog by remember { mutableStateOf(false) }
-    val datePickerState = rememberDatePickerState(initialSelectedDateMillis = selectedDateMillis)
+
+    // Smart logic to restrict dates only to the current running month
+    val selectableDates = remember(restrictToCurrentMonth) {
+        object : SelectableDates {
+            override fun isSelectableDate(utcTimeMillis: Long): Boolean {
+                if (!restrictToCurrentMonth) return true
+                val currentCal = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
+                val targetCal = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply { timeInMillis = utcTimeMillis }
+                return currentCal.get(Calendar.YEAR) == targetCal.get(Calendar.YEAR) &&
+                       currentCal.get(Calendar.MONTH) == targetCal.get(Calendar.MONTH)
+            }
+
+            override fun isSelectableYear(year: Int): Boolean {
+                if (!restrictToCurrentMonth) return true
+                return year == Calendar.getInstance(TimeZone.getTimeZone("UTC")).get(Calendar.YEAR)
+            }
+        }
+    }
+
+    val datePickerState = rememberDatePickerState(
+        initialSelectedDateMillis = selectedDateMillis,
+        selectableDates = selectableDates
+    )
 
     val displayDate = if (selectedDateMillis != null) {
         SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(selectedDateMillis))
@@ -33,7 +58,6 @@ fun CustomDatePicker(
         "DD/MM/YYYY"
     }
 
-    // Box transparent layer to make the entire TextField clickable seamlessly
     Box(modifier = modifier.clickable { showDialog = true }) {
         OutlinedTextField(
             value = displayDate,
@@ -84,4 +108,3 @@ fun CustomDatePicker(
         }
     }
 }
-
