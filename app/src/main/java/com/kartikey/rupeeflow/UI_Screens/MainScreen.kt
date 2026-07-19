@@ -45,7 +45,6 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
     var ccToEdit by remember { mutableStateOf<CreditCardItem?>(null) }
     var fdToEdit by remember { mutableStateOf<FDItem?>(null) }
     
-    // Naye States for Edit/Delete History
     var expenseToEdit by remember { mutableStateOf<TransactionModel?>(null) }
     var expenseToDelete by remember { mutableStateOf<TransactionModel?>(null) }
     
@@ -235,8 +234,7 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
         if (ccToEdit != null) { EditCreditCardDialog(cc = ccToEdit!!, username = username, onDismiss = { ccToEdit = null }, onUpdateSuccess = { ccToEdit = null; refreshTrigger++ }) }
         if (fdToEdit != null) { EditFDDialog(fd = fdToEdit!!, username = username, onDismiss = { fdToEdit = null }, onUpdateSuccess = { fdToEdit = null; refreshTrigger++ }) }
         
-        // Expense Action Listeners
         if (expenseToDelete != null) { DeleteExpenseDialog(expense = expenseToDelete!!, username = username, onDismiss = { expenseToDelete = null }, onSuccess = { expenseToDelete = null; refreshTrigger++ }) }
-        if (expenseToEdit != null) { EditExpenseDialog(expense = expenseToEdit!!, username = username, onDismiss = { expenseToEdit = null }, onSuccess = { expenseToEdit = null; refreshTrigger++ }) }
+        if (expenseToEdit != null) { EditExpenseDialog(expense = expenseToEdit!!, username = username, bankList = bankList, ccList = ccList, onDismiss = { expenseToEdit = null }, onSuccess = { expenseToEdit = null; refreshTrigger++ }) }
     }
 }
