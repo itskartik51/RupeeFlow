@@ -17,10 +17,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kartikey.rupeeflow.UI_Screens.Add.TransactionModel
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 @Composable
 fun ExpenseHistoryScreen(
@@ -58,8 +61,22 @@ fun ExpenseHistoryScreen(
         return "Unknown"
     }
 
-    // Grouping by Month-Year
-    val groupedHistory = history.groupBy { getMonthYear(it.date) }
+    // STRICT DATE-TIME PARSER FOR NEW-TO-OLD SORTING
+    fun parseDateForSort(dateStr: String): Long {
+        val formatWithTime = SimpleDateFormat("dd/MM/yyyy hh:mm a", Locale.getDefault())
+        val formatOnlyDate = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+        return try {
+            formatWithTime.parse(dateStr)?.time ?: 0L
+        } catch (e: Exception) {
+            try { formatOnlyDate.parse(dateStr)?.time ?: 0L } catch (e2: Exception) { 0L }
+        }
+    }
+
+    // Forcefully sort the list: NEW to OLD strictly by exact Date and Time
+    val sortedHistory = history.sortedByDescending { parseDateForSort(it.date) }
+    
+    // Grouping by Month-Year after sorting
+    val groupedHistory = sortedHistory.groupBy { getMonthYear(it.date) }
 
     Column(
         modifier = Modifier
@@ -119,15 +136,16 @@ fun ExpenseHistoryScreen(
             ) {
                 groupedHistory.forEach { (monthYear, monthTransactions) ->
                     val monthTotal = monthTransactions.sumOf { it.amount }
-                    val formattedTotal = String.format("%.0f", monthTotal)
+                    // Format to remove decimals if not needed
+                    val formattedTotal = if (monthTotal % 1.0 == 0.0) String.format("%.0f", monthTotal) else monthTotal.toString()
 
-                    // 1. GIANT 28sp MONTH-YEAR HEADER
+                    // 1. HEADER (24.sp Size)
                     item {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .background(Color(0xFFF5F5F5)) // Grey Background Patti
-                                .padding(horizontal = 16.dp, vertical = 24.dp), // Thodi extra padding luxury feel ke liye
+                                .padding(horizontal = 16.dp, vertical = 20.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -135,13 +153,13 @@ fun ExpenseHistoryScreen(
                                 text = monthYear,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = Color.DarkGray,
-                                fontSize = 28.sp
+                                fontSize = 24.sp // Corrected as instructed
                             )
                             Text(
                                 text = "₹ $formattedTotal", 
                                 fontWeight = FontWeight.ExtraBold,
                                 color = Color.Black,
-                                fontSize = 28.sp
+                                fontSize = 24.sp // Corrected as instructed
                             )
                         }
                     }
@@ -183,8 +201,6 @@ fun TransactionFlatItem(transaction: TransactionModel) {
             val datePart = dateStr.split(" ")[0]
             val parts = datePart.split("/")
             if (parts.size >= 2) {
-                val months = listOf("July", "August", "September", "October", "November", "December", "January", "February", "March", "April", "May", "June")
-                // Adjusting correctly based on 1-12 indexing
                 val standardMonths = listOf("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December")
                 val monthIdx = parts[1].toIntOrNull()?.minus(1)
                 if (monthIdx != null && monthIdx in 0..11) {
@@ -211,20 +227,20 @@ fun TransactionFlatItem(transaction: TransactionModel) {
         modifier = Modifier
             .fillMaxWidth()
             .background(Color.White)
-            .padding(horizontal = 20.dp, vertical = 14.dp), // Clean spacing
+            .padding(horizontal = 20.dp, vertical = 10.dp), // Gap reduced from 14.dp to 10.dp
         verticalAlignment = Alignment.CenterVertically
     ) {
         // LEFT SIDE: Category & Date
-        Column(modifier = Modifier.weight(1.3f)) {
+        Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = transaction.category,
                 fontWeight = FontWeight.Bold,
-                fontSize = 18.sp, // Slightly bigger
+                fontSize = 18.sp,
                 color = Color.Black,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            // No gap shadow date
+            // Tucked right under category
             Text(
                 text = displayDate,
                 fontSize = 12.sp,
@@ -233,42 +249,39 @@ fun TransactionFlatItem(transaction: TransactionModel) {
             )
         }
 
-        // MIDDLE: Remarks (Aligned beautifully at the bottom matching the Date)
-        Box(
-            modifier = Modifier.weight(1f).align(Alignment.Bottom),
-            contentAlignment = Alignment.BottomCenter
+        // RIGHT SIDE: Amount + Icon (Top) & Remarks (Bottom)
+        Column(
+            horizontalAlignment = Alignment.End, // Ensures touched to the right edge
+            modifier = Modifier.padding(start = 8.dp)
         ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = modeIcon,
+                    contentDescription = transaction.mode,
+                    tint = Color.Gray,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                // Format to keep decimal cleanly
+                Text(
+                    text = "₹${transaction.amount}",
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 16.sp,
+                    color = Color.Black 
+                )
+            }
+            
+            // Remarks shifted below amount and right-aligned
             if (remarksCombo.isNotBlank()) {
                 Text(
                     text = remarksCombo,
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                     color = Color.Gray,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(bottom = 2.dp) // Perfect horizontal alignment with Date
+                    textAlign = TextAlign.End,
+                    maxLines = 2, // Allow wrapping if it's very long so it shows completely
+                    overflow = TextOverflow.Ellipsis
                 )
             }
-        }
-
-        // RIGHT SIDE: Mode Icon + Amount (No Minus Sign)
-        Row(
-            modifier = Modifier.weight(1f),
-            horizontalArrangement = Arrangement.End,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = modeIcon,
-                contentDescription = transaction.mode,
-                tint = Color.Gray,
-                modifier = Modifier.size(16.dp) // Small subtle icon
-            )
-            Spacer(modifier = Modifier.width(6.dp))
-            Text(
-                text = "₹${transaction.amount}",
-                fontWeight = FontWeight.ExtraBold,
-                fontSize = 16.sp,
-                color = Color.Black 
-            )
         }
     }
 }
