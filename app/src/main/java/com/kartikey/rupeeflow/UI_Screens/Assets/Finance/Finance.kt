@@ -30,9 +30,14 @@ fun FinanceScreen(
     onBackClick: () -> Unit,
     username: String,
     bankList: List<BankAccountItem>,
+    ccList: List<CreditCardItem>,
+    fdList: List<FDItem>,
+    cashData: CashItem,
     isLoading: Boolean,
     onRefreshClick: () -> Unit,
-    onEditBankClick: (BankAccountItem) -> Unit 
+    onEditBankClick: (BankAccountItem) -> Unit,
+    onEditCCClick: (CreditCardItem) -> Unit,
+    onEditFDClick: (FDItem) -> Unit
 ) {
     var currentFinanceView by remember { mutableStateOf("Main") }
 
@@ -51,24 +56,25 @@ fun FinanceScreen(
                 modifier = Modifier.fillMaxSize().padding(paddingValues).padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                BigFinanceCard("Cash", "₹0.00", Icons.Outlined.Money, Color(0xFF388E3C), isClickable = false) {}
-                
                 val totalBank = bankList.sumOf { it.currentBalance }
+                val totalCash = cashData.amount
+                val totalFD = fdList.sumOf { it.accruedValue }
+                val totalCC = ccList.sumOf { it.outstanding }
+
+                BigFinanceCard("Cash", formatRupeeAmount(totalCash), Icons.Outlined.Money, Color(0xFF388E3C), isClickable = true) { currentFinanceView = "Cash" }
                 BigFinanceCard("Bank Accounts", formatRupeeAmount(totalBank), Icons.Outlined.AccountBalance, Color(0xFF1976D2), isClickable = true) { currentFinanceView = "BankAccounts" }
-                
-                BigFinanceCard("Credit Card", "₹0.00", Icons.Outlined.CreditCard, Color(0xFFD32F2F), isClickable = false) {}
-                BigFinanceCard("FD : Fixed Deposit", "₹0.00", Icons.Outlined.Savings, Color(0xFFF57C00), isClickable = false) {}
+                BigFinanceCard("Credit Card", formatRupeeAmount(totalCC), Icons.Outlined.CreditCard, Color(0xFFD32F2F), isClickable = true) { currentFinanceView = "CreditCards" }
+                BigFinanceCard("FD : Fixed Deposit", formatRupeeAmount(totalFD), Icons.Outlined.Savings, Color(0xFFF57C00), isClickable = true) { currentFinanceView = "FixedDeposits" }
             }
         }
     } else if (currentFinanceView == "BankAccounts") {
-        BankAccountsScreen(
-            onBackClick = { currentFinanceView = "Main" },
-            username = username, 
-            bankList = bankList,
-            isLoading = isLoading,
-            onRefreshClick = onRefreshClick,
-            onEditBankClick = onEditBankClick 
-        )
+        BankAccountsScreen(onBackClick = { currentFinanceView = "Main" }, username = username, bankList = bankList, isLoading = isLoading, onRefreshClick = onRefreshClick, onEditBankClick = onEditBankClick)
+    } else if (currentFinanceView == "CreditCards") {
+        CreditCardsScreen(onBackClick = { currentFinanceView = "Main" }, username = username, ccList = ccList, isLoading = isLoading, onRefreshClick = onRefreshClick, onEditCCClick = onEditCCClick)
+    } else if (currentFinanceView == "FixedDeposits") {
+        FixedDepositsScreen(onBackClick = { currentFinanceView = "Main" }, username = username, fdList = fdList, isLoading = isLoading, onRefreshClick = onRefreshClick, onEditFDClick = onEditFDClick)
+    } else if (currentFinanceView == "Cash") {
+        CashScreen(onBackClick = { currentFinanceView = "Main" }, username = username, cashData = cashData, onRefreshRequest = onRefreshClick)
     }
 }
 
