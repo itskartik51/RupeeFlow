@@ -26,7 +26,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
@@ -36,6 +35,7 @@ import com.kartikey.rupeeflow.Cloud_Database.Constants
 import com.kartikey.rupeeflow.UI_Screens.Assets.BankAccountItem
 import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.CashItem
 import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.CreditCardItem
+import com.kartikey.rupeeflow.UI_Screens.CustomDatePicker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -78,6 +78,7 @@ fun AddExpenseForm(
     var isCategoryEditable by remember { mutableStateOf(false) } 
     var remark1 by remember { mutableStateOf("") }
     var remark2 by remember { mutableStateOf("") }
+    
     var modeText by remember { mutableStateOf("") }
     var modeExpanded by remember { mutableStateOf(false) }
 
@@ -90,8 +91,8 @@ fun AddExpenseForm(
     
     var amount by remember { mutableStateOf("") }
     
-    val todayDate = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
-    var expenseDate by remember { mutableStateOf(todayDate) }
+    // Default Date to Today's Timestamp for CustomDatePicker
+    var expenseDateMillis by remember { mutableStateOf<Long>(System.currentTimeMillis()) }
     
     var expanded by remember { mutableStateOf(false) }
     var isSubmitting by remember { mutableStateOf(false) }
@@ -124,7 +125,8 @@ fun AddExpenseForm(
                 )
                 ExposedDropdownMenu(
                     expanded = expanded,
-                    onDismissRequest = { expanded = false }
+                    onDismissRequest = { expanded = false },
+                    modifier = Modifier.background(Color.White)
                 ) {
                     categories.forEach { (name, icon) ->
                         DropdownMenuItem(
@@ -169,28 +171,50 @@ fun AddExpenseForm(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // SMART MODE & PAID BY ROW (35% & 65%)
+            // SMART MODE & PAID BY ROW
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                // Mode Dropdown (35%)
+                // Mode Dropdown (30% weight to give text more space & prevent wrapping)
                 ExposedDropdownMenuBox(
                     expanded = modeExpanded,
                     onExpandedChange = { modeExpanded = !modeExpanded },
-                    modifier = Modifier.weight(0.35f)
+                    modifier = Modifier.weight(0.3f)
                 ) {
-                    OutlinedTextField(
-                        value = modeText,
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Mode") },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = modeExpanded) },
-                        modifier = Modifier.fillMaxWidth().menuAnchor(),
-                        shape = RoundedCornerShape(12.dp),
-                        singleLine = true,
-                        textStyle = TextStyle(fontSize = 14.sp)
-                    )
+                    // Custom Box to remove internal padding and fix the vertical M-o-d-e issue
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp)
+                            .border(1.dp, if(modeExpanded) Color(0xFF2E7D32) else Color.Gray, RoundedCornerShape(12.dp))
+                            .menuAnchor()
+                            .background(Color.Transparent, RoundedCornerShape(12.dp)),
+                        contentAlignment = Alignment.CenterStart
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp), 
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = if (modeText.isEmpty()) "Mode" else modeText,
+                                color = if (modeText.isEmpty()) Color.Gray else Color.Black,
+                                fontSize = 14.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Icon(
+                                Icons.Outlined.ArrowDropDown, 
+                                contentDescription = null, 
+                                tint = Color.Gray, 
+                                modifier = Modifier.size(20.dp).rotate(if (modeExpanded) 180f else 0f)
+                            )
+                        }
+                    }
+                    
                     ExposedDropdownMenu(
                         expanded = modeExpanded,
-                        onDismissRequest = { modeExpanded = false }
+                        onDismissRequest = { modeExpanded = false },
+                        modifier = Modifier.background(Color.White)
                     ) {
                         paymentModes.forEach { (name, icon) ->
                             DropdownMenuItem(
@@ -206,7 +230,7 @@ fun AddExpenseForm(
                                     modeExpanded = false
                                     selectedSourceId = ""
                                     selectedSourceName = ""
-                                    selectedSourceLogo = null // Reset
+                                    selectedSourceLogo = null 
                                     if (name == "Cash") {
                                         selectedSourceType = "Cash"
                                         selectedSourceId = "Cash"
@@ -222,14 +246,14 @@ fun AddExpenseForm(
                     }
                 }
 
-                // Paid By Dropdown (65%)
+                // Paid By Dropdown (70% weight)
                 val modeIcon = paymentModes.find { it.first == modeText }?.second ?: Icons.Outlined.Payments
                 val isPaidByActive = selectedSourceType.isNotEmpty() && selectedSourceType != "Cash"
 
                 ExposedDropdownMenuBox(
                     expanded = paidByExpanded && isPaidByActive,
                     onExpandedChange = { if(isPaidByActive) paidByExpanded = !paidByExpanded },
-                    modifier = Modifier.weight(0.65f)
+                    modifier = Modifier.weight(0.7f)
                 ) {
                     Box(
                         modifier = Modifier
@@ -320,14 +344,14 @@ fun AddExpenseForm(
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            // 4. Custom Date Picker & Amount
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(
-                    value = expenseDate, 
-                    onValueChange = { expenseDate = it },
-                    label = { Text("Date (DD/MM/YYYY)") },
-                    modifier = Modifier.weight(1f), 
-                    singleLine = true,
-                    shape = RoundedCornerShape(12.dp)
+                CustomDatePicker(
+                    label = "Date",
+                    selectedDateMillis = expenseDateMillis,
+                    onDateSelected = { expenseDateMillis = it },
+                    restrictToCurrentMonth = true, // Locks date selection to current month only
+                    modifier = Modifier.weight(1f)
                 )
 
                 OutlinedTextField(
@@ -344,96 +368,9 @@ fun AddExpenseForm(
             
             Spacer(modifier = Modifier.height(24.dp))
 
+            // 5. Submit Engine (Auto Deduct Payload)
             Button(
                 onClick = {
                     val finalCategory = categoryText.trim()
                     val finalMode = modeText.trim()
-
-                    if (amount.isNotBlank() && finalCategory.isNotBlank() && expenseDate.isNotBlank() && finalMode.isNotBlank()) {
-                        
-                        if (selectedSourceType.isNotEmpty() && selectedSourceId.isEmpty()) {
-                            Toast.makeText(context, "Please select exact Paid By account/card", Toast.LENGTH_SHORT).show()
-                            return@Button
-                        }
-
-                        isSubmitting = true
-                        val expenseAmt = amount.toDoubleOrNull() ?: 0.0
-                        val newEntry = TransactionModel(expenseDate, expenseAmt, finalCategory, remark1, remark2, finalMode)
-                        onExpenseAdded(newEntry)
-
-                        coroutineScope.launch(Dispatchers.IO) {
-                            try {
-                                val json = JSONObject().apply {
-                                    put("action", "add_expense")
-                                    put("username", username)
-                                    put("amount", amount)
-                                    put("category", finalCategory)
-                                    put("date", expenseDate) 
-                                    put("detail1", remark1)
-                                    put("detail2", remark2)
-                                    put("payment_method", finalMode) 
-                                    put("source_type", selectedSourceType) 
-                                    put("source_identifier", selectedSourceId) 
-                                }
-                                val client = OkHttpClient()
-                                val body = json.toString().toRequestBody("application/json".toMediaType())
-                                val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(body).build()
-                                client.newCall(request).execute()
-
-                                withContext(Dispatchers.Main) {
-                                    isSubmitting = false
-                                    Toast.makeText(context, "Saved & Balance Adjusted! ✅", Toast.LENGTH_LONG).show()
-                                    amount = ""; remark1 = ""; remark2 = ""; categoryText = ""; modeText = ""
-                                    selectedSourceId = ""; selectedSourceName = ""; selectedSourceType = ""; selectedSourceLogo = null
-                                    isCategoryEditable = false 
-                                    expenseDate = todayDate
-                                    onDismiss() 
-                                }
-                            } catch (e: Exception) {
-                                withContext(Dispatchers.Main) {
-                                    isSubmitting = false
-                                    Toast.makeText(context, "Failed to connect to sheet ❌", Toast.LENGTH_SHORT).show()
-                                }
-                            }
-                        }
-                    } else {
-                        Toast.makeText(context, "Please fill Amount, Category, Mode & Date", Toast.LENGTH_SHORT).show()
-                    }
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp)
-                    .scale(buttonScale)
-                    .pointerInput(Unit) {
-                        detectTapGestures(
-                            onPress = {
-                                isPressed = true
-                                tryAwaitRelease()
-                                isPressed = false
-                            }
-                        )
-                    },
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
-                shape = RoundedCornerShape(12.dp),
-                enabled = !isSubmitting
-            ) {
-                if (isSubmitting) {
-                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(26.dp), strokeWidth = 3.dp)
-                } else {
-                    Text("Save Expense", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White)
-                }
-            }
-            
-            Spacer(modifier = Modifier.height(24.dp))
-        }
-    }
-}
-
-data class TransactionModel(
-    val date: String,
-    val amount: Double,
-    val category: String,
-    val remark1: String,
-    val remark2: String,
-    val mode: String = "" 
-)
+                    // Converting millis back to String format requi
