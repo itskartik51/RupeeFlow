@@ -1,7 +1,7 @@
 package com.kartikey.rupeeflow.UI_Screens
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.Crossfade
+import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -275,7 +275,6 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                         colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
                     )
                     
-                    // Invisible Placeholder for Add Button
                     NavigationBarItem(
                         selected = false,
                         onClick = { showAddMenu = !showAddMenu },
@@ -297,11 +296,35 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                 }
             }
         ) { paddingValues ->
-            Crossfade(targetState = Pair(selectedTab, showExpenseHistory), animationSpec = tween(400), label = "Screen Transition") { state ->
+            // PREMIUM SLIDE IN/OUT ANIMATION added here!
+            AnimatedContent(
+                targetState = Pair(selectedTab, showExpenseHistory),
+                transitionSpec = {
+                    if (targetState.second && !initialState.second) {
+                        // Opening History (Slide Left)
+                        (slideInHorizontally(animationSpec = tween(250)) { width -> width } + fadeIn(tween(250))).togetherWith(
+                            slideOutHorizontally(animationSpec = tween(250)) { width -> -width / 2 } + fadeOut(tween(250)))
+                    } else if (!targetState.second && initialState.second) {
+                        // Closing History (Slide Right)
+                        (slideInHorizontally(animationSpec = tween(250)) { width -> -width / 2 } + fadeIn(tween(250))).togetherWith(
+                            slideOutHorizontally(animationSpec = tween(250)) { width -> width } + fadeOut(tween(250)))
+                    } else {
+                        // Normal Tab Swapping
+                        fadeIn(tween(250)) togetherWith fadeOut(tween(250))
+                    }
+                },
+                label = "Screen Transition"
+            ) { state ->
                 val (currentTab, isHistoryVisible) = state
                 
                 if (isHistoryVisible) {
-                    com.kartikey.rupeeflow.UI_Screens.Home.ExpenseHistoryScreen(paddingValues = paddingValues, history = transactionList, onBackClick = { showExpenseHistory = false })
+                    com.kartikey.rupeeflow.UI_Screens.Home.ExpenseHistoryScreen(
+                        paddingValues = paddingValues, 
+                        history = transactionList,
+                        isLoading = isLoadingExpenses,
+                        onRefreshClick = { refreshTrigger++ },
+                        onBackClick = { showExpenseHistory = false }
+                    )
                 } else {
                     when (currentTab) {
                         0 -> HomeDashboardDesign(username = username, paddingValues = paddingValues, thisMonthExpenses = thisMonthExpenses, thisYearExpenses = thisYearExpenses, isLoadingExpenses = isLoadingExpenses, dNavState = dNavState, dBackPresses = dBackPresses, onLogout = onLogout, onRefreshExpenses = { refreshTrigger++ }, onExpenseCardClick = { showExpenseHistory = true })
@@ -322,7 +345,6 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
             }
         }
 
-        // The Master Overlay Engine
         AddScreen(
             username = username, showMenu = showAddMenu, onToggleMenu = { showAddMenu = !showAddMenu },
             onExpenseAdded = { newEntry -> transactionList = listOf(newEntry) + transactionList },
@@ -331,16 +353,8 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
             bankList = bankList, ccList = ccList, cashData = cashData
         )
 
-        if (bankToEdit != null) {
-            EditBankDialog(bank = bankToEdit!!, username = username, onDismiss = { bankToEdit = null }, onUpdateSuccess = { bankToEdit = null; refreshTrigger++ })
-        }
-        
-        if (ccToEdit != null) {
-            EditCreditCardDialog(cc = ccToEdit!!, username = username, onDismiss = { ccToEdit = null }, onUpdateSuccess = { ccToEdit = null; refreshTrigger++ })
-        }
-        
-        if (fdToEdit != null) {
-            EditFDDialog(fd = fdToEdit!!, username = username, onDismiss = { fdToEdit = null }, onUpdateSuccess = { fdToEdit = null; refreshTrigger++ })
-        }
+        if (bankToEdit != null) { EditBankDialog(bank = bankToEdit!!, username = username, onDismiss = { bankToEdit = null }, onUpdateSuccess = { bankToEdit = null; refreshTrigger++ }) }
+        if (ccToEdit != null) { EditCreditCardDialog(cc = ccToEdit!!, username = username, onDismiss = { ccToEdit = null }, onUpdateSuccess = { ccToEdit = null; refreshTrigger++ }) }
+        if (fdToEdit != null) { EditFDDialog(fd = fdToEdit!!, username = username, onDismiss = { fdToEdit = null }, onUpdateSuccess = { fdToEdit = null; refreshTrigger++ }) }
     }
 }
