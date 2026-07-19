@@ -26,6 +26,9 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.kartikey.rupeeflow.UI_Screens.Assets.BankAccountItem
+import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.CashItem
+import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.CreditCardItem
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -35,7 +38,10 @@ fun AddScreen(
     onToggleMenu: () -> Unit,
     onExpenseAdded: (TransactionModel) -> Unit,
     onInvestmentAdded: () -> Unit,
-    onFinanceAdded: () -> Unit
+    onFinanceAdded: () -> Unit,
+    bankList: List<BankAccountItem> = emptyList(),
+    ccList: List<CreditCardItem> = emptyList(),
+    cashData: CashItem? = null
 ) {
     var activeAddForm by remember { mutableStateOf<String?>(null) } 
     
@@ -152,7 +158,7 @@ fun AddScreen(
                     modifier = Modifier.padding(bottom = 16.dp, top = 8.dp)
                 )
                 when (activeAddForm) {
-                    "Expense" -> AddExpenseForm(username, onExpenseAdded = { onExpenseAdded(it) }, onDismiss = { activeAddForm = null })
+                    "Expense" -> AddExpenseForm(username, bankList, ccList, cashData, onExpenseAdded = { onExpenseAdded(it) }, onDismiss = { activeAddForm = null })
                     "Investment" -> AddInvestmentForm(username, onInvestmentAdded = { onInvestmentAdded() }, onDismiss = { activeAddForm = null })
                     "Finance" -> AddFinanceForm(username, onFinanceAdded = { onFinanceAdded() }, onDismiss = { activeAddForm = null })
                 }
