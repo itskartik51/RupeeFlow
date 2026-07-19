@@ -11,6 +11,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AccountBalance
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -71,6 +72,9 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
     var ccIssuer by remember { mutableStateOf("") }
     var expandedCcIssuer by remember { mutableStateOf(false) }
     var ccCardNo by remember { mutableStateOf("") }
+    
+    var ccAnnualFee by remember { mutableStateOf("") }
+    var ccJoiningFee by remember { mutableStateOf("") }
     
     var ccSecurity by remember { mutableStateOf("") }
     var expandedSecurity by remember { mutableStateOf(false) }
@@ -214,12 +218,13 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
         }
     }
 
-    // --- NEW: SUBMIT CREDIT CARD LOGIC ---
     val submitCreditCard = {
         val limitAmt = ccLimit.toDoubleOrNull() ?: 0.0
         val billDay = ccBillingDay.toIntOrNull() ?: 0
         val dueD = ccDueDay.toIntOrNull() ?: 0
         val remindD = ccReminderDay.toIntOrNull() ?: 0
+        val annFee = ccAnnualFee.toDoubleOrNull() ?: 0.0
+        val joinFee = ccJoiningFee.toDoubleOrNull() ?: 0.0
         
         if (ccIssuer.isBlank() || ccCardNo.isBlank() || ccSecurity.isBlank() || ccNetwork.isBlank() || limitAmt <= 0 || billDay == 0 || dueD == 0) {
             Toast.makeText(context, "Please fill all required card details properly.", Toast.LENGTH_LONG).show()
@@ -227,7 +232,6 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
             Toast.makeText(context, "Select a valid Issuer from dropdown!", Toast.LENGTH_SHORT).show()
         } else {
             isSubmitting = true
-            // Combine Network and Security as requested (e.g., "Rupay/Secured")
             val finalType = "$ccNetwork/$ccSecurity"
             
             coroutineScope.launch(Dispatchers.IO) {
@@ -237,15 +241,15 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                         put("action", "add_cc")
                         put("username", username)
                         put("issuer", ccIssuer)
-                        put("card_no", "XXXXX$ccCardNo") // Formatted with XXXXX
+                        put("card_no", "XXXXX$ccCardNo")
                         put("type", finalType)
                         put("limit", limitAmt)
-                        put("outstanding", 0.0) // Default for new card
+                        put("outstanding", 0.0) 
                         put("billing_day", billDay)
                         put("due_day", dueD)
                         put("reminder_day", remindD)
-                        put("annual_fee", 0.0) // Kept default, can be edited later
-                        put("joining_fee", 0.0)
+                        put("annual_fee", annFee) 
+                        put("joining_fee", joinFee)
                         put("last_used", "")
                     }
                     val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(jsonBody.toString().toRequestBody("application/json".toMediaType())).build()
@@ -287,7 +291,7 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
             }
 
             if (selectedType.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(20.dp))
                 HorizontalDivider(color = Color(0xFFEEEEEE))
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -305,15 +309,15 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                             }
                         }
                     }
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
                     OutlinedTextField(
                         value = bankAccountNo, onValueChange = { if (it.length <= 4 && it.all { char -> char.isDigit() }) bankAccountNo = it },
                         label = { Text("Account No. (Last 3-4 Digits)") }, prefix = { Text("XXXXX", color = Color.Black, fontWeight = FontWeight.Bold, letterSpacing = 2.sp) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth(), singleLine = true, shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF2E7D32), focusedLabelColor = Color(0xFF2E7D32))
                     )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedTextField(
                             value = currentBalance, onValueChange = { currentBalance = it }, label = { Text("Balance") }, prefix = { Text("₹ ", fontWeight = FontWeight.Bold, color = Color.Black) },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(0.65f), singleLine = true, shape = RoundedCornerShape(12.dp),
@@ -341,8 +345,8 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                             }
                         }
                     }
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedTextField(
                             value = fdAccountNo, onValueChange = { fdAccountNo = it }, label = { Text("FD Account No.") }, modifier = Modifier.weight(0.6f), singleLine = true, shape = RoundedCornerShape(12.dp),
                             colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF2E7D32), focusedLabelColor = Color(0xFF2E7D32))
@@ -353,14 +357,14 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                             colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF2E7D32), focusedLabelColor = Color(0xFF2E7D32))
                         )
                     }
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
                     OutlinedTextField(
                         value = fdAmount, onValueChange = { fdAmount = it }, label = { Text("Invested Amount") }, prefix = { Text("₹ ", fontWeight = FontWeight.Bold, color = Color.Black) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth(), singleLine = true, shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF2E7D32), focusedLabelColor = Color(0xFF2E7D32))
                     )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         CustomDatePicker(label = "Start Date", selectedDateMillis = createDateMillis, onDateSelected = { createDateMillis = it }, modifier = Modifier.weight(1f))
                         CustomDatePicker(label = "End Date", selectedDateMillis = maturityDateMillis, onDateSelected = { maturityDateMillis = it }, modifier = Modifier.weight(1f))
                     }
@@ -377,12 +381,13 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                     Text("This amount will be added to your current cash balance automatically.", color = Color.Gray, fontSize = 11.sp, modifier = Modifier.padding(horizontal = 4.dp))
                 }
 
-                // --- CREDIT CARD UI ---
+                // --- CREDIT CARD UI (REFINED) ---
                 if (selectedType == "Credit Card") {
-                    // 1. Issuer Dropdown
+                    // 1. Issuer Dropdown (With Icon)
                     ExposedDropdownMenuBox(expanded = expandedCcIssuer && filteredCCIssuers.isNotEmpty(), onExpandedChange = { expandedCcIssuer = it }) {
                         OutlinedTextField(
                             value = ccIssuer, onValueChange = { ccIssuer = it; expandedCcIssuer = true }, label = { Text("Issuer Bank") },
+                            leadingIcon = { Icon(Icons.Outlined.AccountBalance, contentDescription = null, tint = Color.Gray) },
                             modifier = Modifier.fillMaxWidth().menuAnchor(), singleLine = true, shape = RoundedCornerShape(12.dp),
                             colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF2E7D32), focusedLabelColor = Color(0xFF2E7D32))
                         )
@@ -392,7 +397,7 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                             }
                         }
                     }
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
 
                     // 2. Card No.
                     OutlinedTextField(
@@ -401,10 +406,27 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth(), singleLine = true, shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF2E7D32), focusedLabelColor = Color(0xFF2E7D32))
                     )
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
 
-                    // 3. Security & Network
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    // 3. Joining & Annual Fee Row
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = ccJoiningFee, onValueChange = { ccJoiningFee = it }, label = { Text("Joining Fee") },
+                            prefix = { Text("₹ ", fontWeight = FontWeight.Bold, color = Color.Black) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.weight(1f), singleLine = true, shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF2E7D32), focusedLabelColor = Color(0xFF2E7D32))
+                        )
+                        OutlinedTextField(
+                            value = ccAnnualFee, onValueChange = { ccAnnualFee = it }, label = { Text("Annual Fee") },
+                            prefix = { Text("₹ ", fontWeight = FontWeight.Bold, color = Color.Black) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.weight(1f), singleLine = true, shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF2E7D32), focusedLabelColor = Color(0xFF2E7D32))
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // 4. Security & Network
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         ExposedDropdownMenuBox(expanded = expandedSecurity, onExpandedChange = { expandedSecurity = it }, modifier = Modifier.weight(1f)) {
                             OutlinedTextField(
                                 value = ccSecurity, onValueChange = {}, readOnly = true, label = { Text("Security") },
@@ -426,17 +448,17 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                             }
                         }
                     }
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
 
-                    // 4. Limit
+                    // 5. Limit
                     OutlinedTextField(
                         value = ccLimit, onValueChange = { ccLimit = it }, label = { Text("Total Limit") }, prefix = { Text("₹ ", fontWeight = FontWeight.Bold, color = Color.Black) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth(), singleLine = true, shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF2E7D32), focusedLabelColor = Color(0xFF2E7D32))
                     )
-                    Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
 
-                    // 5. Days Section
+                    // 6. Days Section
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Outlined.CalendarMonth, contentDescription = "Days", tint = Color.Gray, modifier = Modifier.size(20.dp))
                         Spacer(modifier = Modifier.width(6.dp))
@@ -444,7 +466,6 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        // Billing
                         ExposedDropdownMenuBox(expanded = expandedBilling, onExpandedChange = { expandedBilling = it }, modifier = Modifier.weight(1f)) {
                             OutlinedTextField(
                                 value = ccBillingDay, onValueChange = {}, readOnly = true, label = { Text("Billing") },
@@ -455,7 +476,6 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                                 daysList.forEach { opt -> DropdownMenuItem(text = { Text(opt, color = Color.Black) }, onClick = { ccBillingDay = opt; expandedBilling = false }) }
                             }
                         }
-                        // Due
                         ExposedDropdownMenuBox(expanded = expandedDue, onExpandedChange = { expandedDue = it }, modifier = Modifier.weight(1f)) {
                             OutlinedTextField(
                                 value = ccDueDay, onValueChange = {}, readOnly = true, label = { Text("Due") },
@@ -466,10 +486,9 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                                 daysList.forEach { opt -> DropdownMenuItem(text = { Text(opt, color = Color.Black) }, onClick = { ccDueDay = opt; expandedDue = false }) }
                             }
                         }
-                        // Reminder
                         ExposedDropdownMenuBox(expanded = expandedReminder, onExpandedChange = { expandedReminder = it }, modifier = Modifier.weight(1f)) {
                             OutlinedTextField(
-                                value = ccReminderDay, onValueChange = {}, readOnly = true, label = { Text("Reminder") },
+                                value = ccReminderDay, onValueChange = {}, readOnly = true, label = { Text("Remind") }, // Reminder renamed to Remind
                                 modifier = Modifier.fillMaxWidth().menuAnchor(), singleLine = true, shape = RoundedCornerShape(12.dp),
                                 colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF2E7D32), focusedLabelColor = Color(0xFF2E7D32))
                             )
