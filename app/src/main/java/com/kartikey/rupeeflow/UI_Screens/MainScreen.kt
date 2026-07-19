@@ -183,7 +183,7 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                                         quantity = item.optDouble("quantity", 0.0), 
                                         avgBuyPrice = item.optDouble("buy_price", 0.0), 
                                         currentPrice = item.optDouble("current_price", item.optDouble("buy_price", 0.0)), 
-                                        oneDayReturn = item.optDouble("one_day_change", 0.0)
+                                        oneDayChangePrice = item.optDouble("one_day_change", 0.0)
                                     )
                                 ) 
                             }
