@@ -19,6 +19,9 @@ import com.kartikey.rupeeflow.UI_Screens.Add.TransactionModel
 import com.kartikey.rupeeflow.UI_Screens.Assets.AssetsScreen
 import com.kartikey.rupeeflow.UI_Screens.Assets.InvestmentItem
 import com.kartikey.rupeeflow.UI_Screens.Assets.BankAccountItem
+import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.CashItem
+import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.CreditCardItem
+import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.FDItem
 import com.kartikey.rupeeflow.UI_Screens.Analytics.AnalyticsScreen
 import com.kartikey.rupeeflow.UI_Screens.Profile.ProfileScreen
 import kotlinx.coroutines.Dispatchers
@@ -39,6 +42,8 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
     var assetsCurrentView by remember { mutableStateOf("Main") }
 
     var bankToEdit by remember { mutableStateOf<BankAccountItem?>(null) }
+    var ccToEdit by remember { mutableStateOf<CreditCardItem?>(null) }
+    var fdToEdit by remember { mutableStateOf<FDItem?>(null) }
     
     var showAddMenu by remember { mutableStateOf(false) }
 
@@ -56,22 +61,27 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
     var transactionList by remember { mutableStateOf(emptyList<TransactionModel>()) }
     var investmentList by remember { mutableStateOf(emptyList<InvestmentItem>()) }
     var bankList by remember { mutableStateOf(emptyList<BankAccountItem>()) } 
+    var fdList by remember { mutableStateOf(emptyList<FDItem>()) }
+    var ccList by remember { mutableStateOf(emptyList<CreditCardItem>()) }
+    var cashData by remember { mutableStateOf(CashItem(0.0, "")) }
     
     var dNavState by remember { mutableStateOf("Connecting to Sheet...") }
     var dBackPresses by remember { mutableIntStateOf(0) }
     var refreshTrigger by remember { mutableIntStateOf(0) }
 
-    LaunchedEffect(selectedTab, showExpenseHistory, isLoadingExpenses, transactionList.size, bankToEdit, showAddMenu) {
+    LaunchedEffect(selectedTab, showExpenseHistory, isLoadingExpenses, transactionList.size, bankToEdit, ccToEdit, fdToEdit, showAddMenu) {
         if (showAddMenu) dNavState = "Add Menu Open"
-        else if (bankToEdit != null) dNavState = "Editing Bank"
+        else if (bankToEdit != null || ccToEdit != null || fdToEdit != null) dNavState = "Editing Finance Vault"
         else if (showExpenseHistory) dNavState = "Expense History"
         else dNavState = if (isLoadingExpenses) "Syncing Data... ⏳" else "Tab $selectedTab ✅"
     }
 
-    BackHandler(enabled = showExpenseHistory || selectedTab != 0 || assetsCurrentView != "Main" || bankToEdit != null) {
+    BackHandler(enabled = showExpenseHistory || selectedTab != 0 || assetsCurrentView != "Main" || bankToEdit != null || ccToEdit != null || fdToEdit != null) {
         dBackPresses++ 
         when {
             bankToEdit != null -> bankToEdit = null 
+            ccToEdit != null -> ccToEdit = null
+            fdToEdit != null -> fdToEdit = null
             showExpenseHistory -> showExpenseHistory = false 
             selectedTab == 1 && assetsCurrentView != "Main" -> assetsCurrentView = "Main"
             selectedTab != 0 -> selectedTab = 0 
@@ -166,6 +176,61 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                             }
                         }
 
+                        val cashObj = jsonResponse.optJSONObject("cash")
+                        var fetchedCash = CashItem(0.0, "")
+                        if (cashObj != null) {
+                            fetchedCash = CashItem(cashObj.optDouble("amount", 0.0), cashObj.optString("last_updated", ""))
+                        }
+
+                        val fdArray = jsonResponse.optJSONArray("fds")
+                        val fetchedFDList = mutableListOf<FDItem>()
+                        if (fdArray != null) {
+                            for (i in 0 until fdArray.length()) {
+                                val item = fdArray.getJSONObject(i)
+                                fetchedFDList.add(
+                                    FDItem(
+                                        bankName = item.optString("bank_name", ""),
+                                        accountNo = item.optString("account_no", ""),
+                                        createDate = item.optString("create_date", ""),
+                                        maturityDate = item.optString("maturity_date", ""),
+                                        daysToMaturity = item.optInt("days_to_maturity", 0),
+                                        investedAmt = item.optDouble("invested_amt", 0.0),
+                                        interestRate = item.optDouble("interest_rate", 0.0),
+                                        maturityValue = item.optDouble("maturity_value", 0.0),
+                                        accruedValue = item.optDouble("accrued_value", 0.0),
+                                        accruedInt = item.optDouble("accrued_int", 0.0),
+                                        oneDayInt = item.optDouble("one_day_int", 0.0)
+                                    )
+                                )
+                            }
+                        }
+
+                        val ccArray = jsonResponse.optJSONArray("credit_cards")
+                        val fetchedCCList = mutableListOf<CreditCardItem>()
+                        if (ccArray != null) {
+                            for (i in 0 until ccArray.length()) {
+                                val item = ccArray.getJSONObject(i)
+                                fetchedCCList.add(
+                                    CreditCardItem(
+                                        issuer = item.optString("issuer", ""),
+                                        cardNo = item.optString("card_no", ""),
+                                        type = item.optString("type", ""),
+                                        limit = item.optDouble("limit", 0.0),
+                                        outstanding = item.optDouble("outstanding", 0.0),
+                                        available = item.optDouble("available", 0.0),
+                                        utilization = item.optDouble("utilization", 0.0),
+                                        cibilStatus = item.optString("cibil_status", ""),
+                                        billingDay = item.optInt("billing_day", 0),
+                                        dueDay = item.optInt("due_day", 0),
+                                        reminderDay = item.optInt("reminder_day", 0),
+                                        annualFee = item.optDouble("annual_fee", 0.0),
+                                        joiningFee = item.optDouble("joining_fee", 0.0),
+                                        lastUsed = item.optString("last_used", "")
+                                    )
+                                )
+                            }
+                        }
+
                         withContext(Dispatchers.Main) {
                             userFullName = tempName
                             userEmail = tempEmail
@@ -178,6 +243,10 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                             transactionList = tempHistory.reversed()
                             investmentList = fetchedInvList
                             bankList = fetchedBankList
+                            cashData = fetchedCash
+                            fdList = fetchedFDList
+                            ccList = fetchedCCList
+                            
                             isLoadingExpenses = false
                         }
                     } else { withContext(Dispatchers.Main) { isLoadingExpenses = false } }
@@ -237,21 +306,16 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                     when (currentTab) {
                         0 -> HomeDashboardDesign(username = username, paddingValues = paddingValues, thisMonthExpenses = thisMonthExpenses, thisYearExpenses = thisYearExpenses, isLoadingExpenses = isLoadingExpenses, dNavState = dNavState, dBackPresses = dBackPresses, onLogout = onLogout, onRefreshExpenses = { refreshTrigger++ }, onExpenseCardClick = { showExpenseHistory = true })
                         1 -> AssetsScreen(
-                            paddingValues = paddingValues, username = username, investmentList = investmentList, bankList = bankList, isLoading = isLoadingExpenses, onRefreshClick = { refreshTrigger++ },
+                            paddingValues = paddingValues, username = username, investmentList = investmentList, bankList = bankList, fdList = fdList, ccList = ccList, cashData = cashData, isLoading = isLoadingExpenses, onRefreshClick = { refreshTrigger++ },
                             currentView = assetsCurrentView, onViewChange = { assetsCurrentView = it },
-                            onEditBankClick = { bankToEdit = it }
+                            onEditBankClick = { bankToEdit = it },
+                            onEditCCClick = { ccToEdit = it },
+                            onEditFDClick = { fdToEdit = it }
                         )
                         3 -> AnalyticsScreen(paddingValues = paddingValues)
                         4 -> ProfileScreen(
-                            username = username, 
-                            name = userFullName, 
-                            email = userEmail,
-                            mobile = userMobile,
-                            password = userPassword,
-                            dob = userDob,
-                            paddingValues = paddingValues, 
-                            onLogout = onLogout,
-                            onProfileRefresh = { refreshTrigger++ } 
+                            username = username, name = userFullName, email = userEmail, mobile = userMobile, password = userPassword, dob = userDob,
+                            paddingValues = paddingValues, onLogout = onLogout, onProfileRefresh = { refreshTrigger++ } 
                         )
                     }
                 }
@@ -260,26 +324,22 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
 
         // The Master Overlay Engine
         AddScreen(
-            username = username,
-            showMenu = showAddMenu,
-            onToggleMenu = { showAddMenu = !showAddMenu },
-            onExpenseAdded = { newEntry -> 
-                transactionList = listOf(newEntry) + transactionList 
-            },
+            username = username, showMenu = showAddMenu, onToggleMenu = { showAddMenu = !showAddMenu },
+            onExpenseAdded = { newEntry -> transactionList = listOf(newEntry) + transactionList },
             onInvestmentAdded = { refreshTrigger++ },
             onFinanceAdded = { refreshTrigger++ }
         )
 
         if (bankToEdit != null) {
-            EditBankDialog(
-                bank = bankToEdit!!,
-                username = username,
-                onDismiss = { bankToEdit = null },
-                onUpdateSuccess = { 
-                    bankToEdit = null 
-                    refreshTrigger++ 
-                }
-            )
+            EditBankDialog(bank = bankToEdit!!, username = username, onDismiss = { bankToEdit = null }, onUpdateSuccess = { bankToEdit = null; refreshTrigger++ })
+        }
+        
+        if (ccToEdit != null) {
+            EditCreditCardDialog(cc = ccToEdit!!, username = username, onDismiss = { ccToEdit = null }, onUpdateSuccess = { ccToEdit = null; refreshTrigger++ })
+        }
+        
+        if (fdToEdit != null) {
+            EditFDDialog(fd = fdToEdit!!, username = username, onDismiss = { fdToEdit = null }, onUpdateSuccess = { fdToEdit = null; refreshTrigger++ })
         }
     }
 }
