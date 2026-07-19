@@ -24,6 +24,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.BankAccountsScreen
 import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.FinanceScreen
+import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.CashScreen
+import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.CreditCardsScreen
+import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.FixedDepositsScreen
+import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.CashItem
+import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.CreditCardItem
+import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.FDItem
+import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.formatRupeeAmount
 
 data class InvestmentItem(
     val assetName: String,
@@ -52,13 +59,25 @@ fun AssetsScreen(
     username: String, 
     investmentList: List<InvestmentItem>,
     bankList: List<BankAccountItem>, 
+    fdList: List<FDItem>,
+    ccList: List<CreditCardItem>,
+    cashData: CashItem,
     isLoading: Boolean = false, 
     onRefreshClick: () -> Unit = {},
     currentView: String, 
     onViewChange: (String) -> Unit,
-    onEditBankClick: (BankAccountItem) -> Unit 
+    onEditBankClick: (BankAccountItem) -> Unit,
+    onEditCCClick: (CreditCardItem) -> Unit,
+    onEditFDClick: (FDItem) -> Unit
 ) { 
-    val totalBankBalance = bankList.sumOf { it.currentBalance }
+    val totalBank = bankList.sumOf { it.currentBalance }
+    val totalCash = cashData.amount
+    val totalFD = fdList.sumOf { it.accruedValue }
+    val totalCC = ccList.sumOf { it.outstanding }
+    val totalInv = investmentList.sumOf { it.quantity * it.currentPrice }
+    
+    // Networth Core Logic
+    val networthAmount = totalBank + totalCash + totalFD + totalInv - totalCC
 
     if (currentView == "Main") {
         Column(
@@ -69,7 +88,7 @@ fun AssetsScreen(
                 .verticalScroll(rememberScrollState()) 
                 .padding(16.dp)
         ) {
-            NetworthCard(networthAmount = 79500.0, isLoading = isLoading, onClick = { })
+            NetworthCard(networthAmount = networthAmount, isLoading = isLoading, onClick = { })
             Spacer(modifier = Modifier.height(24.dp))
             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Text(text = "My Investments", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color.Black)
@@ -78,7 +97,7 @@ fun AssetsScreen(
             Spacer(modifier = Modifier.height(8.dp))
             Column(modifier = Modifier.fillMaxWidth()) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Box(modifier = Modifier.weight(1f)) { GridItemCard("STOCKS", "₹0") }
+                    Box(modifier = Modifier.weight(1f)) { GridItemCard("TOTAL INVESTMENTS", formatRupeeAmount(totalInv)) }
                     Box(modifier = Modifier.weight(1f)) { GridItemCard("MUTUAL FUNDS", "₹0") }
                 }
                 Spacer(modifier = Modifier.height(12.dp))
@@ -95,17 +114,21 @@ fun AssetsScreen(
             Spacer(modifier = Modifier.height(8.dp))
             Column(modifier = Modifier.fillMaxWidth()) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Box(modifier = Modifier.weight(1f)) { FinanceGridCard("Cash", "₹0", null, Icons.Outlined.Money, Color(0xFF388E3C)) }
                     Box(modifier = Modifier.weight(1f)) { 
-                        FinanceGridCard("Bank Balance", "₹${totalBankBalance.toInt()}", "${bankList.size}", Icons.Outlined.AccountBalance, Color(0xFF1976D2)) {
-                            onViewChange("DirectBankAccounts") 
-                        } 
+                        FinanceGridCard("Cash", formatRupeeAmount(totalCash), null, Icons.Outlined.Money, Color(0xFF388E3C)) { onViewChange("DirectCash") } 
+                    }
+                    Box(modifier = Modifier.weight(1f)) { 
+                        FinanceGridCard("Bank Balance", formatRupeeAmount(totalBank), "${bankList.size}", Icons.Outlined.AccountBalance, Color(0xFF1976D2)) { onViewChange("DirectBankAccounts") } 
                     }
                 }
                 Spacer(modifier = Modifier.height(12.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Box(modifier = Modifier.weight(1f)) { FinanceGridCard("Credit Card", "₹0", null, Icons.Outlined.CreditCard, Color(0xFFD32F2F)) }
-                    Box(modifier = Modifier.weight(1f)) { FinanceGridCard("FD : Fixed Deposit", "₹0", null, Icons.Outlined.Savings, Color(0xFFF57C00)) }
+                    Box(modifier = Modifier.weight(1f)) { 
+                        FinanceGridCard("Credit Card", formatRupeeAmount(totalCC), "${ccList.size}", Icons.Outlined.CreditCard, Color(0xFFD32F2F)) { onViewChange("DirectCreditCards") } 
+                    }
+                    Box(modifier = Modifier.weight(1f)) { 
+                        FinanceGridCard("FD : Fixed Deposit", formatRupeeAmount(totalFD), "${fdList.size}", Icons.Outlined.Savings, Color(0xFFF57C00)) { onViewChange("DirectFDs") } 
+                    }
                 }
             }
         }
@@ -116,19 +139,23 @@ fun AssetsScreen(
             onBackClick = { onViewChange("Main") },
             username = username,
             bankList = bankList,
+            ccList = ccList,
+            fdList = fdList,
+            cashData = cashData,
             isLoading = isLoading,
             onRefreshClick = onRefreshClick,
-            onEditBankClick = onEditBankClick 
+            onEditBankClick = onEditBankClick,
+            onEditCCClick = onEditCCClick,
+            onEditFDClick = onEditFDClick
         )
     } else if (currentView == "DirectBankAccounts") {
-        BankAccountsScreen(
-            onBackClick = { onViewChange("Main") },
-            username = username,
-            bankList = bankList,
-            isLoading = isLoading,
-            onRefreshClick = onRefreshClick,
-            onEditBankClick = onEditBankClick
-        )
+        BankAccountsScreen(onBackClick = { onViewChange("Main") }, username = username, bankList = bankList, isLoading = isLoading, onRefreshClick = onRefreshClick, onEditBankClick = onEditBankClick)
+    } else if (currentView == "DirectCreditCards") {
+        CreditCardsScreen(onBackClick = { onViewChange("Main") }, username = username, ccList = ccList, isLoading = isLoading, onRefreshClick = onRefreshClick, onEditCCClick = onEditCCClick)
+    } else if (currentView == "DirectFDs") {
+        FixedDepositsScreen(onBackClick = { onViewChange("Main") }, username = username, fdList = fdList, isLoading = isLoading, onRefreshClick = onRefreshClick, onEditFDClick = onEditFDClick)
+    } else if (currentView == "DirectCash") {
+        CashScreen(onBackClick = { onViewChange("Main") }, username = username, cashData = cashData, onRefreshRequest = onRefreshClick)
     }
 }
 
@@ -173,7 +200,7 @@ fun NetworthCard(networthAmount: Double, isLoading: Boolean, onClick: () -> Unit
             Text("NET WORTH", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(8.dp))
             if (isLoading) CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color(0xFF2E7D32))
-            else Text("₹$networthAmount", fontSize = 32.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
+            else Text(formatRupeeAmount(networthAmount), fontSize = 32.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
         }
     }
 }
