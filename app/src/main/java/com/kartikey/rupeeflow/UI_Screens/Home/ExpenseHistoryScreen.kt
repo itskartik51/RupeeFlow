@@ -1,20 +1,21 @@
 package com.kartikey.rupeeflow.UI_Screens.Home
 
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -25,9 +26,23 @@ import com.kartikey.rupeeflow.UI_Screens.Add.TransactionModel
 fun ExpenseHistoryScreen(
     paddingValues: PaddingValues,
     history: List<TransactionModel>, // Google Sheet Data
+    isLoading: Boolean,              // Loading State for Spinner
+    onRefreshClick: () -> Unit,      // Trigger Refresh API
     onBackClick: () -> Unit
 ) {
-    // Helper function to extract Month and Year safely
+    // Smooth Spinning Animation logic for Refresh Icon
+    val infiniteTransition = rememberInfiniteTransition(label = "refreshSpinner")
+    val angle by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "spin"
+    )
+
+    // Helper: Extract Month and Year (e.g., "July 2026")
     fun getMonthYear(dateStr: String): String {
         try {
             val datePart = dateStr.split(" ")[0]
@@ -49,32 +64,47 @@ fun ExpenseHistoryScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.White) // Pure white background for the whole page
+            .background(Color.White) // Pure white background
             .padding(paddingValues)
     ) {
         // TOP HEADER
         Row(
             verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
             modifier = Modifier
                 .fillMaxWidth()
                 .background(Color.White)
                 .padding(16.dp)
         ) {
-            Icon(
-                imageVector = Icons.Default.ArrowBack,
-                contentDescription = "Back",
-                tint = Color.Black,
-                modifier = Modifier
-                    .size(28.dp)
-                    .clickable { onBackClick() }
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-            Text(
-                text = "Expense History",
-                fontWeight = FontWeight.Bold,
-                fontSize = 22.sp,
-                color = Color.Black
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.ArrowBack,
+                    contentDescription = "Back",
+                    tint = Color.Black,
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clickable { onBackClick() }
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = "Expense History",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 22.sp,
+                    color = Color.Black
+                )
+            }
+            
+            // Refresh Button with Continuous Spin
+            IconButton(onClick = onRefreshClick, modifier = Modifier.size(28.dp)) {
+                Icon(
+                    imageVector = Icons.Outlined.Refresh,
+                    contentDescription = "Refresh",
+                    tint = Color.Black,
+                    modifier = Modifier
+                        .size(26.dp)
+                        .rotate(if (isLoading) angle else 0f)
+                )
+            }
         }
 
         // TRANSACTION LIST
@@ -89,40 +119,41 @@ fun ExpenseHistoryScreen(
             ) {
                 groupedHistory.forEach { (monthYear, monthTransactions) ->
                     val monthTotal = monthTransactions.sumOf { it.amount }
+                    val formattedTotal = String.format("%.0f", monthTotal)
 
-                    // GREY MONTH-YEAR HEADER (Highlight Strip)
+                    // 1. GIANT 28sp MONTH-YEAR HEADER
                     item {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .background(Color(0xFFF5F5F5)) // Grey Background
-                                .padding(horizontal = 16.dp, vertical = 10.dp),
+                                .background(Color(0xFFF5F5F5)) // Grey Background Patti
+                                .padding(horizontal = 16.dp, vertical = 24.dp), // Thodi extra padding luxury feel ke liye
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
                                 text = monthYear,
-                                fontWeight = FontWeight.Bold,
+                                fontWeight = FontWeight.ExtraBold,
                                 color = Color.DarkGray,
-                                fontSize = 14.sp
+                                fontSize = 28.sp
                             )
                             Text(
-                                text = "₹ $monthTotal", // Direct total amount
+                                text = "₹ $formattedTotal", 
                                 fontWeight = FontWeight.ExtraBold,
                                 color = Color.Black,
-                                fontSize = 14.sp
+                                fontSize = 28.sp
                             )
                         }
                     }
 
-                    // FLAT EXPENSE DETAILS FOR THE MONTH
+                    // 2. FLAT EXPENSE DETAILS FOR THE MONTH
                     itemsIndexed(monthTransactions) { index, transaction ->
                         TransactionFlatItem(transaction)
 
-                        // Grey Separator Line (Does not touch ends)
+                        // 3. Grey Separator Line
                         if (index < monthTransactions.size - 1) {
                             HorizontalDivider(
-                                modifier = Modifier.padding(horizontal = 20.dp), // Thodi jagah chhod kar line
+                                modifier = Modifier.padding(horizontal = 20.dp), // Kone se jagah chhodi hui
                                 color = Color(0xFFEEEEEE),
                                 thickness = 1.dp
                             )
@@ -134,70 +165,110 @@ fun ExpenseHistoryScreen(
     }
 }
 
-// FLAT & CLEAN LIST ITEM
+// FLAT, ICON-LESS, PREMIUM LIST ITEM
 @Composable
 fun TransactionFlatItem(transaction: TransactionModel) {
-    val icon: ImageVector = when (transaction.category.trim()) {
-        "Food" -> Icons.Outlined.Restaurant
-        "Transport" -> Icons.Outlined.DirectionsCar
-        "Shopping" -> Icons.Outlined.ShoppingBag
-        "Bills" -> Icons.Outlined.Receipt
-        else -> Icons.Outlined.Edit
+    // Dynamic Mode Icon
+    val modeIcon = when (transaction.mode.trim()) {
+        "Cash" -> Icons.Outlined.Payments
+        "UPI" -> Icons.Outlined.QrCodeScanner
+        "NEFT", "Net Banking" -> Icons.Outlined.AccountBalance
+        "Credit Card", "Debit Card" -> Icons.Outlined.CreditCard
+        else -> Icons.Outlined.AccountBalanceWallet
     }
 
-    // Extract Date (Day) and Time from the date string
-    val datePart = transaction.date.split(" ")[0]
-    val dayStr = if (datePart.contains("/")) datePart.split("/")[0] else ""
-    val timeStr = if (transaction.date.contains(" ")) transaction.date.substringAfter(" ") else ""
+    // Extract exactly "19 July"
+    fun getDayMonth(dateStr: String): String {
+        try {
+            val datePart = dateStr.split(" ")[0]
+            val parts = datePart.split("/")
+            if (parts.size >= 2) {
+                val months = listOf("July", "August", "September", "October", "November", "December", "January", "February", "March", "April", "May", "June")
+                // Adjusting correctly based on 1-12 indexing
+                val standardMonths = listOf("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December")
+                val monthIdx = parts[1].toIntOrNull()?.minus(1)
+                if (monthIdx != null && monthIdx in 0..11) {
+                    return "${parts[0]} ${standardMonths[monthIdx]}"
+                }
+            }
+        } catch (e: Exception) {}
+        return ""
+    }
 
-    // Formatting Subtitle (Ex: 19 • 10:04 AM • UPI • Petrol)
-    val subtitleParts = mutableListOf<String>()
-    if (dayStr.isNotBlank()) subtitleParts.add(dayStr)
-    if (timeStr.isNotBlank()) subtitleParts.add(timeStr)
-    if (transaction.mode.isNotBlank()) subtitleParts.add(transaction.mode)
-    if (transaction.remark1.isNotBlank()) subtitleParts.add(transaction.remark1)
+    val displayDate = getDayMonth(transaction.date)
 
-    val subtitle = subtitleParts.joinToString(" • ")
+    // Build the "Remark 1 > Remark 2" string
+    val r1 = transaction.remark1.trim()
+    val r2 = transaction.remark2.trim()
+    val remarksCombo = when {
+        r1.isNotBlank() && r2.isNotBlank() -> "$r1 > $r2"
+        r1.isNotBlank() -> r1
+        r2.isNotBlank() -> r2
+        else -> ""
+    }
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color.White) // Pure white background for list items
-            .padding(horizontal = 16.dp, vertical = 14.dp),
+            .background(Color.White)
+            .padding(horizontal = 20.dp, vertical = 14.dp), // Clean spacing
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier
-                .size(44.dp)
-                .background(Color(0xFFF5F5F5), shape = RoundedCornerShape(10.dp)), // Light grey icon box
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(imageVector = icon, contentDescription = transaction.category, tint = Color.Black)
-        }
-        
-        Spacer(modifier = Modifier.width(14.dp))
-        
-        Column(modifier = Modifier.weight(1f)) {
+        // LEFT SIDE: Category & Date
+        Column(modifier = Modifier.weight(1.3f)) {
             Text(
                 text = transaction.category,
                 fontWeight = FontWeight.Bold,
-                fontSize = 16.sp,
-                color = Color.Black
-            )
-            Text(
-                text = subtitle,
-                fontSize = 13.sp,
-                color = Color.Gray,
+                fontSize = 18.sp, // Slightly bigger
+                color = Color.Black,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
+            // No gap shadow date
+            Text(
+                text = displayDate,
+                fontSize = 12.sp,
+                color = Color.Gray,
+                modifier = Modifier.offset(y = (-2).dp) 
+            )
         }
 
-        Text(
-            text = "- ₹${transaction.amount}",
-            fontWeight = FontWeight.Bold,
-            fontSize = 16.sp,
-            color = Color.Black 
-        )
+        // MIDDLE: Remarks (Aligned beautifully at the bottom matching the Date)
+        Box(
+            modifier = Modifier.weight(1f).align(Alignment.Bottom),
+            contentAlignment = Alignment.BottomCenter
+        ) {
+            if (remarksCombo.isNotBlank()) {
+                Text(
+                    text = remarksCombo,
+                    fontSize = 11.sp,
+                    color = Color.Gray,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(bottom = 2.dp) // Perfect horizontal alignment with Date
+                )
+            }
+        }
+
+        // RIGHT SIDE: Mode Icon + Amount (No Minus Sign)
+        Row(
+            modifier = Modifier.weight(1f),
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = modeIcon,
+                contentDescription = transaction.mode,
+                tint = Color.Gray,
+                modifier = Modifier.size(16.dp) // Small subtle icon
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = "₹${transaction.amount}",
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 16.sp,
+                color = Color.Black 
+            )
+        }
     }
 }
