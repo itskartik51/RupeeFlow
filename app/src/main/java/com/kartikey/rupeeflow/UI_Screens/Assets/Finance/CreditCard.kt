@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.outlined.CreditCard
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -28,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kartikey.rupeeflow.Cloud_Database.Constants
 import com.kartikey.rupeeflow.UI_Screens.QuickUpdateCCDialog
+import java.util.Locale
 
 data class CreditCardItem(
     val issuer: String,
@@ -105,9 +107,10 @@ fun CCDetailCard(cc: CreditCardItem, username: String, onEditClick: (CreditCardI
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
             
+            // --- TOP ROW: IDENTITY & ICONS ---
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
-                    modifier = Modifier.size(44.dp).background(Color(0xFFD32F2F).copy(alpha = 0.05f), RoundedCornerShape(10.dp)),
+                    modifier = Modifier.size(44.dp).background(Color(0xFF1976D2).copy(alpha = 0.05f), RoundedCornerShape(10.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     if (logoRes != null) {
@@ -116,7 +119,7 @@ fun CCDetailCard(cc: CreditCardItem, username: String, onEditClick: (CreditCardI
                             modifier = Modifier.size(28.dp).clip(RoundedCornerShape(6.dp)), contentScale = ContentScale.Fit
                         )
                     } else {
-                        Icon(Icons.Outlined.CreditCard, contentDescription = "Card Fallback", tint = Color(0xFFD32F2F), modifier = Modifier.size(24.dp))
+                        Icon(Icons.Outlined.CreditCard, contentDescription = "Card Fallback", tint = Color(0xFF1976D2), modifier = Modifier.size(24.dp))
                     }
                 }
                 
@@ -126,30 +129,66 @@ fun CCDetailCard(cc: CreditCardItem, username: String, onEditClick: (CreditCardI
                     Text(text = "Card: ${cc.cardNo} | ${cc.type}", color = Color.Gray, fontSize = 12.sp, letterSpacing = 1.sp)
                 }
                 
+                // Bell Icon (Future Reminders)
+                IconButton(onClick = { /* TODO: Notification Settings */ }) {
+                    Icon(Icons.Outlined.Notifications, contentDescription = "Reminders", tint = Color.Gray, modifier = Modifier.size(22.dp))
+                }
+                // Edit Icon
                 IconButton(onClick = { onEditClick(cc) }) {
                     Icon(Icons.Outlined.Edit, contentDescription = "Edit Card", tint = Color.Gray, modifier = Modifier.size(22.dp))
                 }
             }
             
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(20.dp))
             
-            Text(text = "Total Outstanding", color = Color.Gray, fontSize = 12.sp)
+            // --- MIDDLE ROW: LIMIT & ADD BUTTON ---
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(text = formatRupeeAmount(cc.outstanding), fontWeight = FontWeight.ExtraBold, fontSize = 28.sp, color = Color.Black)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    val isSafe = cc.cibilStatus == "Safe"
-                    val pillColor = if(isSafe) Color(0xFF388E3C) else Color(0xFFD32F2F)
-                    Box(modifier = Modifier.background(pillColor.copy(alpha = 0.1f), RoundedCornerShape(20.dp)).padding(horizontal = 10.dp, vertical = 6.dp)) {
-                        Text(text = "CIBIL: ${cc.cibilStatus}", color = pillColor, fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                    }
+                Column {
+                    Text(text = formatRupeeAmount(cc.limit), fontWeight = FontWeight.ExtraBold, fontSize = 24.sp, color = Color.Black)
+                    Text(text = "Total Limit", color = Color.Gray, fontSize = 12.sp)
                 }
                 
                 IconButton(
                     onClick = { showQuickUpdate = true },
-                    modifier = Modifier.size(32.dp).background(Color(0xFFE8F5E9), CircleShape)
+                    modifier = Modifier.size(36.dp).background(Color(0xFFE8F5E9), CircleShape)
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = "Update Outstanding", tint = Color(0xFF2E7D32), modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.Add, contentDescription = "Update Outstanding", tint = Color(0xFF2E7D32), modifier = Modifier.size(20.dp))
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            // --- PROGRESS BAR & UTILIZATION ---
+            val progressVal = (cc.utilization / 100f).toFloat().coerceIn(0f, 1f)
+            LinearProgressIndicator(
+                progress = { progressVal },
+                modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+                color = Color(0xFF1976D2), // Premium Blue
+                trackColor = Color(0xFFEEEEEE),
+            )
+            
+            Spacer(modifier = Modifier.height(6.dp))
+            
+            // Decimal formatting to exactly 2 places
+            Text(
+                text = String.format(Locale.US, "%.2f%%", cc.utilization),
+                fontSize = 11.sp,
+                color = Color.Gray,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.align(Alignment.CenterHorizontally)
+            )
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            // --- OUTSTANDING & AVAILABLE ---
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Column(horizontalAlignment = Alignment.Start) {
+                    Text(text = formatRupeeAmount(cc.outstanding), fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color.Black)
+                    Text(text = "Outstanding", color = Color.Gray, fontSize = 12.sp)
+                }
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(text = formatRupeeAmount(cc.available), fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color(0xFF1976D2))
+                    Text(text = "Available", color = Color.Gray, fontSize = 12.sp)
                 }
             }
             
@@ -157,18 +196,11 @@ fun CCDetailCard(cc: CreditCardItem, username: String, onEditClick: (CreditCardI
             HorizontalDivider(color = Color.LightGray.copy(alpha = 0.4f))
             Spacer(modifier = Modifier.height(16.dp))
             
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    MetricItem(label = "Total Limit", value = formatRupeeAmount(cc.limit), valueColor = Color.DarkGray, alignment = Alignment.Start)
-                    MetricItem(label = "Available", value = formatRupeeAmount(cc.available), valueColor = Color(0xFF1976D2), alignment = Alignment.CenterHorizontally)
-                    MetricItem(label = "Utilization", value = "${cc.utilization}%", valueColor = Color.DarkGray, alignment = Alignment.End)
-                }
-                Spacer(modifier = Modifier.height(16.dp))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    MetricItem(label = "Billing Day", value = "${cc.billingDay}", valueColor = Color.DarkGray, alignment = Alignment.Start)
-                    MetricItem(label = "Due Day", value = "${cc.dueDay}", valueColor = Color(0xFFD32F2F), alignment = Alignment.CenterHorizontally)
-                    MetricItem(label = "Annual Fee", value = formatRupeeAmount(cc.annualFee), valueColor = Color.DarkGray, alignment = Alignment.End)
-                }
+            // --- BOTTOM METRICS ---
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                MetricItem(label = "Billing Day", value = "${cc.billingDay}", valueColor = Color.DarkGray, alignment = Alignment.Start)
+                MetricItem(label = "Due Day", value = "${cc.dueDay}", valueColor = Color.Black, alignment = Alignment.CenterHorizontally)
+                MetricItem(label = "Annual Fee", value = formatRupeeAmount(cc.annualFee), valueColor = Color.DarkGray, alignment = Alignment.End)
             }
         }
     }
