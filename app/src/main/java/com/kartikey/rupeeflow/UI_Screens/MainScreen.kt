@@ -327,7 +327,8 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
             username = username, showMenu = showAddMenu, onToggleMenu = { showAddMenu = !showAddMenu },
             onExpenseAdded = { newEntry -> transactionList = listOf(newEntry) + transactionList },
             onInvestmentAdded = { refreshTrigger++ },
-            onFinanceAdded = { refreshTrigger++ }
+            onFinanceAdded = { refreshTrigger++ },
+            bankList = bankList, ccList = ccList, cashData = cashData
         )
 
         if (bankToEdit != null) {
