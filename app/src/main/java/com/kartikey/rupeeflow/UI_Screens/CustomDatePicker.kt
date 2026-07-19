@@ -25,24 +25,37 @@ fun CustomDatePicker(
     selectedDateMillis: Long?,
     onDateSelected: (Long) -> Unit,
     modifier: Modifier = Modifier,
-    restrictToCurrentMonth: Boolean = false // NEW FEATURE
+    restrictToCurrentMonth: Boolean = false
 ) {
     var showDialog by remember { mutableStateOf(false) }
 
-    // Smart logic to restrict dates only to the current running month
+    // Smart logic to restrict dates only to the CURRENT and PREVIOUS month
     val selectableDates = remember(restrictToCurrentMonth) {
         object : SelectableDates {
             override fun isSelectableDate(utcTimeMillis: Long): Boolean {
                 if (!restrictToCurrentMonth) return true
                 val currentCal = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
                 val targetCal = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply { timeInMillis = utcTimeMillis }
-                return currentCal.get(Calendar.YEAR) == targetCal.get(Calendar.YEAR) &&
-                       currentCal.get(Calendar.MONTH) == targetCal.get(Calendar.MONTH)
+
+                val yearDiff = currentCal.get(Calendar.YEAR) - targetCal.get(Calendar.YEAR)
+                val monthDiff = yearDiff * 12 + currentCal.get(Calendar.MONTH) - targetCal.get(Calendar.MONTH)
+
+                // 0 means current month, 1 means previous month. Block everything else.
+                return monthDiff == 0 || monthDiff == 1
             }
 
             override fun isSelectableYear(year: Int): Boolean {
                 if (!restrictToCurrentMonth) return true
-                return year == Calendar.getInstance(TimeZone.getTimeZone("UTC")).get(Calendar.YEAR)
+                val currentCal = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
+                val currentYear = currentCal.get(Calendar.YEAR)
+                val currentMonth = currentCal.get(Calendar.MONTH)
+
+                // If current month is January, allow the previous year (for December)
+                return if (currentMonth == Calendar.JANUARY) {
+                    year == currentYear || year == currentYear - 1
+                } else {
+                    year == currentYear
+                }
             }
         }
     }
