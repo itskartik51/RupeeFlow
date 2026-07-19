@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.outlined.AccountBalance
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -46,7 +47,8 @@ fun FixedDepositsScreen(
     username: String,
     fdList: List<FDItem>,
     isLoading: Boolean,
-    onRefreshClick: () -> Unit
+    onRefreshClick: () -> Unit,
+    onEditFDClick: (FDItem) -> Unit
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "refresh")
     val angle by infiniteTransition.animateFloat(
@@ -77,7 +79,7 @@ fun FixedDepositsScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 items(fdList) { fd ->
-                    FDetailCard(fd = fd)
+                    FDetailCard(fd = fd, onEditClick = onEditFDClick)
                 }
             }
         }
@@ -85,7 +87,7 @@ fun FixedDepositsScreen(
 }
 
 @Composable
-fun FDetailCard(fd: FDItem) {
+fun FDetailCard(fd: FDItem, onEditClick: (FDItem) -> Unit) {
     val logoRes = Constants.BankLogoMap[fd.bankName]
 
     Card(
@@ -103,18 +105,11 @@ fun FDetailCard(fd: FDItem) {
                 ) {
                     if (logoRes != null) {
                         Image(
-                            painter = painterResource(id = logoRes),
-                            contentDescription = fd.bankName,
-                            modifier = Modifier.size(28.dp).clip(RoundedCornerShape(6.dp)),
-                            contentScale = ContentScale.Fit
+                            painter = painterResource(id = logoRes), contentDescription = fd.bankName,
+                            modifier = Modifier.size(28.dp).clip(RoundedCornerShape(6.dp)), contentScale = ContentScale.Fit
                         )
                     } else {
-                        Icon(
-                            imageVector = Icons.Outlined.AccountBalance, 
-                            contentDescription = "Bank Fallback", 
-                            tint = Color(0xFFF57C00), 
-                            modifier = Modifier.size(24.dp)
-                        )
+                        Icon(Icons.Outlined.AccountBalance, contentDescription = "Bank Fallback", tint = Color(0xFFF57C00), modifier = Modifier.size(24.dp))
                     }
                 }
                 
@@ -126,15 +121,12 @@ fun FDetailCard(fd: FDItem) {
                 
                 val isMatured = fd.daysToMaturity <= 0
                 val pillColor = if (isMatured) Color(0xFF388E3C) else Color(0xFF1976D2)
-                Box(
-                    modifier = Modifier.background(pillColor.copy(alpha = 0.1f), RoundedCornerShape(20.dp)).padding(horizontal = 10.dp, vertical = 6.dp)
-                ) {
-                    Text(
-                        text = if (isMatured) "Matured" else "${fd.daysToMaturity} Days Left", 
-                        color = pillColor, 
-                        fontWeight = FontWeight.Bold, 
-                        fontSize = 11.sp
-                    )
+                Box(modifier = Modifier.background(pillColor.copy(alpha = 0.1f), RoundedCornerShape(20.dp)).padding(horizontal = 10.dp, vertical = 6.dp)) {
+                    Text(text = if (isMatured) "Matured" else "${fd.daysToMaturity} Days Left", color = pillColor, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                IconButton(onClick = { onEditClick(fd) }) {
+                    Icon(Icons.Outlined.Edit, contentDescription = "Edit FD", tint = Color.Gray, modifier = Modifier.size(22.dp))
                 }
             }
             
