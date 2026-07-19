@@ -48,13 +48,16 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+// NEW DATA CLASS: Added sourceType and sourceId for Refund Tracking
 data class TransactionModel(
     val date: String,
     val amount: Double,
     val category: String,
     val remark1: String,
     val remark2: String,
-    val mode: String = "" 
+    val mode: String = "",
+    val sourceType: String = "",
+    val sourceId: String = ""
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -91,7 +94,6 @@ fun AddExpenseForm(
     var modeText by remember { mutableStateOf("") }
     var modeExpanded by remember { mutableStateOf(false) }
 
-    // Auto-Deduct States
     var paidByExpanded by remember { mutableStateOf(false) }
     var selectedSourceType by remember { mutableStateOf("") }
     var selectedSourceId by remember { mutableStateOf("") }
@@ -99,19 +101,14 @@ fun AddExpenseForm(
     var selectedSourceLogo by remember { mutableStateOf<Int?>(null) }
     
     var amount by remember { mutableStateOf("") }
-    
     var expenseDateMillis by remember { mutableStateOf<Long>(System.currentTimeMillis()) }
-    
     var expanded by remember { mutableStateOf(false) }
     var isSubmitting by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
 
     var isPressed by remember { mutableStateOf(false) }
-    val buttonScale by animateFloatAsState(
-        targetValue = if (isPressed) 0.95f else 1f, 
-        label = "ButtonScale"
-    )
+    val buttonScale by animateFloatAsState(targetValue = if (isPressed) 0.95f else 1f, label = "ButtonScale")
 
     Card(
         modifier = Modifier.fillMaxWidth(), 
@@ -125,7 +122,6 @@ fun AddExpenseForm(
                 .verticalScroll(rememberScrollState())
         ) {
             
-            // 1. Category
             ExposedDropdownMenuBox(
                 expanded = expanded,
                 onExpandedChange = { expanded = !expanded }
@@ -148,12 +144,7 @@ fun AddExpenseForm(
                         DropdownMenuItem(
                             text = { 
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        imageVector = icon, 
-                                        contentDescription = name, 
-                                        tint = Color(0xFF2E7D32), 
-                                        modifier = Modifier.size(20.dp)
-                                    )
+                                    Icon(imageVector = icon, contentDescription = name, tint = Color(0xFF2E7D32), modifier = Modifier.size(20.dp))
                                     Spacer(modifier = Modifier.width(12.dp))
                                     Text(name, fontSize = 16.sp)
                                 }
@@ -175,42 +166,15 @@ fun AddExpenseForm(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // 2. Remarks
-            Row(
-                modifier = Modifier.fillMaxWidth(), 
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                OutlinedTextField(
-                    value = remark1, 
-                    onValueChange = { remark1 = it },
-                    label = { Text("Remark 1") },
-                    modifier = Modifier.weight(1f), 
-                    singleLine = true,
-                    shape = RoundedCornerShape(12.dp)
-                )
-                OutlinedTextField(
-                    value = remark2, 
-                    onValueChange = { remark2 = it },
-                    label = { Text("Remark 2") },
-                    modifier = Modifier.weight(1f), 
-                    singleLine = true,
-                    shape = RoundedCornerShape(12.dp)
-                )
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(value = remark1, onValueChange = { remark1 = it }, label = { Text("Remark 1") }, modifier = Modifier.weight(1f), singleLine = true, shape = RoundedCornerShape(12.dp))
+                OutlinedTextField(value = remark2, onValueChange = { remark2 = it }, label = { Text("Remark 2") }, modifier = Modifier.weight(1f), singleLine = true, shape = RoundedCornerShape(12.dp))
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // 3. SMART MODE & PAID BY ROW
-            Row(
-                modifier = Modifier.fillMaxWidth(), 
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                // --- MODE DROPDOWN (35% weight) ---
-                ExposedDropdownMenuBox(
-                    expanded = modeExpanded,
-                    onExpandedChange = { modeExpanded = !modeExpanded },
-                    modifier = Modifier.weight(0.35f)
-                ) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                ExposedDropdownMenuBox(expanded = modeExpanded, onExpandedChange = { modeExpanded = !modeExpanded }, modifier = Modifier.weight(0.35f)) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -220,43 +184,23 @@ fun AddExpenseForm(
                             .background(Color.Transparent, RoundedCornerShape(12.dp)),
                         contentAlignment = Alignment.CenterStart
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp), 
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
+                        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 text = if (modeText.isEmpty()) "Mode" else modeText,
                                 color = if (modeText.isEmpty()) Color.Gray else Color.Black,
-                                fontSize = 14.sp,
-                                maxLines = 1,
-                                softWrap = false, // Stop vertical stacking of letters
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f) // Push icon to the end
+                                fontSize = 14.sp, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
                             )
-                            Icon(
-                                Icons.Outlined.ArrowDropDown, 
-                                contentDescription = null, 
-                                tint = Color.Gray, 
-                                modifier = Modifier.size(20.dp).rotate(if (modeExpanded) 180f else 0f)
-                            )
+                            Icon(Icons.Outlined.ArrowDropDown, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(20.dp).rotate(if (modeExpanded) 180f else 0f))
                         }
                     }
                     
-                    ExposedDropdownMenu(
-                        expanded = modeExpanded,
-                        onDismissRequest = { modeExpanded = false },
-                        modifier = Modifier.background(Color.White).widthIn(min = 140.dp) // Minimum width so options don't squish
-                    ) {
+                    ExposedDropdownMenu(expanded = modeExpanded, onDismissRequest = { modeExpanded = false }, modifier = Modifier.background(Color.White).widthIn(min = 140.dp)) {
                         paymentModes.forEach { (name, icon) ->
                             DropdownMenuItem(
                                 text = { 
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(
-                                            imageVector = icon, 
-                                            contentDescription = name, 
-                                            tint = Color.DarkGray, 
-                                            modifier = Modifier.size(20.dp)
-                                        )
+                                        Icon(imageVector = icon, contentDescription = name, tint = Color.DarkGray, modifier = Modifier.size(20.dp))
                                         Spacer(modifier = Modifier.width(12.dp))
                                         Text(name, fontSize = 14.sp, maxLines = 1, softWrap = false)
                                     }
@@ -283,64 +227,31 @@ fun AddExpenseForm(
                     }
                 }
 
-                // --- PAID BY DROPDOWN (65% weight) ---
                 val isPaidByActive = selectedSourceType.isNotEmpty() && selectedSourceType != "Cash"
 
-                ExposedDropdownMenuBox(
-                    expanded = paidByExpanded && isPaidByActive,
-                    onExpandedChange = { if(isPaidByActive) paidByExpanded = !paidByExpanded },
-                    modifier = Modifier.weight(0.65f)
-                ) {
+                ExposedDropdownMenuBox(expanded = paidByExpanded && isPaidByActive, onExpandedChange = { if(isPaidByActive) paidByExpanded = !paidByExpanded }, modifier = Modifier.weight(0.65f)) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp)
                             .border(1.dp, if(paidByExpanded) Color(0xFF2E7D32) else Color.Gray, RoundedCornerShape(12.dp))
                             .menuAnchor()
-                            .background(
-                                if (!isPaidByActive && selectedSourceType != "Cash") Color(0xFFF5F5F5) else Color.Transparent, 
-                                RoundedCornerShape(12.dp)
-                            ),
+                            .background(if (!isPaidByActive && selectedSourceType != "Cash") Color(0xFFF5F5F5) else Color.Transparent, RoundedCornerShape(12.dp)),
                         contentAlignment = Alignment.CenterStart
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp), 
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
+                        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                             if (selectedSourceType.isEmpty()) {
-                                Text("Select Mode", color = Color.Gray, fontSize = 14.sp, modifier = Modifier.weight(1f)) // Push arrow to end
-                                Icon(Icons.Outlined.ArrowDropDown, null, tint = Color.Transparent, modifier = Modifier.size(20.dp)) // Hidden placeholder
+                                Text("Select Mode", color = Color.Gray, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                                Icon(Icons.Outlined.ArrowDropDown, null, tint = Color.Transparent, modifier = Modifier.size(20.dp))
                             } else if (selectedSourceId.isEmpty()) {
-                                Text(
-                                    if(selectedSourceType == "Bank") "Choose Bank" else "Choose Card", 
-                                    color = Color.Gray, 
-                                    fontSize = 14.sp,
-                                    modifier = Modifier.weight(1f) // Push arrow to end
-                                )
+                                Text(if(selectedSourceType == "Bank") "Choose Bank" else "Choose Card", color = Color.Gray, fontSize = 14.sp, modifier = Modifier.weight(1f))
                                 Icon(Icons.Outlined.ArrowDropDown, null, tint = Color.Gray, modifier = Modifier.size(20.dp).rotate(if (paidByExpanded) 180f else 0f))
                             } else {
-                                // If selected, show Logo + • XXXX format
                                 if (selectedSourceLogo != null && selectedSourceType != "Cash") {
-                                    Image(
-                                        painter = painterResource(id = selectedSourceLogo!!), 
-                                        contentDescription = null, 
-                                        modifier = Modifier.size(20.dp).clip(RoundedCornerShape(4.dp)), 
-                                        contentScale = ContentScale.Fit
-                                    )
+                                    Image(painter = painterResource(id = selectedSourceLogo!!), contentDescription = null, modifier = Modifier.size(20.dp).clip(RoundedCornerShape(4.dp)), contentScale = ContentScale.Fit)
                                     Spacer(modifier = Modifier.width(8.dp))
                                 }
-                                
-                                Text(
-                                    text = selectedSourceName, 
-                                    color = if(selectedSourceType == "Cash") Color(0xFF2E7D32) else Color.Black, 
-                                    fontSize = 14.sp, 
-                                    fontWeight = FontWeight.Bold, 
-                                    maxLines = 1, 
-                                    softWrap = false,
-                                    overflow = TextOverflow.Ellipsis, 
-                                    modifier = Modifier.weight(1f) // Push arrow to end
-                                )
-                                
+                                Text(text = selectedSourceName, color = if(selectedSourceType == "Cash") Color(0xFF2E7D32) else Color.Black, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                                 if (isPaidByActive) {
                                     Icon(Icons.Outlined.ArrowDropDown, null, tint = Color.Gray, modifier = Modifier.size(20.dp).rotate(if (paidByExpanded) 180f else 0f))
                                 }
@@ -348,78 +259,48 @@ fun AddExpenseForm(
                         }
                     }
 
-                    ExposedDropdownMenu(
-                        expanded = paidByExpanded && isPaidByActive,
-                        onDismissRequest = { paidByExpanded = false },
-                        modifier = Modifier.background(Color.White)
-                    ) {
+                    ExposedDropdownMenu(expanded = paidByExpanded && isPaidByActive, onDismissRequest = { paidByExpanded = false }, modifier = Modifier.background(Color.White)) {
                         if (selectedSourceType == "Bank") {
-                            if (bankList.isEmpty()) { 
-                                DropdownMenuItem(
-                                    text = { Text("No Banks Linked", color = Color.Gray) }, 
-                                    onClick = {}
-                                ) 
-                            }
+                            if (bankList.isEmpty()) { DropdownMenuItem(text = { Text("No Banks Linked", color = Color.Gray) }, onClick = {}) }
                             bankList.forEach { bank ->
                                 DropdownMenuItem(
                                     text = { 
                                         Row(verticalAlignment = Alignment.CenterVertically) {
                                             val logo = Constants.BankLogoMap[bank.bankName]
-                                            if (logo != null) {
-                                                Image(
-                                                    painter = painterResource(logo), 
-                                                    contentDescription = null, 
-                                                    modifier = Modifier.size(24.dp).clip(RoundedCornerShape(4.dp))
-                                                )
-                                            } else {
-                                                Icon(Icons.Outlined.AccountBalance, null, tint = Color.DarkGray, modifier = Modifier.size(24.dp))
-                                            }
+                                            if (logo != null) { Image(painter = painterResource(logo), contentDescription = null, modifier = Modifier.size(24.dp).clip(RoundedCornerShape(4.dp))) } 
+                                            else { Icon(Icons.Outlined.AccountBalance, null, tint = Color.DarkGray, modifier = Modifier.size(24.dp)) }
                                             Spacer(modifier = Modifier.width(12.dp))
                                             val shortAcc = if (bank.accountNo.length >= 4) bank.accountNo.takeLast(4) else bank.accountNo
-                                            // Show ONLY • 1234
                                             Text("• $shortAcc", maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold)
                                         }
                                     },
                                     onClick = { 
                                         val shortAcc = if (bank.accountNo.length >= 4) bank.accountNo.takeLast(4) else bank.accountNo
                                         selectedSourceId = bank.accountNo
-                                        selectedSourceName = "• $shortAcc" // Setting it strictly to Logo + 4 digits
+                                        selectedSourceName = "• $shortAcc"
                                         selectedSourceLogo = Constants.BankLogoMap[bank.bankName]
                                         paidByExpanded = false
                                     }
                                 )
                             }
                         } else if (selectedSourceType == "Credit Card") {
-                            if (ccList.isEmpty()) { 
-                                DropdownMenuItem(
-                                    text = { Text("No Cards Linked", color = Color.Gray) }, 
-                                    onClick = {}
-                                ) 
-                            }
+                            if (ccList.isEmpty()) { DropdownMenuItem(text = { Text("No Cards Linked", color = Color.Gray) }, onClick = {}) }
                             ccList.forEach { cc ->
                                 DropdownMenuItem(
                                     text = { 
                                         Row(verticalAlignment = Alignment.CenterVertically) {
                                             val logo = Constants.BankLogoMap[cc.issuer]
-                                            if (logo != null) {
-                                                Image(
-                                                    painter = painterResource(logo), 
-                                                    contentDescription = null, 
-                                                    modifier = Modifier.size(24.dp).clip(RoundedCornerShape(4.dp))
-                                                )
-                                            } else {
-                                                Icon(Icons.Outlined.CreditCard, null, tint = Color.DarkGray, modifier = Modifier.size(24.dp))
-                                            }
+                                            if (logo != null) { Image(painter = painterResource(logo), contentDescription = null, modifier = Modifier.size(24.dp).clip(RoundedCornerShape(4.dp))) } 
+                                            else { Icon(Icons.Outlined.CreditCard, null, tint = Color.DarkGray, modifier = Modifier.size(24.dp)) }
                                             Spacer(modifier = Modifier.width(12.dp))
                                             val shortAcc = if (cc.cardNo.length >= 4) cc.cardNo.takeLast(4) else cc.cardNo
-                                            // Show ONLY • 1234
                                             Text("• $shortAcc", maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold)
                                         }
                                     },
                                     onClick = { 
                                         val shortAcc = if (cc.cardNo.length >= 4) cc.cardNo.takeLast(4) else cc.cardNo
                                         selectedSourceId = cc.cardNo
-                                        selectedSourceName = "• $shortAcc" // Setting it strictly to Logo + 4 digits
+                                        selectedSourceName = "• $shortAcc"
                                         selectedSourceLogo = Constants.BankLogoMap[cc.issuer]
                                         paidByExpanded = false
                                     }
@@ -432,16 +313,12 @@ fun AddExpenseForm(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // 4. Custom Date Picker & Amount
-            Row(
-                modifier = Modifier.fillMaxWidth(), 
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 CustomDatePicker(
                     label = "Date",
                     selectedDateMillis = expenseDateMillis,
                     onDateSelected = { expenseDateMillis = it },
-                    restrictToCurrentMonth = true, // Locks date selection to current and previous month
+                    restrictToCurrentMonth = true,
                     modifier = Modifier.weight(1f)
                 )
 
@@ -459,7 +336,6 @@ fun AddExpenseForm(
             
             Spacer(modifier = Modifier.height(24.dp))
 
-            // 5. Submit Engine
             Button(
                 onClick = {
                     val finalCategory = categoryText.trim()
@@ -481,7 +357,9 @@ fun AddExpenseForm(
                             category = finalCategory, 
                             remark1 = remark1, 
                             remark2 = remark2, 
-                            mode = finalMode
+                            mode = finalMode,
+                            sourceType = selectedSourceType,
+                            sourceId = selectedSourceId
                         )
                         onExpenseAdded(newEntry)
 
