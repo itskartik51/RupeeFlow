@@ -3,7 +3,7 @@ package com.kartikey.rupeeflow.Cloud_Database
 import com.kartikey.rupeeflow.R
 
 object Constants {
-    const val GOOGLE_SHEET_API_URL = "https://script.google.com/macros/s/AKfycbxq6GiNwSEDI85iWu8Zl1mMokr0TPidrIKyM5eHfnnPumnhq4Z1szCLjg-JcuTK_gr6Aw/exec"
+    const val GOOGLE_SHEET_API_URL = "https://script.google.com/macros/s/AKfycbzcInEmmzalDH3eN9cZYjImtKtAKqJ14sfjkquSsJbhqq1TjzavFRvb7Wn0szNlUBHhVA/exec"
 
     val IndianBanksList = listOf(
         "State Bank of India (SBI)", "HDFC Bank", "ICICI Bank", "Axis Bank", "Kotak Mahindra Bank",
