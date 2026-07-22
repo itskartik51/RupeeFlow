@@ -29,6 +29,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
@@ -146,7 +147,7 @@ fun ScanQRScreen(
             Column(
                 modifier = Modifier.fillMaxSize(),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                mainArrangement = Arrangement.Center
+                verticalArrangement = Arrangement.Center
             ) {
                 Text("Camera permission is required to scan QR.", color = Color.White)
                 Spacer(modifier = Modifier.height(16.dp))
