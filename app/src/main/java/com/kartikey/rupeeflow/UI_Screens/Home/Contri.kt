@@ -45,11 +45,12 @@ import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Locale
 
-// Data Model for Contri Rooms
+// Data Model for Contri Rooms (Added Pin with default so MainScreen doesn't crash)
 data class ContriRoomModel(
     val roomName: String,
     val roomCode: String,
-    val lastUpdated: String
+    val lastUpdated: String,
+    val pin: String = "123456" 
 )
 
 @Composable
@@ -63,22 +64,37 @@ fun ContriScreen(
     var showCreateDialog by remember { mutableStateOf(false) }
     var showJoinDialog by remember { mutableStateOf(false) }
     
-    // Scanner & QR Display States
+    // Scanner, QR & Inside Room States
     var showScanner by remember { mutableStateOf(false) }
     var scannedRoomCode by remember { mutableStateOf("") }
     var qrRoomToDisplay by remember { mutableStateOf<ContriRoomModel?>(null) }
+    var openedRoom by remember { mutableStateOf<ContriRoomModel?>(null) }
 
-    // If Scanner is Active, take over the screen
+    val context = LocalContext.current
+
+    // Screen Routing Logic
     if (showScanner) {
         com.kartikey.rupeeflow.UI_Screens.QR.ScanQRScreen(
             onBackClick = { showScanner = false },
             onQrScanned = { code -> 
                 scannedRoomCode = code
                 showScanner = false
-                showJoinDialog = true // Scanner ke baad direct join form khulega
+                showJoinDialog = true
             }
         )
+    } else if (openedRoom != null) {
+        // Full Screen Inside Room
+        InsideContriScreen(
+            room = openedRoom!!,
+            onBackClick = { openedRoom = null },
+            onLeaveClick = { 
+                Toast.makeText(context, "Balance check logic coming soon!", Toast.LENGTH_SHORT).show()
+                openedRoom = null 
+            },
+            onAddClick = { Toast.makeText(context, "Add expense logic coming soon!", Toast.LENGTH_SHORT).show() }
+        )
     } else {
+        // Main Contri Hub UI
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -109,13 +125,13 @@ fun ContriScreen(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 // ==========================================
-                // ACTIVE ROOMS LIST (With new QR Button)
+                // ACTIVE ROOMS LIST
                 // ==========================================
                 if (contriRooms.isNotEmpty()) {
                     contriRooms.forEach { room ->
                         ActiveRoomCard(
                             room = room, 
-                            onClick = { /* TODO: Open Inside Room UI */ },
+                            onClick = { openedRoom = room }, // Link Card to Inside Screen
                             onQrClick = { qrRoomToDisplay = room }
                         )
                         Spacer(modifier = Modifier.height(12.dp))
@@ -146,7 +162,7 @@ fun ContriScreen(
                         bgColor = Color(0xFFE8F5E9),
                         modifier = Modifier.weight(1f),
                         onClick = { 
-                            scannedRoomCode = "" // Reset on manual click
+                            scannedRoomCode = ""
                             showJoinDialog = true 
                         }
                     )
@@ -179,7 +195,6 @@ fun ContriScreen(
                     
                     Spacer(modifier = Modifier.height(24.dp))
                     
-                    // Connected to the PremiumQR Generator
                     com.kartikey.rupeeflow.UI_Screens.QR.PremiumQRCode(
                         data = qrRoomToDisplay!!.roomCode,
                         size = 180.dp
@@ -209,8 +224,8 @@ fun ContriScreen(
             username = username,
             initialScannedCode = scannedRoomCode,
             onScanClick = {
-                showJoinDialog = false // Pehle dialog band karo
-                showScanner = true     // Fir scanner kholo
+                showJoinDialog = false 
+                showScanner = true     
             },
             onDismiss = { showJoinDialog = false },
             onSuccess = {
@@ -263,7 +278,6 @@ fun ActiveRoomCard(room: ContriRoomModel, onClick: () -> Unit, onQrClick: () -> 
                 }
             }
             
-            // New QR Generator Icon Button
             IconButton(
                 onClick = onQrClick,
                 modifier = Modifier
@@ -419,7 +433,7 @@ fun CreateContriDialog(username: String, onDismiss: () -> Unit, onSuccess: () ->
 }
 
 // ==========================================
-// JOIN CONTRI DIALOG (WITH SCANNER WIRING)
+// JOIN CONTRI DIALOG 
 // ==========================================
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -430,7 +444,6 @@ fun JoinContriDialog(
     onDismiss: () -> Unit, 
     onSuccess: () -> Unit
 ) {
-    // Agar QR scan hokar code mila hai, toh direct Manual wali screen (1) khulegi
     var viewState by remember { mutableIntStateOf(if (initialScannedCode.isNotBlank()) 1 else 0) }
     
     var roomCode by remember { mutableStateOf(initialScannedCode) }
@@ -451,9 +464,6 @@ fun JoinContriDialog(
             elevation = CardDefaults.cardElevation(8.dp)
         ) {
             if (viewState == 0) {
-                // --------------------------
-                // VIEW 1: OPTIONS
-                // --------------------------
                 Column(
                     modifier = Modifier.fillMaxWidth().padding(20.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
@@ -473,7 +483,6 @@ fun JoinContriDialog(
                     ) {
                         Column(
                             modifier = Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp)).clickable { 
-                                // Call the real Scanner function
                                 onScanClick()
                             },
                             horizontalAlignment = Alignment.CenterHorizontally,
@@ -500,9 +509,6 @@ fun JoinContriDialog(
                     }
                 }
             } else {
-                // --------------------------
-                // VIEW 2: MANUAL ENTRY FORM
-                // --------------------------
                 Column(
                     modifier = Modifier.fillMaxWidth().padding(20.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
@@ -619,7 +625,7 @@ fun JoinContriDialog(
 }
 
 // ==========================================
-// PREMIUM GRID CARD (SIDE-BY-SIDE LAYOUT)
+// PREMIUM GRID CARD
 // ==========================================
 @Composable
 fun ContriGridCard(
