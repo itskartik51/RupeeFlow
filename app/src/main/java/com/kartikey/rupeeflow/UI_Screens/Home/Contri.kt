@@ -177,7 +177,7 @@ fun CreateContriDialog(onDismiss: () -> Unit) {
 }
 
 // ==========================================
-// JOIN CONTRI DIALOG (ANIMATED DUAL UI)
+// JOIN CONTRI DIALOG (60FPS ANIMATED UI)
 // ==========================================
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -191,9 +191,11 @@ fun JoinContriDialog(onDismiss: () -> Unit) {
         onDismissRequest = onDismiss,
         properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = true)
     ) {
-        // Removed animateContentSize() to stop the hanging/laggy feel
+        // animateContentSize added back with matched 250ms duration for jitter-free resize
         Card(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .animateContentSize(animationSpec = tween(250)),
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(containerColor = Color.White),
             elevation = CardDefaults.cardElevation(8.dp)
@@ -201,9 +203,16 @@ fun JoinContriDialog(onDismiss: () -> Unit) {
             AnimatedContent(
                 targetState = viewState,
                 transitionSpec = {
-                    (slideInHorizontally(animationSpec = tween(200)) { width -> if (targetState == 1) width else -width } + fadeIn(tween(200))).togetherWith(
-                        slideOutHorizontally(animationSpec = tween(200)) { width -> if (targetState == 1) -width else width } + fadeOut(tween(200))
-                    )
+                    // 33% Slide (it/3) + Fade transition for buttery smooth 60fps feel
+                    if (targetState == 1) {
+                        (slideInHorizontally(animationSpec = tween(250)) { it / 3 } + fadeIn(tween(250))).togetherWith(
+                            slideOutHorizontally(animationSpec = tween(250)) { -it / 3 } + fadeOut(tween(250))
+                        )
+                    } else {
+                        (slideInHorizontally(animationSpec = tween(250)) { -it / 3 } + fadeIn(tween(250))).togetherWith(
+                            slideOutHorizontally(animationSpec = tween(250)) { it / 3 } + fadeOut(tween(250))
+                        )
+                    }
                 }, label = "join_animation"
             ) { state ->
                 if (state == 0) {
