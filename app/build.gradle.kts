@@ -64,6 +64,6 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:$cameraxVersion")
     implementation("androidx.camera:camera-view:$cameraxVersion")
     
-    // 3. Google ML Kit (For Lightning Fast QR Scanning)
-    implementation("com.google.mlkit:barcode-scanning:17.2.0")
+    // 3. Google ML Kit (UNBUNDLED - 0 MB Size Increase)
+    implementation("com.google.android.gms:play-services-mlkit-barcode-scanning:18.3.0")
 }
