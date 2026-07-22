@@ -39,6 +39,7 @@ import java.util.Locale
 fun MainScreen(username: String, onLogout: () -> Unit) {
     var selectedTab by remember { mutableIntStateOf(0) } 
     var showExpenseHistory by remember { mutableStateOf(false) }
+    var showContriScreen by remember { mutableStateOf(false) }
     var assetsCurrentView by remember { mutableStateOf("Main") }
 
     var bankToEdit by remember { mutableStateOf<BankAccountItem?>(null) }
@@ -71,14 +72,15 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
     var dBackPresses by remember { mutableIntStateOf(0) }
     var refreshTrigger by remember { mutableIntStateOf(0) }
 
-    LaunchedEffect(selectedTab, showExpenseHistory, isLoadingExpenses, transactionList.size, bankToEdit, ccToEdit, fdToEdit, showAddMenu) {
+    LaunchedEffect(selectedTab, showExpenseHistory, showContriScreen, isLoadingExpenses, transactionList.size, bankToEdit, ccToEdit, fdToEdit, showAddMenu) {
         if (showAddMenu) dNavState = "Add Menu Open"
         else if (bankToEdit != null || ccToEdit != null || fdToEdit != null || expenseToEdit != null) dNavState = "Editing Vault"
+        else if (showContriScreen) dNavState = "Contri Hub"
         else if (showExpenseHistory) dNavState = "Expense History"
         else dNavState = if (isLoadingExpenses) "Syncing Data... ⏳" else "Tab $selectedTab ✅"
     }
 
-    BackHandler(enabled = showExpenseHistory || selectedTab != 0 || assetsCurrentView != "Main" || bankToEdit != null || ccToEdit != null || fdToEdit != null || expenseToEdit != null || expenseToDelete != null) {
+    BackHandler(enabled = showContriScreen || showExpenseHistory || selectedTab != 0 || assetsCurrentView != "Main" || bankToEdit != null || ccToEdit != null || fdToEdit != null || expenseToEdit != null || expenseToDelete != null) {
         dBackPresses++ 
         when {
             expenseToDelete != null -> expenseToDelete = null
@@ -86,6 +88,7 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
             bankToEdit != null -> bankToEdit = null 
             ccToEdit != null -> ccToEdit = null
             fdToEdit != null -> fdToEdit = null
+            showContriScreen -> showContriScreen = false
             showExpenseHistory -> showExpenseHistory = false 
             selectedTab == 1 && assetsCurrentView != "Main" -> assetsCurrentView = "Main"
             selectedTab != 0 -> selectedTab = 0 
@@ -307,8 +310,8 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
             bottomBar = {
                 NavigationBar(containerColor = Color.White, tonalElevation = 8.dp) {
                     NavigationBarItem(
-                        selected = selectedTab == 0 && !showExpenseHistory, 
-                        onClick = { selectedTab = 0; showExpenseHistory = false }, 
+                        selected = selectedTab == 0 && !showExpenseHistory && !showContriScreen, 
+                        onClick = { selectedTab = 0; showExpenseHistory = false; showContriScreen = false }, 
                         icon = { Icon(Icons.Outlined.Home, contentDescription = "Home") }, 
                         label = { Text("Home") }, 
                         colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
@@ -317,7 +320,7 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                         selected = selectedTab == 1, 
                         onClick = { 
                             if (selectedTab == 1) assetsCurrentView = "Main"
-                            selectedTab = 1; showExpenseHistory = false 
+                            selectedTab = 1; showExpenseHistory = false; showContriScreen = false 
                         }, 
                         icon = { Icon(Icons.Outlined.AccountBalanceWallet, contentDescription = "Assets") }, 
                         label = { Text("Assets") }, 
@@ -330,14 +333,14 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                     )
                     NavigationBarItem(
                         selected = selectedTab == 3, 
-                        onClick = { selectedTab = 3; showExpenseHistory = false }, 
+                        onClick = { selectedTab = 3; showExpenseHistory = false; showContriScreen = false }, 
                         icon = { Icon(Icons.Outlined.PieChart, contentDescription = "Analytics") }, 
                         label = { Text("Analytics") }, 
                         colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
                     )
                     NavigationBarItem(
                         selected = selectedTab == 4, 
-                        onClick = { selectedTab = 4; showExpenseHistory = false }, 
+                        onClick = { selectedTab = 4; showExpenseHistory = false; showContriScreen = false }, 
                         icon = { Icon(Icons.Outlined.Person, contentDescription = "Profile") }, 
                         label = { Text("Profile") }, 
                         colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
@@ -346,13 +349,16 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
             }
         ) { paddingValues ->
             AnimatedContent(
-                targetState = Pair(selectedTab, showExpenseHistory),
+                targetState = Triple(selectedTab, showExpenseHistory, showContriScreen),
                 transitionSpec = {
-                    if (targetState.second && !initialState.second) {
+                    val targetIsSecondary = targetState.second || targetState.third
+                    val initialIsSecondary = initialState.second || initialState.third
+                    
+                    if (targetIsSecondary && !initialIsSecondary) {
                         (slideInHorizontally(animationSpec = tween(250)) { width -> width } + fadeIn(tween(250))).togetherWith(
                             slideOutHorizontally(animationSpec = tween(250)) { width -> -width / 2 } + fadeOut(tween(250))
                         )
-                    } else if (!targetState.second && initialState.second) {
+                    } else if (!targetIsSecondary && initialIsSecondary) {
                         (slideInHorizontally(animationSpec = tween(250)) { width -> -width / 2 } + fadeIn(tween(250))).togetherWith(
                             slideOutHorizontally(animationSpec = tween(250)) { width -> width } + fadeOut(tween(250))
                         )
@@ -362,8 +368,13 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                 }, 
                 label = "Screen Transition"
             ) { state ->
-                val (currentTab, isHistoryVisible) = state
-                if (isHistoryVisible) {
+                val (currentTab, isHistoryVisible, isContriVisible) = state
+                if (isContriVisible) {
+                    com.kartikey.rupeeflow.UI_Screens.Home.ContriScreen(
+                        paddingValues = paddingValues,
+                        onBackClick = { showContriScreen = false }
+                    )
+                } else if (isHistoryVisible) {
                     com.kartikey.rupeeflow.UI_Screens.Home.ExpenseHistoryScreen(
                         paddingValues = paddingValues, 
                         history = transactionList, 
@@ -385,7 +396,8 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                             dBackPresses = dBackPresses, 
                             onLogout = onLogout, 
                             onRefreshExpenses = { refreshTrigger++ }, 
-                            onExpenseCardClick = { showExpenseHistory = true }
+                            onExpenseCardClick = { showExpenseHistory = true },
+                            onContriClick = { showContriScreen = true }
                         )
                         1 -> AssetsScreen(
                             paddingValues = paddingValues, 
