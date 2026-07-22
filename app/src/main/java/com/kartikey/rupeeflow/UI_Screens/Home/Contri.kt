@@ -83,8 +83,8 @@ fun ContriScreen(
                 title = "Join a Room",
                 subtitle = "Have a Room Code? Scan QR or enter passkey to join.",
                 icon = Icons.Outlined.GroupAdd,
-                iconTint = Color(0xFF0277BD),
-                bgColor = Color(0xFFE1F5FE),
+                iconTint = Color(0xFF2E7D32),
+                bgColor = Color(0xFFE8F5E9),
                 onClick = { showJoinDialog = true }
             )
             
@@ -102,7 +102,7 @@ fun ContriScreen(
 }
 
 // ==========================================
-// CREATE CONTRI DIALOG (MINIMALISTIC)
+// CREATE CONTRI DIALOG
 // ==========================================
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -151,7 +151,6 @@ fun CreateContriDialog(onDismiss: () -> Unit) {
                     shape = RoundedCornerShape(12.dp)
                 )
 
-                // Red Hint for 6 digits
                 AnimatedVisibility(visible = pin.isNotEmpty() && pin.length < 6) {
                     Text(
                         text = "Enter 6 digits", 
@@ -183,7 +182,6 @@ fun CreateContriDialog(onDismiss: () -> Unit) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun JoinContriDialog(onDismiss: () -> Unit) {
-    // viewState: 0 for Options, 1 for Manual Entry
     var viewState by remember { mutableIntStateOf(0) }
     
     var roomCode by remember { mutableStateOf("") }
@@ -193,8 +191,9 @@ fun JoinContriDialog(onDismiss: () -> Unit) {
         onDismissRequest = onDismiss,
         properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = true)
     ) {
+        // Removed animateContentSize() to stop the hanging/laggy feel
         Card(
-            modifier = Modifier.fillMaxWidth().animateContentSize(),
+            modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(containerColor = Color.White),
             elevation = CardDefaults.cardElevation(8.dp)
@@ -202,8 +201,8 @@ fun JoinContriDialog(onDismiss: () -> Unit) {
             AnimatedContent(
                 targetState = viewState,
                 transitionSpec = {
-                    (slideInHorizontally(animationSpec = tween(300)) { width -> if (targetState == 1) width else -width } + fadeIn(tween(300))).togetherWith(
-                        slideOutHorizontally(animationSpec = tween(300)) { width -> if (targetState == 1) -width else width } + fadeOut(tween(300))
+                    (slideInHorizontally(animationSpec = tween(200)) { width -> if (targetState == 1) width else -width } + fadeIn(tween(200))).togetherWith(
+                        slideOutHorizontally(animationSpec = tween(200)) { width -> if (targetState == 1) -width else width } + fadeOut(tween(200))
                     )
                 }, label = "join_animation"
             ) { state ->
@@ -234,13 +233,13 @@ fun JoinContriDialog(onDismiss: () -> Unit) {
                             ) {
                                 Icon(Icons.Outlined.QrCodeScanner, contentDescription = "Scan QR", modifier = Modifier.size(28.dp), tint = Color.Black)
                                 Spacer(modifier = Modifier.height(4.dp))
-                                Text("Scan QR", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                Text("Scan QR", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.Black)
                             }
 
                             // DIVIDER
                             Box(modifier = Modifier.width(1.dp).height(50.dp).background(Color.LightGray))
 
-                            // MANUAL OPTION
+                            // MANUAL OPTION (Black Theme)
                             Column(
                                 modifier = Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(topEnd = 16.dp, bottomEnd = 16.dp)).clickable { 
                                     viewState = 1 // Switch to Manual
@@ -248,9 +247,9 @@ fun JoinContriDialog(onDismiss: () -> Unit) {
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 verticalArrangement = Arrangement.Center
                             ) {
-                                Icon(Icons.Outlined.Keyboard, contentDescription = "Manual", modifier = Modifier.size(28.dp), tint = Color(0xFF0277BD))
+                                Icon(Icons.Outlined.Keyboard, contentDescription = "Manual", modifier = Modifier.size(28.dp), tint = Color.Black)
                                 Spacer(modifier = Modifier.height(4.dp))
-                                Text("Enter Manually", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0277BD))
+                                Text("Enter Manually", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.Black)
                             }
                         }
                     }
@@ -269,7 +268,7 @@ fun JoinContriDialog(onDismiss: () -> Unit) {
                             Spacer(modifier = Modifier.weight(1f))
                             Text("Enter Details", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
                             Spacer(modifier = Modifier.weight(1f))
-                            Spacer(modifier = Modifier.size(24.dp)) // To balance the back button
+                            Spacer(modifier = Modifier.size(24.dp)) 
                         }
                         
                         Spacer(modifier = Modifier.height(16.dp))
@@ -277,9 +276,7 @@ fun JoinContriDialog(onDismiss: () -> Unit) {
                         OutlinedTextField(
                             value = roomCode,
                             onValueChange = { raw ->
-                                // Keep only letters/digits, force uppercase, limit to 9 chars
                                 val clean = raw.replace("-", "").filter { it.isLetterOrDigit() }.uppercase().take(9)
-                                // Auto-insert hyphens every 3 chars
                                 val formatted = clean.chunked(3).joinToString("-")
                                 roomCode = formatted
                             },
@@ -314,11 +311,12 @@ fun JoinContriDialog(onDismiss: () -> Unit) {
 
                         Spacer(modifier = Modifier.height(20.dp))
 
+                        // Green Button Theme
                         Button(
                             onClick = { /* TODO: Connect to backend handleJoinContri */ },
                             modifier = Modifier.fillMaxWidth().height(50.dp),
                             shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0277BD))
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
                         ) {
                             Text("Join Contri", color = Color.White, fontWeight = FontWeight.Bold)
                         }
