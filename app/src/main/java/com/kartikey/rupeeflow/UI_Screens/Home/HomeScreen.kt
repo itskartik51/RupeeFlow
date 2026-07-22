@@ -34,7 +34,8 @@ fun HomeDashboardDesign(
     dNavState: String, dBackPresses: Int, 
     onLogout: () -> Unit,
     onRefreshExpenses: () -> Unit = {}, 
-    onExpenseCardClick: () -> Unit
+    onExpenseCardClick: () -> Unit,
+    onContriClick: () -> Unit
 ) {
     var showDiagnostics by remember { mutableStateOf(false) }
 
@@ -135,7 +136,12 @@ fun HomeDashboardDesign(
         
         Spacer(modifier = Modifier.height(16.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            GridCard(title = "STOCKS", value = "₹0", lineColor = Color(0xFF2E7D32), modifier = Modifier.weight(1f)) 
+            GridCard(
+                title = "CONTRI", 
+                value = "0 Rooms", 
+                lineColor = Color(0xFF2E7D32), 
+                modifier = Modifier.weight(1f).clickable { onContriClick() }
+            ) 
             GridCard(title = "MUTUAL FUNDS", value = "₹0", lineColor = Color(0xFF039BE5), modifier = Modifier.weight(1f))
         }
         Spacer(modifier = Modifier.height(12.dp))
