@@ -8,6 +8,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -61,74 +62,134 @@ fun ContriScreen(
 ) {
     var showCreateDialog by remember { mutableStateOf(false) }
     var showJoinDialog by remember { mutableStateOf(false) }
+    
+    // Scanner & QR Display States
+    var showScanner by remember { mutableStateOf(false) }
+    var scannedRoomCode by remember { mutableStateOf("") }
+    var qrRoomToDisplay by remember { mutableStateOf<ContriRoomModel?>(null) }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(paddingValues)
-            .background(Color(0xFFFAFAFA))
-    ) {
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        Row(
-            verticalAlignment = Alignment.CenterVertically, 
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
-        ) {
-            IconButton(onClick = onBackClick) {
-                Icon(Icons.Outlined.ArrowBack, contentDescription = "Back", tint = Color.Black)
+    // If Scanner is Active, take over the screen
+    if (showScanner) {
+        com.kartikey.rupeeflow.UI_Screens.QR.ScanQRScreen(
+            onBackClick = { showScanner = false },
+            onQrScanned = { code -> 
+                scannedRoomCode = code
+                showScanner = false
+                showJoinDialog = true // Scanner ke baad direct join form khulega
             }
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("Contri", fontWeight = FontWeight.ExtraBold, fontSize = 22.sp, color = Color.Black)
-        }
-        
-        Spacer(modifier = Modifier.height(16.dp))
-
+        )
+    } else {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp)
+                .padding(paddingValues)
+                .background(Color(0xFFFAFAFA))
         ) {
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // ==========================================
-            // ACTIVE ROOMS LIST
-            // ==========================================
-            if (contriRooms.isNotEmpty()) {
-                contriRooms.forEach { room ->
-                    ActiveRoomCard(room = room, onClick = { /* TODO: Open Inside Room UI */ })
-                    Spacer(modifier = Modifier.height(12.dp))
-                }
-                Spacer(modifier = Modifier.height(12.dp))
-            }
-
-            // ==========================================
-            // ACTION CARDS (Side-by-Side Grid Layout)
-            // ==========================================
+            Spacer(modifier = Modifier.height(16.dp))
+            
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                verticalAlignment = Alignment.CenterVertically, 
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
             ) {
-                ContriGridCard(
-                    title = "Create Contri",
-                    icon = Icons.Outlined.Add,
-                    iconTint = Color(0xFF2E7D32),
-                    bgColor = Color(0xFFE8F5E9),
-                    modifier = Modifier.weight(1f),
-                    onClick = { showCreateDialog = true }
-                )
-                
-                ContriGridCard(
-                    title = "Join Contri",
-                    icon = Icons.Outlined.GroupAdd,
-                    iconTint = Color(0xFF2E7D32),
-                    bgColor = Color(0xFFE8F5E9),
-                    modifier = Modifier.weight(1f),
-                    onClick = { showJoinDialog = true }
-                )
+                IconButton(onClick = onBackClick) {
+                    Icon(Icons.Outlined.ArrowBack, contentDescription = "Back", tint = Color.Black)
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Contri", fontWeight = FontWeight.ExtraBold, fontSize = 22.sp, color = Color.Black)
             }
             
-            Spacer(modifier = Modifier.height(40.dp))
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp)
+            ) {
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // ==========================================
+                // ACTIVE ROOMS LIST (With new QR Button)
+                // ==========================================
+                if (contriRooms.isNotEmpty()) {
+                    contriRooms.forEach { room ->
+                        ActiveRoomCard(
+                            room = room, 
+                            onClick = { /* TODO: Open Inside Room UI */ },
+                            onQrClick = { qrRoomToDisplay = room }
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
+
+                // ==========================================
+                // ACTION CARDS (Side-by-Side Grid Layout)
+                // ==========================================
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    ContriGridCard(
+                        title = "Create Contri",
+                        icon = Icons.Outlined.Add,
+                        iconTint = Color(0xFF2E7D32),
+                        bgColor = Color(0xFFE8F5E9),
+                        modifier = Modifier.weight(1f),
+                        onClick = { showCreateDialog = true }
+                    )
+                    
+                    ContriGridCard(
+                        title = "Join Contri",
+                        icon = Icons.Outlined.GroupAdd,
+                        iconTint = Color(0xFF2E7D32),
+                        bgColor = Color(0xFFE8F5E9),
+                        modifier = Modifier.weight(1f),
+                        onClick = { 
+                            scannedRoomCode = "" // Reset on manual click
+                            showJoinDialog = true 
+                        }
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(40.dp))
+            }
+        }
+    }
+
+    // ==========================================
+    // QR DISPLAY DIALOG
+    // ==========================================
+    if (qrRoomToDisplay != null) {
+        Dialog(
+            onDismissRequest = { qrRoomToDisplay = null },
+            properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = true)
+        ) {
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(8.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp).fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(qrRoomToDisplay!!.roomName, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
+                    Text("Ask your friend to scan this QR", fontSize = 12.sp, color = Color.Gray)
+                    
+                    Spacer(modifier = Modifier.height(24.dp))
+                    
+                    // Connected to the PremiumQR Generator
+                    com.kartikey.rupeeflow.UI_Screens.QR.PremiumQRCode(
+                        data = qrRoomToDisplay!!.roomCode,
+                        size = 180.dp
+                    )
+                    
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Text("Room Code", fontSize = 11.sp, color = Color.Gray)
+                    Text(qrRoomToDisplay!!.roomCode, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 2.sp, color = Color.Black)
+                }
+            }
         }
     }
 
@@ -146,9 +207,15 @@ fun ContriScreen(
     if (showJoinDialog) {
         JoinContriDialog(
             username = username,
+            initialScannedCode = scannedRoomCode,
+            onScanClick = {
+                showJoinDialog = false // Pehle dialog band karo
+                showScanner = true     // Fir scanner kholo
+            },
             onDismiss = { showJoinDialog = false },
             onSuccess = {
                 showJoinDialog = false
+                scannedRoomCode = ""
                 onRefresh()
             }
         )
@@ -156,10 +223,10 @@ fun ContriScreen(
 }
 
 // ==========================================
-// ACTIVE ROOM CARD UI (With Date Formatter)
+// ACTIVE ROOM CARD UI (With QR Icon)
 // ==========================================
 @Composable
-fun ActiveRoomCard(room: ContriRoomModel, onClick: () -> Unit) {
+fun ActiveRoomCard(room: ContriRoomModel, onClick: () -> Unit, onQrClick: () -> Unit) {
     var isPressed by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(targetValue = if (isPressed) 0.95f else 1f, label = "cardScale")
 
@@ -181,13 +248,29 @@ fun ActiveRoomCard(room: ContriRoomModel, onClick: () -> Unit) {
                 )
             }
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(text = room.roomName, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
-            Spacer(modifier = Modifier.height(8.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Outlined.Update, contentDescription = "Last Updated", tint = Color.Gray, modifier = Modifier.size(14.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(text = formatToDayMonth(room.lastUpdated), fontSize = 12.sp, color = Color.Gray, fontWeight = FontWeight.Medium)
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = room.roomName, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Outlined.Update, contentDescription = "Last Updated", tint = Color.Gray, modifier = Modifier.size(14.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(text = formatToDayMonth(room.lastUpdated), fontSize = 12.sp, color = Color.Gray, fontWeight = FontWeight.Medium)
+                }
+            }
+            
+            // New QR Generator Icon Button
+            IconButton(
+                onClick = onQrClick,
+                modifier = Modifier
+                    .size(44.dp)
+                    .background(Color(0xFFE8F5E9), shape = CircleShape)
+            ) {
+                Icon(Icons.Outlined.QrCode2, contentDescription = "Show QR", tint = Color(0xFF2E7D32), modifier = Modifier.size(24.dp))
             }
         }
     }
@@ -206,7 +289,7 @@ fun formatToDayMonth(dateStr: String): String {
 }
 
 // ==========================================
-// CREATE CONTRI DIALOG (WITH API CALL)
+// CREATE CONTRI DIALOG 
 // ==========================================
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -336,14 +419,21 @@ fun CreateContriDialog(username: String, onDismiss: () -> Unit, onSuccess: () ->
 }
 
 // ==========================================
-// JOIN CONTRI DIALOG (WITH API CALL)
+// JOIN CONTRI DIALOG (WITH SCANNER WIRING)
 // ==========================================
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun JoinContriDialog(username: String, onDismiss: () -> Unit, onSuccess: () -> Unit) {
-    var viewState by remember { mutableIntStateOf(0) }
+fun JoinContriDialog(
+    username: String, 
+    initialScannedCode: String = "", 
+    onScanClick: () -> Unit, 
+    onDismiss: () -> Unit, 
+    onSuccess: () -> Unit
+) {
+    // Agar QR scan hokar code mila hai, toh direct Manual wali screen (1) khulegi
+    var viewState by remember { mutableIntStateOf(if (initialScannedCode.isNotBlank()) 1 else 0) }
     
-    var roomCode by remember { mutableStateOf("") }
+    var roomCode by remember { mutableStateOf(initialScannedCode) }
     var pin by remember { mutableStateOf("") }
     var isSubmitting by remember { mutableStateOf(false) }
     
@@ -383,7 +473,8 @@ fun JoinContriDialog(username: String, onDismiss: () -> Unit, onSuccess: () -> U
                     ) {
                         Column(
                             modifier = Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp)).clickable { 
-                                Toast.makeText(context, "QR Scanner coming soon!", Toast.LENGTH_SHORT).show()
+                                // Call the real Scanner function
+                                onScanClick()
                             },
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center
