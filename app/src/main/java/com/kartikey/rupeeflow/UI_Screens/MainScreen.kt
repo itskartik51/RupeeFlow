@@ -67,6 +67,7 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
     var fdList by remember { mutableStateOf(emptyList<FDItem>()) }
     var ccList by remember { mutableStateOf(emptyList<CreditCardItem>()) }
     var cashData by remember { mutableStateOf(CashItem(0.0, "")) }
+    var contriRoomsList by remember { mutableStateOf(emptyList<com.kartikey.rupeeflow.UI_Screens.Home.ContriRoomModel>()) }
     
     var dNavState by remember { mutableStateOf("Connecting to Sheet...") }
     var dBackPresses by remember { mutableIntStateOf(0) }
@@ -176,7 +177,6 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
 
                         val invArray = jsonResponse.optJSONArray("investments")
                         val fetchedInvList = mutableListOf<InvestmentItem>()
-                        
                         if (invArray != null) {
                             for (i in 0 until invArray.length()) { 
                                 val item = invArray.getJSONObject(i)
@@ -194,7 +194,6 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
 
                         val banksArray = jsonResponse.optJSONArray("banks")
                         val fetchedBankList = mutableListOf<BankAccountItem>()
-                        
                         if (banksArray != null) {
                             for (i in 0 until banksArray.length()) { 
                                 val item = banksArray.getJSONObject(i)
@@ -226,7 +225,6 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
 
                         val fdArray = jsonResponse.optJSONArray("fds")
                         val fetchedFDList = mutableListOf<FDItem>()
-                        
                         if (fdArray != null) {
                             for (i in 0 until fdArray.length()) { 
                                 val item = fdArray.getJSONObject(i)
@@ -250,7 +248,6 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
 
                         val ccArray = jsonResponse.optJSONArray("credit_cards")
                         val fetchedCCList = mutableListOf<CreditCardItem>()
-                        
                         if (ccArray != null) {
                             for (i in 0 until ccArray.length()) { 
                                 val item = ccArray.getJSONObject(i)
@@ -275,6 +272,23 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                             }
                         }
 
+                        val contriArray = jsonResponse.optJSONArray("contri_rooms")
+                        val fetchedContriRooms = mutableListOf<com.kartikey.rupeeflow.UI_Screens.Home.ContriRoomModel>()
+                        if (contriArray != null) {
+                            for (i in 0 until contriArray.length()) {
+                                val item = contriArray.getJSONObject(i)
+                                val rName = item.optString("room_name", "")
+                                val rCode = item.optString("room_code", "")
+                                val expArray = item.optJSONArray("expenses")
+                                var lastDate = ""
+                                if (expArray != null && expArray.length() > 0) {
+                                    val lastExp = expArray.getJSONObject(0)
+                                    lastDate = lastExp.optString("date", "")
+                                }
+                                fetchedContriRooms.add(com.kartikey.rupeeflow.UI_Screens.Home.ContriRoomModel(rName, rCode, lastDate))
+                            }
+                        }
+
                         withContext(Dispatchers.Main) {
                             userFullName = tempName
                             userEmail = tempEmail
@@ -290,6 +304,7 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                             cashData = fetchedCash
                             fdList = fetchedFDList
                             ccList = fetchedCCList
+                            contriRoomsList = fetchedContriRooms
                             
                             isLoadingExpenses = false
                         }
@@ -371,8 +386,11 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                 val (currentTab, isHistoryVisible, isContriVisible) = state
                 if (isContriVisible) {
                     com.kartikey.rupeeflow.UI_Screens.Home.ContriScreen(
+                        username = username,
+                        contriRooms = contriRoomsList,
                         paddingValues = paddingValues,
-                        onBackClick = { showContriScreen = false }
+                        onBackClick = { showContriScreen = false },
+                        onRefresh = { refreshTrigger++ }
                     )
                 } else if (isHistoryVisible) {
                     com.kartikey.rupeeflow.UI_Screens.Home.ExpenseHistoryScreen(
