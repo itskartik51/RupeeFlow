@@ -1,9 +1,9 @@
 package com.kartikey.rupeeflow.UI_Screens.Home
 
+import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -21,6 +21,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
@@ -30,11 +31,32 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.kartikey.rupeeflow.Cloud_Database.Constants
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONObject
+import java.text.SimpleDateFormat
+import java.util.Locale
+
+// Data Model for Contri Rooms
+data class ContriRoomModel(
+    val roomName: String,
+    val roomCode: String,
+    val lastUpdated: String
+)
 
 @Composable
 fun ContriScreen(
+    username: String,
+    contriRooms: List<ContriRoomModel>,
     paddingValues: PaddingValues,
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    onRefresh: () -> Unit
 ) {
     var showCreateDialog by remember { mutableStateOf(false) }
     var showJoinDialog by remember { mutableStateOf(false) }
@@ -47,7 +69,6 @@ fun ContriScreen(
     ) {
         Spacer(modifier = Modifier.height(16.dp))
         
-        // Header
         Row(
             verticalAlignment = Alignment.CenterVertically, 
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
@@ -68,6 +89,17 @@ fun ContriScreen(
                 .padding(horizontal = 16.dp)
         ) {
             Spacer(modifier = Modifier.height(8.dp))
+
+            // ==========================================
+            // ACTIVE ROOMS LIST
+            // ==========================================
+            if (contriRooms.isNotEmpty()) {
+                contriRooms.forEach { room ->
+                    ActiveRoomCard(room = room, onClick = { /* TODO: Open Inside Room UI */ })
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+            }
 
             // ==========================================
             // ACTION CARDS (Side-by-Side Grid Layout)
@@ -100,26 +132,94 @@ fun ContriScreen(
     }
 
     if (showCreateDialog) {
-        CreateContriDialog(onDismiss = { showCreateDialog = false })
+        CreateContriDialog(
+            username = username,
+            onDismiss = { showCreateDialog = false },
+            onSuccess = { 
+                showCreateDialog = false
+                onRefresh() 
+            }
+        )
     }
 
     if (showJoinDialog) {
-        JoinContriDialog(onDismiss = { showJoinDialog = false })
+        JoinContriDialog(
+            username = username,
+            onDismiss = { showJoinDialog = false },
+            onSuccess = {
+                showJoinDialog = false
+                onRefresh()
+            }
+        )
     }
 }
 
 // ==========================================
-// CREATE CONTRI DIALOG
+// ACTIVE ROOM CARD UI (With Date Formatter)
+// ==========================================
+@Composable
+fun ActiveRoomCard(room: ContriRoomModel, onClick: () -> Unit) {
+    var isPressed by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(targetValue = if (isPressed) 0.95f else 1f, label = "cardScale")
+
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .scale(scale)
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onPress = {
+                        isPressed = true
+                        tryAwaitRelease()
+                        isPressed = false
+                        onClick()
+                    }
+                )
+            }
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(text = room.roomName, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Outlined.Update, contentDescription = "Last Updated", tint = Color.Gray, modifier = Modifier.size(14.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(text = formatToDayMonth(room.lastUpdated), fontSize = 12.sp, color = Color.Gray, fontWeight = FontWeight.Medium)
+            }
+        }
+    }
+}
+
+fun formatToDayMonth(dateStr: String): String {
+    if (dateStr.isEmpty()) return "Newly Created"
+    return try {
+        val inputFormat = SimpleDateFormat("dd/MM/yyyy hh:mm a", Locale.getDefault())
+        val outputFormat = SimpleDateFormat("dd MMMM", Locale.getDefault())
+        val date = inputFormat.parse(dateStr)
+        if (date != null) outputFormat.format(date) else dateStr
+    } catch (e: Exception) {
+        dateStr
+    }
+}
+
+// ==========================================
+// CREATE CONTRI DIALOG (WITH API CALL)
 // ==========================================
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CreateContriDialog(onDismiss: () -> Unit) {
+fun CreateContriDialog(username: String, onDismiss: () -> Unit, onSuccess: () -> Unit) {
     var contriName by remember { mutableStateOf("") }
     var pin by remember { mutableStateOf("") }
+    var isSubmitting by remember { mutableStateOf(false) }
+    
+    val coroutineScope = rememberCoroutineScope()
+    val context = LocalContext.current
 
     Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = true)
+        onDismissRequest = { if (!isSubmitting) onDismiss() },
+        properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = false)
     ) {
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -131,7 +231,15 @@ fun CreateContriDialog(onDismiss: () -> Unit) {
                 modifier = Modifier.padding(20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text("Create Room", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Text("Create Room", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
+                    if (!isSubmitting) {
+                        IconButton(onClick = onDismiss, modifier = Modifier.size(24.dp)) {
+                            Icon(Icons.Outlined.Close, contentDescription = "Close", tint = Color.Gray)
+                        }
+                    }
+                }
+                
                 Spacer(modifier = Modifier.height(16.dp))
 
                 OutlinedTextField(
@@ -143,7 +251,8 @@ fun CreateContriDialog(onDismiss: () -> Unit) {
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF2E7D32), focusedLabelColor = Color(0xFF2E7D32))
                 )
 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -155,7 +264,8 @@ fun CreateContriDialog(onDismiss: () -> Unit) {
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF2E7D32), focusedLabelColor = Color(0xFF2E7D32))
                 )
 
                 AnimatedVisibility(visible = pin.isNotEmpty() && pin.length < 6) {
@@ -171,12 +281,53 @@ fun CreateContriDialog(onDismiss: () -> Unit) {
                 Spacer(modifier = Modifier.height(20.dp))
 
                 Button(
-                    onClick = { /* TODO: Connect to backend handleCreateContri */ },
+                    onClick = {
+                        if (contriName.isNotBlank() && pin.length == 6) {
+                            isSubmitting = true
+                            coroutineScope.launch(Dispatchers.IO) {
+                                try {
+                                    val jsonBody = JSONObject().apply {
+                                        put("action", "create_contri")
+                                        put("username", username)
+                                        put("room_name", contriName.trim())
+                                        put("passkey", pin)
+                                    }
+                                    val request = Request.Builder()
+                                        .url(Constants.GOOGLE_SHEET_API_URL)
+                                        .post(jsonBody.toString().toRequestBody("application/json".toMediaType()))
+                                        .build()
+                                    
+                                    val response = OkHttpClient().newCall(request).execute()
+                                    val resData = response.body?.string() ?: ""
+                                    
+                                    withContext(Dispatchers.Main) {
+                                        isSubmitting = false
+                                        if (resData.contains("success")) {
+                                            Toast.makeText(context, "Room Created!", Toast.LENGTH_SHORT).show()
+                                            onSuccess()
+                                        } else {
+                                            val errorMsg = try { JSONObject(resData).optString("message", "Limit Reached") } catch(e:Exception){"Error"}
+                                            Toast.makeText(context, errorMsg, Toast.LENGTH_LONG).show()
+                                        }
+                                    }
+                                } catch (e: Exception) {
+                                    withContext(Dispatchers.Main) {
+                                        isSubmitting = false
+                                        Toast.makeText(context, "Network Error", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            }
+                        } else {
+                            Toast.makeText(context, "Fill details correctly", Toast.LENGTH_SHORT).show()
+                        }
+                    },
                     modifier = Modifier.fillMaxWidth().height(50.dp),
                     shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
+                    enabled = !isSubmitting
                 ) {
-                    Text("Create Contri", color = Color.White, fontWeight = FontWeight.Bold)
+                    if (isSubmitting) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                    else Text("Create Contri", color = Color.White, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -184,19 +335,23 @@ fun CreateContriDialog(onDismiss: () -> Unit) {
 }
 
 // ==========================================
-// JOIN CONTRI DIALOG (INSTANT UI - NO ANIMATIONS)
+// JOIN CONTRI DIALOG (WITH API CALL)
 // ==========================================
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun JoinContriDialog(onDismiss: () -> Unit) {
+fun JoinContriDialog(username: String, onDismiss: () -> Unit, onSuccess: () -> Unit) {
     var viewState by remember { mutableIntStateOf(0) }
     
     var roomCode by remember { mutableStateOf("") }
     var pin by remember { mutableStateOf("") }
+    var isSubmitting by remember { mutableStateOf(false) }
+    
+    val coroutineScope = rememberCoroutineScope()
+    val context = LocalContext.current
 
     Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = true)
+        onDismissRequest = { if (!isSubmitting) onDismiss() },
+        properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = false)
     ) {
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -204,7 +359,6 @@ fun JoinContriDialog(onDismiss: () -> Unit) {
             colors = CardDefaults.cardColors(containerColor = Color.White),
             elevation = CardDefaults.cardElevation(8.dp)
         ) {
-            // NO ANIMATIONS - Instant State Switch
             if (viewState == 0) {
                 // --------------------------
                 // VIEW 1: OPTIONS
@@ -213,7 +367,12 @@ fun JoinContriDialog(onDismiss: () -> Unit) {
                     modifier = Modifier.fillMaxWidth().padding(20.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text("Join Contri", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Text("Join Contri", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
+                        IconButton(onClick = onDismiss, modifier = Modifier.size(24.dp)) {
+                            Icon(Icons.Outlined.Close, contentDescription = "Close", tint = Color.Gray)
+                        }
+                    }
                     
                     Spacer(modifier = Modifier.height(20.dp))
 
@@ -221,10 +380,9 @@ fun JoinContriDialog(onDismiss: () -> Unit) {
                         modifier = Modifier.fillMaxWidth().height(80.dp).background(Color(0xFFF5F5F5), RoundedCornerShape(16.dp)),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // QR SCAN OPTION
                         Column(
                             modifier = Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp)).clickable { 
-                                // TODO: QR Scanner trigger
+                                Toast.makeText(context, "QR Scanner coming soon!", Toast.LENGTH_SHORT).show()
                             },
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center
@@ -234,13 +392,11 @@ fun JoinContriDialog(onDismiss: () -> Unit) {
                             Text("Scan QR", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.Black)
                         }
 
-                        // DIVIDER
                         Box(modifier = Modifier.width(1.dp).height(40.dp).background(Color.LightGray))
 
-                        // MANUAL OPTION (Black Theme)
                         Column(
                             modifier = Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(topEnd = 16.dp, bottomEnd = 16.dp)).clickable { 
-                                viewState = 1 // Switch to Manual
+                                viewState = 1 
                             },
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center
@@ -260,8 +416,12 @@ fun JoinContriDialog(onDismiss: () -> Unit) {
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(onClick = { viewState = 0 }, modifier = Modifier.size(24.dp)) {
-                            Icon(Icons.Outlined.ArrowBack, contentDescription = "Back", tint = Color.Black)
+                        if (!isSubmitting) {
+                            IconButton(onClick = { viewState = 0 }, modifier = Modifier.size(24.dp)) {
+                                Icon(Icons.Outlined.ArrowBack, contentDescription = "Back", tint = Color.Black)
+                            }
+                        } else {
+                            Spacer(modifier = Modifier.size(24.dp))
                         }
                         Spacer(modifier = Modifier.weight(1f))
                         Text("Enter Details", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
@@ -282,7 +442,8 @@ fun JoinContriDialog(onDismiss: () -> Unit) {
                         placeholder = { Text("ABC-123-XYZ") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF2E7D32), focusedLabelColor = Color(0xFF2E7D32))
                     )
 
                     Spacer(modifier = Modifier.height(12.dp))
@@ -294,7 +455,8 @@ fun JoinContriDialog(onDismiss: () -> Unit) {
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF2E7D32), focusedLabelColor = Color(0xFF2E7D32))
                     )
 
                     AnimatedVisibility(visible = pin.isNotEmpty() && pin.length < 6) {
@@ -309,14 +471,54 @@ fun JoinContriDialog(onDismiss: () -> Unit) {
 
                     Spacer(modifier = Modifier.height(20.dp))
 
-                    // Green Button Theme
                     Button(
-                        onClick = { /* TODO: Connect to backend handleJoinContri */ },
+                        onClick = {
+                            if (roomCode.length >= 11 && pin.length == 6) {
+                                isSubmitting = true
+                                coroutineScope.launch(Dispatchers.IO) {
+                                    try {
+                                        val jsonBody = JSONObject().apply {
+                                            put("action", "join_contri")
+                                            put("username", username)
+                                            put("room_code", roomCode)
+                                            put("passkey", pin)
+                                        }
+                                        val request = Request.Builder()
+                                            .url(Constants.GOOGLE_SHEET_API_URL)
+                                            .post(jsonBody.toString().toRequestBody("application/json".toMediaType()))
+                                            .build()
+                                        
+                                        val response = OkHttpClient().newCall(request).execute()
+                                        val resData = response.body?.string() ?: ""
+                                        
+                                        withContext(Dispatchers.Main) {
+                                            isSubmitting = false
+                                            if (resData.contains("success")) {
+                                                Toast.makeText(context, "Joined Successfully!", Toast.LENGTH_SHORT).show()
+                                                onSuccess()
+                                            } else {
+                                                val errorMsg = try { JSONObject(resData).optString("message", "Invalid Code/Pin") } catch(e:Exception){"Error"}
+                                                Toast.makeText(context, errorMsg, Toast.LENGTH_LONG).show()
+                                            }
+                                        }
+                                    } catch (e: Exception) {
+                                        withContext(Dispatchers.Main) {
+                                            isSubmitting = false
+                                            Toast.makeText(context, "Network Error", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                }
+                            } else {
+                                Toast.makeText(context, "Enter Valid Code & Pin", Toast.LENGTH_SHORT).show()
+                            }
+                        },
                         modifier = Modifier.fillMaxWidth().height(50.dp),
                         shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
+                        enabled = !isSubmitting
                     ) {
-                        Text("Join Contri", color = Color.White, fontWeight = FontWeight.Bold)
+                        if (isSubmitting) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                        else Text("Join Contri", color = Color.White, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -364,7 +566,7 @@ fun ContriGridCard(
         ) {
             Box(
                 modifier = Modifier
-                    .size(42.dp) // Reduced Box Size
+                    .size(42.dp)
                     .background(bgColor, shape = RoundedCornerShape(12.dp)),
                 contentAlignment = Alignment.Center
             ) {
@@ -372,7 +574,7 @@ fun ContriGridCard(
                     imageVector = icon,
                     contentDescription = title,
                     tint = iconTint,
-                    modifier = Modifier.size(22.dp) // Reduced Icon Size
+                    modifier = Modifier.size(22.dp)
                 )
             }
             
@@ -383,9 +585,9 @@ fun ContriGridCard(
                 fontSize = 14.sp, 
                 fontWeight = FontWeight.ExtraBold, 
                 color = Color.Black,
-                maxLines = 1,          // Strictly Single Line
-                softWrap = false,      // Prevent line breaking
-                overflow = TextOverflow.Ellipsis // Add dots if screen is too small
+                maxLines = 1,          
+                softWrap = false,      
+                overflow = TextOverflow.Ellipsis 
             )
         }
     }
