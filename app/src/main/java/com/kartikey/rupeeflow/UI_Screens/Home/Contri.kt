@@ -2,7 +2,6 @@ package com.kartikey.rupeeflow.UI_Screens.Home
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -26,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -47,6 +47,7 @@ fun ContriScreen(
     ) {
         Spacer(modifier = Modifier.height(16.dp))
         
+        // Header
         Row(
             verticalAlignment = Alignment.CenterVertically, 
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
@@ -55,7 +56,7 @@ fun ContriScreen(
                 Icon(Icons.Outlined.ArrowBack, contentDescription = "Back", tint = Color.Black)
             }
             Spacer(modifier = Modifier.width(8.dp))
-            Text("Contri Hub", fontWeight = FontWeight.ExtraBold, fontSize = 22.sp, color = Color.Black)
+            Text("Contri", fontWeight = FontWeight.ExtraBold, fontSize = 22.sp, color = Color.Black)
         }
         
         Spacer(modifier = Modifier.height(16.dp))
@@ -68,25 +69,31 @@ fun ContriScreen(
         ) {
             Spacer(modifier = Modifier.height(8.dp))
 
-            ContriActionCard(
-                title = "Create New Room",
-                subtitle = "Start a new split-expense group with your friends.",
-                icon = Icons.Outlined.Add,
-                iconTint = Color(0xFF2E7D32),
-                bgColor = Color(0xFFE8F5E9),
-                onClick = { showCreateDialog = true }
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            ContriActionCard(
-                title = "Join a Room",
-                subtitle = "Have a Room Code? Scan QR or enter passkey to join.",
-                icon = Icons.Outlined.GroupAdd,
-                iconTint = Color(0xFF2E7D32),
-                bgColor = Color(0xFFE8F5E9),
-                onClick = { showJoinDialog = true }
-            )
+            // ==========================================
+            // ACTION CARDS (Side-by-Side Grid Layout)
+            // ==========================================
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                ContriGridCard(
+                    title = "Create Contri",
+                    icon = Icons.Outlined.Add,
+                    iconTint = Color(0xFF2E7D32),
+                    bgColor = Color(0xFFE8F5E9),
+                    modifier = Modifier.weight(1f),
+                    onClick = { showCreateDialog = true }
+                )
+                
+                ContriGridCard(
+                    title = "Join Contri",
+                    icon = Icons.Outlined.GroupAdd,
+                    iconTint = Color(0xFF2E7D32),
+                    bgColor = Color(0xFFE8F5E9),
+                    modifier = Modifier.weight(1f),
+                    onClick = { showJoinDialog = true }
+                )
+            }
             
             Spacer(modifier = Modifier.height(40.dp))
         }
@@ -177,7 +184,7 @@ fun CreateContriDialog(onDismiss: () -> Unit) {
 }
 
 // ==========================================
-// JOIN CONTRI DIALOG (60FPS ANIMATED UI)
+// JOIN CONTRI DIALOG (INSTANT UI - NO ANIMATIONS)
 // ==========================================
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -191,144 +198,125 @@ fun JoinContriDialog(onDismiss: () -> Unit) {
         onDismissRequest = onDismiss,
         properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = true)
     ) {
-        // animateContentSize added back with matched 250ms duration for jitter-free resize
         Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .animateContentSize(animationSpec = tween(250)),
+            modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(containerColor = Color.White),
             elevation = CardDefaults.cardElevation(8.dp)
         ) {
-            AnimatedContent(
-                targetState = viewState,
-                transitionSpec = {
-                    // 33% Slide (it/3) + Fade transition for buttery smooth 60fps feel
-                    if (targetState == 1) {
-                        (slideInHorizontally(animationSpec = tween(250)) { it / 3 } + fadeIn(tween(250))).togetherWith(
-                            slideOutHorizontally(animationSpec = tween(250)) { -it / 3 } + fadeOut(tween(250))
-                        )
-                    } else {
-                        (slideInHorizontally(animationSpec = tween(250)) { -it / 3 } + fadeIn(tween(250))).togetherWith(
-                            slideOutHorizontally(animationSpec = tween(250)) { it / 3 } + fadeOut(tween(250))
-                        )
-                    }
-                }, label = "join_animation"
-            ) { state ->
-                if (state == 0) {
-                    // --------------------------
-                    // VIEW 1: OPTIONS
-                    // --------------------------
-                    Column(
-                        modifier = Modifier.fillMaxWidth().padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+            // NO ANIMATIONS - Instant State Switch
+            if (viewState == 0) {
+                // --------------------------
+                // VIEW 1: OPTIONS
+                // --------------------------
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text("Join Contri", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
+                    
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth().height(80.dp).background(Color(0xFFF5F5F5), RoundedCornerShape(16.dp)),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("Join Room", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
-                        Text("Choose how you want to join", fontSize = 12.sp, color = Color.Gray)
-                        
-                        Spacer(modifier = Modifier.height(24.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth().height(90.dp).background(Color(0xFFF5F5F5), RoundedCornerShape(16.dp)),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            // QR SCAN OPTION
-                            Column(
-                                modifier = Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp)).clickable { 
-                                    // TODO: QR Scanner trigger
-                                },
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.Center
-                            ) {
-                                Icon(Icons.Outlined.QrCodeScanner, contentDescription = "Scan QR", modifier = Modifier.size(28.dp), tint = Color.Black)
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text("Scan QR", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.Black)
-                            }
-
-                            // DIVIDER
-                            Box(modifier = Modifier.width(1.dp).height(50.dp).background(Color.LightGray))
-
-                            // MANUAL OPTION (Black Theme)
-                            Column(
-                                modifier = Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(topEnd = 16.dp, bottomEnd = 16.dp)).clickable { 
-                                    viewState = 1 // Switch to Manual
-                                },
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.Center
-                            ) {
-                                Icon(Icons.Outlined.Keyboard, contentDescription = "Manual", modifier = Modifier.size(28.dp), tint = Color.Black)
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text("Enter Manually", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.Black)
-                            }
-                        }
-                    }
-                } else {
-                    // --------------------------
-                    // VIEW 2: MANUAL ENTRY FORM
-                    // --------------------------
-                    Column(
-                        modifier = Modifier.fillMaxWidth().padding(20.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            IconButton(onClick = { viewState = 0 }, modifier = Modifier.size(24.dp)) {
-                                Icon(Icons.Outlined.ArrowBack, contentDescription = "Back", tint = Color.Black)
-                            }
-                            Spacer(modifier = Modifier.weight(1f))
-                            Text("Enter Details", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
-                            Spacer(modifier = Modifier.weight(1f))
-                            Spacer(modifier = Modifier.size(24.dp)) 
-                        }
-                        
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        OutlinedTextField(
-                            value = roomCode,
-                            onValueChange = { raw ->
-                                val clean = raw.replace("-", "").filter { it.isLetterOrDigit() }.uppercase().take(9)
-                                val formatted = clean.chunked(3).joinToString("-")
-                                roomCode = formatted
+                        // QR SCAN OPTION
+                        Column(
+                            modifier = Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp)).clickable { 
+                                // TODO: QR Scanner trigger
                             },
-                            label = { Text("Enter Contri Code") },
-                            placeholder = { Text("ABC-123-XYZ") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp)
-                        )
-
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        OutlinedTextField(
-                            value = pin,
-                            onValueChange = { if (it.length <= 6 && it.all { char -> char.isDigit() }) pin = it },
-                            label = { Text("Enter Pin") },
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp)
-                        )
-
-                        AnimatedVisibility(visible = pin.isNotEmpty() && pin.length < 6) {
-                            Text(
-                                text = "Enter 6 digits", 
-                                color = Color.Red, 
-                                fontSize = 11.sp, 
-                                modifier = Modifier.fillMaxWidth().padding(start = 8.dp, top = 2.dp),
-                                textAlign = TextAlign.Start
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(20.dp))
-
-                        // Green Button Theme
-                        Button(
-                            onClick = { /* TODO: Connect to backend handleJoinContri */ },
-                            modifier = Modifier.fillMaxWidth().height(50.dp),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
                         ) {
-                            Text("Join Contri", color = Color.White, fontWeight = FontWeight.Bold)
+                            Icon(Icons.Outlined.QrCodeScanner, contentDescription = "Scan QR", modifier = Modifier.size(28.dp), tint = Color.Black)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text("Scan QR", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.Black)
                         }
+
+                        // DIVIDER
+                        Box(modifier = Modifier.width(1.dp).height(40.dp).background(Color.LightGray))
+
+                        // MANUAL OPTION (Black Theme)
+                        Column(
+                            modifier = Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(topEnd = 16.dp, bottomEnd = 16.dp)).clickable { 
+                                viewState = 1 // Switch to Manual
+                            },
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Icon(Icons.Outlined.Keyboard, contentDescription = "Manual", modifier = Modifier.size(28.dp), tint = Color.Black)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text("Enter Manually", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+                        }
+                    }
+                }
+            } else {
+                // --------------------------
+                // VIEW 2: MANUAL ENTRY FORM
+                // --------------------------
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = { viewState = 0 }, modifier = Modifier.size(24.dp)) {
+                            Icon(Icons.Outlined.ArrowBack, contentDescription = "Back", tint = Color.Black)
+                        }
+                        Spacer(modifier = Modifier.weight(1f))
+                        Text("Enter Details", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
+                        Spacer(modifier = Modifier.weight(1f))
+                        Spacer(modifier = Modifier.size(24.dp)) 
+                    }
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    OutlinedTextField(
+                        value = roomCode,
+                        onValueChange = { raw ->
+                            val clean = raw.replace("-", "").filter { it.isLetterOrDigit() }.uppercase().take(9)
+                            val formatted = clean.chunked(3).joinToString("-")
+                            roomCode = formatted
+                        },
+                        label = { Text("Enter Contri Code") },
+                        placeholder = { Text("ABC-123-XYZ") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    OutlinedTextField(
+                        value = pin,
+                        onValueChange = { if (it.length <= 6 && it.all { char -> char.isDigit() }) pin = it },
+                        label = { Text("Enter Pin") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+
+                    AnimatedVisibility(visible = pin.isNotEmpty() && pin.length < 6) {
+                        Text(
+                            text = "Enter 6 digits", 
+                            color = Color.Red, 
+                            fontSize = 11.sp, 
+                            modifier = Modifier.fillMaxWidth().padding(start = 8.dp, top = 2.dp),
+                            textAlign = TextAlign.Start
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    // Green Button Theme
+                    Button(
+                        onClick = { /* TODO: Connect to backend handleJoinContri */ },
+                        modifier = Modifier.fillMaxWidth().height(50.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
+                    ) {
+                        Text("Join Contri", color = Color.White, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -337,15 +325,15 @@ fun JoinContriDialog(onDismiss: () -> Unit) {
 }
 
 // ==========================================
-// PREMIUM ACTION CARD
+// PREMIUM GRID CARD (SIDE-BY-SIDE LAYOUT)
 // ==========================================
 @Composable
-fun ContriActionCard(
+fun ContriGridCard(
     title: String,
-    subtitle: String,
     icon: ImageVector,
     iconTint: Color,
     bgColor: Color,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
     var isPressed by remember { mutableStateOf(false) }
@@ -355,8 +343,7 @@ fun ContriActionCard(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = if (isPressed) 2.dp else 6.dp),
-        modifier = Modifier
-            .fillMaxWidth()
+        modifier = modifier
             .scale(scale)
             .pointerInput(Unit) {
                 detectTapGestures(
@@ -372,30 +359,34 @@ fun ContriActionCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(20.dp),
+                .padding(horizontal = 12.dp, vertical = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier
-                    .size(56.dp)
-                    .background(bgColor, shape = RoundedCornerShape(16.dp)),
+                    .size(42.dp) // Reduced Box Size
+                    .background(bgColor, shape = RoundedCornerShape(12.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = title,
                     tint = iconTint,
-                    modifier = Modifier.size(28.dp)
+                    modifier = Modifier.size(22.dp) // Reduced Icon Size
                 )
             }
             
-            Spacer(modifier = Modifier.width(16.dp))
+            Spacer(modifier = Modifier.width(10.dp))
             
-            Column(modifier = Modifier.weight(1f)) {
-                Text(text = title, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(text = subtitle, fontSize = 13.sp, color = Color.Gray, lineHeight = 18.sp)
-            }
+            Text(
+                text = title, 
+                fontSize = 14.sp, 
+                fontWeight = FontWeight.ExtraBold, 
+                color = Color.Black,
+                maxLines = 1,          // Strictly Single Line
+                softWrap = false,      // Prevent line breaking
+                overflow = TextOverflow.Ellipsis // Add dots if screen is too small
+            )
         }
     }
 }
