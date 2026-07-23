@@ -272,6 +272,9 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                             }
                         }
 
+                        // ==========================================
+                        // UPDATED CONTRI PARSER (NOW FETCHES PIN/PASSKEY)
+                        // ==========================================
                         val contriArray = jsonResponse.optJSONArray("contri_rooms")
                         val fetchedContriRooms = mutableListOf<com.kartikey.rupeeflow.UI_Screens.Home.ContriRoomModel>()
                         if (contriArray != null) {
@@ -279,13 +282,15 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                                 val item = contriArray.getJSONObject(i)
                                 val rName = item.optString("room_name", "")
                                 val rCode = item.optString("room_code", "")
+                                // Parsing the passkey (Pin) explicitly so InsideContri Screen gets the real data
+                                val rPin = item.optString("passkey", "123456") 
                                 val expArray = item.optJSONArray("expenses")
                                 var lastDate = ""
                                 if (expArray != null && expArray.length() > 0) {
                                     val lastExp = expArray.getJSONObject(0)
                                     lastDate = lastExp.optString("date", "")
                                 }
-                                fetchedContriRooms.add(com.kartikey.rupeeflow.UI_Screens.Home.ContriRoomModel(rName, rCode, lastDate))
+                                fetchedContriRooms.add(com.kartikey.rupeeflow.UI_Screens.Home.ContriRoomModel(rName, rCode, lastDate, rPin))
                             }
                         }
 
