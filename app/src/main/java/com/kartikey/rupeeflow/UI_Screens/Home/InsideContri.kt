@@ -57,7 +57,7 @@ data class MemberLedger(val memberName: String, val totalSpent: Double, val expe
 
 @Composable
 fun InsideContriScreen(
-    username: String, // Secure routing variable
+    username: String,
     room: ContriRoomModel,
     onBackClick: () -> Unit,
     onLeaveClick: () -> Unit
@@ -67,20 +67,16 @@ fun InsideContriScreen(
     val coroutineScope = rememberCoroutineScope()
     val formattedName = if (room.roomName.length > 10) "${room.roomName.take(10)}..." else room.roomName
 
-    // Cache Engine setup
     val sharedPreferences = context.getSharedPreferences("RupeeFlowCache", Context.MODE_PRIVATE)
     val cacheKey = "room_data_${room.roomCode}"
 
     var ledgers by remember { mutableStateOf<List<MemberLedger>>(emptyList()) }
     var totalGroupExpense by remember { mutableDoubleStateOf(0.0) }
     var isLoading by remember { mutableStateOf(false) }
-    var refreshTrigger by remember { mutableIntStateOf(0) } // Auto refresh trigger
+    var refreshTrigger by remember { mutableIntStateOf(0) }
     
     var showAddExpenseDialog by remember { mutableStateOf(false) }
 
-    // ==========================================
-    // OFFLINE-FIRST CACHE & SILENT SYNC LOGIC
-    // ==========================================
     LaunchedEffect(room.roomCode, refreshTrigger) {
         val cachedJson = sharedPreferences.getString(cacheKey, null)
         if (cachedJson != null) {
@@ -152,7 +148,7 @@ fun InsideContriScreen(
         Column(
             modifier = Modifier.fillMaxSize().padding(paddingValues)
         ) {
-            // INFO CARD
+            // INFO CARD (Total Amount reduced in size)
             Card(
                 modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 12.dp),
                 shape = RoundedCornerShape(16.dp),
@@ -164,12 +160,14 @@ fun InsideContriScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    // LEFT SIDE: Total Amount
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("₹", fontSize = 38.sp, color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold)
+                        Text("₹", fontSize = 28.sp, color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text(totalGroupExpense.toInt().toString(), fontSize = 48.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
+                        Text(totalGroupExpense.toInt().toString(), fontSize = 34.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
                     }
 
+                    // RIGHT SIDE: Code and Pin
                     Column(horizontalAlignment = Alignment.End) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -258,27 +256,17 @@ fun InsideContriScreen(
         }
 
         // ==========================================
-        // REAL NETWORK SPLIT ENGINE CALL
+        // REAL NETWORK CALL (Fixed: No more automatic split)
         // ==========================================
         if (showAddExpenseDialog) {
             AddContriExpenseDialog(
                 onDismiss = { showAddExpenseDialog = false },
                 onAdd = { title, dateMillis, amount ->
                     showAddExpenseDialog = false
-                    isLoading = true // Show loading spinner
+                    isLoading = true 
                     
                     coroutineScope.launch(Dispatchers.IO) {
                         try {
-                            // SPLIT MATH ENGINE
-                            val memberCount = ledgers.size
-                            val splitAmount = if (memberCount > 0) amount / memberCount else amount
-                            
-                            val amountsObj = JSONObject()
-                            ledgers.forEach { ledger ->
-                                amountsObj.put(ledger.memberName, splitAmount)
-                            }
-                            
-                            // Format Date exactly as backend needs
                             val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
                             val formattedDate = sdf.format(Date(dateMillis))
 
@@ -288,7 +276,7 @@ fun InsideContriScreen(
                                 put("room_code", room.roomCode)
                                 put("date", formattedDate)
                                 put("item_name", title)
-                                put("amounts", amountsObj.toString())
+                                put("amount", amount) // Now just sending raw amount
                             }
                             
                             val request = Request.Builder()
@@ -301,8 +289,7 @@ fun InsideContriScreen(
 
                             withContext(Dispatchers.Main) {
                                 if (resData.contains("\"status\":\"success\"")) {
-                                    Toast.makeText(context, "Expense Added & Split Successfully!", Toast.LENGTH_SHORT).show()
-                                    // Remove old cache and fetch fresh data
+                                    Toast.makeText(context, "Expense Added Successfully!", Toast.LENGTH_SHORT).show()
                                     sharedPreferences.edit().remove(cacheKey).apply()
                                     refreshTrigger++ 
                                 } else {
