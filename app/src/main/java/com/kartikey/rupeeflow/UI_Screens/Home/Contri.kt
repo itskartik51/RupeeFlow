@@ -80,27 +80,25 @@ fun ContriScreen(
             }
         )
     } else if (openedRoom != null) {
-        // FULL-SCREEN DIALOG OVERLAY (Hides bottom bar & frees the FAB!)
         Dialog(
             onDismissRequest = { openedRoom = null },
             properties = DialogProperties(
                 dismissOnBackPress = true, 
                 dismissOnClickOutside = false,
-                usePlatformDefaultWidth = false // Completely hides background MainScreen
+                usePlatformDefaultWidth = false 
             )
         ) {
             InsideContriScreen(
+                username = username, // <-- Now passing username here securely
                 room = openedRoom!!,
                 onBackClick = { openedRoom = null },
                 onLeaveClick = { 
                     Toast.makeText(context, "Balance check logic coming soon!", Toast.LENGTH_SHORT).show()
                     openedRoom = null 
-                },
-                onAddClick = { Toast.makeText(context, "Add expense logic coming soon!", Toast.LENGTH_SHORT).show() }
+                }
             )
         }
     } else {
-        // Main Contri Hub UI
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -189,14 +187,8 @@ fun ContriScreen(
                 ) {
                     Text(qrRoomToDisplay!!.roomName, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
                     Text("Ask your friend to scan this QR", fontSize = 12.sp, color = Color.Gray)
-                    
                     Spacer(modifier = Modifier.height(24.dp))
-                    
-                    com.kartikey.rupeeflow.UI_Screens.QR.PremiumQRCode(
-                        data = qrRoomToDisplay!!.roomCode,
-                        size = 180.dp
-                    )
-                    
+                    com.kartikey.rupeeflow.UI_Screens.QR.PremiumQRCode(data = qrRoomToDisplay!!.roomCode, size = 180.dp)
                     Spacer(modifier = Modifier.height(24.dp))
                     Text("Room Code", fontSize = 11.sp, color = Color.Gray)
                     Text(qrRoomToDisplay!!.roomCode, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 2.sp, color = Color.Black)
@@ -209,10 +201,7 @@ fun ContriScreen(
         CreateContriDialog(
             username = username,
             onDismiss = { showCreateDialog = false },
-            onSuccess = { 
-                showCreateDialog = false
-                onRefresh() 
-            }
+            onSuccess = { showCreateDialog = false; onRefresh() }
         )
     }
 
@@ -220,23 +209,13 @@ fun ContriScreen(
         JoinContriDialog(
             username = username,
             initialScannedCode = scannedRoomCode,
-            onScanClick = {
-                showJoinDialog = false 
-                showScanner = true     
-            },
+            onScanClick = { showJoinDialog = false; showScanner = true },
             onDismiss = { showJoinDialog = false },
-            onSuccess = {
-                showJoinDialog = false
-                scannedRoomCode = ""
-                onRefresh()
-            }
+            onSuccess = { showJoinDialog = false; scannedRoomCode = ""; onRefresh() }
         )
     }
 }
 
-// ==========================================
-// ACTIVE ROOM CARD UI
-// ==========================================
 @Composable
 fun ActiveRoomCard(room: ContriRoomModel, onClick: () -> Unit, onQrClick: () -> Unit) {
     var isPressed by remember { mutableStateOf(false) }
@@ -277,9 +256,7 @@ fun ActiveRoomCard(room: ContriRoomModel, onClick: () -> Unit, onQrClick: () -> 
             
             IconButton(
                 onClick = onQrClick,
-                modifier = Modifier
-                    .size(44.dp)
-                    .background(Color(0xFFE8F5E9), shape = CircleShape)
+                modifier = Modifier.size(44.dp).background(Color(0xFFE8F5E9), shape = CircleShape)
             ) {
                 Icon(Icons.Outlined.QrCode2, contentDescription = "Show QR", tint = Color(0xFF2E7D32), modifier = Modifier.size(24.dp))
             }
@@ -299,9 +276,6 @@ fun formatToDayMonth(dateStr: String): String {
     }
 }
 
-// ==========================================
-// CREATE CONTRI DIALOG 
-// ==========================================
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CreateContriDialog(username: String, onDismiss: () -> Unit, onSuccess: () -> Unit) {
@@ -322,10 +296,7 @@ fun CreateContriDialog(username: String, onDismiss: () -> Unit, onSuccess: () ->
             colors = CardDefaults.cardColors(containerColor = Color.White),
             elevation = CardDefaults.cardElevation(8.dp)
         ) {
-            Column(
-                modifier = Modifier.padding(20.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
+            Column(modifier = Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Text("Create Room", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
                     if (!isSubmitting) {
@@ -339,9 +310,7 @@ fun CreateContriDialog(username: String, onDismiss: () -> Unit, onSuccess: () ->
 
                 OutlinedTextField(
                     value = contriName,
-                    onValueChange = { 
-                        contriName = it.replaceFirstChar { char -> if (char.isLowerCase()) char.titlecase() else char.toString() } 
-                    },
+                    onValueChange = { contriName = it.replaceFirstChar { char -> if (char.isLowerCase()) char.titlecase() else char.toString() } },
                     label = { Text("Contri Name") },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
@@ -349,9 +318,7 @@ fun CreateContriDialog(username: String, onDismiss: () -> Unit, onSuccess: () ->
                     shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF2E7D32), focusedLabelColor = Color(0xFF2E7D32))
                 )
-
                 Spacer(modifier = Modifier.height(12.dp))
-
                 OutlinedTextField(
                     value = pin,
                     onValueChange = { if (it.length <= 6 && it.all { char -> char.isDigit() }) pin = it },
@@ -364,13 +331,7 @@ fun CreateContriDialog(username: String, onDismiss: () -> Unit, onSuccess: () ->
                 )
 
                 AnimatedVisibility(visible = pin.isNotEmpty() && pin.length < 6) {
-                    Text(
-                        text = "Enter 6 digits", 
-                        color = Color.Red, 
-                        fontSize = 11.sp, 
-                        modifier = Modifier.fillMaxWidth().padding(start = 8.dp, top = 2.dp),
-                        textAlign = TextAlign.Start
-                    )
+                    Text("Enter 6 digits", color = Color.Red, fontSize = 11.sp, modifier = Modifier.fillMaxWidth().padding(start = 8.dp, top = 2.dp), textAlign = TextAlign.Start)
                 }
 
                 Spacer(modifier = Modifier.height(20.dp))
@@ -387,10 +348,8 @@ fun CreateContriDialog(username: String, onDismiss: () -> Unit, onSuccess: () ->
                                         put("room_name", contriName.trim())
                                         put("passkey", pin)
                                     }
-                                    val request = Request.Builder()
-                                        .url(Constants.GOOGLE_SHEET_API_URL)
-                                        .post(jsonBody.toString().toRequestBody("application/json".toMediaType()))
-                                        .build()
+                                    val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL)
+                                        .post(jsonBody.toString().toRequestBody("application/json".toMediaType())).build()
                                     
                                     val response = OkHttpClient().newCall(request).execute()
                                     val resData = response.body?.string() ?: ""
@@ -406,10 +365,7 @@ fun CreateContriDialog(username: String, onDismiss: () -> Unit, onSuccess: () ->
                                         }
                                     }
                                 } catch (e: Exception) {
-                                    withContext(Dispatchers.Main) {
-                                        isSubmitting = false
-                                        Toast.makeText(context, "Network Error", Toast.LENGTH_SHORT).show()
-                                    }
+                                    withContext(Dispatchers.Main) { isSubmitting = false; Toast.makeText(context, "Network Error", Toast.LENGTH_SHORT).show() }
                                 }
                             }
                         } else {
@@ -429,18 +385,9 @@ fun CreateContriDialog(username: String, onDismiss: () -> Unit, onSuccess: () ->
     }
 }
 
-// ==========================================
-// JOIN CONTRI DIALOG
-// ==========================================
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun JoinContriDialog(
-    username: String, 
-    initialScannedCode: String = "", 
-    onScanClick: () -> Unit, 
-    onDismiss: () -> Unit, 
-    onSuccess: () -> Unit
-) {
+fun JoinContriDialog(username: String, initialScannedCode: String = "", onScanClick: () -> Unit, onDismiss: () -> Unit, onSuccess: () -> Unit) {
     var viewState by remember { mutableIntStateOf(if (initialScannedCode.isNotBlank()) 1 else 0) }
     var roomCode by remember { mutableStateOf(initialScannedCode) }
     var pin by remember { mutableStateOf("") }
@@ -460,43 +407,30 @@ fun JoinContriDialog(
             elevation = CardDefaults.cardElevation(8.dp)
         ) {
             if (viewState == 0) {
-                Column(
-                    modifier = Modifier.fillMaxWidth().padding(20.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
+                Column(modifier = Modifier.fillMaxWidth().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                         Text("Join Contri", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
                         IconButton(onClick = onDismiss, modifier = Modifier.size(24.dp)) {
                             Icon(Icons.Outlined.Close, contentDescription = "Close", tint = Color.Gray)
                         }
                     }
-                    
                     Spacer(modifier = Modifier.height(20.dp))
-
                     Row(
                         modifier = Modifier.fillMaxWidth().height(80.dp).background(Color(0xFFF5F5F5), RoundedCornerShape(16.dp)),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(
-                            modifier = Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp)).clickable { 
-                                onScanClick()
-                            },
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
+                            modifier = Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp)).clickable { onScanClick() },
+                            horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center
                         ) {
                             Icon(Icons.Outlined.QrCodeScanner, contentDescription = "Scan QR", modifier = Modifier.size(28.dp), tint = Color.Black)
                             Spacer(modifier = Modifier.height(4.dp))
                             Text("Scan QR", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.Black)
                         }
-
                         Box(modifier = Modifier.width(1.dp).height(40.dp).background(Color.LightGray))
-
                         Column(
-                            modifier = Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(topEnd = 16.dp, bottomEnd = 16.dp)).clickable { 
-                                viewState = 1 
-                            },
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
+                            modifier = Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(topEnd = 16.dp, bottomEnd = 16.dp)).clickable { viewState = 1 },
+                            horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center
                         ) {
                             Icon(Icons.Outlined.Keyboard, contentDescription = "Manual", modifier = Modifier.size(28.dp), tint = Color.Black)
                             Spacer(modifier = Modifier.height(4.dp))
@@ -505,18 +439,13 @@ fun JoinContriDialog(
                     }
                 }
             } else {
-                Column(
-                    modifier = Modifier.fillMaxWidth().padding(20.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
+                Column(modifier = Modifier.fillMaxWidth().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         if (!isSubmitting) {
                             IconButton(onClick = { viewState = 0 }, modifier = Modifier.size(24.dp)) {
                                 Icon(Icons.Outlined.ArrowBack, contentDescription = "Back", tint = Color.Black)
                             }
-                        } else {
-                            Spacer(modifier = Modifier.size(24.dp))
-                        }
+                        } else { Spacer(modifier = Modifier.size(24.dp)) }
                         Spacer(modifier = Modifier.weight(1f))
                         Text("Enter Details", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
                         Spacer(modifier = Modifier.weight(1f))
@@ -524,7 +453,6 @@ fun JoinContriDialog(
                     }
                     
                     Spacer(modifier = Modifier.height(16.dp))
-
                     OutlinedTextField(
                         value = roomCode,
                         onValueChange = { raw ->
@@ -539,9 +467,7 @@ fun JoinContriDialog(
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF2E7D32), focusedLabelColor = Color(0xFF2E7D32))
                     )
-
                     Spacer(modifier = Modifier.height(12.dp))
-
                     OutlinedTextField(
                         value = pin,
                         onValueChange = { if (it.length <= 6 && it.all { char -> char.isDigit() }) pin = it },
@@ -554,13 +480,7 @@ fun JoinContriDialog(
                     )
 
                     AnimatedVisibility(visible = pin.isNotEmpty() && pin.length < 6) {
-                        Text(
-                            text = "Enter 6 digits", 
-                            color = Color.Red, 
-                            fontSize = 11.sp, 
-                            modifier = Modifier.fillMaxWidth().padding(start = 8.dp, top = 2.dp),
-                            textAlign = TextAlign.Start
-                        )
+                        Text("Enter 6 digits", color = Color.Red, fontSize = 11.sp, modifier = Modifier.fillMaxWidth().padding(start = 8.dp, top = 2.dp), textAlign = TextAlign.Start)
                     }
 
                     Spacer(modifier = Modifier.height(20.dp))
@@ -577,10 +497,8 @@ fun JoinContriDialog(
                                             put("room_code", roomCode)
                                             put("passkey", pin)
                                         }
-                                        val request = Request.Builder()
-                                            .url(Constants.GOOGLE_SHEET_API_URL)
-                                            .post(jsonBody.toString().toRequestBody("application/json".toMediaType()))
-                                            .build()
+                                        val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL)
+                                            .post(jsonBody.toString().toRequestBody("application/json".toMediaType())).build()
                                         
                                         val response = OkHttpClient().newCall(request).execute()
                                         val resData = response.body?.string() ?: ""
@@ -596,10 +514,7 @@ fun JoinContriDialog(
                                             }
                                         }
                                     } catch (e: Exception) {
-                                        withContext(Dispatchers.Main) {
-                                            isSubmitting = false
-                                            Toast.makeText(context, "Network Error", Toast.LENGTH_SHORT).show()
-                                        }
+                                        withContext(Dispatchers.Main) { isSubmitting = false; Toast.makeText(context, "Network Error", Toast.LENGTH_SHORT).show() }
                                     }
                                 }
                             } else {
@@ -620,18 +535,8 @@ fun JoinContriDialog(
     }
 }
 
-// ==========================================
-// PREMIUM GRID CARD
-// ==========================================
 @Composable
-fun ContriGridCard(
-    title: String,
-    icon: ImageVector,
-    iconTint: Color,
-    bgColor: Color,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
-) {
+fun ContriGridCard(title: String, icon: ImageVector, iconTint: Color, bgColor: Color, modifier: Modifier = Modifier, onClick: () -> Unit) {
     var isPressed by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(targetValue = if (isPressed) 0.95f else 1f, label = "cardScale")
 
@@ -653,27 +558,16 @@ fun ContriGridCard(
             }
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 16.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
-                modifier = Modifier
-                    .size(42.dp)
-                    .background(bgColor, shape = RoundedCornerShape(12.dp)),
+                modifier = Modifier.size(42.dp).background(bgColor, shape = RoundedCornerShape(12.dp)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = title,
-                    tint = iconTint,
-                    modifier = Modifier.size(22.dp)
-                )
+                Icon(imageVector = icon, contentDescription = title, tint = iconTint, modifier = Modifier.size(22.dp))
             }
-            
             Spacer(modifier = Modifier.width(10.dp))
-            
             Text(
                 text = title, 
                 fontSize = 14.sp, 
