@@ -3,6 +3,7 @@ package com.kartikey.rupeeflow.UI_Screens.Home
 import android.widget.Toast
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -85,7 +86,7 @@ fun InsideContriScreen(
                 .padding(paddingValues)
         ) {
             // ==========================================
-            // GREY INFO CARD (Total Expense & Code)
+            // INFO CARD (Exact Match to your Image)
             // ==========================================
             Card(
                 modifier = Modifier
@@ -98,55 +99,48 @@ fun InsideContriScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(20.dp),
+                        .padding(horizontal = 24.dp, vertical = 28.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // LEFT SIDE: Total Amount
-                    Column {
-                        Text("Total Expense", fontSize = 12.sp, color = Color.Gray)
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("₹", fontSize = 20.sp, color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold)
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("0", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black) // DB connect hone par dynamically update hoga
-                        }
+                    // LEFT SIDE: Huge Green ₹ and Black 0
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("₹", fontSize = 38.sp, color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("0", fontSize = 48.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
                     }
 
-                    // RIGHT SIDE: Code, Pin & Copy Icon
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        // Texts are Left-Aligned inside this block
-                        Column(horizontalAlignment = Alignment.Start) {
+                    // RIGHT SIDE: Copy Icon, Code, and Pin directly below
+                    Column(horizontalAlignment = Alignment.End) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.clickable {
+                                clipboardManager.setText(AnnotatedString("Join my RupeeFlow Contri!\nCode: ${room.roomCode}\nPin: ${room.pin}"))
+                                Toast.makeText(context, "Code Copied!", Toast.LENGTH_SHORT).show()
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.ContentCopy, 
+                                contentDescription = "Copy", 
+                                tint = Color.Gray, 
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = room.roomCode, 
-                                fontSize = 15.sp, 
+                                fontSize = 20.sp, 
                                 fontWeight = FontWeight.ExtraBold, 
                                 color = Color.Black, 
                                 letterSpacing = 1.sp
                             )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = "Pin: ${room.pin}", 
-                                fontSize = 12.sp, 
-                                color = Color.Gray, 
-                                fontWeight = FontWeight.Medium
-                            )
                         }
-                        
-                        Spacer(modifier = Modifier.width(12.dp))
-                        
-                        // Copy Icon
-                        IconButton(
-                            onClick = {
-                                clipboardManager.setText(AnnotatedString("Join my RupeeFlow Contri!\nCode: ${room.roomCode}\nPin: ${room.pin}"))
-                                Toast.makeText(context, "Code Copied!", Toast.LENGTH_SHORT).show()
-                            },
-                            modifier = Modifier
-                                .size(36.dp)
-                                .background(Color.White, shape = CircleShape)
-                        ) {
-                            Icon(Icons.Outlined.ContentCopy, contentDescription = "Copy", tint = Color.Black, modifier = Modifier.size(18.dp))
-                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Pin: ${room.pin}", 
+                            fontSize = 16.sp, 
+                            color = Color.Gray, 
+                            fontWeight = FontWeight.Medium
+                        )
                     }
                 }
             }
@@ -155,7 +149,7 @@ fun InsideContriScreen(
 }
 
 // ==========================================
-// PREMIUM BOUNCE FLOATING BUTTON
+// PREMIUM BOUNCE FLOATING BUTTON (+)
 // ==========================================
 @Composable
 fun PremiumFloatingButton(onClick: () -> Unit) {
