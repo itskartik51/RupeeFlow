@@ -48,7 +48,7 @@ fun InsideContriScreen(
     
     val formattedName = if (room.roomName.length > 10) "${room.roomName.take(10)}..." else room.roomName
 
-    // Demo Data matching your sketch
+    // Demo Data (Try changing size to 2, 3 or 5 to see the smart layout magic!)
     val mockLedgers = listOf(
         MemberLedger(
             memberName = "XX", 
@@ -120,12 +120,12 @@ fun InsideContriScreen(
                 .padding(paddingValues)
         ) {
             // ==========================================
-            // INFO CARD
+            // COMPACT INFO CARD
             // ==========================================
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
+                    .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 12.dp),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = Color(0xFFF5F5F5)),
                 elevation = CardDefaults.cardElevation(0.dp)
@@ -133,16 +133,19 @@ fun InsideContriScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 28.dp),
+                        // Vertical padding reduced to 16.dp for compact look
+                        .padding(horizontal = 20.dp, vertical = 16.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    // LEFT SIDE
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("₹", fontSize = 38.sp, color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.width(6.dp))
                         Text("0", fontSize = 48.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
                     }
 
+                    // RIGHT SIDE
                     Column(horizontalAlignment = Alignment.End) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -157,7 +160,7 @@ fun InsideContriScreen(
                                 tint = Color.Gray, 
                                 modifier = Modifier.size(20.dp)
                             )
-                            Spacer(modifier = Modifier.width(8.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 text = room.roomCode, 
                                 fontSize = 20.sp, 
@@ -166,10 +169,10 @@ fun InsideContriScreen(
                                 letterSpacing = 1.sp
                             )
                         }
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = "Pin: ${room.pin}", 
-                            fontSize = 16.sp, 
+                            fontSize = 15.sp, 
                             color = Color.Gray, 
                             fontWeight = FontWeight.Medium
                         )
@@ -177,22 +180,24 @@ fun InsideContriScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            // ==========================================
+            // SMART DYNAMIC LEDGER SECTION
+            // ==========================================
+            val memberCount = mockLedgers.size
+            val isScrollable = memberCount > 3
+            val fixedColumnWidth = 110.dp
 
-            // ==========================================
-            // SKETCH IMPLEMENTATION (LEDGER TABLE)
-            // ==========================================
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp)
+                    .let { if (isScrollable) it.horizontalScroll(rememberScrollState()) else it }
+                    .padding(horizontal = 16.dp) // Edge padding
             ) {
                 // 1. TOP ROW: User Name & Total Spent
-                Row {
+                Row(modifier = if (!isScrollable) Modifier.fillMaxWidth() else Modifier) {
                     mockLedgers.forEach { ledger ->
                         Column(
-                            modifier = Modifier.width(110.dp),
+                            modifier = if (isScrollable) Modifier.width(fixedColumnWidth) else Modifier.weight(1f),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text(
@@ -206,30 +211,31 @@ fun InsideContriScreen(
                                 text = "₹${ledger.totalSpent.toInt()}", 
                                 fontSize = 18.sp, 
                                 fontWeight = FontWeight.Bold, 
-                                color = Color(0xFF2E7D32) // Premium Green
+                                color = Color(0xFF2E7D32)
                             )
                         }
                     }
                 }
 
                 // 2. CONTINUOUS DIVIDER LINE
+                val dividerModifier = if (isScrollable) Modifier.width(fixedColumnWidth * memberCount) else Modifier.fillMaxWidth()
                 HorizontalDivider(
-                    modifier = Modifier.padding(vertical = 12.dp).width((mockLedgers.size * 110).dp),
-                    thickness = 1.5.dp,
+                    modifier = dividerModifier.padding(vertical = 12.dp),
+                    thickness = 1.dp,
                     color = Color.LightGray
                 )
 
                 // 3. BOTTOM ROW: Expense Items
-                Row {
+                Row(modifier = if (!isScrollable) Modifier.fillMaxWidth() else Modifier) {
                     mockLedgers.forEach { ledger ->
                         Column(
-                            modifier = Modifier.width(110.dp),
+                            modifier = if (isScrollable) Modifier.width(fixedColumnWidth) else Modifier.weight(1f),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             ledger.expenses.forEach { expense ->
                                 Column(
                                     horizontalAlignment = Alignment.CenterHorizontally,
-                                    modifier = Modifier.padding(bottom = 16.dp)
+                                    modifier = Modifier.padding(bottom = 12.dp)
                                 ) {
                                     Text(
                                         text = expense.itemName, 
