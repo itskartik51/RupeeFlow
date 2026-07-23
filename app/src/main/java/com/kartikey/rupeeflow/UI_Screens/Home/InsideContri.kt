@@ -1,5 +1,6 @@
 package com.kartikey.rupeeflow.UI_Screens.Home
 
+import android.content.Context
 import android.widget.Toast
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
@@ -29,9 +30,19 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.kartikey.rupeeflow.Cloud_Database.Constants
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONArray
+import org.json.JSONObject
 
 // ==========================================
-// MOCK DATA MODELS (For UI Testing)
+// DATA MODELS
 // ==========================================
 data class ContriExpense(val itemName: String, val amount: Double, val date: String)
 data class MemberLedger(val memberName: String, val totalSpent: Double, val expenses: List<ContriExpense>)
@@ -45,35 +56,64 @@ fun InsideContriScreen(
 ) {
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
-    
     val formattedName = if (room.roomName.length > 10) "${room.roomName.take(10)}..." else room.roomName
 
-    // Demo Data (Try changing size to 2, 3 or 5 to see the smart layout magic!)
-    val mockLedgers = listOf(
-        MemberLedger(
-            memberName = "XX", 
-            totalSpent = 30.0, 
-            expenses = listOf(
-                ContriExpense("Toffee", 15.0, "17 July"),
-                ContriExpense("Pen", 15.0, "19 July")
-            )
-        ),
-        MemberLedger(
-            memberName = "YY", 
-            totalSpent = 46.0, 
-            expenses = listOf(
-                ContriExpense("Snacks", 20.0, "16 July"),
-                ContriExpense("Tea", 26.0, "14 July")
-            )
-        ),
-        MemberLedger(
-            memberName = "ZZ", 
-            totalSpent = 35.0, 
-            expenses = listOf(
-                ContriExpense("Cold Drink", 35.0, "15 July")
-            )
-        )
-    )
+    // Cache Engine setup
+    val sharedPreferences = context.getSharedPreferences("RupeeFlowCache", Context.MODE_PRIVATE)
+    val cacheKey = "room_data_${room.roomCode}"
+
+    var ledgers by remember { mutableStateOf<List<MemberLedger>>(emptyList()) }
+    var totalGroupExpense by remember { mutableDoubleStateOf(0.0) }
+    var isLoading by remember { mutableStateOf(false) }
+
+    // ==========================================
+    // OFFLINE-FIRST CACHE & SILENT SYNC LOGIC
+    // ==========================================
+    LaunchedEffect(room.roomCode) {
+        // 1. FAST LOAD: Check Phone Storage First
+        val cachedJson = sharedPreferences.getString(cacheKey, null)
+        if (cachedJson != null) {
+            try {
+                val (cachedLedgers, cachedTotal) = parseLedgerData(cachedJson)
+                ledgers = cachedLedgers
+                totalGroupExpense = cachedTotal
+            } catch (e: Exception) { e.printStackTrace() }
+        } else {
+            // First time opening the room
+            isLoading = true
+        }
+
+        // 2. BACKGROUND SYNC: Fetch Latest from Google Sheets
+        withContext(Dispatchers.IO) {
+            try {
+                val jsonBody = JSONObject().apply {
+                    put("action", "fetch_room_details")
+                    put("room_code", room.roomCode)
+                }
+                val request = Request.Builder()
+                    .url(Constants.GOOGLE_SHEET_API_URL)
+                    .post(jsonBody.toString().toRequestBody("application/json".toMediaType()))
+                    .build()
+
+                val response = OkHttpClient().newCall(request).execute()
+                val resData = response.body?.string() ?: ""
+
+                if (resData.contains("\"status\":\"success\"")) { // Will match our backend response
+                    // Save to Cache
+                    sharedPreferences.edit().putString(cacheKey, resData).apply()
+                    
+                    val (newLedgers, newTotal) = parseLedgerData(resData)
+                    withContext(Dispatchers.Main) {
+                        ledgers = newLedgers
+                        totalGroupExpense = newTotal
+                        isLoading = false
+                    }
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) { isLoading = false }
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -88,24 +128,12 @@ fun InsideContriScreen(
                 IconButton(onClick = onBackClick) {
                     Icon(Icons.Outlined.ArrowBack, contentDescription = "Back", tint = Color.Black)
                 }
-                
                 Spacer(modifier = Modifier.width(8.dp))
-                
-                Text(
-                    text = formattedName,
-                    fontWeight = FontWeight.ExtraBold,
-                    fontSize = 20.sp,
-                    color = Color.Black
-                )
-                
+                Text(text = formattedName, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp, color = Color.Black)
                 Spacer(modifier = Modifier.weight(1f))
                 
                 IconButton(onClick = onLeaveClick) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Outlined.ExitToApp, 
-                        contentDescription = "Leave Room", 
-                        tint = Color.Red
-                    )
+                    Icon(imageVector = Icons.AutoMirrored.Outlined.ExitToApp, contentDescription = "Leave Room", tint = Color.Red)
                 }
             }
         },
@@ -115,37 +143,28 @@ fun InsideContriScreen(
         containerColor = Color(0xFFFAFAFA)
     ) { paddingValues ->
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
+            modifier = Modifier.fillMaxSize().padding(paddingValues)
         ) {
             // ==========================================
             // COMPACT INFO CARD
             // ==========================================
             Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 12.dp),
+                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 12.dp),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = Color(0xFFF5F5F5)),
                 elevation = CardDefaults.cardElevation(0.dp)
             ) {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        // Vertical padding reduced to 16.dp for compact look
-                        .padding(horizontal = 20.dp, vertical = 16.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // LEFT SIDE
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("₹", fontSize = 38.sp, color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("0", fontSize = 48.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
+                        Text(totalGroupExpense.toInt().toString(), fontSize = 48.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
                     }
 
-                    // RIGHT SIDE
                     Column(horizontalAlignment = Alignment.End) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -154,112 +173,83 @@ fun InsideContriScreen(
                                 Toast.makeText(context, "Code Copied!", Toast.LENGTH_SHORT).show()
                             }
                         ) {
-                            Icon(
-                                imageVector = Icons.Outlined.ContentCopy, 
-                                contentDescription = "Copy", 
-                                tint = Color.Gray, 
-                                modifier = Modifier.size(20.dp)
-                            )
+                            Icon(imageVector = Icons.Outlined.ContentCopy, contentDescription = "Copy", tint = Color.Gray, modifier = Modifier.size(20.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = room.roomCode, 
-                                fontSize = 20.sp, 
-                                fontWeight = FontWeight.ExtraBold, 
-                                color = Color.Black, 
-                                letterSpacing = 1.sp
-                            )
+                            Text(text = room.roomCode, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black, letterSpacing = 1.sp)
                         }
                         Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = "Pin: ${room.pin}", 
-                            fontSize = 15.sp, 
-                            color = Color.Gray, 
-                            fontWeight = FontWeight.Medium
-                        )
+                        Text(text = "Pin: ${room.pin}", fontSize = 15.sp, color = Color.Gray, fontWeight = FontWeight.Medium)
                     }
                 }
             }
 
+            Spacer(modifier = Modifier.height(8.dp))
+
             // ==========================================
             // SMART DYNAMIC LEDGER SECTION
             // ==========================================
-            val memberCount = mockLedgers.size
-            val isScrollable = memberCount > 3
-            val fixedColumnWidth = 110.dp
+            if (isLoading && ledgers.isEmpty()) {
+                // Initial Loading State
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = Color(0xFF2E7D32))
+                }
+            } else if (ledgers.isEmpty()) {
+                // Empty State
+                Box(modifier = Modifier.fillMaxSize().padding(top = 40.dp), contentAlignment = Alignment.TopCenter) {
+                    Text("No expenses yet. Tap + to add!", color = Color.Gray, fontWeight = FontWeight.Medium)
+                }
+            } else {
+                val memberCount = ledgers.size
+                val isScrollable = memberCount > 3
+                val fixedColumnWidth = 110.dp
 
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .let { if (isScrollable) it.horizontalScroll(rememberScrollState()) else it }
-                    .padding(horizontal = 16.dp) // Edge padding
-            ) {
-                // 1. TOP ROW: User Name & Total Spent
-                Row(modifier = if (!isScrollable) Modifier.fillMaxWidth() else Modifier) {
-                    mockLedgers.forEach { ledger ->
-                        Column(
-                            modifier = if (isScrollable) Modifier.width(fixedColumnWidth) else Modifier.weight(1f),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text(
-                                text = ledger.memberName, 
-                                fontSize = 16.sp, 
-                                fontWeight = FontWeight.ExtraBold, 
-                                color = Color.Black
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = "₹${ledger.totalSpent.toInt()}", 
-                                fontSize = 18.sp, 
-                                fontWeight = FontWeight.Bold, 
-                                color = Color(0xFF2E7D32)
-                            )
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .let { if (isScrollable) it.horizontalScroll(rememberScrollState()) else it }
+                        .padding(horizontal = 16.dp)
+                ) {
+                    // TOP ROW: User Name & Total
+                    Row(modifier = if (!isScrollable) Modifier.fillMaxWidth() else Modifier) {
+                        ledgers.forEach { ledger ->
+                            Column(
+                                modifier = if (isScrollable) Modifier.width(fixedColumnWidth) else Modifier.weight(1f),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(text = ledger.memberName, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(text = "₹${ledger.totalSpent.toInt()}", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2E7D32))
+                            }
                         }
                     }
-                }
 
-                // 2. CONTINUOUS DIVIDER LINE
-                val dividerModifier = if (isScrollable) Modifier.width(fixedColumnWidth * memberCount) else Modifier.fillMaxWidth()
-                HorizontalDivider(
-                    modifier = dividerModifier.padding(vertical = 12.dp),
-                    thickness = 1.dp,
-                    color = Color.LightGray
-                )
+                    // DIVIDER
+                    val dividerModifier = if (isScrollable) Modifier.width(fixedColumnWidth * memberCount) else Modifier.fillMaxWidth()
+                    HorizontalDivider(
+                        modifier = dividerModifier.padding(vertical = 12.dp),
+                        thickness = 1.dp,
+                        color = Color.LightGray
+                    )
 
-                // 3. BOTTOM ROW: Expense Items
-                Row(modifier = if (!isScrollable) Modifier.fillMaxWidth() else Modifier) {
-                    mockLedgers.forEach { ledger ->
-                        Column(
-                            modifier = if (isScrollable) Modifier.width(fixedColumnWidth) else Modifier.weight(1f),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            ledger.expenses.forEach { expense ->
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    modifier = Modifier.padding(bottom = 12.dp)
-                                ) {
-                                    Text(
-                                        text = expense.itemName, 
-                                        fontSize = 15.sp, 
-                                        fontWeight = FontWeight.SemiBold, 
-                                        color = Color.Black,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    Spacer(modifier = Modifier.height(2.dp))
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text(
-                                            text = "₹${expense.amount.toInt()}", 
-                                            fontSize = 13.sp, 
-                                            fontWeight = FontWeight.Bold, 
-                                            color = Color.DarkGray
-                                        )
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text(
-                                            text = expense.date, 
-                                            fontSize = 11.sp, 
-                                            color = Color.Gray,
-                                            fontWeight = FontWeight.Medium
-                                        )
+                    // BOTTOM ROW: Expenses
+                    Row(modifier = if (!isScrollable) Modifier.fillMaxWidth() else Modifier) {
+                        ledgers.forEach { ledger ->
+                            Column(
+                                modifier = if (isScrollable) Modifier.width(fixedColumnWidth) else Modifier.weight(1f),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                ledger.expenses.forEach { expense ->
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        modifier = Modifier.padding(bottom = 12.dp)
+                                    ) {
+                                        Text(text = expense.itemName, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Color.Black, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(text = "₹${expense.amount.toInt()}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.DarkGray)
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text(text = expense.date, fontSize = 11.sp, color = Color.Gray, fontWeight = FontWeight.Medium)
+                                        }
                                     }
                                 }
                             }
@@ -269,6 +259,44 @@ fun InsideContriScreen(
             }
         }
     }
+}
+
+// ==========================================
+// JSON PARSER LOGIC
+// ==========================================
+fun parseLedgerData(jsonString: String): Pair<List<MemberLedger>, Double> {
+    val ledgers = mutableListOf<MemberLedger>()
+    var totalGroupExp = 0.0
+    
+    try {
+        val root = JSONObject(jsonString)
+        totalGroupExp = root.optDouble("total_group_expense", 0.0)
+        
+        val membersArray = root.getJSONArray("members")
+        for (i in 0 until membersArray.length()) {
+            val memberObj = membersArray.getJSONObject(i)
+            val name = memberObj.getString("name")
+            val totalSpent = memberObj.getDouble("total_spent")
+            
+            val expensesList = mutableListOf<ContriExpense>()
+            val expensesArray = memberObj.getJSONArray("expenses")
+            
+            for (j in 0 until expensesArray.length()) {
+                val expObj = expensesArray.getJSONObject(j)
+                expensesList.add(
+                    ContriExpense(
+                        itemName = expObj.getString("item_name"),
+                        amount = expObj.getDouble("amount"),
+                        date = expObj.getString("date")
+                    )
+                )
+            }
+            ledgers.add(MemberLedger(name, totalSpent, expensesList))
+        }
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+    return Pair(ledgers, totalGroupExp)
 }
 
 // ==========================================
