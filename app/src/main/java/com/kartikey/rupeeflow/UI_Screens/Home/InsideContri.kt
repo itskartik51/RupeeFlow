@@ -57,7 +57,7 @@ data class MemberLedger(val memberName: String, val totalSpent: Double, val expe
 
 @Composable
 fun InsideContriScreen(
-    username: String, // <-- Ab ye component secure hai!
+    username: String, // Secure routing variable
     room: ContriRoomModel,
     onBackClick: () -> Unit,
     onLeaveClick: () -> Unit
