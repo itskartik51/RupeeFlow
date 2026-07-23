@@ -5,7 +5,9 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -24,8 +26,15 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+
+// ==========================================
+// MOCK DATA MODELS (For UI Testing)
+// ==========================================
+data class ContriExpense(val itemName: String, val amount: Double, val date: String)
+data class MemberLedger(val memberName: String, val totalSpent: Double, val expenses: List<ContriExpense>)
 
 @Composable
 fun InsideContriScreen(
@@ -37,8 +46,34 @@ fun InsideContriScreen(
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
     
-    // 10-Character Truncation Logic
     val formattedName = if (room.roomName.length > 10) "${room.roomName.take(10)}..." else room.roomName
+
+    // Demo Data matching your sketch
+    val mockLedgers = listOf(
+        MemberLedger(
+            memberName = "XX", 
+            totalSpent = 30.0, 
+            expenses = listOf(
+                ContriExpense("Toffee", 15.0, "17 July"),
+                ContriExpense("Pen", 15.0, "19 July")
+            )
+        ),
+        MemberLedger(
+            memberName = "YY", 
+            totalSpent = 46.0, 
+            expenses = listOf(
+                ContriExpense("Snacks", 20.0, "16 July"),
+                ContriExpense("Tea", 26.0, "14 July")
+            )
+        ),
+        MemberLedger(
+            memberName = "ZZ", 
+            totalSpent = 35.0, 
+            expenses = listOf(
+                ContriExpense("Cold Drink", 35.0, "15 July")
+            )
+        )
+    )
 
     Scaffold(
         topBar = {
@@ -65,7 +100,6 @@ fun InsideContriScreen(
                 
                 Spacer(modifier = Modifier.weight(1f))
                 
-                // Leave Room Icon
                 IconButton(onClick = onLeaveClick) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Outlined.ExitToApp, 
@@ -86,7 +120,7 @@ fun InsideContriScreen(
                 .padding(paddingValues)
         ) {
             // ==========================================
-            // INFO CARD (Exact Match to your Image)
+            // INFO CARD
             // ==========================================
             Card(
                 modifier = Modifier
@@ -103,14 +137,12 @@ fun InsideContriScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // LEFT SIDE: Huge Green ₹ and Black 0
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("₹", fontSize = 38.sp, color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.width(6.dp))
                         Text("0", fontSize = 48.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
                     }
 
-                    // RIGHT SIDE: Copy Icon, Code, and Pin directly below
                     Column(horizontalAlignment = Alignment.End) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -141,6 +173,91 @@ fun InsideContriScreen(
                             color = Color.Gray, 
                             fontWeight = FontWeight.Medium
                         )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // ==========================================
+            // SKETCH IMPLEMENTATION (LEDGER TABLE)
+            // ==========================================
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp)
+            ) {
+                // 1. TOP ROW: User Name & Total Spent
+                Row {
+                    mockLedgers.forEach { ledger ->
+                        Column(
+                            modifier = Modifier.width(110.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = ledger.memberName, 
+                                fontSize = 16.sp, 
+                                fontWeight = FontWeight.ExtraBold, 
+                                color = Color.Black
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "₹${ledger.totalSpent.toInt()}", 
+                                fontSize = 18.sp, 
+                                fontWeight = FontWeight.Bold, 
+                                color = Color(0xFF2E7D32) // Premium Green
+                            )
+                        }
+                    }
+                }
+
+                // 2. CONTINUOUS DIVIDER LINE
+                HorizontalDivider(
+                    modifier = Modifier.padding(vertical = 12.dp).width((mockLedgers.size * 110).dp),
+                    thickness = 1.5.dp,
+                    color = Color.LightGray
+                )
+
+                // 3. BOTTOM ROW: Expense Items
+                Row {
+                    mockLedgers.forEach { ledger ->
+                        Column(
+                            modifier = Modifier.width(110.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            ledger.expenses.forEach { expense ->
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    modifier = Modifier.padding(bottom = 16.dp)
+                                ) {
+                                    Text(
+                                        text = expense.itemName, 
+                                        fontSize = 15.sp, 
+                                        fontWeight = FontWeight.SemiBold, 
+                                        color = Color.Black,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            text = "₹${expense.amount.toInt()}", 
+                                            fontSize = 13.sp, 
+                                            fontWeight = FontWeight.Bold, 
+                                            color = Color.DarkGray
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = expense.date, 
+                                            fontSize = 11.sp, 
+                                            color = Color.Gray,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
