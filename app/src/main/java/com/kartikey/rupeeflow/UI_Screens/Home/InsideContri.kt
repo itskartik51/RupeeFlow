@@ -45,7 +45,9 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
+import java.text.SimpleDateFormat
 import java.util.Date
+import java.util.Locale
 
 // ==========================================
 // DATA MODELS
@@ -55,13 +57,14 @@ data class MemberLedger(val memberName: String, val totalSpent: Double, val expe
 
 @Composable
 fun InsideContriScreen(
+    username: String, // <-- Ab ye component secure hai!
     room: ContriRoomModel,
     onBackClick: () -> Unit,
-    onLeaveClick: () -> Unit,
-    onAddClick: () -> Unit // Using local Add Dialog instead
+    onLeaveClick: () -> Unit
 ) {
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
+    val coroutineScope = rememberCoroutineScope()
     val formattedName = if (room.roomName.length > 10) "${room.roomName.take(10)}..." else room.roomName
 
     // Cache Engine setup
@@ -71,14 +74,14 @@ fun InsideContriScreen(
     var ledgers by remember { mutableStateOf<List<MemberLedger>>(emptyList()) }
     var totalGroupExpense by remember { mutableDoubleStateOf(0.0) }
     var isLoading by remember { mutableStateOf(false) }
+    var refreshTrigger by remember { mutableIntStateOf(0) } // Auto refresh trigger
     
-    // NAYA STATE: Add Expense Popup control karne ke liye
     var showAddExpenseDialog by remember { mutableStateOf(false) }
 
     // ==========================================
     // OFFLINE-FIRST CACHE & SILENT SYNC LOGIC
     // ==========================================
-    LaunchedEffect(room.roomCode) {
+    LaunchedEffect(room.roomCode, refreshTrigger) {
         val cachedJson = sharedPreferences.getString(cacheKey, null)
         if (cachedJson != null) {
             try {
@@ -142,7 +145,6 @@ fun InsideContriScreen(
             }
         },
         floatingActionButton = {
-            // NAYA LOGIC: Plus dabane par popup khulega
             PremiumFloatingButton(onClick = { showAddExpenseDialog = true })
         },
         containerColor = Color(0xFFFAFAFA)
@@ -256,14 +258,65 @@ fun InsideContriScreen(
         }
 
         // ==========================================
-        // RENDER ADD EXPENSE DIALOG
+        // REAL NETWORK SPLIT ENGINE CALL
         // ==========================================
         if (showAddExpenseDialog) {
             AddContriExpenseDialog(
                 onDismiss = { showAddExpenseDialog = false },
                 onAdd = { title, dateMillis, amount ->
                     showAddExpenseDialog = false
-                    Toast.makeText(context, "UI Verified! Next: Split Engine & Backend", Toast.LENGTH_SHORT).show()
+                    isLoading = true // Show loading spinner
+                    
+                    coroutineScope.launch(Dispatchers.IO) {
+                        try {
+                            // SPLIT MATH ENGINE
+                            val memberCount = ledgers.size
+                            val splitAmount = if (memberCount > 0) amount / memberCount else amount
+                            
+                            val amountsObj = JSONObject()
+                            ledgers.forEach { ledger ->
+                                amountsObj.put(ledger.memberName, splitAmount)
+                            }
+                            
+                            // Format Date exactly as backend needs
+                            val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+                            val formattedDate = sdf.format(Date(dateMillis))
+
+                            val jsonBody = JSONObject().apply {
+                                put("action", "add_contri_expense")
+                                put("username", username)
+                                put("room_code", room.roomCode)
+                                put("date", formattedDate)
+                                put("item_name", title)
+                                put("amounts", amountsObj.toString())
+                            }
+                            
+                            val request = Request.Builder()
+                                .url(Constants.GOOGLE_SHEET_API_URL)
+                                .post(jsonBody.toString().toRequestBody("application/json".toMediaType()))
+                                .build()
+
+                            val response = OkHttpClient().newCall(request).execute()
+                            val resData = response.body?.string() ?: ""
+
+                            withContext(Dispatchers.Main) {
+                                if (resData.contains("\"status\":\"success\"")) {
+                                    Toast.makeText(context, "Expense Added & Split Successfully!", Toast.LENGTH_SHORT).show()
+                                    // Remove old cache and fetch fresh data
+                                    sharedPreferences.edit().remove(cacheKey).apply()
+                                    refreshTrigger++ 
+                                } else {
+                                    Toast.makeText(context, "Error saving expense", Toast.LENGTH_SHORT).show()
+                                    isLoading = false
+                                }
+                            }
+                        } catch (e: Exception) {
+                            withContext(Dispatchers.Main) {
+                                Toast.makeText(context, "Network Error", Toast.LENGTH_SHORT).show()
+                                isLoading = false
+                            }
+                        }
+                    }
                 }
             )
         }
@@ -271,7 +324,7 @@ fun InsideContriScreen(
 }
 
 // ==========================================
-// NEW: ADD EXPENSE POPUP (DIALOG)
+// ADD EXPENSE POPUP (DIALOG)
 // ==========================================
 @Composable
 fun AddContriExpenseDialog(
@@ -280,7 +333,6 @@ fun AddContriExpenseDialog(
 ) {
     var expenseTitle by remember { mutableStateOf("") }
     var amount by remember { mutableStateOf("") }
-    // By default current date (aaj ki date) set hai
     var dateMillis by remember { mutableStateOf<Long?>(System.currentTimeMillis()) }
 
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(dismissOnClickOutside = false)) {
@@ -294,31 +346,20 @@ fun AddContriExpenseDialog(
                 Text("Add New Expense", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // TOP CELL: Item Name / Expense Title
                 OutlinedTextField(
                     value = expenseTitle,
                     onValueChange = { expenseTitle = it.replaceFirstChar { char -> if (char.isLowerCase()) char.titlecase() else char.toString() } },
-                    label = { 
-                        Text("Expense Title", fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) 
-                    },
+                    label = { Text("Expense Title", fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color(0xFF2E7D32), 
-                        focusedLabelColor = Color(0xFF2E7D32)
-                    )
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF2E7D32), focusedLabelColor = Color(0xFF2E7D32))
                 )
                 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // BOTTOM ROW: Date & Amount side-by-side
-                Row(
-                    modifier = Modifier.fillMaxWidth(), 
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    // LEFT CELL: DatePicker (Linked exactly to your UI_Screens.CustomDatePicker)
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     com.kartikey.rupeeflow.UI_Screens.CustomDatePicker(
                         label = "Date",
                         selectedDateMillis = dateMillis,
@@ -326,7 +367,6 @@ fun AddContriExpenseDialog(
                         modifier = Modifier.weight(1f)
                     )
 
-                    // RIGHT CELL: Amount Box
                     OutlinedTextField(
                         value = amount,
                         onValueChange = { newValue -> 
@@ -334,26 +374,18 @@ fun AddContriExpenseDialog(
                                 amount = newValue
                             }
                         },
-                        label = { 
-                            Text("Amount", fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) 
-                        },
-                        prefix = { 
-                            Text("₹ ", color = Color.Black, fontWeight = FontWeight.Bold) 
-                        },
+                        label = { Text("Amount", fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        prefix = { Text("₹ ", color = Color.Black, fontWeight = FontWeight.Bold) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true,
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF2E7D32), 
-                            focusedLabelColor = Color(0xFF2E7D32)
-                        )
+                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF2E7D32), focusedLabelColor = Color(0xFF2E7D32))
                     )
                 }
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // ACTION BUTTONS
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     TextButton(onClick = onDismiss) {
                         Text("Cancel", color = Color.Gray, fontWeight = FontWeight.Bold)
