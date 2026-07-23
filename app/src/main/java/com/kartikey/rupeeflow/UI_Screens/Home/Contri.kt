@@ -45,7 +45,6 @@ import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Locale
 
-// Data Model for Contri Rooms (Added Pin with default so MainScreen doesn't crash)
 data class ContriRoomModel(
     val roomName: String,
     val roomCode: String,
@@ -64,7 +63,6 @@ fun ContriScreen(
     var showCreateDialog by remember { mutableStateOf(false) }
     var showJoinDialog by remember { mutableStateOf(false) }
     
-    // Scanner, QR & Inside Room States
     var showScanner by remember { mutableStateOf(false) }
     var scannedRoomCode by remember { mutableStateOf("") }
     var qrRoomToDisplay by remember { mutableStateOf<ContriRoomModel?>(null) }
@@ -72,7 +70,6 @@ fun ContriScreen(
 
     val context = LocalContext.current
 
-    // Screen Routing Logic
     if (showScanner) {
         com.kartikey.rupeeflow.UI_Screens.QR.ScanQRScreen(
             onBackClick = { showScanner = false },
@@ -83,16 +80,25 @@ fun ContriScreen(
             }
         )
     } else if (openedRoom != null) {
-        // Full Screen Inside Room
-        InsideContriScreen(
-            room = openedRoom!!,
-            onBackClick = { openedRoom = null },
-            onLeaveClick = { 
-                Toast.makeText(context, "Balance check logic coming soon!", Toast.LENGTH_SHORT).show()
-                openedRoom = null 
-            },
-            onAddClick = { Toast.makeText(context, "Add expense logic coming soon!", Toast.LENGTH_SHORT).show() }
-        )
+        // FULL-SCREEN DIALOG OVERLAY (Hides bottom bar & frees the FAB!)
+        Dialog(
+            onDismissRequest = { openedRoom = null },
+            properties = DialogProperties(
+                dismissOnBackPress = true, 
+                dismissOnClickOutside = false,
+                usePlatformDefaultWidth = false // Completely hides background MainScreen
+            )
+        ) {
+            InsideContriScreen(
+                room = openedRoom!!,
+                onBackClick = { openedRoom = null },
+                onLeaveClick = { 
+                    Toast.makeText(context, "Balance check logic coming soon!", Toast.LENGTH_SHORT).show()
+                    openedRoom = null 
+                },
+                onAddClick = { Toast.makeText(context, "Add expense logic coming soon!", Toast.LENGTH_SHORT).show() }
+            )
+        }
     } else {
         // Main Contri Hub UI
         Column(
@@ -124,14 +130,11 @@ fun ContriScreen(
             ) {
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // ==========================================
-                // ACTIVE ROOMS LIST
-                // ==========================================
                 if (contriRooms.isNotEmpty()) {
                     contriRooms.forEach { room ->
                         ActiveRoomCard(
                             room = room, 
-                            onClick = { openedRoom = room }, // Link Card to Inside Screen
+                            onClick = { openedRoom = room }, 
                             onQrClick = { qrRoomToDisplay = room }
                         )
                         Spacer(modifier = Modifier.height(12.dp))
@@ -139,9 +142,6 @@ fun ContriScreen(
                     Spacer(modifier = Modifier.height(12.dp))
                 }
 
-                // ==========================================
-                // ACTION CARDS (Side-by-Side Grid Layout)
-                // ==========================================
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -173,9 +173,6 @@ fun ContriScreen(
         }
     }
 
-    // ==========================================
-    // QR DISPLAY DIALOG
-    // ==========================================
     if (qrRoomToDisplay != null) {
         Dialog(
             onDismissRequest = { qrRoomToDisplay = null },
@@ -238,7 +235,7 @@ fun ContriScreen(
 }
 
 // ==========================================
-// ACTIVE ROOM CARD UI (With QR Icon)
+// ACTIVE ROOM CARD UI
 // ==========================================
 @Composable
 fun ActiveRoomCard(room: ContriRoomModel, onClick: () -> Unit, onQrClick: () -> Unit) {
@@ -433,7 +430,7 @@ fun CreateContriDialog(username: String, onDismiss: () -> Unit, onSuccess: () ->
 }
 
 // ==========================================
-// JOIN CONTRI DIALOG 
+// JOIN CONTRI DIALOG
 // ==========================================
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -445,7 +442,6 @@ fun JoinContriDialog(
     onSuccess: () -> Unit
 ) {
     var viewState by remember { mutableIntStateOf(if (initialScannedCode.isNotBlank()) 1 else 0) }
-    
     var roomCode by remember { mutableStateOf(initialScannedCode) }
     var pin by remember { mutableStateOf("") }
     var isSubmitting by remember { mutableStateOf(false) }
