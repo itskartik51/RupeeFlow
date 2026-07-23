@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ExitToApp
 import androidx.compose.material.icons.outlined.Add
@@ -27,9 +28,13 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.kartikey.rupeeflow.Cloud_Database.Constants
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -40,6 +45,7 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
+import java.util.Date
 
 // ==========================================
 // DATA MODELS
@@ -52,7 +58,7 @@ fun InsideContriScreen(
     room: ContriRoomModel,
     onBackClick: () -> Unit,
     onLeaveClick: () -> Unit,
-    onAddClick: () -> Unit
+    onAddClick: () -> Unit // Using local Add Dialog instead
 ) {
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
@@ -65,12 +71,14 @@ fun InsideContriScreen(
     var ledgers by remember { mutableStateOf<List<MemberLedger>>(emptyList()) }
     var totalGroupExpense by remember { mutableDoubleStateOf(0.0) }
     var isLoading by remember { mutableStateOf(false) }
+    
+    // NAYA STATE: Add Expense Popup control karne ke liye
+    var showAddExpenseDialog by remember { mutableStateOf(false) }
 
     // ==========================================
     // OFFLINE-FIRST CACHE & SILENT SYNC LOGIC
     // ==========================================
     LaunchedEffect(room.roomCode) {
-        // 1. FAST LOAD: Check Phone Storage First
         val cachedJson = sharedPreferences.getString(cacheKey, null)
         if (cachedJson != null) {
             try {
@@ -79,11 +87,9 @@ fun InsideContriScreen(
                 totalGroupExpense = cachedTotal
             } catch (e: Exception) { e.printStackTrace() }
         } else {
-            // First time opening the room
             isLoading = true
         }
 
-        // 2. BACKGROUND SYNC: Fetch Latest from Google Sheets
         withContext(Dispatchers.IO) {
             try {
                 val jsonBody = JSONObject().apply {
@@ -98,10 +104,8 @@ fun InsideContriScreen(
                 val response = OkHttpClient().newCall(request).execute()
                 val resData = response.body?.string() ?: ""
 
-                if (resData.contains("\"status\":\"success\"")) { // Will match our backend response
-                    // Save to Cache
+                if (resData.contains("\"status\":\"success\"")) {
                     sharedPreferences.edit().putString(cacheKey, resData).apply()
-                    
                     val (newLedgers, newTotal) = parseLedgerData(resData)
                     withContext(Dispatchers.Main) {
                         ledgers = newLedgers
@@ -138,16 +142,15 @@ fun InsideContriScreen(
             }
         },
         floatingActionButton = {
-            PremiumFloatingButton(onClick = onAddClick)
+            // NAYA LOGIC: Plus dabane par popup khulega
+            PremiumFloatingButton(onClick = { showAddExpenseDialog = true })
         },
         containerColor = Color(0xFFFAFAFA)
     ) { paddingValues ->
         Column(
             modifier = Modifier.fillMaxSize().padding(paddingValues)
         ) {
-            // ==========================================
-            // COMPACT INFO CARD
-            // ==========================================
+            // INFO CARD
             Card(
                 modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 12.dp),
                 shape = RoundedCornerShape(16.dp),
@@ -185,16 +188,12 @@ fun InsideContriScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // ==========================================
             // SMART DYNAMIC LEDGER SECTION
-            // ==========================================
             if (isLoading && ledgers.isEmpty()) {
-                // Initial Loading State
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = Color(0xFF2E7D32))
                 }
             } else if (ledgers.isEmpty()) {
-                // Empty State
                 Box(modifier = Modifier.fillMaxSize().padding(top = 40.dp), contentAlignment = Alignment.TopCenter) {
                     Text("No expenses yet. Tap + to add!", color = Color.Gray, fontWeight = FontWeight.Medium)
                 }
@@ -209,7 +208,6 @@ fun InsideContriScreen(
                         .let { if (isScrollable) it.horizontalScroll(rememberScrollState()) else it }
                         .padding(horizontal = 16.dp)
                 ) {
-                    // TOP ROW: User Name & Total
                     Row(modifier = if (!isScrollable) Modifier.fillMaxWidth() else Modifier) {
                         ledgers.forEach { ledger ->
                             Column(
@@ -223,7 +221,6 @@ fun InsideContriScreen(
                         }
                     }
 
-                    // DIVIDER
                     val dividerModifier = if (isScrollable) Modifier.width(fixedColumnWidth * memberCount) else Modifier.fillMaxWidth()
                     HorizontalDivider(
                         modifier = dividerModifier.padding(vertical = 12.dp),
@@ -231,7 +228,6 @@ fun InsideContriScreen(
                         color = Color.LightGray
                     )
 
-                    // BOTTOM ROW: Expenses
                     Row(modifier = if (!isScrollable) Modifier.fillMaxWidth() else Modifier) {
                         ledgers.forEach { ledger ->
                             Column(
@@ -254,6 +250,126 @@ fun InsideContriScreen(
                                 }
                             }
                         }
+                    }
+                }
+            }
+        }
+
+        // ==========================================
+        // RENDER ADD EXPENSE DIALOG
+        // ==========================================
+        if (showAddExpenseDialog) {
+            AddContriExpenseDialog(
+                onDismiss = { showAddExpenseDialog = false },
+                onAdd = { title, dateMillis, amount ->
+                    showAddExpenseDialog = false
+                    Toast.makeText(context, "UI Verified! Next: Split Engine & Backend", Toast.LENGTH_SHORT).show()
+                }
+            )
+        }
+    }
+}
+
+// ==========================================
+// NEW: ADD EXPENSE POPUP (DIALOG)
+// ==========================================
+@Composable
+fun AddContriExpenseDialog(
+    onDismiss: () -> Unit,
+    onAdd: (String, Long, Double) -> Unit
+) {
+    var expenseTitle by remember { mutableStateOf("") }
+    var amount by remember { mutableStateOf("") }
+    // By default current date (aaj ki date) set hai
+    var dateMillis by remember { mutableStateOf<Long?>(System.currentTimeMillis()) }
+
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(dismissOnClickOutside = false)) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(8.dp)
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Text("Add New Expense", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // TOP CELL: Item Name / Expense Title
+                OutlinedTextField(
+                    value = expenseTitle,
+                    onValueChange = { expenseTitle = it.replaceFirstChar { char -> if (char.isLowerCase()) char.titlecase() else char.toString() } },
+                    label = { 
+                        Text("Expense Title", fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) 
+                    },
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color(0xFF2E7D32), 
+                        focusedLabelColor = Color(0xFF2E7D32)
+                    )
+                )
+                
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // BOTTOM ROW: Date & Amount side-by-side
+                Row(
+                    modifier = Modifier.fillMaxWidth(), 
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    // LEFT CELL: DatePicker (Linked exactly to your UI_Screens.CustomDatePicker)
+                    com.kartikey.rupeeflow.UI_Screens.CustomDatePicker(
+                        label = "Date",
+                        selectedDateMillis = dateMillis,
+                        onDateSelected = { dateMillis = it },
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    // RIGHT CELL: Amount Box
+                    OutlinedTextField(
+                        value = amount,
+                        onValueChange = { newValue -> 
+                            if (newValue.isEmpty() || newValue.matches(Regex("^\\d*\\.?\\d*$"))) {
+                                amount = newValue
+                            }
+                        },
+                        label = { 
+                            Text("Amount", fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) 
+                        },
+                        prefix = { 
+                            Text("₹ ", color = Color.Black, fontWeight = FontWeight.Bold) 
+                        },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color(0xFF2E7D32), 
+                            focusedLabelColor = Color(0xFF2E7D32)
+                        )
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // ACTION BUTTONS
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = onDismiss) {
+                        Text("Cancel", color = Color.Gray, fontWeight = FontWeight.Bold)
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = { 
+                            val amt = amount.toDoubleOrNull()
+                            if (expenseTitle.isNotBlank() && amt != null && dateMillis != null) {
+                                onAdd(expenseTitle, dateMillis!!, amt)
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text("Add Expense", color = Color.White, fontWeight = FontWeight.Bold)
                     }
                 }
             }
