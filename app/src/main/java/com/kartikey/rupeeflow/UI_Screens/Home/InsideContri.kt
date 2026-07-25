@@ -124,7 +124,7 @@ fun InsideContriScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(Color.White)
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                    .padding(horizontal = 16.dp, vertical = 10.dp)
                     .statusBarsPadding(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -148,26 +148,35 @@ fun InsideContriScreen(
         Column(
             modifier = Modifier.fillMaxSize().padding(paddingValues)
         ) {
-            // INFO CARD (Total Amount reduced in size)
+            // COMPACT PREMIUM INFO CARD
             Card(
-                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 12.dp),
-                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                shape = RoundedCornerShape(14.dp),
                 colors = CardDefaults.cardColors(containerColor = Color(0xFFF5F5F5)),
                 elevation = CardDefaults.cardElevation(0.dp)
             ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // LEFT SIDE: Total Amount
+                    // LEFT SIDE: Total Amount (Compact & Balanced)
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("₹", fontSize = 28.sp, color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold)
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(totalGroupExpense.toInt().toString(), fontSize = 34.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
+                        Text("₹", fontSize = 22.sp, color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = totalGroupExpense.toInt().toString(), 
+                            fontSize = 28.sp, 
+                            fontWeight = FontWeight.ExtraBold, 
+                            color = Color.Black
+                        )
                     }
 
-                    // RIGHT SIDE: Code and Pin
+                    // RIGHT SIDE: Code & Pin (Compact & Sleek)
                     Column(horizontalAlignment = Alignment.End) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -176,19 +185,35 @@ fun InsideContriScreen(
                                 Toast.makeText(context, "Code Copied!", Toast.LENGTH_SHORT).show()
                             }
                         ) {
-                            Icon(imageVector = Icons.Outlined.ContentCopy, contentDescription = "Copy", tint = Color.Gray, modifier = Modifier.size(20.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(text = room.roomCode, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black, letterSpacing = 1.sp)
+                            Icon(
+                                imageVector = Icons.Outlined.ContentCopy, 
+                                contentDescription = "Copy", 
+                                tint = Color.Gray, 
+                                modifier = Modifier.size(15.dp)
+                            )
+                            Spacer(modifier = Modifier.width(5.dp))
+                            Text(
+                                text = room.roomCode, 
+                                fontSize = 15.sp, 
+                                fontWeight = FontWeight.Bold, 
+                                color = Color.Black, 
+                                letterSpacing = 0.5.sp
+                            )
                         }
                         Spacer(modifier = Modifier.height(2.dp))
-                        Text(text = "Pin: ${room.pin}", fontSize = 15.sp, color = Color.Gray, fontWeight = FontWeight.Medium)
+                        Text(
+                            text = "Pin: ${room.pin}", 
+                            fontSize = 13.sp, 
+                            color = Color.Gray, 
+                            fontWeight = FontWeight.Medium
+                        )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(4.dp))
 
-            // SMART DYNAMIC LEDGER SECTION
+            // SMART DYNAMIC LEDGER SECTION (Compact Vertical Spacing)
             if (isLoading && ledgers.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = Color(0xFF2E7D32))
@@ -214,16 +239,28 @@ fun InsideContriScreen(
                                 modifier = if (isScrollable) Modifier.width(fixedColumnWidth) else Modifier.weight(1f),
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
-                                Text(text = ledger.memberName, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Text(text = "₹${ledger.totalSpent.toInt()}", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2E7D32))
+                                Text(
+                                    text = ledger.memberName, 
+                                    fontSize = 15.sp, 
+                                    fontWeight = FontWeight.ExtraBold, 
+                                    color = Color.Black,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Spacer(modifier = Modifier.height(1.dp))
+                                Text(
+                                    text = "₹${ledger.totalSpent.toInt()}", 
+                                    fontSize = 16.sp, 
+                                    fontWeight = FontWeight.Bold, 
+                                    color = Color(0xFF2E7D32)
+                                )
                             }
                         }
                     }
 
                     val dividerModifier = if (isScrollable) Modifier.width(fixedColumnWidth * memberCount) else Modifier.fillMaxWidth()
                     HorizontalDivider(
-                        modifier = dividerModifier.padding(vertical = 12.dp),
+                        modifier = dividerModifier.padding(vertical = 8.dp),
                         thickness = 1.dp,
                         color = Color.LightGray
                     )
@@ -237,14 +274,31 @@ fun InsideContriScreen(
                                 ledger.expenses.forEach { expense ->
                                     Column(
                                         horizontalAlignment = Alignment.CenterHorizontally,
-                                        modifier = Modifier.padding(bottom = 12.dp)
+                                        modifier = Modifier.padding(bottom = 10.dp)
                                     ) {
-                                        Text(text = expense.itemName, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Color.Black, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = expense.itemName, 
+                                            fontSize = 14.sp, 
+                                            fontWeight = FontWeight.SemiBold, 
+                                            color = Color.Black, 
+                                            maxLines = 1, 
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Spacer(modifier = Modifier.height(1.dp))
                                         Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Text(text = "₹${expense.amount.toInt()}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.DarkGray)
+                                            Text(
+                                                text = "₹${expense.amount.toInt()}", 
+                                                fontSize = 12.sp, 
+                                                fontWeight = FontWeight.Bold, 
+                                                color = Color.DarkGray
+                                            )
                                             Spacer(modifier = Modifier.width(4.dp))
-                                            Text(text = expense.date, fontSize = 11.sp, color = Color.Gray, fontWeight = FontWeight.Medium)
+                                            Text(
+                                                text = expense.date, 
+                                                fontSize = 11.sp, 
+                                                color = Color.Gray, 
+                                                fontWeight = FontWeight.Medium
+                                            )
                                         }
                                     }
                                 }
@@ -256,7 +310,7 @@ fun InsideContriScreen(
         }
 
         // ==========================================
-        // REAL NETWORK CALL (Fixed: No more automatic split)
+        // REAL NETWORK CALL
         // ==========================================
         if (showAddExpenseDialog) {
             AddContriExpenseDialog(
@@ -276,7 +330,7 @@ fun InsideContriScreen(
                                 put("room_code", room.roomCode)
                                 put("date", formattedDate)
                                 put("item_name", title)
-                                put("amount", amount) // Now just sending raw amount
+                                put("amount", amount)
                             }
                             
                             val request = Request.Builder()
