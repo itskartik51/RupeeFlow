@@ -17,6 +17,7 @@ import androidx.compose.material.icons.automirrored.outlined.ExitToApp
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -77,6 +78,7 @@ fun InsideContriScreen(
     var refreshTrigger by remember { mutableIntStateOf(0) }
     
     var showAddExpenseDialog by remember { mutableStateOf(false) }
+    var showLeaveDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(room.roomCode, refreshTrigger) {
         val cachedJson = sharedPreferences.getString(cacheKey, null)
@@ -125,18 +127,24 @@ fun InsideContriScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(Color.White)
-                    .padding(horizontal = 16.dp, vertical = 10.dp)
+                    .padding(horizontal = 12.dp, vertical = 10.dp)
                     .statusBarsPadding(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onBackClick) {
                     Icon(Icons.Outlined.ArrowBack, contentDescription = "Back", tint = Color.Black)
                 }
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(4.dp))
                 Text(text = formattedName, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp, color = Color.Black)
+                
                 Spacer(modifier = Modifier.weight(1f))
                 
-                IconButton(onClick = onLeaveClick) {
+                // Demo Setting Icon
+                IconButton(onClick = { Toast.makeText(context, "Settings Demo", Toast.LENGTH_SHORT).show() }) {
+                    Icon(imageVector = Icons.Outlined.Settings, contentDescription = "Settings", tint = Color.Black)
+                }
+                
+                IconButton(onClick = { showLeaveDialog = true }) {
                     Icon(imageVector = Icons.AutoMirrored.Outlined.ExitToApp, contentDescription = "Leave Room", tint = Color.Red)
                 }
             }
@@ -165,16 +173,31 @@ fun InsideContriScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // LEFT SIDE: Total Amount
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("₹", fontSize = 22.sp, color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold)
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = totalGroupExpense.toInt().toString(), 
-                            fontSize = 28.sp, 
-                            fontWeight = FontWeight.ExtraBold, 
-                            color = Color.Black
-                        )
+                    // LEFT SIDE: Total Amount & Settle Up Button
+                    Column(horizontalAlignment = Alignment.Start) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("₹", fontSize = 22.sp, color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = totalGroupExpense.toInt().toString(), 
+                                fontSize = 28.sp, 
+                                fontWeight = FontWeight.ExtraBold, 
+                                color = Color.Black
+                            )
+                        }
+                        
+                        Spacer(modifier = Modifier.height(6.dp))
+                        
+                        // Settle Up Demo Button
+                        Button(
+                            onClick = { Toast.makeText(context, "Settle-up Demo", Toast.LENGTH_SHORT).show() },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                            modifier = Modifier.height(28.dp),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("Settle-up", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        }
                     }
 
                     // RIGHT SIDE: Code & Pin (Code: 17.sp, Pin: 13.sp)
@@ -312,6 +335,38 @@ fun InsideContriScreen(
                     }
                 }
             }
+        }
+
+        // ==========================================
+        // LEAVE ROOM POPUP (DIALOG)
+        // ==========================================
+        if (showLeaveDialog) {
+            AlertDialog(
+                onDismissRequest = { showLeaveDialog = false },
+                title = { 
+                    Text("Leave Room?", fontWeight = FontWeight.ExtraBold, color = Color.Black) 
+                },
+                text = { 
+                    Text("Are you sure you want to leave this Contri room? Backend disconnection is pending.", color = Color.DarkGray) 
+                },
+                containerColor = Color.White,
+                confirmButton = {
+                    TextButton(
+                        onClick = { 
+                            showLeaveDialog = false
+                            Toast.makeText(context, "Leave signal sent (Demo)", Toast.LENGTH_SHORT).show()
+                            onLeaveClick() // Return to home hub
+                        }
+                    ) {
+                        Text("Leave", color = Color.Red, fontWeight = FontWeight.Bold)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showLeaveDialog = false }) {
+                        Text("Cancel", color = Color.Gray, fontWeight = FontWeight.Bold)
+                    }
+                }
+            )
         }
 
         // ==========================================
