@@ -35,7 +35,8 @@ fun HomeDashboardDesign(
     onLogout: () -> Unit,
     onRefreshExpenses: () -> Unit = {}, 
     onExpenseCardClick: () -> Unit,
-    onContriClick: () -> Unit
+    onContriClick: () -> Unit,
+    contriCount: Int = 0 // Dynamic Contri count
 ) {
     var showDiagnostics by remember { mutableStateOf(false) }
 
@@ -136,10 +137,9 @@ fun HomeDashboardDesign(
         
         Spacer(modifier = Modifier.height(16.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            GridCard(
-                title = "CONTRI", 
-                value = "0 Rooms", 
-                lineColor = Color(0xFF2E7D32), 
+            // UPDATED CONTRI CARD (Dynamic count & 5-Segment Progress Line)
+            ContriDashboardCard(
+                contriCount = contriCount,
                 modifier = Modifier.weight(1f).clickable { onContriClick() }
             ) 
             GridCard(title = "MUTUAL FUNDS", value = "₹0", lineColor = Color(0xFF039BE5), modifier = Modifier.weight(1f))
@@ -159,6 +159,65 @@ fun HomeDashboardDesign(
             TextButton(onClick = onLogout) { Text("Logout", color = Color(0xFFD32F2F)) }
         }
         Spacer(modifier = Modifier.height(60.dp)) 
+    }
+}
+
+// ==========================================
+// NEW: DYNAMIC CONTRI DASHBOARD CARD
+// ==========================================
+@Composable
+fun ContriDashboardCard(
+    contriCount: Int,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        modifier = modifier
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Text(
+                text = "CONTRI",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.Gray,
+                letterSpacing = 0.5.sp
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = "$contriCount Contri",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = Color.Black
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // 5-Segment Progress Line (0%, 20%, 40%, 60%, 80%, 100%)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
+                val safeCount = contriCount.coerceIn(0, 5)
+                for (i in 1..5) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .background(
+                                color = if (i <= safeCount) Color(0xFF2E7D32) else Color(0xFFE0E0E0),
+                                shape = RoundedCornerShape(2.dp)
+                            )
+                    )
+                }
+            }
+        }
     }
 }
 
