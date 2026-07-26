@@ -24,9 +24,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.OffsetMapping
+import androidx.compose.ui.text.input.TransformedText
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -442,7 +446,7 @@ fun CreateContriDialog(username: String, onDismiss: () -> Unit, onSuccess: () ->
 }
 
 // ==========================================
-// JOIN CONTRI DIALOG 
+// JOIN CONTRI DIALOG (FIXED CURSOR GLITCH)
 // ==========================================
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -455,7 +459,10 @@ fun JoinContriDialog(
 ) {
     var viewState by remember { mutableIntStateOf(if (initialScannedCode.isNotBlank()) 1 else 0) }
     
-    var roomCode by remember { mutableStateOf(initialScannedCode) }
+    // Store only raw alphanumeric characters (Max 9)
+    var roomCode by remember(initialScannedCode) { 
+        mutableStateOf(initialScannedCode.replace("-", "").filter { it.isLetterOrDigit() }.uppercase().take(9)) 
+    }
     var pin by remember { mutableStateOf("") }
     var isSubmitting by remember { mutableStateOf(false) }
     
@@ -541,13 +548,13 @@ fun JoinContriDialog(
                     OutlinedTextField(
                         value = roomCode,
                         onValueChange = { raw ->
-                            val clean = raw.replace("-", "").filter { it.isLetterOrDigit() }.uppercase().take(9)
-                            val formatted = clean.chunked(3).joinToString("-")
-                            roomCode = formatted
+                            // Strip dashes and keep max 9 alphanumeric chars
+                            roomCode = raw.replace("-", "").filter { it.isLetterOrDigit() }.uppercase().take(9)
                         },
                         label = { Text("Enter Contri Code") },
                         placeholder = { Text("ABC-123-XYZ") },
                         singleLine = true,
+                        visualTransformation = RoomCodeVisualTransformation(), // Visual hyphenation engine
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF2E7D32), focusedLabelColor = Color(0xFF2E7D32))
@@ -580,14 +587,15 @@ fun JoinContriDialog(
 
                     Button(
                         onClick = {
-                            if (roomCode.length >= 11 && pin.length == 6) {
+                            if (roomCode.length == 9 && pin.length == 6) {
                                 isSubmitting = true
+                                val formattedCode = roomCode.chunked(3).joinToString("-")
                                 coroutineScope.launch(Dispatchers.IO) {
                                     try {
                                         val jsonBody = JSONObject().apply {
                                             put("action", "join_contri")
                                             put("username", username)
-                                            put("room_code", roomCode)
+                                            put("room_code", formattedCode)
                                             put("passkey", pin)
                                         }
                                         val request = Request.Builder()
@@ -630,6 +638,43 @@ fun JoinContriDialog(
                 }
             }
         }
+    }
+}
+
+// ==========================================
+// VISUAL TRANSFORMATION ENGINE (3-3-3 FORMAT)
+// ==========================================
+class RoomCodeVisualTransformation : VisualTransformation {
+    override fun filter(text: AnnotatedString): TransformedText {
+        val raw = text.text.take(9)
+        val formatted = buildString {
+            for (i in raw.indices) {
+                append(raw[i])
+                if ((i == 2 || i == 5) && i != raw.lastIndex) {
+                    append("-")
+                }
+            }
+        }
+
+        val offsetMapping = object : OffsetMapping {
+            override fun originalToTransformed(offset: Int): Int {
+                if (offset <= 0) return 0
+                if (offset <= 3) return offset
+                if (offset <= 6) return offset + 1
+                if (offset <= 9) return offset + 2
+                return formatted.length
+            }
+
+            override fun transformedToOriginal(offset: Int): Int {
+                if (offset <= 0) return 0
+                if (offset <= 3) return offset
+                if (offset <= 7) return (offset - 1).coerceAtLeast(0)
+                if (offset <= 11) return (offset - 2).coerceAtLeast(0)
+                return raw.length
+            }
+        }
+
+        return TransformedText(AnnotatedString(formatted), offsetMapping)
     }
 }
 
