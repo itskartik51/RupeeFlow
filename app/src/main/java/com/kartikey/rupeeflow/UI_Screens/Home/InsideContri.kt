@@ -78,7 +78,7 @@ fun InsideContriScreen(
 
     var ledgers by remember { mutableStateOf<List<MemberLedger>>(emptyList()) }
     var totalGroupExpense by remember { mutableDoubleStateOf(0.0) }
-    var isAdmin by remember { mutableStateOf(false) } // Real dynamic state
+    var isAdmin by remember { mutableStateOf(false) } 
     var isLoading by remember { mutableStateOf(false) }
     var refreshTrigger by remember { mutableIntStateOf(0) }
     
@@ -105,7 +105,7 @@ fun InsideContriScreen(
                 val jsonBody = JSONObject().apply {
                     put("action", "fetch_room_details")
                     put("room_code", room.roomCode)
-                    put("username", username) // Passed backend to verify Admin
+                    put("username", username) 
                 }
                 val request = Request.Builder()
                     .url(Constants.GOOGLE_SHEET_API_URL)
@@ -148,7 +148,6 @@ fun InsideContriScreen(
                 
                 Text(text = formattedName, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp, color = Color.Black)
                 
-                // ADMIN TAG (Exact Outline Design)
                 if (isAdmin) {
                     Spacer(modifier = Modifier.width(8.dp))
                     Box(
@@ -168,7 +167,6 @@ fun InsideContriScreen(
                 
                 Spacer(modifier = Modifier.weight(1f))
                 
-                // SETTINGS ICON (Only for Admin)
                 if (isAdmin) {
                     IconButton(onClick = { Toast.makeText(context, "Settings Demo", Toast.LENGTH_SHORT).show() }) {
                         Icon(imageVector = Icons.Outlined.Settings, contentDescription = "Settings", tint = Color.Black)
@@ -188,7 +186,6 @@ fun InsideContriScreen(
         Column(
             modifier = Modifier.fillMaxSize().padding(paddingValues)
         ) {
-            // COMPACT PREMIUM INFO CARD
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -204,7 +201,6 @@ fun InsideContriScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // LEFT SIDE: Total Amount & Action Buttons
                     Column(horizontalAlignment = Alignment.Start) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text("₹", fontSize = 22.sp, color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold)
@@ -230,7 +226,6 @@ fun InsideContriScreen(
                                 Text("Settle-up", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
                             }
 
-                            // NEW TAG BUTTON (Only for Admin)
                             if (isAdmin) {
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Box(
@@ -252,7 +247,6 @@ fun InsideContriScreen(
                         }
                     }
 
-                    // RIGHT SIDE: Code & Pin
                     Column(horizontalAlignment = Alignment.End) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Box(
@@ -293,7 +287,6 @@ fun InsideContriScreen(
 
             Spacer(modifier = Modifier.height(4.dp))
 
-            // SMART DYNAMIC LEDGER SECTION
             if (isLoading && ledgers.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = Color(0xFF2E7D32))
@@ -402,7 +395,7 @@ fun InsideContriScreen(
         }
 
         // ==========================================
-        // NEW CYCLE POPUP (Only for Admin)
+        // REAL NETWORK CALL (START NEW CYCLE)
         // ==========================================
         if (showNewCycleDialog) {
             AlertDialog(
@@ -418,7 +411,40 @@ fun InsideContriScreen(
                     TextButton(
                         onClick = { 
                             showNewCycleDialog = false
-                            Toast.makeText(context, "New cycle created (Demo)", Toast.LENGTH_SHORT).show()
+                            isLoading = true
+                            
+                            coroutineScope.launch(Dispatchers.IO) {
+                                try {
+                                    val jsonBody = JSONObject().apply {
+                                        put("action", "start_new_cycle")
+                                        put("username", username)
+                                        put("room_code", room.roomCode)
+                                    }
+                                    val request = Request.Builder()
+                                        .url(Constants.GOOGLE_SHEET_API_URL)
+                                        .post(jsonBody.toString().toRequestBody("application/json".toMediaType()))
+                                        .build()
+
+                                    val response = OkHttpClient().newCall(request).execute()
+                                    val resData = response.body?.string() ?: ""
+
+                                    withContext(Dispatchers.Main) {
+                                        if (resData.contains("\"status\":\"success\"")) {
+                                            Toast.makeText(context, "New Cycle Started!", Toast.LENGTH_SHORT).show()
+                                            sharedPreferences.edit().remove(cacheKey).apply()
+                                            refreshTrigger++ 
+                                        } else {
+                                            Toast.makeText(context, "Error starting cycle", Toast.LENGTH_SHORT).show()
+                                            isLoading = false
+                                        }
+                                    }
+                                } catch (e: Exception) {
+                                    withContext(Dispatchers.Main) {
+                                        Toast.makeText(context, "Network Error", Toast.LENGTH_SHORT).show()
+                                        isLoading = false
+                                    }
+                                }
+                            }
                         }
                     ) {
                         Text("New", color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold)
@@ -433,7 +459,7 @@ fun InsideContriScreen(
         }
 
         // ==========================================
-        // LEAVE ROOM POPUP
+        // REAL NETWORK CALL (LEAVE ROOM)
         // ==========================================
         if (showLeaveDialog) {
             AlertDialog(
@@ -442,15 +468,47 @@ fun InsideContriScreen(
                     Text("Leave Room?", fontWeight = FontWeight.ExtraBold, color = Color.Black) 
                 },
                 text = { 
-                    Text("Are you sure you want to leave this Contri room? Backend disconnection is pending.", color = Color.DarkGray) 
+                    Text("Are you sure you want to leave this Contri room? This action cannot be undone.", color = Color.DarkGray) 
                 },
                 containerColor = Color.White,
                 confirmButton = {
                     TextButton(
                         onClick = { 
                             showLeaveDialog = false
-                            Toast.makeText(context, "Leave signal sent (Demo)", Toast.LENGTH_SHORT).show()
-                            onLeaveClick()
+                            isLoading = true
+                            
+                            coroutineScope.launch(Dispatchers.IO) {
+                                try {
+                                    val jsonBody = JSONObject().apply {
+                                        put("action", "leave_contri")
+                                        put("username", username)
+                                        put("room_code", room.roomCode)
+                                    }
+                                    val request = Request.Builder()
+                                        .url(Constants.GOOGLE_SHEET_API_URL)
+                                        .post(jsonBody.toString().toRequestBody("application/json".toMediaType()))
+                                        .build()
+
+                                    val response = OkHttpClient().newCall(request).execute()
+                                    val resData = response.body?.string() ?: ""
+
+                                    withContext(Dispatchers.Main) {
+                                        if (resData.contains("\"status\":\"success\"")) {
+                                            Toast.makeText(context, "Left Room Successfully!", Toast.LENGTH_SHORT).show()
+                                            sharedPreferences.edit().remove(cacheKey).apply()
+                                            onLeaveClick() // Return to Hub
+                                        } else {
+                                            Toast.makeText(context, "Error leaving room", Toast.LENGTH_SHORT).show()
+                                            isLoading = false
+                                        }
+                                    }
+                                } catch (e: Exception) {
+                                    withContext(Dispatchers.Main) {
+                                        Toast.makeText(context, "Network Error", Toast.LENGTH_SHORT).show()
+                                        isLoading = false
+                                    }
+                                }
+                            }
                         }
                     ) {
                         Text("Leave", color = Color.Red, fontWeight = FontWeight.Bold)
@@ -531,14 +589,6 @@ fun calculateUserSettlements(username: String, ledgers: List<MemberLedger>, tota
         balances[ledger.memberName] = ledger.totalSpent - perPerson
     }
     
-    // Find current user's full name based on the login username. (Handled natively by finding self in ledgers)
-    // Actually, in the frontend, we don't have Full Name easily unless passed. 
-    // BUT since we just want to know if WE owe money, let's match logic.
-    // NOTE: This algorithm requires the user's Full Name. Since we don't have it explicitly stored here,
-    // we assume the user finds their name on screen. For automatic mapping, we just match by finding self.
-    
-    // TEMPORARY: For UI display, we just show all settlements involving anyone.
-    // In final backend link, we will filter by `myNetBalance`. 
     val myNetBalance = balances.values.firstOrNull() ?: 0.0 
     
     val settlements = mutableListOf<Settlement>()
