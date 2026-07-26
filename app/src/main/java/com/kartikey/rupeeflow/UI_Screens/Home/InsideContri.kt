@@ -177,7 +177,7 @@ fun InsideContriScreen(
                         )
                     }
 
-                    // RIGHT SIDE: Code & Pin (Free-body Copy Icon)
+                    // RIGHT SIDE: Code & Pin (Free-body Copy Icon & Exact Sizes)
                     Column(horizontalAlignment = Alignment.End) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Box(
