@@ -3,13 +3,15 @@ package com.kartikey.rupeeflow.UI_Screens.Home
 import android.content.Context
 import android.widget.Toast
 import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -17,15 +19,13 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ExitToApp
-import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.ArrowBack
-import androidx.compose.material.icons.outlined.ContentCopy
-import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
@@ -43,6 +43,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.kartikey.rupeeflow.Cloud_Database.Constants
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -62,7 +63,7 @@ data class ContriExpense(val itemName: String, val amount: Double, val date: Str
 data class MemberLedger(val memberName: String, val totalSpent: Double, val expenses: List<ContriExpense>)
 data class Settlement(val from: String, val to: String, val amount: Double)
 data class PastCycle(val dateRange: String, val totalAmount: String)
-data class RoomDetailsData(val ledgers: List<MemberLedger>, val totalExpense: Double, val isAdmin: Boolean, val pastCycles: List<PastCycle>)
+data class RoomDetailsData(val roomName: String, val ledgers: List<MemberLedger>, val totalExpense: Double, val isAdmin: Boolean, val pastCycles: List<PastCycle>)
 
 @Composable
 fun InsideContriScreen(
@@ -74,7 +75,10 @@ fun InsideContriScreen(
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
     val coroutineScope = rememberCoroutineScope()
-    val formattedName = if (room.roomName.length > 10) "${room.roomName.take(10)}..." else room.roomName
+    
+    var localRoomName by remember { mutableStateOf(room.roomName) }
+    var localRoomPin by remember { mutableStateOf(room.pin) }
+    val formattedName = if (localRoomName.length > 10) "${localRoomName.take(10)}..." else localRoomName
 
     val sharedPreferences = context.getSharedPreferences("RupeeFlowCache", Context.MODE_PRIVATE)
     val cacheKey = "room_data_${room.roomCode}"
@@ -90,17 +94,33 @@ fun InsideContriScreen(
     var showLeaveDialog by remember { mutableStateOf(false) }
     var showSettleDialog by remember { mutableStateOf(false) }
     var showNewCycleDialog by remember { mutableStateOf(false) }
+    var showSettingsDialog by remember { mutableStateOf(false) }
+    
+    var memberToRemove by remember { mutableStateOf<String?>(null) }
 
-    // DYNAMIC STATES FOR PAST CYCLES LAZY LOADING
     val expandedState = remember { mutableStateMapOf<String, Boolean>() }
     val loadingState = remember { mutableStateMapOf<String, Boolean>() }
     val fetchedCycleData = remember { mutableStateMapOf<String, List<MemberLedger>>() }
+
+    // ROTATION ANIMATION FOR SYNC WHEEL
+    var currentRotation by remember { mutableFloatStateOf(0f) }
+    LaunchedEffect(isLoading) {
+        if (isLoading) {
+            while (true) {
+                delay(16)
+                currentRotation += 8f
+            }
+        } else {
+            currentRotation = 0f
+        }
+    }
 
     LaunchedEffect(room.roomCode, refreshTrigger) {
         val cachedJson = sharedPreferences.getString(cacheKey, null)
         if (cachedJson != null) {
             try {
                 val data = parseLedgerData(cachedJson)
+                if (data.roomName.isNotEmpty()) localRoomName = data.roomName
                 ledgers = data.ledgers
                 totalGroupExpense = data.totalExpense
                 isAdmin = data.isAdmin
@@ -129,25 +149,16 @@ fun InsideContriScreen(
                     if (resData.contains("\"status\":\"success\"")) {
                         sharedPreferences.edit().putString(cacheKey, resData).apply()
                         val data = parseLedgerData(resData)
+                        if (data.roomName.isNotEmpty()) localRoomName = data.roomName
                         ledgers = data.ledgers
                         totalGroupExpense = data.totalExpense
                         isAdmin = data.isAdmin
                         pastCycles = data.pastCycles
-                    } else {
-                        try {
-                            val errorMsg = JSONObject(resData).getString("message")
-                            Toast.makeText(context, errorMsg, Toast.LENGTH_SHORT).show()
-                        } catch (e: Exception) {
-                            Toast.makeText(context, "Error loading data", Toast.LENGTH_SHORT).show()
-                        }
                     }
-                    isLoading = false // FIX: ALWAYS TURN OFF LOADING
+                    isLoading = false 
                 }
             } catch (e: Exception) {
-                withContext(Dispatchers.Main) { 
-                    isLoading = false // FIX: TURN OFF LOADING ON ERROR
-                    Toast.makeText(context, "Network Error", Toast.LENGTH_SHORT).show() 
-                }
+                withContext(Dispatchers.Main) { isLoading = false }
             }
         }
     }
@@ -177,19 +188,14 @@ fun InsideContriScreen(
                             .padding(horizontal = 8.dp, vertical = 2.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = "Admin", 
-                            fontSize = 10.sp, 
-                            color = Color(0xFF424242), 
-                            fontWeight = FontWeight.SemiBold
-                        )
+                        Text("Admin", fontSize = 10.sp, color = Color(0xFF424242), fontWeight = FontWeight.SemiBold)
                     }
                 }
                 
                 Spacer(modifier = Modifier.weight(1f))
                 
                 if (isAdmin) {
-                    IconButton(onClick = { Toast.makeText(context, "Settings Demo", Toast.LENGTH_SHORT).show() }) {
+                    IconButton(onClick = { showSettingsDialog = true }) {
                         Icon(imageVector = Icons.Outlined.Settings, contentDescription = "Settings", tint = Color.Black)
                     }
                 }
@@ -232,6 +238,17 @@ fun InsideContriScreen(
                                 fontWeight = FontWeight.ExtraBold, 
                                 color = Color.Black
                             )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            // SYNC/REFRESH WHEEL
+                            Icon(
+                                imageVector = Icons.Outlined.Sync,
+                                contentDescription = "Sync",
+                                tint = if (isLoading) Color(0xFF2E7D32) else Color.Gray,
+                                modifier = Modifier
+                                    .size(20.dp)
+                                    .rotate(currentRotation)
+                                    .clickable { if (!isLoading) refreshTrigger++ }
+                            )
                         }
                         
                         Spacer(modifier = Modifier.height(6.dp))
@@ -257,12 +274,7 @@ fun InsideContriScreen(
                                         .padding(horizontal = 12.dp, vertical = 4.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Text(
-                                        text = "New", 
-                                        fontSize = 12.sp, 
-                                        color = Color(0xFF424242), 
-                                        fontWeight = FontWeight.SemiBold
-                                    )
+                                    Text("New", fontSize = 12.sp, color = Color(0xFF424242), fontWeight = FontWeight.SemiBold)
                                 }
                             }
                         }
@@ -274,7 +286,7 @@ fun InsideContriScreen(
                                 modifier = Modifier
                                     .clip(CircleShape)
                                     .clickable {
-                                        clipboardManager.setText(AnnotatedString("Join my RupeeFlow Contri!\nCode: ${room.roomCode}\nPin: ${room.pin}"))
+                                        clipboardManager.setText(AnnotatedString("Join my RupeeFlow Contri!\nCode: ${room.roomCode}\nPin: $localRoomPin"))
                                         Toast.makeText(context, "Code Copied!", Toast.LENGTH_SHORT).show()
                                     }
                                     .padding(2.dp)
@@ -297,7 +309,7 @@ fun InsideContriScreen(
                         }
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = "Pin: ${room.pin}", 
+                            text = "Pin: $localRoomPin", 
                             fontSize = 13.sp, 
                             color = Color.Gray, 
                             fontWeight = FontWeight.Medium
@@ -308,7 +320,6 @@ fun InsideContriScreen(
 
             Spacer(modifier = Modifier.height(4.dp))
 
-            // RE-USABLE COMPONENT FOR CURRENT CYCLE
             if (isLoading && ledgers.isEmpty()) {
                 Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = Color(0xFF2E7D32))
@@ -321,9 +332,6 @@ fun InsideContriScreen(
                 DynamicLedgerView(ledgers)
             }
 
-            // ==========================================
-            // PAST CYCLES EXPANDABLE CARDS (LAZY LOAD)
-            // ==========================================
             if (pastCycles.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(24.dp))
                 Text(
@@ -395,27 +403,13 @@ fun InsideContriScreen(
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text(
-                                        text = cycle.dateRange, 
-                                        fontSize = 13.sp, 
-                                        fontWeight = FontWeight.Medium, 
-                                        color = Color.DarkGray
-                                    )
+                                    Text(text = cycle.dateRange, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = Color.DarkGray)
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         if (isFetching) {
-                                            CircularProgressIndicator(
-                                                modifier = Modifier.size(16.dp),
-                                                color = Color(0xFF2E7D32),
-                                                strokeWidth = 2.dp
-                                            )
+                                            CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color(0xFF2E7D32), strokeWidth = 2.dp)
                                             Spacer(modifier = Modifier.width(8.dp))
                                         }
-                                        Text(
-                                            text = cycle.totalAmount, 
-                                            fontSize = 15.sp, 
-                                            fontWeight = FontWeight.ExtraBold, 
-                                            color = Color(0xFF2E7D32)
-                                        )
+                                        Text(text = cycle.totalAmount, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFF2E7D32))
                                     }
                                 }
 
@@ -426,12 +420,7 @@ fun InsideContriScreen(
                                         DynamicLedgerView(cycleLedger)
                                         Spacer(modifier = Modifier.height(12.dp))
                                     } else if (!isFetching) {
-                                        Text(
-                                            "No data available.", 
-                                            color = Color.Gray, 
-                                            modifier = Modifier.fillMaxWidth().padding(16.dp), 
-                                            textAlign = TextAlign.Center
-                                        )
+                                        Text("No data available.", color = Color.Gray, modifier = Modifier.fillMaxWidth().padding(16.dp), textAlign = TextAlign.Center)
                                     }
                                 }
                             }
@@ -443,15 +432,240 @@ fun InsideContriScreen(
         }
 
         // ==========================================
-        // ALL POPUPS (SETTLE, NEW CYCLE, LEAVE, ADD)
+        // ADMIN SETTINGS DIALOG
         // ==========================================
-        if (showSettleDialog) {
-            SettleUpDialog(
-                username = username,
-                ledgers = ledgers,
-                totalExpense = totalGroupExpense,
-                onDismiss = { showSettleDialog = false }
+        if (showSettingsDialog) {
+            var editName by remember { mutableStateOf(localRoomName) }
+            var editPin by remember { mutableStateOf(localRoomPin) }
+            var isEditingName by remember { mutableStateOf(false) }
+            var isEditingPin by remember { mutableStateOf(false) }
+
+            Dialog(onDismissRequest = { showSettingsDialog = false }) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    elevation = CardDefaults.cardElevation(8.dp)
+                ) {
+                    Column(modifier = Modifier.padding(20.dp)) {
+                        Text("Room Settings", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // Edit Name
+                        OutlinedTextField(
+                            value = editName,
+                            onValueChange = { 
+                                editName = it.replaceFirstChar { char -> if (char.isLowerCase()) char.titlecase() else char.toString() }
+                            },
+                            label = { Text("Contri Name", fontSize = 13.sp) },
+                            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
+                            singleLine = true,
+                            readOnly = !isEditingName,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = if(isEditingName) Color(0xFF2E7D32) else Color.LightGray, 
+                                unfocusedBorderColor = Color.LightGray
+                            ),
+                            trailingIcon = {
+                                IconButton(onClick = { isEditingName = !isEditingName }) {
+                                    Icon(Icons.Outlined.Edit, contentDescription = "Edit", tint = if (isEditingName) Color(0xFF2E7D32) else Color.Gray)
+                                }
+                            }
+                        )
+                        
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Edit Pin
+                        OutlinedTextField(
+                            value = editPin,
+                            onValueChange = { newValue -> 
+                                if (newValue.length <= 6 && newValue.all { it.isDigit() }) {
+                                    editPin = newValue
+                                }
+                            },
+                            label = { Text("Contri Pin", fontSize = 13.sp) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true,
+                            readOnly = !isEditingPin,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = if(isEditingPin) Color(0xFF2E7D32) else Color.LightGray, 
+                                unfocusedBorderColor = Color.LightGray
+                            ),
+                            trailingIcon = {
+                                IconButton(onClick = { isEditingPin = !isEditingPin }) {
+                                    Icon(Icons.Outlined.Edit, contentDescription = "Edit", tint = if (isEditingPin) Color(0xFF2E7D32) else Color.Gray)
+                                }
+                            }
+                        )
+
+                        Spacer(modifier = Modifier.height(20.dp))
+                        Text("Manage Members", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // Shrinkable/Scrollable Members List (Max 3 Items Height)
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 170.dp) // Auto shrink, max 3 items
+                                .border(1.dp, Color(0xFFEEEEEE), RoundedCornerShape(12.dp))
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Color(0xFFFAFAFA))
+                        ) {
+                            if (ledgers.isNotEmpty()) {
+                                val adminName = ledgers[0].memberName
+                                LazyColumn {
+                                    itemsIndexed(ledgers) { index, member ->
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            val dispName = if (member.memberName.length > 10) member.memberName.take(10) + "..." else member.memberName
+                                            Text(text = dispName, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Color.Black)
+                                            
+                                            if (member.memberName == adminName) {
+                                                Text("Admin", fontSize = 12.sp, color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold)
+                                            } else {
+                                                Icon(
+                                                    imageVector = Icons.AutoMirrored.Outlined.ExitToApp,
+                                                    contentDescription = "Remove",
+                                                    tint = Color.Red,
+                                                    modifier = Modifier.size(22.dp).clickable { memberToRemove = member.memberName }
+                                                )
+                                            }
+                                        }
+                                        if (index < ledgers.size - 1) {
+                                            HorizontalDivider(color = Color(0xFFEEEEEE), thickness = 1.dp)
+                                        }
+                                    }
+                                }
+                            } else {
+                                Text("No members found.", modifier = Modifier.padding(16.dp), color = Color.Gray, fontSize = 13.sp)
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(20.dp))
+                        
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                            TextButton(onClick = { showSettingsDialog = false }) { Text("Cancel", color = Color.Gray, fontWeight = FontWeight.Bold) }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Button(
+                                onClick = { 
+                                    if (editName.isNotBlank() && editPin.length == 6) {
+                                        showSettingsDialog = false
+                                        isLoading = true
+                                        coroutineScope.launch(Dispatchers.IO) {
+                                            try {
+                                                val reqBody = JSONObject().apply {
+                                                    put("action", "edit_contri_room")
+                                                    put("username", username)
+                                                    put("room_code", room.roomCode)
+                                                    put("new_name", editName)
+                                                    put("new_pin", editPin)
+                                                }
+                                                val request = Request.Builder()
+                                                    .url(Constants.GOOGLE_SHEET_API_URL)
+                                                    .post(reqBody.toString().toRequestBody("application/json".toMediaType()))
+                                                    .build()
+
+                                                val response = OkHttpClient().newCall(request).execute()
+                                                val resStr = response.body?.string() ?: ""
+
+                                                withContext(Dispatchers.Main) {
+                                                    if (resStr.contains("\"status\":\"success\"")) {
+                                                        localRoomName = editName
+                                                        localRoomPin = editPin
+                                                        Toast.makeText(context, "Settings Saved!", Toast.LENGTH_SHORT).show()
+                                                        sharedPreferences.edit().remove(cacheKey).apply()
+                                                        refreshTrigger++
+                                                    } else {
+                                                        Toast.makeText(context, "Update Failed", Toast.LENGTH_SHORT).show()
+                                                        isLoading = false
+                                                    }
+                                                }
+                                            } catch (e: Exception) {
+                                                withContext(Dispatchers.Main) {
+                                                    Toast.makeText(context, "Network Error", Toast.LENGTH_SHORT).show()
+                                                    isLoading = false
+                                                }
+                                            }
+                                        }
+                                    } else {
+                                        Toast.makeText(context, "Invalid Name or Pin (must be 6 digits)", Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
+                                shape = RoundedCornerShape(10.dp)
+                            ) { Text("Save Changes", color = Color.White, fontWeight = FontWeight.Bold) }
+                        }
+                    }
+                }
+            }
+        }
+
+        // CONFIRMATION DIALOG FOR REMOVING A MEMBER
+        if (memberToRemove != null) {
+            AlertDialog(
+                onDismissRequest = { memberToRemove = null },
+                title = { Text("Remove Member?", fontWeight = FontWeight.ExtraBold, color = Color.Black) },
+                text = { Text("Are you sure you want to kick '$memberToRemove' from this room? Unka saara individual share room se zero ho jayega.", color = Color.DarkGray) },
+                containerColor = Color.White,
+                confirmButton = {
+                    TextButton(
+                        onClick = { 
+                            val target = memberToRemove!!
+                            memberToRemove = null
+                            showSettingsDialog = false
+                            isLoading = true
+                            
+                            coroutineScope.launch(Dispatchers.IO) {
+                                try {
+                                    val jsonBody = JSONObject().apply {
+                                        put("action", "leave_contri")
+                                        put("username", username)
+                                        put("room_code", room.roomCode)
+                                        put("target_name", target) 
+                                    }
+                                    val request = Request.Builder()
+                                        .url(Constants.GOOGLE_SHEET_API_URL)
+                                        .post(jsonBody.toString().toRequestBody("application/json".toMediaType()))
+                                        .build()
+
+                                    val response = OkHttpClient().newCall(request).execute()
+                                    val resData = response.body?.string() ?: ""
+
+                                    withContext(Dispatchers.Main) {
+                                        if (resData.contains("\"status\":\"success\"")) {
+                                            Toast.makeText(context, "$target Removed Successfully!", Toast.LENGTH_SHORT).show()
+                                            sharedPreferences.edit().remove(cacheKey).apply()
+                                            refreshTrigger++ 
+                                        } else {
+                                            Toast.makeText(context, "Error removing member", Toast.LENGTH_SHORT).show()
+                                            isLoading = false
+                                        }
+                                    }
+                                } catch (e: Exception) {
+                                    withContext(Dispatchers.Main) {
+                                        Toast.makeText(context, "Network Error", Toast.LENGTH_SHORT).show()
+                                        isLoading = false
+                                    }
+                                }
+                            }
+                        }
+                    ) { Text("Remove", color = Color.Red, fontWeight = FontWeight.Bold) }
+                },
+                dismissButton = {
+                    TextButton(onClick = { memberToRemove = null }) { Text("Cancel", color = Color.Gray, fontWeight = FontWeight.Bold) }
+                }
             )
+        }
+
+        // ALL OTHER POPUPS
+        if (showSettleDialog) {
+            SettleUpDialog(username = username, ledgers = ledgers, totalExpense = totalGroupExpense, onDismiss = { showSettleDialog = false })
         }
 
         if (showNewCycleDialog) {
@@ -465,7 +679,6 @@ fun InsideContriScreen(
                         onClick = { 
                             showNewCycleDialog = false
                             isLoading = true
-                            
                             coroutineScope.launch(Dispatchers.IO) {
                                 try {
                                     val jsonBody = JSONObject().apply {
@@ -473,42 +686,21 @@ fun InsideContriScreen(
                                         put("username", username)
                                         put("room_code", room.roomCode)
                                     }
-                                    val request = Request.Builder()
-                                        .url(Constants.GOOGLE_SHEET_API_URL)
-                                        .post(jsonBody.toString().toRequestBody("application/json".toMediaType()))
-                                        .build()
-
+                                    val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(jsonBody.toString().toRequestBody("application/json".toMediaType())).build()
                                     val response = OkHttpClient().newCall(request).execute()
-                                    val resData = response.body?.string() ?: ""
-
                                     withContext(Dispatchers.Main) {
-                                        if (resData.contains("\"status\":\"success\"")) {
-                                            Toast.makeText(context, "New Cycle Started!", Toast.LENGTH_SHORT).show()
-                                            sharedPreferences.edit().remove(cacheKey).apply()
-                                            refreshTrigger++ 
-                                        } else {
-                                            try {
-                                                val errorMsg = JSONObject(resData).getString("message")
-                                                Toast.makeText(context, errorMsg, Toast.LENGTH_SHORT).show()
-                                            } catch (e: Exception) {
-                                                Toast.makeText(context, "Error starting cycle", Toast.LENGTH_SHORT).show()
-                                            }
-                                        }
-                                        isLoading = false
+                                        Toast.makeText(context, "New Cycle Started!", Toast.LENGTH_SHORT).show()
+                                        sharedPreferences.edit().remove(cacheKey).apply()
+                                        refreshTrigger++ 
                                     }
                                 } catch (e: Exception) {
-                                    withContext(Dispatchers.Main) {
-                                        Toast.makeText(context, "Network Error", Toast.LENGTH_SHORT).show()
-                                        isLoading = false
-                                    }
+                                    withContext(Dispatchers.Main) { isLoading = false }
                                 }
                             }
                         }
                     ) { Text("New", color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold) }
                 },
-                dismissButton = {
-                    TextButton(onClick = { showNewCycleDialog = false }) { Text("Cancel", color = Color.Gray, fontWeight = FontWeight.Bold) }
-                }
+                dismissButton = { TextButton(onClick = { showNewCycleDialog = false }) { Text("Cancel", color = Color.Gray, fontWeight = FontWeight.Bold) } }
             )
         }
 
@@ -523,7 +715,6 @@ fun InsideContriScreen(
                         onClick = { 
                             showLeaveDialog = false
                             isLoading = true
-                            
                             coroutineScope.launch(Dispatchers.IO) {
                                 try {
                                     val jsonBody = JSONObject().apply {
@@ -531,42 +722,20 @@ fun InsideContriScreen(
                                         put("username", username)
                                         put("room_code", room.roomCode)
                                     }
-                                    val request = Request.Builder()
-                                        .url(Constants.GOOGLE_SHEET_API_URL)
-                                        .post(jsonBody.toString().toRequestBody("application/json".toMediaType()))
-                                        .build()
-
+                                    val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(jsonBody.toString().toRequestBody("application/json".toMediaType())).build()
                                     val response = OkHttpClient().newCall(request).execute()
-                                    val resData = response.body?.string() ?: ""
-
                                     withContext(Dispatchers.Main) {
-                                        if (resData.contains("\"status\":\"success\"")) {
-                                            Toast.makeText(context, "Left Room Successfully!", Toast.LENGTH_SHORT).show()
-                                            sharedPreferences.edit().remove(cacheKey).apply()
-                                            onLeaveClick()
-                                        } else {
-                                            try {
-                                                val errorMsg = JSONObject(resData).getString("message")
-                                                Toast.makeText(context, errorMsg, Toast.LENGTH_SHORT).show()
-                                            } catch (e: Exception) {
-                                                Toast.makeText(context, "Error leaving room", Toast.LENGTH_SHORT).show()
-                                            }
-                                        }
-                                        isLoading = false
+                                        sharedPreferences.edit().remove(cacheKey).apply()
+                                        onLeaveClick()
                                     }
                                 } catch (e: Exception) {
-                                    withContext(Dispatchers.Main) {
-                                        Toast.makeText(context, "Network Error", Toast.LENGTH_SHORT).show()
-                                        isLoading = false
-                                    }
+                                    withContext(Dispatchers.Main) { isLoading = false }
                                 }
                             }
                         }
                     ) { Text("Leave", color = Color.Red, fontWeight = FontWeight.Bold) }
                 },
-                dismissButton = {
-                    TextButton(onClick = { showLeaveDialog = false }) { Text("Cancel", color = Color.Gray, fontWeight = FontWeight.Bold) }
-                }
+                dismissButton = { TextButton(onClick = { showLeaveDialog = false }) { Text("Cancel", color = Color.Gray, fontWeight = FontWeight.Bold) } }
             )
         }
 
@@ -576,49 +745,25 @@ fun InsideContriScreen(
                 onAdd = { title, dateMillis, amount ->
                     showAddExpenseDialog = false
                     isLoading = true 
-                    
                     coroutineScope.launch(Dispatchers.IO) {
                         try {
                             val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
-                            val formattedDate = sdf.format(Date(dateMillis))
-
                             val jsonBody = JSONObject().apply {
                                 put("action", "add_contri_expense")
                                 put("username", username)
                                 put("room_code", room.roomCode)
-                                put("date", formattedDate)
+                                put("date", sdf.format(Date(dateMillis)))
                                 put("item_name", title)
                                 put("amount", amount)
                             }
-                            
-                            val request = Request.Builder()
-                                .url(Constants.GOOGLE_SHEET_API_URL)
-                                .post(jsonBody.toString().toRequestBody("application/json".toMediaType()))
-                                .build()
-
+                            val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(jsonBody.toString().toRequestBody("application/json".toMediaType())).build()
                             val response = OkHttpClient().newCall(request).execute()
-                            val resData = response.body?.string() ?: ""
-
                             withContext(Dispatchers.Main) {
-                                if (resData.contains("\"status\":\"success\"")) {
-                                    Toast.makeText(context, "Expense Added Successfully!", Toast.LENGTH_SHORT).show()
-                                    sharedPreferences.edit().remove(cacheKey).apply()
-                                    refreshTrigger++ 
-                                } else {
-                                    try {
-                                        val errorMsg = JSONObject(resData).getString("message")
-                                        Toast.makeText(context, errorMsg, Toast.LENGTH_SHORT).show()
-                                    } catch (e: Exception) {
-                                        Toast.makeText(context, "Error saving expense", Toast.LENGTH_SHORT).show()
-                                    }
-                                }
-                                isLoading = false
+                                sharedPreferences.edit().remove(cacheKey).apply()
+                                refreshTrigger++ 
                             }
                         } catch (e: Exception) {
-                            withContext(Dispatchers.Main) {
-                                Toast.makeText(context, "Network Error", Toast.LENGTH_SHORT).show()
-                                isLoading = false
-                            }
+                            withContext(Dispatchers.Main) { isLoading = false }
                         }
                     }
                 }
@@ -668,11 +813,7 @@ fun DynamicLedgerView(ledgers: List<MemberLedger>) {
         }
 
         val dividerModifier = if (isScrollable) Modifier.width(fixedColumnWidth * memberCount) else Modifier.fillMaxWidth()
-        HorizontalDivider(
-            modifier = dividerModifier.padding(vertical = 8.dp),
-            thickness = 1.dp,
-            color = Color.LightGray
-        )
+        HorizontalDivider(modifier = dividerModifier.padding(vertical = 8.dp), thickness = 1.dp, color = Color.LightGray)
 
         Row(modifier = if (!isScrollable) Modifier.fillMaxWidth() else Modifier) {
             ledgers.forEach { ledger ->
@@ -681,33 +822,13 @@ fun DynamicLedgerView(ledgers: List<MemberLedger>) {
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     ledger.expenses.forEach { expense ->
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier.padding(bottom = 10.dp)
-                        ) {
-                            Text(
-                                text = expense.itemName, 
-                                fontSize = 14.sp, 
-                                fontWeight = FontWeight.SemiBold, 
-                                color = Color.Black, 
-                                maxLines = 1, 
-                                overflow = TextOverflow.Ellipsis
-                            )
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(bottom = 10.dp)) {
+                            Text(text = expense.itemName, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Color.Black, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Spacer(modifier = Modifier.height(1.dp))
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = "₹${expense.amount.toInt()}", 
-                                    fontSize = 12.sp, 
-                                    fontWeight = FontWeight.Bold, 
-                                    color = Color.DarkGray
-                                )
+                                Text(text = "₹${expense.amount.toInt()}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.DarkGray)
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = expense.date, 
-                                    fontSize = 11.sp, 
-                                    color = Color.Gray, 
-                                    fontWeight = FontWeight.Medium
-                                )
+                                Text(text = expense.date, fontSize = 11.sp, color = Color.Gray, fontWeight = FontWeight.Medium)
                             }
                         }
                     }
@@ -723,14 +844,10 @@ fun DynamicLedgerView(ledgers: List<MemberLedger>) {
 fun calculateUserSettlements(username: String, ledgers: List<MemberLedger>, totalExpense: Double): Pair<Double, List<Settlement>> {
     if (ledgers.isEmpty()) return Pair(0.0, emptyList())
     val perPerson = totalExpense / ledgers.size
-    
     val balances = mutableMapOf<String, Double>()
-    ledgers.forEach { ledger ->
-        balances[ledger.memberName] = ledger.totalSpent - perPerson
-    }
+    ledgers.forEach { balances[it.memberName] = it.totalSpent - perPerson }
     
     val myNetBalance = balances.values.firstOrNull() ?: 0.0 
-    
     val settlements = mutableListOf<Settlement>()
     val debtors = balances.filter { it.value < -0.01 }.toMutableMap()
     val creditors = balances.filter { it.value > 0.01 }.toMutableMap()
@@ -738,47 +855,31 @@ fun calculateUserSettlements(username: String, ledgers: List<MemberLedger>, tota
     while (debtors.isNotEmpty() && creditors.isNotEmpty()) {
         val debtor = debtors.keys.first()
         val creditor = creditors.keys.first()
-        
         val debtAmount = abs(debtors[debtor]!!)
         val creditAmount = creditors[creditor]!!
-        
         val settledAmount = minOf(debtAmount, creditAmount)
         
         settlements.add(Settlement(from = debtor, to = creditor, amount = settledAmount))
         
         debtors[debtor] = debtors[debtor]!! + settledAmount
         if (debtors[debtor]!! > -0.01) debtors.remove(debtor)
-        
         creditors[creditor] = creditors[creditor]!! - settledAmount
         if (creditors[creditor]!! < 0.01) creditors.remove(creditor)
     }
-    
     return Pair(myNetBalance, settlements)
 }
 
 @Composable
-fun SettleUpDialog(
-    username: String,
-    ledgers: List<MemberLedger>,
-    totalExpense: Double,
-    onDismiss: () -> Unit
-) {
+fun SettleUpDialog(username: String, ledgers: List<MemberLedger>, totalExpense: Double, onDismiss: () -> Unit) {
     val (myNetBalance, allSettlements) = calculateUserSettlements(username, ledgers, totalExpense)
-    
     Dialog(onDismissRequest = onDismiss) {
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
-            elevation = CardDefaults.cardElevation(8.dp)
-        ) {
+        Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(8.dp)) {
             Column(modifier = Modifier.padding(20.dp)) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
                     Text("Group Balances", fontSize = 14.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(4.dp))
                     Text("Total: ₹${totalExpense.toInt()}", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
                 }
-
                 Spacer(modifier = Modifier.height(16.dp))
                 HorizontalDivider(color = Color.LightGray, thickness = 1.dp)
                 Spacer(modifier = Modifier.height(16.dp))
@@ -788,27 +889,17 @@ fun SettleUpDialog(
                         Text("No pending payments.", fontSize = 14.sp, color = Color.Gray, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
                     } else {
                         allSettlements.forEach { settlement ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
+                            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Text("${settlement.from} owes ${settlement.to}", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Color.Black)
                                 Text("₹${settlement.amount.toInt()}", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2E7D32))
                             }
                         }
                     }
                 }
-
                 Spacer(modifier = Modifier.height(16.dp))
                 HorizontalDivider(color = Color.LightGray, thickness = 1.dp)
                 Spacer(modifier = Modifier.height(16.dp))
-
-                Button(
-                    onClick = onDismiss,
-                    modifier = Modifier.fillMaxWidth().height(48.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
-                ) {
+                Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth().height(48.dp), shape = RoundedCornerShape(12.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))) {
                     Text("Dismiss", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 }
             }
@@ -817,24 +908,16 @@ fun SettleUpDialog(
 }
 
 // ==========================================
-// ADD EXPENSE POPUP (DIALOG)
+// ADD EXPENSE POPUP
 // ==========================================
 @Composable
-fun AddContriExpenseDialog(
-    onDismiss: () -> Unit,
-    onAdd: (String, Long, Double) -> Unit
-) {
+fun AddContriExpenseDialog(onDismiss: () -> Unit, onAdd: (String, Long, Double) -> Unit) {
     var expenseTitle by remember { mutableStateOf("") }
     var amount by remember { mutableStateOf("") }
     var dateMillis by remember { mutableStateOf<Long?>(System.currentTimeMillis()) }
 
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(dismissOnClickOutside = false)) {
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
-            elevation = CardDefaults.cardElevation(8.dp)
-        ) {
+        Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(8.dp)) {
             Column(modifier = Modifier.padding(20.dp)) {
                 Text("Add New Expense", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
                 Spacer(modifier = Modifier.height(16.dp))
@@ -842,32 +925,21 @@ fun AddContriExpenseDialog(
                 OutlinedTextField(
                     value = expenseTitle,
                     onValueChange = { expenseTitle = it.replaceFirstChar { char -> if (char.isLowerCase()) char.titlecase() else char.toString() } },
-                    label = { Text("Expense Title", fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    label = { Text("Expense Title", fontSize = 13.sp) },
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF2E7D32), focusedLabelColor = Color(0xFF2E7D32))
                 )
-                
                 Spacer(modifier = Modifier.height(12.dp))
 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    com.kartikey.rupeeflow.UI_Screens.CustomDatePicker(
-                        label = "Date",
-                        selectedDateMillis = dateMillis,
-                        onDateSelected = { dateMillis = it },
-                        modifier = Modifier.weight(1f)
-                    )
-
+                    com.kartikey.rupeeflow.UI_Screens.CustomDatePicker(label = "Date", selectedDateMillis = dateMillis, onDateSelected = { dateMillis = it }, modifier = Modifier.weight(1f))
                     OutlinedTextField(
                         value = amount,
-                        onValueChange = { newValue -> 
-                            if (newValue.isEmpty() || newValue.matches(Regex("^\\d*\\.?\\d*$"))) {
-                                amount = newValue
-                            }
-                        },
-                        label = { Text("Amount", fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        onValueChange = { if (it.isEmpty() || it.matches(Regex("^\\d*\\.?\\d*$"))) amount = it },
+                        label = { Text("Amount", fontSize = 13.sp) },
                         prefix = { Text("₹ ", color = Color.Black, fontWeight = FontWeight.Bold) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true,
@@ -876,26 +948,15 @@ fun AddContriExpenseDialog(
                         colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF2E7D32), focusedLabelColor = Color(0xFF2E7D32))
                     )
                 }
-
                 Spacer(modifier = Modifier.height(20.dp))
 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    TextButton(onClick = onDismiss) {
-                        Text("Cancel", color = Color.Gray, fontWeight = FontWeight.Bold)
-                    }
+                    TextButton(onClick = onDismiss) { Text("Cancel", color = Color.Gray, fontWeight = FontWeight.Bold) }
                     Spacer(modifier = Modifier.width(8.dp))
-                    Button(
-                        onClick = { 
-                            val amt = amount.toDoubleOrNull()
-                            if (expenseTitle.isNotBlank() && amt != null && dateMillis != null) {
-                                onAdd(expenseTitle, dateMillis!!, amt)
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
-                        shape = RoundedCornerShape(10.dp)
-                    ) {
-                        Text("Add Expense", color = Color.White, fontWeight = FontWeight.Bold)
-                    }
+                    Button(onClick = { 
+                        val amt = amount.toDoubleOrNull()
+                        if (expenseTitle.isNotBlank() && amt != null && dateMillis != null) onAdd(expenseTitle, dateMillis!!, amt)
+                    }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)), shape = RoundedCornerShape(10.dp)) { Text("Add Expense", color = Color.White, fontWeight = FontWeight.Bold) }
                 }
             }
         }
@@ -903,18 +964,19 @@ fun AddContriExpenseDialog(
 }
 
 // ==========================================
-// JSON PARSERS (100% CRASH-PROOF)
+// JSON PARSERS
 // ==========================================
 fun parseLedgerData(jsonString: String): RoomDetailsData {
     val ledgers = mutableListOf<MemberLedger>()
     val pastCycles = mutableListOf<PastCycle>()
     var totalGroupExp = 0.0
     var isAdmin = false
-    
+    var rName = ""
     try {
         val root = JSONObject(jsonString)
         totalGroupExp = root.optDouble("total_group_expense", 0.0)
         isAdmin = root.optBoolean("is_admin", false)
+        rName = root.optString("room_name", "")
         
         val membersArray = root.optJSONArray("members")
         if (membersArray != null) {
@@ -922,20 +984,12 @@ fun parseLedgerData(jsonString: String): RoomDetailsData {
                 val memberObj = membersArray.optJSONObject(i) ?: continue
                 val name = memberObj.optString("name", "Unknown")
                 val totalSpent = memberObj.optDouble("total_spent", 0.0)
-                
                 val expensesList = mutableListOf<ContriExpense>()
                 val expensesArray = memberObj.optJSONArray("expenses")
-                
                 if (expensesArray != null) {
                     for (j in 0 until expensesArray.length()) {
                         val expObj = expensesArray.optJSONObject(j) ?: continue
-                        expensesList.add(
-                            ContriExpense(
-                                itemName = expObj.optString("item_name", ""),
-                                amount = expObj.optDouble("amount", 0.0),
-                                date = expObj.optString("date", "")
-                            )
-                        )
+                        expensesList.add(ContriExpense(itemName = expObj.optString("item_name", ""), amount = expObj.optDouble("amount", 0.0), date = expObj.optString("date", "")))
                     }
                 }
                 ledgers.add(MemberLedger(name, totalSpent, expensesList))
@@ -946,18 +1000,11 @@ fun parseLedgerData(jsonString: String): RoomDetailsData {
         if (pastCyclesArray != null) {
             for (i in 0 until pastCyclesArray.length()) {
                 val cycleObj = pastCyclesArray.optJSONObject(i) ?: continue
-                pastCycles.add(
-                    PastCycle(
-                        dateRange = cycleObj.optString("date_range", ""),
-                        totalAmount = cycleObj.optString("total_amount", "₹0")
-                    )
-                )
+                pastCycles.add(PastCycle(dateRange = cycleObj.optString("date_range", ""), totalAmount = cycleObj.optString("total_amount", "₹0")))
             }
         }
-    } catch (e: Exception) {
-        e.printStackTrace()
-    }
-    return RoomDetailsData(ledgers, totalGroupExp, isAdmin, pastCycles)
+    } catch (e: Exception) { e.printStackTrace() }
+    return RoomDetailsData(rName, ledgers, totalGroupExp, isAdmin, pastCycles)
 }
 
 fun parsePastCycleMembersOnly(jsonString: String): List<MemberLedger> {
@@ -970,28 +1017,18 @@ fun parsePastCycleMembersOnly(jsonString: String): List<MemberLedger> {
                 val memberObj = membersArray.optJSONObject(i) ?: continue
                 val name = memberObj.optString("name", "Unknown")
                 val totalSpent = memberObj.optDouble("total_spent", 0.0)
-                
                 val expensesList = mutableListOf<ContriExpense>()
                 val expensesArray = memberObj.optJSONArray("expenses")
-                
                 if (expensesArray != null) {
                     for (j in 0 until expensesArray.length()) {
                         val expObj = expensesArray.optJSONObject(j) ?: continue
-                        expensesList.add(
-                            ContriExpense(
-                                itemName = expObj.optString("item_name", ""),
-                                amount = expObj.optDouble("amount", 0.0),
-                                date = expObj.optString("date", "")
-                            )
-                        )
+                        expensesList.add(ContriExpense(itemName = expObj.optString("item_name", ""), amount = expObj.optDouble("amount", 0.0), date = expObj.optString("date", "")))
                     }
                 }
                 ledgers.add(MemberLedger(name, totalSpent, expensesList))
             }
         }
-    } catch (e: Exception) {
-        e.printStackTrace()
-    }
+    } catch (e: Exception) { e.printStackTrace() }
     return ledgers
 }
 
@@ -1002,29 +1039,9 @@ fun parsePastCycleMembersOnly(jsonString: String): List<MemberLedger> {
 fun PremiumFloatingButton(onClick: () -> Unit) {
     var isPressed by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(targetValue = if (isPressed) 0.85f else 1f, label = "fabScale")
-
     Box(
-        modifier = Modifier
-            .scale(scale)
-            .size(56.dp)
-            .background(Color(0xFF2E7D32), shape = CircleShape)
-            .pointerInput(Unit) {
-                detectTapGestures(
-                    onPress = {
-                        isPressed = true
-                        tryAwaitRelease()
-                        isPressed = false
-                        onClick()
-                    }
-                )
-            },
+        modifier = Modifier.scale(scale).size(56.dp).background(Color(0xFF2E7D32), shape = CircleShape)
+            .pointerInput(Unit) { detectTapGestures(onPress = { isPressed = true; tryAwaitRelease(); isPressed = false; onClick() }) },
         contentAlignment = Alignment.Center
-    ) {
-        Icon(
-            imageVector = Icons.Outlined.Add,
-            contentDescription = "Add Expense",
-            tint = Color.White,
-            modifier = Modifier.size(28.dp)
-        )
-    }
+    ) { Icon(imageVector = Icons.Outlined.Add, contentDescription = "Add Expense", tint = Color.White, modifier = Modifier.size(28.dp)) }
 }
