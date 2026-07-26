@@ -50,12 +50,14 @@ import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.math.abs
 
 // ==========================================
 // DATA MODELS
 // ==========================================
 data class ContriExpense(val itemName: String, val amount: Double, val date: String)
 data class MemberLedger(val memberName: String, val totalSpent: Double, val expenses: List<ContriExpense>)
+data class Settlement(val from: String, val to: String, val amount: Double)
 
 @Composable
 fun InsideContriScreen(
@@ -79,6 +81,7 @@ fun InsideContriScreen(
     
     var showAddExpenseDialog by remember { mutableStateOf(false) }
     var showLeaveDialog by remember { mutableStateOf(false) }
+    var showSettleDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(room.roomCode, refreshTrigger) {
         val cachedJson = sharedPreferences.getString(cacheKey, null)
@@ -139,7 +142,6 @@ fun InsideContriScreen(
                 
                 Spacer(modifier = Modifier.weight(1f))
                 
-                // Demo Setting Icon
                 IconButton(onClick = { Toast.makeText(context, "Settings Demo", Toast.LENGTH_SHORT).show() }) {
                     Icon(imageVector = Icons.Outlined.Settings, contentDescription = "Settings", tint = Color.Black)
                 }
@@ -188,9 +190,8 @@ fun InsideContriScreen(
                         
                         Spacer(modifier = Modifier.height(6.dp))
                         
-                        // Settle Up Demo Button
                         Button(
-                            onClick = { Toast.makeText(context, "Settle-up Demo", Toast.LENGTH_SHORT).show() },
+                            onClick = { showSettleDialog = true },
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                             modifier = Modifier.height(28.dp),
@@ -200,7 +201,7 @@ fun InsideContriScreen(
                         }
                     }
 
-                    // RIGHT SIDE: Code & Pin (Code: 17.sp, Pin: 13.sp)
+                    // RIGHT SIDE: Code & Pin
                     Column(horizontalAlignment = Alignment.End) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Box(
@@ -338,6 +339,18 @@ fun InsideContriScreen(
         }
 
         // ==========================================
+        // SETTLE UP POPUP (3 SECTIONS ALGORITHM)
+        // ==========================================
+        if (showSettleDialog) {
+            SettleUpDialog(
+                username = username,
+                ledgers = ledgers,
+                totalExpense = totalGroupExpense,
+                onDismiss = { showSettleDialog = false }
+            )
+        }
+
+        // ==========================================
         // LEAVE ROOM POPUP (DIALOG)
         // ==========================================
         if (showLeaveDialog) {
@@ -355,7 +368,7 @@ fun InsideContriScreen(
                         onClick = { 
                             showLeaveDialog = false
                             Toast.makeText(context, "Leave signal sent (Demo)", Toast.LENGTH_SHORT).show()
-                            onLeaveClick() // Return to home hub
+                            onLeaveClick()
                         }
                     ) {
                         Text("Leave", color = Color.Red, fontWeight = FontWeight.Bold)
@@ -370,7 +383,7 @@ fun InsideContriScreen(
         }
 
         // ==========================================
-        // REAL NETWORK CALL
+        // REAL NETWORK CALL (ADD EXPENSE)
         // ==========================================
         if (showAddExpenseDialog) {
             AddContriExpenseDialog(
@@ -420,6 +433,124 @@ fun InsideContriScreen(
                     }
                 }
             )
+        }
+    }
+}
+
+// ==========================================
+// ALGORITHM & SETTLE UP DIALOG
+// ==========================================
+fun calculateUserSettlements(username: String, ledgers: List<MemberLedger>, totalExpense: Double): Pair<Double, List<Settlement>> {
+    if (ledgers.isEmpty()) return Pair(0.0, emptyList())
+    val perPerson = totalExpense / ledgers.size
+    
+    val balances = mutableMapOf<String, Double>()
+    ledgers.forEach { ledger ->
+        balances[ledger.memberName] = ledger.totalSpent - perPerson
+    }
+    
+    val myNetBalance = balances[username] ?: 0.0
+    val settlements = mutableListOf<Settlement>()
+    
+    val debtors = balances.filter { it.value < -0.01 }.toMutableMap()
+    val creditors = balances.filter { it.value > 0.01 }.toMutableMap()
+    
+    while (debtors.isNotEmpty() && creditors.isNotEmpty()) {
+        val debtor = debtors.keys.first()
+        val creditor = creditors.keys.first()
+        
+        val debtAmount = abs(debtors[debtor]!!)
+        val creditAmount = creditors[creditor]!!
+        
+        val settledAmount = minOf(debtAmount, creditAmount)
+        
+        settlements.add(Settlement(from = debtor, to = creditor, amount = settledAmount))
+        
+        debtors[debtor] = debtors[debtor]!! + settledAmount
+        if (debtors[debtor]!! > -0.01) debtors.remove(debtor)
+        
+        creditors[creditor] = creditors[creditor]!! - settledAmount
+        if (creditors[creditor]!! < 0.01) creditors.remove(creditor)
+    }
+    
+    val mySettlements = settlements.filter { it.from == username || it.to == username }
+    return Pair(myNetBalance, mySettlements)
+}
+
+@Composable
+fun SettleUpDialog(
+    username: String,
+    ledgers: List<MemberLedger>,
+    totalExpense: Double,
+    onDismiss: () -> Unit
+) {
+    val (myNetBalance, mySettlements) = calculateUserSettlements(username, ledgers, totalExpense)
+    
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(8.dp)
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                // SECTION 1: Total Pay / Collect
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                    Text("Your Balance", fontSize = 14.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    when {
+                        myNetBalance > 0.01 -> {
+                            Text("Net Collect: ₹${myNetBalance.toInt()}", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFF2E7D32))
+                        }
+                        myNetBalance < -0.01 -> {
+                            Text("Net Pay: ₹${abs(myNetBalance).toInt()}", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = Color.Red)
+                        }
+                        else -> {
+                            Text("All Settled ✅", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+                HorizontalDivider(color = Color.LightGray, thickness = 1.dp)
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // SECTION 2: Details
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    if (mySettlements.isEmpty()) {
+                        Text("No pending payments for you.", fontSize = 14.sp, color = Color.Gray, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                    } else {
+                        mySettlements.forEach { settlement ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                if (settlement.from == username) {
+                                    Text("Pay ${settlement.to}", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Color.Black)
+                                    Text("₹${settlement.amount.toInt()}", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.Red)
+                                } else if (settlement.to == username) {
+                                    Text("Collect from ${settlement.from}", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Color.Black)
+                                    Text("₹${settlement.amount.toInt()}", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2E7D32))
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+                HorizontalDivider(color = Color.LightGray, thickness = 1.dp)
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // SECTION 3: Settle Action Button
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
+                ) {
+                    Text("Settled", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                }
+            }
         }
     }
 }
