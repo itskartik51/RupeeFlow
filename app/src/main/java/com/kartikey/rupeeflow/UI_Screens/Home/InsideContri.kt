@@ -4,6 +4,7 @@ import android.content.Context
 import android.widget.Toast
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
@@ -32,6 +33,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -82,6 +84,10 @@ fun InsideContriScreen(
     var showAddExpenseDialog by remember { mutableStateOf(false) }
     var showLeaveDialog by remember { mutableStateOf(false) }
     var showSettleDialog by remember { mutableStateOf(false) }
+    var showNewCycleDialog by remember { mutableStateOf(false) }
+
+    // REAL DYNAMIC ADMIN FLAG
+    val isAdmin = ledgers.isNotEmpty() && ledgers[0].memberName == username
 
     LaunchedEffect(room.roomCode, refreshTrigger) {
         val cachedJson = sharedPreferences.getString(cacheKey, null)
@@ -138,12 +144,34 @@ fun InsideContriScreen(
                     Icon(Icons.Outlined.ArrowBack, contentDescription = "Back", tint = Color.Black)
                 }
                 Spacer(modifier = Modifier.width(4.dp))
+                
                 Text(text = formattedName, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp, color = Color.Black)
+                
+                // ADMIN TAG (Exact Outline Design)
+                if (isAdmin) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Box(
+                        modifier = Modifier
+                            .border(1.2.dp, Color(0xFF424242), RoundedCornerShape(50))
+                            .padding(horizontal = 8.dp, vertical = 2.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "Admin", 
+                            fontSize = 10.sp, 
+                            color = Color(0xFF424242), 
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
                 
                 Spacer(modifier = Modifier.weight(1f))
                 
-                IconButton(onClick = { Toast.makeText(context, "Settings Demo", Toast.LENGTH_SHORT).show() }) {
-                    Icon(imageVector = Icons.Outlined.Settings, contentDescription = "Settings", tint = Color.Black)
+                // SETTINGS ICON (Only for Admin)
+                if (isAdmin) {
+                    IconButton(onClick = { Toast.makeText(context, "Settings Demo", Toast.LENGTH_SHORT).show() }) {
+                        Icon(imageVector = Icons.Outlined.Settings, contentDescription = "Settings", tint = Color.Black)
+                    }
                 }
                 
                 IconButton(onClick = { showLeaveDialog = true }) {
@@ -175,7 +203,7 @@ fun InsideContriScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // LEFT SIDE: Total Amount & Settle Up Button
+                    // LEFT SIDE: Total Amount & Action Buttons
                     Column(horizontalAlignment = Alignment.Start) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text("₹", fontSize = 22.sp, color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold)
@@ -190,14 +218,36 @@ fun InsideContriScreen(
                         
                         Spacer(modifier = Modifier.height(6.dp))
                         
-                        Button(
-                            onClick = { showSettleDialog = true },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                            modifier = Modifier.height(28.dp),
-                            shape = RoundedCornerShape(8.dp)
-                        ) {
-                            Text("Settle-up", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Button(
+                                onClick = { showSettleDialog = true },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                modifier = Modifier.height(28.dp),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text("Settle-up", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            }
+
+                            // NEW TAG BUTTON (Only for Admin)
+                            if (isAdmin) {
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(50))
+                                        .clickable { showNewCycleDialog = true }
+                                        .border(1.2.dp, Color(0xFF424242), RoundedCornerShape(50))
+                                        .padding(horizontal = 12.dp, vertical = 4.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "New", 
+                                        fontSize = 12.sp, 
+                                        color = Color(0xFF424242), 
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            }
                         }
                     }
 
@@ -339,7 +389,7 @@ fun InsideContriScreen(
         }
 
         // ==========================================
-        // SETTLE UP POPUP (3 SECTIONS ALGORITHM)
+        // SETTLE UP POPUP
         // ==========================================
         if (showSettleDialog) {
             SettleUpDialog(
@@ -351,7 +401,38 @@ fun InsideContriScreen(
         }
 
         // ==========================================
-        // LEAVE ROOM POPUP (DIALOG)
+        // NEW CYCLE POPUP (Only for Admin)
+        // ==========================================
+        if (showNewCycleDialog) {
+            AlertDialog(
+                onDismissRequest = { showNewCycleDialog = false },
+                title = { 
+                    Text("Start New Cycle?", fontWeight = FontWeight.ExtraBold, color = Color.Black) 
+                },
+                text = { 
+                    Text("Once created, users cannot change this. It will be saved and calculations will restart from zero.", color = Color.DarkGray) 
+                },
+                containerColor = Color.White,
+                confirmButton = {
+                    TextButton(
+                        onClick = { 
+                            showNewCycleDialog = false
+                            Toast.makeText(context, "New cycle created (Demo)", Toast.LENGTH_SHORT).show()
+                        }
+                    ) {
+                        Text("New", color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showNewCycleDialog = false }) {
+                        Text("Cancel", color = Color.Gray, fontWeight = FontWeight.Bold)
+                    }
+                }
+            )
+        }
+
+        // ==========================================
+        // LEAVE ROOM POPUP
         // ==========================================
         if (showLeaveDialog) {
             AlertDialog(
