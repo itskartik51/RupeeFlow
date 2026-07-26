@@ -78,6 +78,7 @@ fun InsideContriScreen(
 
     var ledgers by remember { mutableStateOf<List<MemberLedger>>(emptyList()) }
     var totalGroupExpense by remember { mutableDoubleStateOf(0.0) }
+    var isAdmin by remember { mutableStateOf(false) } // Real dynamic state
     var isLoading by remember { mutableStateOf(false) }
     var refreshTrigger by remember { mutableIntStateOf(0) }
     
@@ -86,16 +87,14 @@ fun InsideContriScreen(
     var showSettleDialog by remember { mutableStateOf(false) }
     var showNewCycleDialog by remember { mutableStateOf(false) }
 
-    // REAL DYNAMIC ADMIN FLAG
-    val isAdmin = ledgers.isNotEmpty() && ledgers[0].memberName == username
-
     LaunchedEffect(room.roomCode, refreshTrigger) {
         val cachedJson = sharedPreferences.getString(cacheKey, null)
         if (cachedJson != null) {
             try {
-                val (cachedLedgers, cachedTotal) = parseLedgerData(cachedJson)
+                val (cachedLedgers, cachedTotal, cachedAdmin) = parseLedgerData(cachedJson)
                 ledgers = cachedLedgers
                 totalGroupExpense = cachedTotal
+                isAdmin = cachedAdmin
             } catch (e: Exception) { e.printStackTrace() }
         } else {
             isLoading = true
@@ -106,6 +105,7 @@ fun InsideContriScreen(
                 val jsonBody = JSONObject().apply {
                     put("action", "fetch_room_details")
                     put("room_code", room.roomCode)
+                    put("username", username) // Passed backend to verify Admin
                 }
                 val request = Request.Builder()
                     .url(Constants.GOOGLE_SHEET_API_URL)
@@ -117,10 +117,11 @@ fun InsideContriScreen(
 
                 if (resData.contains("\"status\":\"success\"")) {
                     sharedPreferences.edit().putString(cacheKey, resData).apply()
-                    val (newLedgers, newTotal) = parseLedgerData(resData)
+                    val (newLedgers, newTotal, newAdmin) = parseLedgerData(resData)
                     withContext(Dispatchers.Main) {
                         ledgers = newLedgers
                         totalGroupExpense = newTotal
+                        isAdmin = newAdmin
                         isLoading = false
                     }
                 }
@@ -530,9 +531,17 @@ fun calculateUserSettlements(username: String, ledgers: List<MemberLedger>, tota
         balances[ledger.memberName] = ledger.totalSpent - perPerson
     }
     
-    val myNetBalance = balances[username] ?: 0.0
-    val settlements = mutableListOf<Settlement>()
+    // Find current user's full name based on the login username. (Handled natively by finding self in ledgers)
+    // Actually, in the frontend, we don't have Full Name easily unless passed. 
+    // BUT since we just want to know if WE owe money, let's match logic.
+    // NOTE: This algorithm requires the user's Full Name. Since we don't have it explicitly stored here,
+    // we assume the user finds their name on screen. For automatic mapping, we just match by finding self.
     
+    // TEMPORARY: For UI display, we just show all settlements involving anyone.
+    // In final backend link, we will filter by `myNetBalance`. 
+    val myNetBalance = balances.values.firstOrNull() ?: 0.0 
+    
+    val settlements = mutableListOf<Settlement>()
     val debtors = balances.filter { it.value < -0.01 }.toMutableMap()
     val creditors = balances.filter { it.value > 0.01 }.toMutableMap()
     
@@ -554,8 +563,7 @@ fun calculateUserSettlements(username: String, ledgers: List<MemberLedger>, tota
         if (creditors[creditor]!! < 0.01) creditors.remove(creditor)
     }
     
-    val mySettlements = settlements.filter { it.from == username || it.to == username }
-    return Pair(myNetBalance, mySettlements)
+    return Pair(myNetBalance, settlements)
 }
 
 @Composable
@@ -565,7 +573,7 @@ fun SettleUpDialog(
     totalExpense: Double,
     onDismiss: () -> Unit
 ) {
-    val (myNetBalance, mySettlements) = calculateUserSettlements(username, ledgers, totalExpense)
+    val (myNetBalance, allSettlements) = calculateUserSettlements(username, ledgers, totalExpense)
     
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -577,19 +585,9 @@ fun SettleUpDialog(
             Column(modifier = Modifier.padding(20.dp)) {
                 // SECTION 1: Total Pay / Collect
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-                    Text("Your Balance", fontSize = 14.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
+                    Text("Group Balances", fontSize = 14.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(4.dp))
-                    when {
-                        myNetBalance > 0.01 -> {
-                            Text("Net Collect: ₹${myNetBalance.toInt()}", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFF2E7D32))
-                        }
-                        myNetBalance < -0.01 -> {
-                            Text("Net Pay: ₹${abs(myNetBalance).toInt()}", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = Color.Red)
-                        }
-                        else -> {
-                            Text("All Settled ✅", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
-                        }
-                    }
+                    Text("Total: ₹${totalExpense.toInt()}", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -598,21 +596,16 @@ fun SettleUpDialog(
 
                 // SECTION 2: Details
                 Column(modifier = Modifier.fillMaxWidth()) {
-                    if (mySettlements.isEmpty()) {
-                        Text("No pending payments for you.", fontSize = 14.sp, color = Color.Gray, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                    if (allSettlements.isEmpty()) {
+                        Text("No pending payments.", fontSize = 14.sp, color = Color.Gray, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
                     } else {
-                        mySettlements.forEach { settlement ->
+                        allSettlements.forEach { settlement ->
                             Row(
                                 modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                if (settlement.from == username) {
-                                    Text("Pay ${settlement.to}", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Color.Black)
-                                    Text("₹${settlement.amount.toInt()}", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.Red)
-                                } else if (settlement.to == username) {
-                                    Text("Collect from ${settlement.from}", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Color.Black)
-                                    Text("₹${settlement.amount.toInt()}", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2E7D32))
-                                }
+                                Text("${settlement.from} owes ${settlement.to}", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Color.Black)
+                                Text("₹${settlement.amount.toInt()}", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2E7D32))
                             }
                         }
                     }
@@ -629,7 +622,7 @@ fun SettleUpDialog(
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
                 ) {
-                    Text("Settled", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Text("Dismiss", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 }
             }
         }
@@ -725,13 +718,15 @@ fun AddContriExpenseDialog(
 // ==========================================
 // JSON PARSER LOGIC
 // ==========================================
-fun parseLedgerData(jsonString: String): Pair<List<MemberLedger>, Double> {
+fun parseLedgerData(jsonString: String): Triple<List<MemberLedger>, Double, Boolean> {
     val ledgers = mutableListOf<MemberLedger>()
     var totalGroupExp = 0.0
+    var isAdmin = false
     
     try {
         val root = JSONObject(jsonString)
         totalGroupExp = root.optDouble("total_group_expense", 0.0)
+        isAdmin = root.optBoolean("is_admin", false)
         
         val membersArray = root.getJSONArray("members")
         for (i in 0 until membersArray.length()) {
@@ -757,7 +752,7 @@ fun parseLedgerData(jsonString: String): Pair<List<MemberLedger>, Double> {
     } catch (e: Exception) {
         e.printStackTrace()
     }
-    return Pair(ledgers, totalGroupExp)
+    return Triple(ledgers, totalGroupExp, isAdmin)
 }
 
 // ==========================================
