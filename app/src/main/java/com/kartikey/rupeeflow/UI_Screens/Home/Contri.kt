@@ -74,16 +74,33 @@ fun ContriScreen(
     var qrRoomToDisplay by remember { mutableStateOf<ContriRoomModel?>(null) }
     var openedRoom by remember { mutableStateOf<ContriRoomModel?>(null) }
 
+    // Auto-Join State from QR (Code, Pin, RoomName)
+    var autoJoinData by remember { mutableStateOf<Triple<String, String, String>?>(null) }
+
     val context = LocalContext.current
 
     // Screen Routing Logic
     if (showScanner) {
         com.kartikey.rupeeflow.UI_Screens.QR.ScanQRScreen(
             onBackClick = { showScanner = false },
-            onQrScanned = { code -> 
-                scannedRoomCode = code
+            onQrScanned = { qrValue -> 
                 showScanner = false
-                showJoinDialog = true
+                if (qrValue.contains("|")) {
+                    val parts = qrValue.split("|")
+                    val code = parts.getOrNull(0) ?: ""
+                    val pin = parts.getOrNull(1) ?: ""
+                    val rName = parts.getOrNull(2) ?: "Contri Room"
+                    if (code.isNotBlank() && pin.isNotBlank()) {
+                        // Triggers direct auto-join process
+                        autoJoinData = Triple(code, pin, rName)
+                    } else {
+                        scannedRoomCode = qrValue
+                        showJoinDialog = true
+                    }
+                } else {
+                    scannedRoomCode = qrValue
+                    showJoinDialog = true
+                }
             }
         )
     } else if (openedRoom != null) {
@@ -187,7 +204,7 @@ fun ContriScreen(
     }
 
     // ==========================================
-    // QR DISPLAY DIALOG
+    // SMART QR DISPLAY DIALOG (INCLUDES CODE | PIN | NAME)
     // ==========================================
     if (qrRoomToDisplay != null) {
         Dialog(
@@ -204,12 +221,13 @@ fun ContriScreen(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(qrRoomToDisplay!!.roomName, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
-                    Text("Ask your friend to scan this QR", fontSize = 12.sp, color = Color.Gray)
+                    Text("Ask your friend to scan to join instantly", fontSize = 12.sp, color = Color.Gray)
                     
                     Spacer(modifier = Modifier.height(24.dp))
                     
+                    // QR Code Payload Packs: CODE|PIN|NAME
                     com.kartikey.rupeeflow.UI_Screens.QR.PremiumQRCode(
-                        data = qrRoomToDisplay!!.roomCode,
+                        data = "${qrRoomToDisplay!!.roomCode}|${qrRoomToDisplay!!.pin}|${qrRoomToDisplay!!.roomName}",
                         size = 180.dp
                     )
                     
@@ -219,6 +237,23 @@ fun ContriScreen(
                 }
             }
         }
+    }
+
+    // ==========================================
+    // AUTO JOIN DIRECT PROCESSOR
+    // ==========================================
+    if (autoJoinData != null) {
+        AutoJoinContriDialog(
+            username = username,
+            roomCode = autoJoinData!!.first,
+            pin = autoJoinData!!.second,
+            roomName = autoJoinData!!.third,
+            onDismiss = { autoJoinData = null },
+            onSuccess = {
+                autoJoinData = null
+                onRefresh()
+            }
+        )
     }
 
     if (showCreateDialog) {
@@ -247,6 +282,81 @@ fun ContriScreen(
                 onRefresh()
             }
         )
+    }
+}
+
+// ==========================================
+// DIRECT AUTO-JOIN DIALOG (SHOWS NAME & SPINNER)
+// ==========================================
+@Composable
+fun AutoJoinContriDialog(
+    username: String,
+    roomCode: String,
+    pin: String,
+    roomName: String,
+    onDismiss: () -> Unit,
+    onSuccess: () -> Unit
+) {
+    val coroutineScope = rememberCoroutineScope()
+    val context = LocalContext.current
+
+    LaunchedEffect(Unit) {
+        coroutineScope.launch(Dispatchers.IO) {
+            try {
+                val jsonBody = JSONObject().apply {
+                    put("action", "join_contri")
+                    put("username", username)
+                    put("room_code", roomCode)
+                    put("passkey", pin)
+                }
+                val request = Request.Builder()
+                    .url(Constants.GOOGLE_SHEET_API_URL)
+                    .post(jsonBody.toString().toRequestBody("application/json".toMediaType()))
+                    .build()
+                
+                val response = OkHttpClient().newCall(request).execute()
+                val resData = response.body?.string() ?: ""
+                
+                withContext(Dispatchers.Main) {
+                    if (resData.contains("success")) {
+                        Toast.makeText(context, "Joined $roomName Successfully!", Toast.LENGTH_SHORT).show()
+                        onSuccess()
+                    } else {
+                        val errorMsg = try { JSONObject(resData).optString("message", "Invalid Code/Pin") } catch(e:Exception){ "Error joining room" }
+                        Toast.makeText(context, errorMsg, Toast.LENGTH_LONG).show()
+                        onDismiss()
+                    }
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, "Network Error", Toast.LENGTH_SHORT).show()
+                    onDismiss()
+                }
+            }
+        }
+    }
+
+    Dialog(
+        onDismissRequest = { /* Lock back press during direct join */ },
+        properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false)
+    ) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(8.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                CircularProgressIndicator(color = Color(0xFF2E7D32), modifier = Modifier.size(36.dp), strokeWidth = 3.dp)
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("Joining Room...", fontSize = 13.sp, color = Color.Gray, fontWeight = FontWeight.Medium)
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(roomName, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
+            }
+        }
     }
 }
 
@@ -548,13 +658,12 @@ fun JoinContriDialog(
                     OutlinedTextField(
                         value = roomCode,
                         onValueChange = { raw ->
-                            // Strip dashes and keep max 9 alphanumeric chars
                             roomCode = raw.replace("-", "").filter { it.isLetterOrDigit() }.uppercase().take(9)
                         },
                         label = { Text("Enter Contri Code") },
                         placeholder = { Text("ABC-123-XYZ") },
                         singleLine = true,
-                        visualTransformation = RoomCodeVisualTransformation(), // Visual hyphenation engine
+                        visualTransformation = RoomCodeVisualTransformation(),
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF2E7D32), focusedLabelColor = Color(0xFF2E7D32))
