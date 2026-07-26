@@ -177,7 +177,7 @@ fun InsideContriScreen(
                         )
                     }
 
-                    // RIGHT SIDE: Code & Pin (Free-body Copy Icon & Exact Sizes)
+                    // RIGHT SIDE: Code & Pin (Free-body Copy Icon & Adjusted Sizes)
                     Column(horizontalAlignment = Alignment.End) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Box(
@@ -199,7 +199,7 @@ fun InsideContriScreen(
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
                                 text = room.roomCode, 
-                                fontSize = 13.sp, 
+                                fontSize = 14.sp, // Updated to 14.sp
                                 fontWeight = FontWeight.Bold, 
                                 color = Color.Black, 
                                 letterSpacing = 0.5.sp
@@ -208,7 +208,7 @@ fun InsideContriScreen(
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = "Pin: ${room.pin}", 
-                            fontSize = 10.sp, 
+                            fontSize = 12.sp, // Updated to 12.sp
                             color = Color.Gray, 
                             fontWeight = FontWeight.Medium
                         )
