@@ -49,7 +49,6 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import org.json.JSONArray
 import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -126,19 +125,29 @@ fun InsideContriScreen(
                 val response = OkHttpClient().newCall(request).execute()
                 val resData = response.body?.string() ?: ""
 
-                if (resData.contains("\"status\":\"success\"")) {
-                    sharedPreferences.edit().putString(cacheKey, resData).apply()
-                    val data = parseLedgerData(resData)
-                    withContext(Dispatchers.Main) {
+                withContext(Dispatchers.Main) {
+                    if (resData.contains("\"status\":\"success\"")) {
+                        sharedPreferences.edit().putString(cacheKey, resData).apply()
+                        val data = parseLedgerData(resData)
                         ledgers = data.ledgers
                         totalGroupExpense = data.totalExpense
                         isAdmin = data.isAdmin
                         pastCycles = data.pastCycles
-                        isLoading = false
+                    } else {
+                        try {
+                            val errorMsg = JSONObject(resData).getString("message")
+                            Toast.makeText(context, errorMsg, Toast.LENGTH_SHORT).show()
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "Error loading data", Toast.LENGTH_SHORT).show()
+                        }
                     }
+                    isLoading = false // FIX: ALWAYS TURN OFF LOADING
                 }
             } catch (e: Exception) {
-                withContext(Dispatchers.Main) { isLoading = false }
+                withContext(Dispatchers.Main) { 
+                    isLoading = false // FIX: TURN OFF LOADING ON ERROR
+                    Toast.makeText(context, "Network Error", Toast.LENGTH_SHORT).show() 
+                }
             }
         }
     }
@@ -336,13 +345,12 @@ fun InsideContriScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(bottom = 8.dp)
-                                .animateContentSize() // ANIMATION MAGIC HERE
+                                .animateContentSize() 
                                 .clickable {
                                     if (isExpanded) {
                                         expandedState[cycle.dateRange] = false
                                     } else {
                                         expandedState[cycle.dateRange] = true
-                                        // Fetch only if data not already fetched
                                         if (cycleLedger == null) {
                                             loadingState[cycle.dateRange] = true
                                             coroutineScope.launch(Dispatchers.IO) {
@@ -359,17 +367,19 @@ fun InsideContriScreen(
                                                     val response = OkHttpClient().newCall(request).execute()
                                                     val resStr = response.body?.string() ?: ""
 
-                                                    if (resStr.contains("\"status\":\"success\"")) {
-                                                        val pastData = parsePastCycleMembersOnly(resStr)
-                                                        withContext(Dispatchers.Main) {
-                                                            fetchedCycleData[cycle.dateRange] = pastData
-                                                            loadingState[cycle.dateRange] = false
+                                                    withContext(Dispatchers.Main) {
+                                                        if (resStr.contains("\"status\":\"success\"")) {
+                                                            fetchedCycleData[cycle.dateRange] = parsePastCycleMembersOnly(resStr)
+                                                        } else {
+                                                            Toast.makeText(context, "Error fetching cycle", Toast.LENGTH_SHORT).show()
                                                         }
-                                                    } else {
-                                                        withContext(Dispatchers.Main) { loadingState[cycle.dateRange] = false }
+                                                        loadingState[cycle.dateRange] = false
                                                     }
                                                 } catch (e: Exception) {
-                                                    withContext(Dispatchers.Main) { loadingState[cycle.dateRange] = false }
+                                                    withContext(Dispatchers.Main) { 
+                                                        loadingState[cycle.dateRange] = false 
+                                                        Toast.makeText(context, "Network Error", Toast.LENGTH_SHORT).show()
+                                                    }
                                                 }
                                             }
                                         }
@@ -380,7 +390,6 @@ fun InsideContriScreen(
                             elevation = CardDefaults.cardElevation(1.5.dp)
                         ) {
                             Column {
-                                // CLICKABLE HEADER
                                 Row(
                                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
                                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -393,7 +402,6 @@ fun InsideContriScreen(
                                         color = Color.DarkGray
                                     )
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        // LOADING WHEEL
                                         if (isFetching) {
                                             CircularProgressIndicator(
                                                 modifier = Modifier.size(16.dp),
@@ -411,7 +419,6 @@ fun InsideContriScreen(
                                     }
                                 }
 
-                                // EXPANDED VIEW WITH EXACT SAME UI
                                 if (isExpanded) {
                                     if (cycleLedger != null && cycleLedger.isNotEmpty()) {
                                         HorizontalDivider(color = Color.LightGray, thickness = 0.5.dp)
@@ -480,9 +487,14 @@ fun InsideContriScreen(
                                             sharedPreferences.edit().remove(cacheKey).apply()
                                             refreshTrigger++ 
                                         } else {
-                                            Toast.makeText(context, "Error starting cycle", Toast.LENGTH_SHORT).show()
-                                            isLoading = false
+                                            try {
+                                                val errorMsg = JSONObject(resData).getString("message")
+                                                Toast.makeText(context, errorMsg, Toast.LENGTH_SHORT).show()
+                                            } catch (e: Exception) {
+                                                Toast.makeText(context, "Error starting cycle", Toast.LENGTH_SHORT).show()
+                                            }
                                         }
+                                        isLoading = false
                                     }
                                 } catch (e: Exception) {
                                     withContext(Dispatchers.Main) {
@@ -533,9 +545,14 @@ fun InsideContriScreen(
                                             sharedPreferences.edit().remove(cacheKey).apply()
                                             onLeaveClick()
                                         } else {
-                                            Toast.makeText(context, "Error leaving room", Toast.LENGTH_SHORT).show()
-                                            isLoading = false
+                                            try {
+                                                val errorMsg = JSONObject(resData).getString("message")
+                                                Toast.makeText(context, errorMsg, Toast.LENGTH_SHORT).show()
+                                            } catch (e: Exception) {
+                                                Toast.makeText(context, "Error leaving room", Toast.LENGTH_SHORT).show()
+                                            }
                                         }
+                                        isLoading = false
                                     }
                                 } catch (e: Exception) {
                                     withContext(Dispatchers.Main) {
@@ -588,9 +605,14 @@ fun InsideContriScreen(
                                     sharedPreferences.edit().remove(cacheKey).apply()
                                     refreshTrigger++ 
                                 } else {
-                                    Toast.makeText(context, "Error saving expense", Toast.LENGTH_SHORT).show()
-                                    isLoading = false
+                                    try {
+                                        val errorMsg = JSONObject(resData).getString("message")
+                                        Toast.makeText(context, errorMsg, Toast.LENGTH_SHORT).show()
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, "Error saving expense", Toast.LENGTH_SHORT).show()
+                                    }
                                 }
+                                isLoading = false
                             }
                         } catch (e: Exception) {
                             withContext(Dispatchers.Main) {
@@ -881,7 +903,7 @@ fun AddContriExpenseDialog(
 }
 
 // ==========================================
-// JSON PARSERS (MAIN & PAST CYCLES ONLY)
+// JSON PARSERS (100% CRASH-PROOF)
 // ==========================================
 fun parseLedgerData(jsonString: String): RoomDetailsData {
     val ledgers = mutableListOf<MemberLedger>()
@@ -897,22 +919,24 @@ fun parseLedgerData(jsonString: String): RoomDetailsData {
         val membersArray = root.optJSONArray("members")
         if (membersArray != null) {
             for (i in 0 until membersArray.length()) {
-                val memberObj = membersArray.getJSONObject(i)
-                val name = memberObj.getString("name")
-                val totalSpent = memberObj.getDouble("total_spent")
+                val memberObj = membersArray.optJSONObject(i) ?: continue
+                val name = memberObj.optString("name", "Unknown")
+                val totalSpent = memberObj.optDouble("total_spent", 0.0)
                 
                 val expensesList = mutableListOf<ContriExpense>()
-                val expensesArray = memberObj.getJSONArray("expenses")
+                val expensesArray = memberObj.optJSONArray("expenses")
                 
-                for (j in 0 until expensesArray.length()) {
-                    val expObj = expensesArray.getJSONObject(j)
-                    expensesList.add(
-                        ContriExpense(
-                            itemName = expObj.getString("item_name"),
-                            amount = expObj.getDouble("amount"),
-                            date = expObj.getString("date")
+                if (expensesArray != null) {
+                    for (j in 0 until expensesArray.length()) {
+                        val expObj = expensesArray.optJSONObject(j) ?: continue
+                        expensesList.add(
+                            ContriExpense(
+                                itemName = expObj.optString("item_name", ""),
+                                amount = expObj.optDouble("amount", 0.0),
+                                date = expObj.optString("date", "")
+                            )
                         )
-                    )
+                    }
                 }
                 ledgers.add(MemberLedger(name, totalSpent, expensesList))
             }
@@ -921,11 +945,11 @@ fun parseLedgerData(jsonString: String): RoomDetailsData {
         val pastCyclesArray = root.optJSONArray("past_cycles")
         if (pastCyclesArray != null) {
             for (i in 0 until pastCyclesArray.length()) {
-                val cycleObj = pastCyclesArray.getJSONObject(i)
+                val cycleObj = pastCyclesArray.optJSONObject(i) ?: continue
                 pastCycles.add(
                     PastCycle(
-                        dateRange = cycleObj.getString("date_range"),
-                        totalAmount = cycleObj.getString("total_amount")
+                        dateRange = cycleObj.optString("date_range", ""),
+                        totalAmount = cycleObj.optString("total_amount", "₹0")
                     )
                 )
             }
@@ -943,22 +967,24 @@ fun parsePastCycleMembersOnly(jsonString: String): List<MemberLedger> {
         val membersArray = root.optJSONArray("members")
         if (membersArray != null) {
             for (i in 0 until membersArray.length()) {
-                val memberObj = membersArray.getJSONObject(i)
-                val name = memberObj.getString("name")
-                val totalSpent = memberObj.getDouble("total_spent")
+                val memberObj = membersArray.optJSONObject(i) ?: continue
+                val name = memberObj.optString("name", "Unknown")
+                val totalSpent = memberObj.optDouble("total_spent", 0.0)
                 
                 val expensesList = mutableListOf<ContriExpense>()
-                val expensesArray = memberObj.getJSONArray("expenses")
+                val expensesArray = memberObj.optJSONArray("expenses")
                 
-                for (j in 0 until expensesArray.length()) {
-                    val expObj = expensesArray.getJSONObject(j)
-                    expensesList.add(
-                        ContriExpense(
-                            itemName = expObj.getString("item_name"),
-                            amount = expObj.getDouble("amount"),
-                            date = expObj.getString("date")
+                if (expensesArray != null) {
+                    for (j in 0 until expensesArray.length()) {
+                        val expObj = expensesArray.optJSONObject(j) ?: continue
+                        expensesList.add(
+                            ContriExpense(
+                                itemName = expObj.optString("item_name", ""),
+                                amount = expObj.optDouble("amount", 0.0),
+                                date = expObj.optString("date", "")
+                            )
                         )
-                    )
+                    }
                 }
                 ledgers.add(MemberLedger(name, totalSpent, expensesList))
             }
