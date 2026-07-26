@@ -19,6 +19,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -39,6 +40,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.kartikey.rupeeflow.Cloud_Database.Constants
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -78,6 +80,22 @@ fun ContriScreen(
     var autoJoinData by remember { mutableStateOf<Triple<String, String, String>?>(null) }
 
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    
+    // REFRESH ANIMATION STATES
+    var isRefreshing by remember { mutableStateOf(false) }
+    var currentRotation by remember { mutableFloatStateOf(0f) }
+
+    LaunchedEffect(isRefreshing) {
+        if (isRefreshing) {
+            while (true) {
+                delay(16)
+                currentRotation += 8f
+            }
+        } else {
+            currentRotation = 0f
+        }
+    }
 
     // Screen Routing Logic
     if (showScanner) {
@@ -91,7 +109,6 @@ fun ContriScreen(
                     val pin = parts.getOrNull(1) ?: ""
                     val rName = parts.getOrNull(2) ?: "Contri Room"
                     if (code.isNotBlank() && pin.isNotBlank()) {
-                        // Triggers direct auto-join process
                         autoJoinData = Triple(code, pin, rName)
                     } else {
                         scannedRoomCode = qrValue
@@ -110,7 +127,7 @@ fun ContriScreen(
             properties = DialogProperties(
                 dismissOnBackPress = true, 
                 dismissOnClickOutside = false,
-                usePlatformDefaultWidth = false // Completely hides background MainScreen
+                usePlatformDefaultWidth = false 
             )
         ) {
             InsideContriScreen(
@@ -142,6 +159,33 @@ fun ContriScreen(
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Contri", fontWeight = FontWeight.ExtraBold, fontSize = 22.sp, color = Color.Black)
+
+                Spacer(modifier = Modifier.weight(1f))
+
+                // MANUAL REFRESH WHEEL
+                IconButton(
+                    onClick = {
+                        if (!isRefreshing) {
+                            isRefreshing = true
+                            onRefresh() // Triggers the backend fetch
+                            
+                            // Spins for 1.2s to show visual activity
+                            coroutineScope.launch {
+                                delay(1200)
+                                isRefreshing = false
+                            }
+                        }
+                    }
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Sync,
+                        contentDescription = "Sync",
+                        tint = if (isRefreshing) Color(0xFF2E7D32) else Color.Black,
+                        modifier = Modifier
+                            .size(24.dp)
+                            .rotate(currentRotation)
+                    )
+                }
             }
             
             Spacer(modifier = Modifier.height(16.dp))
@@ -161,7 +205,7 @@ fun ContriScreen(
                     contriRooms.forEach { room ->
                         ActiveRoomCard(
                             room = room, 
-                            onClick = { openedRoom = room }, // Link Card to Inside Screen
+                            onClick = { openedRoom = room }, 
                             onQrClick = { qrRoomToDisplay = room }
                         )
                         Spacer(modifier = Modifier.height(12.dp))
@@ -204,7 +248,7 @@ fun ContriScreen(
     }
 
     // ==========================================
-    // SMART QR DISPLAY DIALOG (INCLUDES CODE | PIN | NAME)
+    // SMART QR DISPLAY DIALOG
     // ==========================================
     if (qrRoomToDisplay != null) {
         Dialog(
@@ -225,7 +269,6 @@ fun ContriScreen(
                     
                     Spacer(modifier = Modifier.height(24.dp))
                     
-                    // QR Code Payload Packs: CODE|PIN|NAME
                     com.kartikey.rupeeflow.UI_Screens.QR.PremiumQRCode(
                         data = "${qrRoomToDisplay!!.roomCode}|${qrRoomToDisplay!!.pin}|${qrRoomToDisplay!!.roomName}",
                         size = 180.dp
@@ -556,7 +599,7 @@ fun CreateContriDialog(username: String, onDismiss: () -> Unit, onSuccess: () ->
 }
 
 // ==========================================
-// JOIN CONTRI DIALOG (FIXED CURSOR GLITCH)
+// JOIN CONTRI DIALOG 
 // ==========================================
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -569,7 +612,6 @@ fun JoinContriDialog(
 ) {
     var viewState by remember { mutableIntStateOf(if (initialScannedCode.isNotBlank()) 1 else 0) }
     
-    // Store only raw alphanumeric characters (Max 9)
     var roomCode by remember(initialScannedCode) { 
         mutableStateOf(initialScannedCode.replace("-", "").filter { it.isLetterOrDigit() }.uppercase().take(9)) 
     }
