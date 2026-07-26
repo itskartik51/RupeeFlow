@@ -21,6 +21,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
@@ -164,7 +165,7 @@ fun InsideContriScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // LEFT SIDE: Total Amount (Compact & Balanced)
+                    // LEFT SIDE: Total Amount
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("₹", fontSize = 22.sp, color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.width(4.dp))
@@ -176,25 +177,29 @@ fun InsideContriScreen(
                         )
                     }
 
-                    // RIGHT SIDE: Code & Pin (Compact & Sleek)
+                    // RIGHT SIDE: Code & Pin (Free-body Copy Icon)
                     Column(horizontalAlignment = Alignment.End) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.clickable {
-                                clipboardManager.setText(AnnotatedString("Join my RupeeFlow Contri!\nCode: ${room.roomCode}\nPin: ${room.pin}"))
-                                Toast.makeText(context, "Code Copied!", Toast.LENGTH_SHORT).show()
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(CircleShape)
+                                    .clickable {
+                                        clipboardManager.setText(AnnotatedString("Join my RupeeFlow Contri!\nCode: ${room.roomCode}\nPin: ${room.pin}"))
+                                        Toast.makeText(context, "Code Copied!", Toast.LENGTH_SHORT).show()
+                                    }
+                                    .padding(2.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.ContentCopy, 
+                                    contentDescription = "Copy", 
+                                    tint = Color.Gray, 
+                                    modifier = Modifier.size(13.dp)
+                                )
                             }
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.ContentCopy, 
-                                contentDescription = "Copy", 
-                                tint = Color.Gray, 
-                                modifier = Modifier.size(15.dp)
-                            )
-                            Spacer(modifier = Modifier.width(5.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
                             Text(
                                 text = room.roomCode, 
-                                fontSize = 15.sp, 
+                                fontSize = 13.sp, 
                                 fontWeight = FontWeight.Bold, 
                                 color = Color.Black, 
                                 letterSpacing = 0.5.sp
@@ -203,7 +208,7 @@ fun InsideContriScreen(
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = "Pin: ${room.pin}", 
-                            fontSize = 13.sp, 
+                            fontSize = 10.sp, 
                             color = Color.Gray, 
                             fontWeight = FontWeight.Medium
                         )
@@ -213,7 +218,7 @@ fun InsideContriScreen(
 
             Spacer(modifier = Modifier.height(4.dp))
 
-            // SMART DYNAMIC LEDGER SECTION (Compact Vertical Spacing)
+            // SMART DYNAMIC LEDGER SECTION
             if (isLoading && ledgers.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = Color(0xFF2E7D32))
