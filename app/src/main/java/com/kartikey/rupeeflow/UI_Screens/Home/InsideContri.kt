@@ -2,6 +2,7 @@ package com.kartikey.rupeeflow.UI_Screens.Home
 
 import android.content.Context
 import android.widget.Toast
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -13,6 +14,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ExitToApp
 import androidx.compose.material.icons.outlined.Add
@@ -89,6 +91,11 @@ fun InsideContriScreen(
     var showLeaveDialog by remember { mutableStateOf(false) }
     var showSettleDialog by remember { mutableStateOf(false) }
     var showNewCycleDialog by remember { mutableStateOf(false) }
+
+    // DYNAMIC STATES FOR PAST CYCLES LAZY LOADING
+    val expandedState = remember { mutableStateMapOf<String, Boolean>() }
+    val loadingState = remember { mutableStateMapOf<String, Boolean>() }
+    val fetchedCycleData = remember { mutableStateMapOf<String, List<MemberLedger>>() }
 
     LaunchedEffect(room.roomCode, refreshTrigger) {
         val cachedJson = sharedPreferences.getString(cacheKey, null)
@@ -292,6 +299,7 @@ fun InsideContriScreen(
 
             Spacer(modifier = Modifier.height(4.dp))
 
+            // RE-USABLE COMPONENT FOR CURRENT CYCLE
             if (isLoading && ledgers.isEmpty()) {
                 Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = Color(0xFF2E7D32))
@@ -301,93 +309,11 @@ fun InsideContriScreen(
                     Text("No expenses yet. Tap + to add!", color = Color.Gray, fontWeight = FontWeight.Medium)
                 }
             } else {
-                val memberCount = ledgers.size
-                val isScrollable = memberCount > 3
-                val fixedColumnWidth = 110.dp
-
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .let { if (isScrollable) it.horizontalScroll(rememberScrollState()) else it }
-                        .padding(horizontal = 16.dp)
-                ) {
-                    Row(modifier = if (!isScrollable) Modifier.fillMaxWidth() else Modifier) {
-                        ledgers.forEach { ledger ->
-                            Column(
-                                modifier = if (isScrollable) Modifier.width(fixedColumnWidth) else Modifier.weight(1f),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Text(
-                                    text = ledger.memberName, 
-                                    fontSize = 15.sp, 
-                                    fontWeight = FontWeight.ExtraBold, 
-                                    color = Color.Black,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Spacer(modifier = Modifier.height(1.dp))
-                                Text(
-                                    text = "₹${ledger.totalSpent.toInt()}", 
-                                    fontSize = 16.sp, 
-                                    fontWeight = FontWeight.Bold, 
-                                    color = Color(0xFF2E7D32)
-                                )
-                            }
-                        }
-                    }
-
-                    val dividerModifier = if (isScrollable) Modifier.width(fixedColumnWidth * memberCount) else Modifier.fillMaxWidth()
-                    HorizontalDivider(
-                        modifier = dividerModifier.padding(vertical = 8.dp),
-                        thickness = 1.dp,
-                        color = Color.LightGray
-                    )
-
-                    Row(modifier = if (!isScrollable) Modifier.fillMaxWidth() else Modifier) {
-                        ledgers.forEach { ledger ->
-                            Column(
-                                modifier = if (isScrollable) Modifier.width(fixedColumnWidth) else Modifier.weight(1f),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                ledger.expenses.forEach { expense ->
-                                    Column(
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                        modifier = Modifier.padding(bottom = 10.dp)
-                                    ) {
-                                        Text(
-                                            text = expense.itemName, 
-                                            fontSize = 14.sp, 
-                                            fontWeight = FontWeight.SemiBold, 
-                                            color = Color.Black, 
-                                            maxLines = 1, 
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                        Spacer(modifier = Modifier.height(1.dp))
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Text(
-                                                text = "₹${expense.amount.toInt()}", 
-                                                fontSize = 12.sp, 
-                                                fontWeight = FontWeight.Bold, 
-                                                color = Color.DarkGray
-                                            )
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            Text(
-                                                text = expense.date, 
-                                                fontSize = 11.sp, 
-                                                color = Color.Gray, 
-                                                fontWeight = FontWeight.Medium
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+                DynamicLedgerView(ledgers)
             }
 
             // ==========================================
-            // PAST CYCLES HISTORY CARDS
+            // PAST CYCLES EXPANDABLE CARDS (LAZY LOAD)
             // ==========================================
             if (pastCycles.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(24.dp))
@@ -402,39 +328,115 @@ fun InsideContriScreen(
                 
                 Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                     pastCycles.forEach { cycle ->
+                        val isExpanded = expandedState[cycle.dateRange] == true
+                        val isFetching = loadingState[cycle.dateRange] == true
+                        val cycleLedger = fetchedCycleData[cycle.dateRange]
+
                         Card(
-                            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 8.dp)
+                                .animateContentSize() // ANIMATION MAGIC HERE
+                                .clickable {
+                                    if (isExpanded) {
+                                        expandedState[cycle.dateRange] = false
+                                    } else {
+                                        expandedState[cycle.dateRange] = true
+                                        // Fetch only if data not already fetched
+                                        if (cycleLedger == null) {
+                                            loadingState[cycle.dateRange] = true
+                                            coroutineScope.launch(Dispatchers.IO) {
+                                                try {
+                                                    val reqBody = JSONObject().apply {
+                                                        put("action", "fetch_past_cycle")
+                                                        put("room_code", room.roomCode)
+                                                        put("date_range", cycle.dateRange)
+                                                    }
+                                                    val request = Request.Builder()
+                                                        .url(Constants.GOOGLE_SHEET_API_URL)
+                                                        .post(reqBody.toString().toRequestBody("application/json".toMediaType()))
+                                                        .build()
+                                                    val response = OkHttpClient().newCall(request).execute()
+                                                    val resStr = response.body?.string() ?: ""
+
+                                                    if (resStr.contains("\"status\":\"success\"")) {
+                                                        val pastData = parsePastCycleMembersOnly(resStr)
+                                                        withContext(Dispatchers.Main) {
+                                                            fetchedCycleData[cycle.dateRange] = pastData
+                                                            loadingState[cycle.dateRange] = false
+                                                        }
+                                                    } else {
+                                                        withContext(Dispatchers.Main) { loadingState[cycle.dateRange] = false }
+                                                    }
+                                                } catch (e: Exception) {
+                                                    withContext(Dispatchers.Main) { loadingState[cycle.dateRange] = false }
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
                             shape = RoundedCornerShape(12.dp),
                             colors = CardDefaults.cardColors(containerColor = Color.White),
                             elevation = CardDefaults.cardElevation(1.5.dp)
                         ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = cycle.dateRange, 
-                                    fontSize = 13.sp, 
-                                    fontWeight = FontWeight.Medium, 
-                                    color = Color.DarkGray
-                                )
-                                Text(
-                                    text = cycle.totalAmount, 
-                                    fontSize = 15.sp, 
-                                    fontWeight = FontWeight.ExtraBold, 
-                                    color = Color(0xFF2E7D32)
-                                )
+                            Column {
+                                // CLICKABLE HEADER
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = cycle.dateRange, 
+                                        fontSize = 13.sp, 
+                                        fontWeight = FontWeight.Medium, 
+                                        color = Color.DarkGray
+                                    )
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        // LOADING WHEEL
+                                        if (isFetching) {
+                                            CircularProgressIndicator(
+                                                modifier = Modifier.size(16.dp),
+                                                color = Color(0xFF2E7D32),
+                                                strokeWidth = 2.dp
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                        }
+                                        Text(
+                                            text = cycle.totalAmount, 
+                                            fontSize = 15.sp, 
+                                            fontWeight = FontWeight.ExtraBold, 
+                                            color = Color(0xFF2E7D32)
+                                        )
+                                    }
+                                }
+
+                                // EXPANDED VIEW WITH EXACT SAME UI
+                                if (isExpanded) {
+                                    if (cycleLedger != null && cycleLedger.isNotEmpty()) {
+                                        HorizontalDivider(color = Color.LightGray, thickness = 0.5.dp)
+                                        Spacer(modifier = Modifier.height(12.dp))
+                                        DynamicLedgerView(cycleLedger)
+                                        Spacer(modifier = Modifier.height(12.dp))
+                                    } else if (!isFetching) {
+                                        Text(
+                                            "No data available.", 
+                                            color = Color.Gray, 
+                                            modifier = Modifier.fillMaxWidth().padding(16.dp), 
+                                            textAlign = TextAlign.Center
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
                 }
-                Spacer(modifier = Modifier.height(80.dp)) // Extra padding for Floating Button
+                Spacer(modifier = Modifier.height(80.dp))
             }
         }
 
         // ==========================================
-        // SETTLE UP POPUP
+        // ALL POPUPS (SETTLE, NEW CYCLE, LEAVE, ADD)
         // ==========================================
         if (showSettleDialog) {
             SettleUpDialog(
@@ -445,18 +447,11 @@ fun InsideContriScreen(
             )
         }
 
-        // ==========================================
-        // START NEW CYCLE POPUP
-        // ==========================================
         if (showNewCycleDialog) {
             AlertDialog(
                 onDismissRequest = { showNewCycleDialog = false },
-                title = { 
-                    Text("Start New Cycle?", fontWeight = FontWeight.ExtraBold, color = Color.Black) 
-                },
-                text = { 
-                    Text("Once created, users cannot change this. It will be saved and calculations will restart from zero.", color = Color.DarkGray) 
-                },
+                title = { Text("Start New Cycle?", fontWeight = FontWeight.ExtraBold, color = Color.Black) },
+                text = { Text("Once created, users cannot change this. It will be saved and calculations will restart from zero.", color = Color.DarkGray) },
                 containerColor = Color.White,
                 confirmButton = {
                     TextButton(
@@ -497,30 +492,19 @@ fun InsideContriScreen(
                                 }
                             }
                         }
-                    ) {
-                        Text("New", color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold)
-                    }
+                    ) { Text("New", color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold) }
                 },
                 dismissButton = {
-                    TextButton(onClick = { showNewCycleDialog = false }) {
-                        Text("Cancel", color = Color.Gray, fontWeight = FontWeight.Bold)
-                    }
+                    TextButton(onClick = { showNewCycleDialog = false }) { Text("Cancel", color = Color.Gray, fontWeight = FontWeight.Bold) }
                 }
             )
         }
 
-        // ==========================================
-        // LEAVE ROOM POPUP
-        // ==========================================
         if (showLeaveDialog) {
             AlertDialog(
                 onDismissRequest = { showLeaveDialog = false },
-                title = { 
-                    Text("Leave Room?", fontWeight = FontWeight.ExtraBold, color = Color.Black) 
-                },
-                text = { 
-                    Text("Are you sure you want to leave this Contri room? This action cannot be undone.", color = Color.DarkGray) 
-                },
+                title = { Text("Leave Room?", fontWeight = FontWeight.ExtraBold, color = Color.Black) },
+                text = { Text("Are you sure you want to leave this Contri room? This action cannot be undone.", color = Color.DarkGray) },
                 containerColor = Color.White,
                 confirmButton = {
                     TextButton(
@@ -561,21 +545,14 @@ fun InsideContriScreen(
                                 }
                             }
                         }
-                    ) {
-                        Text("Leave", color = Color.Red, fontWeight = FontWeight.Bold)
-                    }
+                    ) { Text("Leave", color = Color.Red, fontWeight = FontWeight.Bold) }
                 },
                 dismissButton = {
-                    TextButton(onClick = { showLeaveDialog = false }) {
-                        Text("Cancel", color = Color.Gray, fontWeight = FontWeight.Bold)
-                    }
+                    TextButton(onClick = { showLeaveDialog = false }) { Text("Cancel", color = Color.Gray, fontWeight = FontWeight.Bold) }
                 }
             )
         }
 
-        // ==========================================
-        // ADD EXPENSE POPUP
-        // ==========================================
         if (showAddExpenseDialog) {
             AddContriExpenseDialog(
                 onDismiss = { showAddExpenseDialog = false },
@@ -624,6 +601,96 @@ fun InsideContriScreen(
                     }
                 }
             )
+        }
+    }
+}
+
+// ==========================================
+// REUSABLE UI COMPONENT: DYNAMIC LEDGER VIEW
+// ==========================================
+@Composable
+fun DynamicLedgerView(ledgers: List<MemberLedger>) {
+    val memberCount = ledgers.size
+    val isScrollable = memberCount > 3
+    val fixedColumnWidth = 110.dp
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .let { if (isScrollable) it.horizontalScroll(rememberScrollState()) else it }
+            .padding(horizontal = 16.dp)
+    ) {
+        Row(modifier = if (!isScrollable) Modifier.fillMaxWidth() else Modifier) {
+            ledgers.forEach { ledger ->
+                Column(
+                    modifier = if (isScrollable) Modifier.width(fixedColumnWidth) else Modifier.weight(1f),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = ledger.memberName, 
+                        fontSize = 15.sp, 
+                        fontWeight = FontWeight.ExtraBold, 
+                        color = Color.Black,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(modifier = Modifier.height(1.dp))
+                    Text(
+                        text = "₹${ledger.totalSpent.toInt()}", 
+                        fontSize = 16.sp, 
+                        fontWeight = FontWeight.Bold, 
+                        color = Color(0xFF2E7D32)
+                    )
+                }
+            }
+        }
+
+        val dividerModifier = if (isScrollable) Modifier.width(fixedColumnWidth * memberCount) else Modifier.fillMaxWidth()
+        HorizontalDivider(
+            modifier = dividerModifier.padding(vertical = 8.dp),
+            thickness = 1.dp,
+            color = Color.LightGray
+        )
+
+        Row(modifier = if (!isScrollable) Modifier.fillMaxWidth() else Modifier) {
+            ledgers.forEach { ledger ->
+                Column(
+                    modifier = if (isScrollable) Modifier.width(fixedColumnWidth) else Modifier.weight(1f),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    ledger.expenses.forEach { expense ->
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.padding(bottom = 10.dp)
+                        ) {
+                            Text(
+                                text = expense.itemName, 
+                                fontSize = 14.sp, 
+                                fontWeight = FontWeight.SemiBold, 
+                                color = Color.Black, 
+                                maxLines = 1, 
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Spacer(modifier = Modifier.height(1.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "₹${expense.amount.toInt()}", 
+                                    fontSize = 12.sp, 
+                                    fontWeight = FontWeight.Bold, 
+                                    color = Color.DarkGray
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = expense.date, 
+                                    fontSize = 11.sp, 
+                                    color = Color.Gray, 
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -814,7 +881,7 @@ fun AddContriExpenseDialog(
 }
 
 // ==========================================
-// JSON PARSER LOGIC WITH PAST CYCLES
+// JSON PARSERS (MAIN & PAST CYCLES ONLY)
 // ==========================================
 fun parseLedgerData(jsonString: String): RoomDetailsData {
     val ledgers = mutableListOf<MemberLedger>()
@@ -867,6 +934,39 @@ fun parseLedgerData(jsonString: String): RoomDetailsData {
         e.printStackTrace()
     }
     return RoomDetailsData(ledgers, totalGroupExp, isAdmin, pastCycles)
+}
+
+fun parsePastCycleMembersOnly(jsonString: String): List<MemberLedger> {
+    val ledgers = mutableListOf<MemberLedger>()
+    try {
+        val root = JSONObject(jsonString)
+        val membersArray = root.optJSONArray("members")
+        if (membersArray != null) {
+            for (i in 0 until membersArray.length()) {
+                val memberObj = membersArray.getJSONObject(i)
+                val name = memberObj.getString("name")
+                val totalSpent = memberObj.getDouble("total_spent")
+                
+                val expensesList = mutableListOf<ContriExpense>()
+                val expensesArray = memberObj.getJSONArray("expenses")
+                
+                for (j in 0 until expensesArray.length()) {
+                    val expObj = expensesArray.getJSONObject(j)
+                    expensesList.add(
+                        ContriExpense(
+                            itemName = expObj.getString("item_name"),
+                            amount = expObj.getDouble("amount"),
+                            date = expObj.getString("date")
+                        )
+                    )
+                }
+                ledgers.add(MemberLedger(name, totalSpent, expensesList))
+            }
+        }
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+    return ledgers
 }
 
 // ==========================================
