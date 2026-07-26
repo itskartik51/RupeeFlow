@@ -60,6 +60,8 @@ import kotlin.math.abs
 data class ContriExpense(val itemName: String, val amount: Double, val date: String)
 data class MemberLedger(val memberName: String, val totalSpent: Double, val expenses: List<ContriExpense>)
 data class Settlement(val from: String, val to: String, val amount: Double)
+data class PastCycle(val dateRange: String, val totalAmount: String)
+data class RoomDetailsData(val ledgers: List<MemberLedger>, val totalExpense: Double, val isAdmin: Boolean, val pastCycles: List<PastCycle>)
 
 @Composable
 fun InsideContriScreen(
@@ -77,6 +79,7 @@ fun InsideContriScreen(
     val cacheKey = "room_data_${room.roomCode}"
 
     var ledgers by remember { mutableStateOf<List<MemberLedger>>(emptyList()) }
+    var pastCycles by remember { mutableStateOf<List<PastCycle>>(emptyList()) }
     var totalGroupExpense by remember { mutableDoubleStateOf(0.0) }
     var isAdmin by remember { mutableStateOf(false) } 
     var isLoading by remember { mutableStateOf(false) }
@@ -91,10 +94,11 @@ fun InsideContriScreen(
         val cachedJson = sharedPreferences.getString(cacheKey, null)
         if (cachedJson != null) {
             try {
-                val (cachedLedgers, cachedTotal, cachedAdmin) = parseLedgerData(cachedJson)
-                ledgers = cachedLedgers
-                totalGroupExpense = cachedTotal
-                isAdmin = cachedAdmin
+                val data = parseLedgerData(cachedJson)
+                ledgers = data.ledgers
+                totalGroupExpense = data.totalExpense
+                isAdmin = data.isAdmin
+                pastCycles = data.pastCycles
             } catch (e: Exception) { e.printStackTrace() }
         } else {
             isLoading = true
@@ -117,11 +121,12 @@ fun InsideContriScreen(
 
                 if (resData.contains("\"status\":\"success\"")) {
                     sharedPreferences.edit().putString(cacheKey, resData).apply()
-                    val (newLedgers, newTotal, newAdmin) = parseLedgerData(resData)
+                    val data = parseLedgerData(resData)
                     withContext(Dispatchers.Main) {
-                        ledgers = newLedgers
-                        totalGroupExpense = newTotal
-                        isAdmin = newAdmin
+                        ledgers = data.ledgers
+                        totalGroupExpense = data.totalExpense
+                        isAdmin = data.isAdmin
+                        pastCycles = data.pastCycles
                         isLoading = false
                     }
                 }
@@ -184,7 +189,7 @@ fun InsideContriScreen(
         containerColor = Color(0xFFFAFAFA)
     ) { paddingValues ->
         Column(
-            modifier = Modifier.fillMaxSize().padding(paddingValues)
+            modifier = Modifier.fillMaxSize().padding(paddingValues).verticalScroll(rememberScrollState())
         ) {
             Card(
                 modifier = Modifier
@@ -288,11 +293,11 @@ fun InsideContriScreen(
             Spacer(modifier = Modifier.height(4.dp))
 
             if (isLoading && ledgers.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = Color(0xFF2E7D32))
                 }
             } else if (ledgers.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize().padding(top = 40.dp), contentAlignment = Alignment.TopCenter) {
+                Box(modifier = Modifier.fillMaxWidth().height(200.dp).padding(top = 40.dp), contentAlignment = Alignment.TopCenter) {
                     Text("No expenses yet. Tap + to add!", color = Color.Gray, fontWeight = FontWeight.Medium)
                 }
             } else {
@@ -380,6 +385,52 @@ fun InsideContriScreen(
                     }
                 }
             }
+
+            // ==========================================
+            // PAST CYCLES HISTORY CARDS
+            // ==========================================
+            if (pastCycles.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(24.dp))
+                Text(
+                    text = "Past Cycles", 
+                    fontSize = 15.sp, 
+                    fontWeight = FontWeight.Bold, 
+                    color = Color.Gray, 
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                    pastCycles.forEach { cycle ->
+                        Card(
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color.White),
+                            elevation = CardDefaults.cardElevation(1.5.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = cycle.dateRange, 
+                                    fontSize = 13.sp, 
+                                    fontWeight = FontWeight.Medium, 
+                                    color = Color.DarkGray
+                                )
+                                Text(
+                                    text = cycle.totalAmount, 
+                                    fontSize = 15.sp, 
+                                    fontWeight = FontWeight.ExtraBold, 
+                                    color = Color(0xFF2E7D32)
+                                )
+                            }
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(80.dp)) // Extra padding for Floating Button
+            }
         }
 
         // ==========================================
@@ -395,7 +446,7 @@ fun InsideContriScreen(
         }
 
         // ==========================================
-        // REAL NETWORK CALL (START NEW CYCLE)
+        // START NEW CYCLE POPUP
         // ==========================================
         if (showNewCycleDialog) {
             AlertDialog(
@@ -459,7 +510,7 @@ fun InsideContriScreen(
         }
 
         // ==========================================
-        // REAL NETWORK CALL (LEAVE ROOM)
+        // LEAVE ROOM POPUP
         // ==========================================
         if (showLeaveDialog) {
             AlertDialog(
@@ -496,7 +547,7 @@ fun InsideContriScreen(
                                         if (resData.contains("\"status\":\"success\"")) {
                                             Toast.makeText(context, "Left Room Successfully!", Toast.LENGTH_SHORT).show()
                                             sharedPreferences.edit().remove(cacheKey).apply()
-                                            onLeaveClick() // Return to Hub
+                                            onLeaveClick()
                                         } else {
                                             Toast.makeText(context, "Error leaving room", Toast.LENGTH_SHORT).show()
                                             isLoading = false
@@ -523,7 +574,7 @@ fun InsideContriScreen(
         }
 
         // ==========================================
-        // REAL NETWORK CALL (ADD EXPENSE)
+        // ADD EXPENSE POPUP
         // ==========================================
         if (showAddExpenseDialog) {
             AddContriExpenseDialog(
@@ -633,7 +684,6 @@ fun SettleUpDialog(
             elevation = CardDefaults.cardElevation(8.dp)
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
-                // SECTION 1: Total Pay / Collect
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
                     Text("Group Balances", fontSize = 14.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(4.dp))
@@ -644,7 +694,6 @@ fun SettleUpDialog(
                 HorizontalDivider(color = Color.LightGray, thickness = 1.dp)
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // SECTION 2: Details
                 Column(modifier = Modifier.fillMaxWidth()) {
                     if (allSettlements.isEmpty()) {
                         Text("No pending payments.", fontSize = 14.sp, color = Color.Gray, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
@@ -665,7 +714,6 @@ fun SettleUpDialog(
                 HorizontalDivider(color = Color.LightGray, thickness = 1.dp)
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // SECTION 3: Settle Action Button
                 Button(
                     onClick = onDismiss,
                     modifier = Modifier.fillMaxWidth().height(48.dp),
@@ -766,10 +814,11 @@ fun AddContriExpenseDialog(
 }
 
 // ==========================================
-// JSON PARSER LOGIC
+// JSON PARSER LOGIC WITH PAST CYCLES
 // ==========================================
-fun parseLedgerData(jsonString: String): Triple<List<MemberLedger>, Double, Boolean> {
+fun parseLedgerData(jsonString: String): RoomDetailsData {
     val ledgers = mutableListOf<MemberLedger>()
+    val pastCycles = mutableListOf<PastCycle>()
     var totalGroupExp = 0.0
     var isAdmin = false
     
@@ -778,31 +827,46 @@ fun parseLedgerData(jsonString: String): Triple<List<MemberLedger>, Double, Bool
         totalGroupExp = root.optDouble("total_group_expense", 0.0)
         isAdmin = root.optBoolean("is_admin", false)
         
-        val membersArray = root.getJSONArray("members")
-        for (i in 0 until membersArray.length()) {
-            val memberObj = membersArray.getJSONObject(i)
-            val name = memberObj.getString("name")
-            val totalSpent = memberObj.getDouble("total_spent")
-            
-            val expensesList = mutableListOf<ContriExpense>()
-            val expensesArray = memberObj.getJSONArray("expenses")
-            
-            for (j in 0 until expensesArray.length()) {
-                val expObj = expensesArray.getJSONObject(j)
-                expensesList.add(
-                    ContriExpense(
-                        itemName = expObj.getString("item_name"),
-                        amount = expObj.getDouble("amount"),
-                        date = expObj.getString("date")
+        val membersArray = root.optJSONArray("members")
+        if (membersArray != null) {
+            for (i in 0 until membersArray.length()) {
+                val memberObj = membersArray.getJSONObject(i)
+                val name = memberObj.getString("name")
+                val totalSpent = memberObj.getDouble("total_spent")
+                
+                val expensesList = mutableListOf<ContriExpense>()
+                val expensesArray = memberObj.getJSONArray("expenses")
+                
+                for (j in 0 until expensesArray.length()) {
+                    val expObj = expensesArray.getJSONObject(j)
+                    expensesList.add(
+                        ContriExpense(
+                            itemName = expObj.getString("item_name"),
+                            amount = expObj.getDouble("amount"),
+                            date = expObj.getString("date")
+                        )
+                    )
+                }
+                ledgers.add(MemberLedger(name, totalSpent, expensesList))
+            }
+        }
+        
+        val pastCyclesArray = root.optJSONArray("past_cycles")
+        if (pastCyclesArray != null) {
+            for (i in 0 until pastCyclesArray.length()) {
+                val cycleObj = pastCyclesArray.getJSONObject(i)
+                pastCycles.add(
+                    PastCycle(
+                        dateRange = cycleObj.getString("date_range"),
+                        totalAmount = cycleObj.getString("total_amount")
                     )
                 )
             }
-            ledgers.add(MemberLedger(name, totalSpent, expensesList))
         }
     } catch (e: Exception) {
         e.printStackTrace()
     }
-    return Triple(ledgers, totalGroupExp, isAdmin)
+    return RoomDetailsData(ledgers, totalGroupExp, isAdmin, pastCycles)
 }
 
 // ==========================================
