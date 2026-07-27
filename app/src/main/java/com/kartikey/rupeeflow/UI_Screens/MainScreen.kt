@@ -50,6 +50,7 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
     var expenseToDelete by remember { mutableStateOf<TransactionModel?>(null) }
     
     var showAddMenu by remember { mutableStateOf(false) }
+    var openProfileDetails by remember { mutableStateOf(false) } // Naya State Profile Details open karne ke liye
 
     var userFullName by remember { mutableStateOf("") } 
     var userEmail by remember { mutableStateOf("") } 
@@ -407,6 +408,7 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                     when (currentTab) {
                         0 -> HomeDashboardDesign(
                             username = username, 
+                            userFullName = userFullName, 
                             paddingValues = paddingValues, 
                             thisMonthExpenses = thisMonthExpenses, 
                             thisYearExpenses = thisYearExpenses, 
@@ -417,7 +419,11 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                             onRefreshExpenses = { refreshTrigger++ }, 
                             onExpenseCardClick = { showExpenseHistory = true },
                             onContriClick = { showContriScreen = true },
-                            contriCount = contriRoomsList.size // Pass live rooms count here
+                            onAvatarClick = { 
+                                selectedTab = 4 
+                                openProfileDetails = true 
+                            },
+                            contriCount = contriRoomsList.size
                         )
                         1 -> AssetsScreen(
                             paddingValues = paddingValues, 
@@ -445,7 +451,9 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                             dob = userDob, 
                             paddingValues = paddingValues, 
                             onLogout = onLogout, 
-                            onProfileRefresh = { refreshTrigger++ }
+                            onProfileRefresh = { refreshTrigger++ },
+                            startInDetails = openProfileDetails,
+                            onResetDetailsState = { openProfileDetails = false }
                         )
                     }
                 }
