@@ -63,7 +63,7 @@ data class ContriExpense(val itemName: String, val amount: Double, val date: Str
 data class MemberLedger(val memberName: String, val totalSpent: Double, val expenses: List<ContriExpense>)
 data class Settlement(val from: String, val to: String, val amount: Double)
 data class PastCycle(val dateRange: String, val totalAmount: String)
-data class RoomDetailsData(val roomName: String, val ledgers: List<MemberLedger>, val totalExpense: Double, val isAdmin: Boolean, val pastCycles: List<PastCycle>)
+data class RoomDetailsData(val roomName: String, val ledgers: List<MemberLedger>, val totalExpense: Double, val isAdmin: Boolean, val pastCycles: List<PastCycle>, val myName: String)
 
 @Composable
 fun InsideContriScreen(
@@ -83,6 +83,7 @@ fun InsideContriScreen(
     val sharedPreferences = context.getSharedPreferences("RupeeFlowCache", Context.MODE_PRIVATE)
     val cacheKey = "room_data_${room.roomCode}"
 
+    var myName by remember { mutableStateOf("") }
     var ledgers by remember { mutableStateOf<List<MemberLedger>>(emptyList()) }
     var pastCycles by remember { mutableStateOf<List<PastCycle>>(emptyList()) }
     var totalGroupExpense by remember { mutableDoubleStateOf(0.0) }
@@ -121,6 +122,7 @@ fun InsideContriScreen(
             try {
                 val data = parseLedgerData(cachedJson)
                 if (data.roomName.isNotEmpty()) localRoomName = data.roomName
+                myName = data.myName
                 ledgers = data.ledgers
                 totalGroupExpense = data.totalExpense
                 isAdmin = data.isAdmin
@@ -150,6 +152,7 @@ fun InsideContriScreen(
                         sharedPreferences.edit().putString(cacheKey, resData).apply()
                         val data = parseLedgerData(resData)
                         if (data.roomName.isNotEmpty()) localRoomName = data.roomName
+                        myName = data.myName
                         ledgers = data.ledgers
                         totalGroupExpense = data.totalExpense
                         isAdmin = data.isAdmin
@@ -505,11 +508,10 @@ fun InsideContriScreen(
                         Text("Manage Members", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
                         Spacer(modifier = Modifier.height(8.dp))
 
-                        // Shrinkable/Scrollable Members List (Max 3 Items Height)
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .heightIn(max = 170.dp) // Auto shrink, max 3 items
+                                .heightIn(max = 170.dp)
                                 .border(1.dp, Color(0xFFEEEEEE), RoundedCornerShape(12.dp))
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(Color(0xFFFAFAFA))
@@ -665,7 +667,7 @@ fun InsideContriScreen(
 
         // ALL OTHER POPUPS
         if (showSettleDialog) {
-            SettleUpDialog(username = username, ledgers = ledgers, totalExpense = totalGroupExpense, onDismiss = { showSettleDialog = false })
+            SettleUpDialog(myName = myName, ledgers = ledgers, totalExpense = totalGroupExpense, onDismiss = { showSettleDialog = false })
         }
 
         if (showNewCycleDialog) {
@@ -841,13 +843,13 @@ fun DynamicLedgerView(ledgers: List<MemberLedger>) {
 // ==========================================
 // ALGORITHM & SETTLE UP DIALOG
 // ==========================================
-fun calculateUserSettlements(username: String, ledgers: List<MemberLedger>, totalExpense: Double): Pair<Double, List<Settlement>> {
+fun calculateUserSettlements(ledgers: List<MemberLedger>, totalExpense: Double): Pair<Double, List<Settlement>> {
     if (ledgers.isEmpty()) return Pair(0.0, emptyList())
     val perPerson = totalExpense / ledgers.size
     val balances = mutableMapOf<String, Double>()
     ledgers.forEach { balances[it.memberName] = it.totalSpent - perPerson }
     
-    val myNetBalance = balances.values.firstOrNull() ?: 0.0 
+    val myNetBalance = 0.0 // Removed manual dependency
     val settlements = mutableListOf<Settlement>()
     val debtors = balances.filter { it.value < -0.01 }.toMutableMap()
     val creditors = balances.filter { it.value > 0.01 }.toMutableMap()
@@ -870,28 +872,52 @@ fun calculateUserSettlements(username: String, ledgers: List<MemberLedger>, tota
 }
 
 @Composable
-fun SettleUpDialog(username: String, ledgers: List<MemberLedger>, totalExpense: Double, onDismiss: () -> Unit) {
-    val (myNetBalance, allSettlements) = calculateUserSettlements(username, ledgers, totalExpense)
+fun SettleUpDialog(myName: String, ledgers: List<MemberLedger>, totalExpense: Double, onDismiss: () -> Unit) {
+    val (_, allSettlements) = calculateUserSettlements(ledgers, totalExpense)
+    
+    // SMART SORTING: 'You' wala hisaab humesha upar aayega
+    val sortedSettlements = allSettlements.sortedWith(
+        compareByDescending<Settlement> { it.from == myName || it.to == myName }
+        .thenByDescending { it.amount }
+    )
+
     Dialog(onDismissRequest = onDismiss) {
         Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(8.dp)) {
             Column(modifier = Modifier.padding(20.dp)) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-                    Text("Group Balances", fontSize = 14.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text("Total: ₹${totalExpense.toInt()}", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
+                    Text("Total: ₹${totalExpense.toInt()}", fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
                 }
                 Spacer(modifier = Modifier.height(16.dp))
                 HorizontalDivider(color = Color.LightGray, thickness = 1.dp)
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Column(modifier = Modifier.fillMaxWidth()) {
-                    if (allSettlements.isEmpty()) {
+                    if (sortedSettlements.isEmpty()) {
                         Text("No pending payments.", fontSize = 14.sp, color = Color.Gray, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
                     } else {
-                        allSettlements.forEach { settlement ->
-                            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                                Text("${settlement.from} owes ${settlement.to}", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Color.Black)
-                                Text("₹${settlement.amount.toInt()}", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2E7D32))
+                        sortedSettlements.forEach { settlement ->
+                            
+                            // "YOU" Logic & "Pay" Formatting
+                            val fromText = if (settlement.from == myName) "You" else settlement.from
+                            val toText = if (settlement.to == myName) "You" else settlement.to
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp), 
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "$fromText pay $toText", 
+                                    fontSize = 14.sp, 
+                                    fontWeight = if (fromText == "You" || toText == "You") FontWeight.ExtraBold else FontWeight.SemiBold, 
+                                    color = Color.Black
+                                )
+                                Text(
+                                    text = "₹${settlement.amount.toInt()}", 
+                                    fontSize = 15.sp, 
+                                    fontWeight = FontWeight.ExtraBold, 
+                                    color = Color(0xFF2E7D32)
+                                )
                             }
                         }
                     }
@@ -972,11 +998,13 @@ fun parseLedgerData(jsonString: String): RoomDetailsData {
     var totalGroupExp = 0.0
     var isAdmin = false
     var rName = ""
+    var myName = ""
     try {
         val root = JSONObject(jsonString)
         totalGroupExp = root.optDouble("total_group_expense", 0.0)
         isAdmin = root.optBoolean("is_admin", false)
         rName = root.optString("room_name", "")
+        myName = root.optString("my_name", "")
         
         val membersArray = root.optJSONArray("members")
         if (membersArray != null) {
@@ -1004,7 +1032,7 @@ fun parseLedgerData(jsonString: String): RoomDetailsData {
             }
         }
     } catch (e: Exception) { e.printStackTrace() }
-    return RoomDetailsData(rName, ledgers, totalGroupExp, isAdmin, pastCycles)
+    return RoomDetailsData(rName, ledgers, totalGroupExp, isAdmin, pastCycles, myName)
 }
 
 fun parsePastCycleMembersOnly(jsonString: String): List<MemberLedger> {
