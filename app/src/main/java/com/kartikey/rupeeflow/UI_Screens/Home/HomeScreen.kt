@@ -1,5 +1,6 @@
 package com.kartikey.rupeeflow.UI_Screens.Home
 
+import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -19,17 +20,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kartikey.rupeeflow.Cloud_Database.Constants
 import com.kartikey.rupeeflow.R
+import java.text.NumberFormat
+import java.util.Locale
 
 @Composable
 fun HomeDashboardDesign(
     username: String, 
-    userFullName: String, // Naya parameter (Name ka first letter nikalne ke liye)
+    userFullName: String, 
     paddingValues: PaddingValues, 
     thisMonthExpenses: Double, 
     thisYearExpenses: Double, 
@@ -40,9 +44,23 @@ fun HomeDashboardDesign(
     onRefreshExpenses: () -> Unit = {}, 
     onExpenseCardClick: () -> Unit,
     onContriClick: () -> Unit,
-    onAvatarClick: () -> Unit, // Naya parameter Profile Details kholne ke liye
-    contriCount: Int = 0 
+    onAvatarClick: () -> Unit, 
+    contriCount: Int = 0,
+    // NEW: Asset Values pass karne ke liye
+    totalInvestment: Double,
+    totalBankBalance: Double,
+    onInvestmentClick: () -> Unit,
+    onBankClick: () -> Unit
 ) {
+    val context = LocalContext.current
+
+    // Currency Formatting function
+    fun formatRupee(amount: Double): String {
+        val format = NumberFormat.getCurrencyInstance(Locale("en", "IN"))
+        format.maximumFractionDigits = 2
+        return format.format(amount).replace("-₹", "-₹ ")
+    }
+
     Column(modifier = Modifier.fillMaxSize().padding(paddingValues).padding(horizontal = 16.dp).verticalScroll(rememberScrollState())) {
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -54,7 +72,6 @@ fun HomeDashboardDesign(
                 Text("Hi, $username", color = Color.Gray, fontSize = 12.sp)
             }
             
-            // Name ka 1st letter (Agar name khali hai to username ka 1st letter)
             val displayLetter = if (userFullName.isNotBlank()) userFullName.take(1).uppercase() else username.take(1).uppercase()
             
             Box(
@@ -62,14 +79,14 @@ fun HomeDashboardDesign(
                     .size(36.dp)
                     .clip(CircleShape)
                     .background(Color(0xFFE8F5E9))
-                    .clickable { onAvatarClick() }, // Click event map kar diya
+                    .clickable { onAvatarClick() }, 
                 contentAlignment = Alignment.Center
             ) {
                 Text(displayLetter, color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold, fontSize = 16.sp)
             }
         }
         
-        Spacer(modifier = Modifier.height(24.dp)) // System diagnosis hata diya
+        Spacer(modifier = Modifier.height(24.dp))
         
         ExpenseSummaryCard(
             thisMonthExpenses = thisMonthExpenses, 
@@ -80,17 +97,40 @@ fun HomeDashboardDesign(
         )
         
         Spacer(modifier = Modifier.height(16.dp))
+
+        // SMART 0-CHECK LOGIC FOR CARDS
+        val invDisplayValue = if (totalInvestment > 0) formatRupee(totalInvestment) else "Add Details"
+        val bankDisplayValue = if (totalBankBalance > 0) formatRupee(totalBankBalance) else "Add Details"
+
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             ContriDashboardCard(
                 contriCount = contriCount,
                 modifier = Modifier.weight(1f).clickable { onContriClick() }
             ) 
-            GridCard(title = "MUTUAL FUNDS", value = "₹0", lineColor = Color(0xFF039BE5), modifier = Modifier.weight(1f))
+            GridCard(
+                title = "TOTAL INVESTMENT", 
+                value = invDisplayValue, 
+                lineColor = Color.Transparent, // Line Removed
+                modifier = Modifier.weight(1f),
+                onClick = onInvestmentClick // Linked to My Investments
+            )
         }
         Spacer(modifier = Modifier.height(12.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            GridCard(title = "BANK / FD", value = "₹0", lineColor = Color(0xFFFFB300), modifier = Modifier.weight(1f))
-            GridCard(title = "BUDGET LIMIT", value = "0% Used", lineColor = Color.Transparent, modifier = Modifier.weight(1f))
+            GridCard(
+                title = "BANK ACCOUNTS", 
+                value = bankDisplayValue, 
+                lineColor = Color(0xFFFFB300), 
+                modifier = Modifier.weight(1f),
+                onClick = onBankClick // Linked to Bank Accounts
+            )
+            GridCard(
+                title = "BUDGET LIMIT", 
+                value = "Add Details", 
+                lineColor = Color.Transparent, 
+                modifier = Modifier.weight(1f),
+                onClick = { Toast.makeText(context, "Budget feature coming soon!", Toast.LENGTH_SHORT).show() }
+            )
         }
         Spacer(modifier = Modifier.height(24.dp))
         SpendingTrackerCard()
