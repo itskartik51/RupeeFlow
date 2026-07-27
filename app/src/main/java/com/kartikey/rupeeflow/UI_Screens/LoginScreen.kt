@@ -10,6 +10,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Phone
@@ -46,6 +47,7 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
     var name by remember { mutableStateOf("") }
     var mobile by remember { mutableStateOf("") }
     var username by remember { mutableStateOf("") }
+    var email by remember { mutableStateOf("") } // Naya state Email ke liye
     var password by remember { mutableStateOf("") }
     var statusMessage by remember { mutableStateOf("") }
     val coroutineScope = rememberCoroutineScope()
@@ -60,7 +62,7 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
         modifier = Modifier
             .fillMaxSize()
             .background(Color.White)
-            .imePadding() // CRITICAL: Ye keyboard aane par sab kuch smooth upar shift karega
+            .imePadding() 
             .padding(horizontal = 24.dp)
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -137,6 +139,23 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
                 keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
             )
             Spacer(modifier = Modifier.height(12.dp))
+
+            // Naya Mandatory Email Field
+            OutlinedTextField(
+                value = email,
+                onValueChange = { email = it },
+                label = { Text("Email ID", color = Color.Gray) },
+                leadingIcon = { Icon(Icons.Outlined.Email, contentDescription = "Email", tint = Color.Gray) },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = Color(0xFF2E7D32),
+                    unfocusedBorderColor = Color(0xFFEEEEEE)
+                ),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
+                keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
+            )
+            Spacer(modifier = Modifier.height(12.dp))
         }
         
         OutlinedTextField(
@@ -158,7 +177,7 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
             ),
             keyboardOptions = KeyboardOptions(
                 keyboardType = if (isLoginMode) KeyboardType.Text else KeyboardType.Phone,
-                imeAction = ImeAction.Next // Keyboard Enter will move to next field
+                imeAction = ImeAction.Next 
             ),
             keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
         )
@@ -179,14 +198,33 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
             visualTransformation = PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Password,
-                imeAction = ImeAction.Done // LAST FIELD: Keyboard shows 'Done/Tick'
+                imeAction = ImeAction.Done 
             ),
             keyboardActions = KeyboardActions(onDone = {
-                // Hide keyboard when done typing
                 keyboardController?.hide()
                 focusManager.clearFocus()
             })
         )
+
+        // Forget Password Option (Left Aligned, Only in Login Mode)
+        if (isLoginMode) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp), 
+                contentAlignment = Alignment.CenterStart
+            ) {
+                Text(
+                    text = "Forget Password?",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF2E7D32),
+                    modifier = Modifier.clickable { 
+                        // Empty action as requested
+                    }
+                )
+            }
+        }
         
         Spacer(modifier = Modifier.height(8.dp))
 
@@ -200,11 +238,22 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
         // --- MAIN ACTION BUTTON ---
         Button(
             onClick = {
-                // Button click karte hi keyboard hide karo aur focus hatao
                 keyboardController?.hide()
                 focusManager.clearFocus()
 
-                // ORIGINAL BACKEND LOGIC (No changes here)
+                // Mandatory fields check
+                if (!isLoginMode) {
+                    if (name.isBlank() || mobile.isBlank() || username.isBlank() || password.isBlank() || email.isBlank()) {
+                        statusMessage = "All fields including Email are mandatory!"
+                        return@Button
+                    }
+                } else {
+                    if (mobile.isBlank() || password.isBlank()) {
+                        statusMessage = "Please enter your credentials."
+                        return@Button
+                    }
+                }
+
                 coroutineScope.launch(Dispatchers.IO) {
                     try {
                         statusMessage = "Processing..."
@@ -214,6 +263,9 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
                             put("mobile", mobile)
                             put("username", username)
                             put("password", password)
+                            if (!isLoginMode) {
+                                put("email", email) // Backend me email send kar rahe hain
+                            }
                         }
 
                         val client = OkHttpClient()
@@ -245,10 +297,9 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
                 .fillMaxWidth()
                 .height(52.dp),
             shape = RoundedCornerShape(12.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)) // Premium Green
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)) 
         ) { 
             if (isLoading) {
-                // "Processing..." ki jagah gol ghumne wala loading indicator
                 CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp), strokeWidth = 2.5.dp)
             } else {
                 Text(
@@ -282,6 +333,6 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
             )
         }
 
-        Spacer(modifier = Modifier.height(40.dp)) // Extra space to let scrolling work perfectly
+        Spacer(modifier = Modifier.height(40.dp)) 
     }
 }
