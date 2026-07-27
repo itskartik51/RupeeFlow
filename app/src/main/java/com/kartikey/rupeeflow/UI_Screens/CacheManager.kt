@@ -19,7 +19,6 @@ import org.json.JSONObject
 import java.util.Calendar
 import java.util.Locale
 
-// Ye ek Data Box (Container) hai jisme app ka saara data pack hoke MainScreen ko milega
 data class AppData(
     val userFullName: String,
     val userEmail: String,
@@ -41,7 +40,6 @@ data class AppData(
 object CacheManager {
     private const val PREFS_NAME = "RupeeFlow_GlobalCache"
     
-    // 1. OFFLINE DATA LENE KE LIYE (Instant Load)
     fun getCachedData(context: Context, username: String): AppData? {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val cachedJson = prefs.getString("data_$username", null) ?: return null
@@ -52,13 +50,14 @@ object CacheManager {
         }
     }
 
-    // 2. BACKEND SE NAYA DATA LAAKAR SAVE KARNE KE LIYE (Silent Sync)
-    suspend fun fetchAndCacheData(context: Context, username: String): AppData? {
+    // forceRefresh parameter joda gaya hai
+    suspend fun fetchAndCacheData(context: Context, username: String, forceRefresh: Boolean = false): AppData? {
         return withContext(Dispatchers.IO) {
             try {
                 val json = JSONObject().apply { 
                     put("action", "get_all_data")
                     put("username", username) 
+                    put("force_refresh", forceRefresh) // Backend ko instruction
                 }
                 
                 val client = OkHttpClient()
@@ -70,23 +69,18 @@ object CacheManager {
                 if (response.isSuccessful && responseData.trim().startsWith("{")) {
                     val jsonResponse = JSONObject(responseData)
                     if (jsonResponse.optString("status") == "success") {
-                        
-                        // Naya Data aaya to turant Local Memory me Overwrite kardo
                         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                         prefs.edit().putString("data_$username", responseData).apply()
-                        
-                        // Data parse karke wapis bhejo
                         return@withContext parseJsonToAppData(responseData)
                     }
                 }
                 null
             } catch (e: Exception) {
-                null // Agar internet band hua to crash nahi hoga, null bhej dega
+                null 
             }
         }
     }
 
-    // Ye wahi apka purana parser engine hai jo JSON ko todta hai
     private fun parseJsonToAppData(responseData: String): AppData {
         val jsonResponse = JSONObject(responseData)
         
