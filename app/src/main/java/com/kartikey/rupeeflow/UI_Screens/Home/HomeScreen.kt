@@ -10,9 +10,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.AccountBalance
-import androidx.compose.material.icons.outlined.KeyboardArrowDown
-import androidx.compose.material.icons.outlined.KeyboardArrowUp
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.GroupAdd
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -29,17 +28,21 @@ import com.kartikey.rupeeflow.R
 
 @Composable
 fun HomeDashboardDesign(
-    username: String, paddingValues: PaddingValues, 
-    thisMonthExpenses: Double, thisYearExpenses: Double, isLoadingExpenses: Boolean,
-    dNavState: String, dBackPresses: Int, 
+    username: String, 
+    userFullName: String, // Naya parameter (Name ka first letter nikalne ke liye)
+    paddingValues: PaddingValues, 
+    thisMonthExpenses: Double, 
+    thisYearExpenses: Double, 
+    isLoadingExpenses: Boolean,
+    dNavState: String, 
+    dBackPresses: Int, 
     onLogout: () -> Unit,
     onRefreshExpenses: () -> Unit = {}, 
     onExpenseCardClick: () -> Unit,
     onContriClick: () -> Unit,
-    contriCount: Int = 0 // Dynamic Contri count
+    onAvatarClick: () -> Unit, // Naya parameter Profile Details kholne ke liye
+    contriCount: Int = 0 
 ) {
-    var showDiagnostics by remember { mutableStateOf(false) }
-
     Column(modifier = Modifier.fillMaxSize().padding(paddingValues).padding(horizontal = 16.dp).verticalScroll(rememberScrollState())) {
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -50,82 +53,23 @@ fun HomeDashboardDesign(
                 Text("RupeeFlow", fontWeight = FontWeight.ExtraBold, fontSize = 20.sp)
                 Text("Hi, $username", color = Color.Gray, fontSize = 12.sp)
             }
-            Text("INR (₹) / USD", fontSize = 10.sp, color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold)
-            Spacer(modifier = Modifier.width(12.dp))
-            Box(modifier = Modifier.size(36.dp).clip(CircleShape).background(Color(0xFFE8F5E9)), contentAlignment = Alignment.Center) {
-                Text(username.take(2).uppercase(), color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            
+            // Name ka 1st letter (Agar name khali hai to username ka 1st letter)
+            val displayLetter = if (userFullName.isNotBlank()) userFullName.take(1).uppercase() else username.take(1).uppercase()
+            
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFE8F5E9))
+                    .clickable { onAvatarClick() }, // Click event map kar diya
+                contentAlignment = Alignment.Center
+            ) {
+                Text(displayLetter, color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold, fontSize = 16.sp)
             }
         }
         
-        Spacer(modifier = Modifier.height(16.dp))
-
-        SystemDiagnosisCard(
-            testName = "Offline HD Logo Engine",
-            isExpanded = showDiagnostics,
-            onToggle = { showDiagnostics = !showDiagnostics }
-        ) {
-            Column(modifier = Modifier.padding(top = 12.dp).fillMaxWidth()) {
-                Text(
-                    text = "Engine: 100% Local Storage (Zero Lag)",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = Color.DarkGray
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                Constants.IndianBanksList.forEach { bankName ->
-                    val logoRes = Constants.BankLogoMap[bankName]
-                    
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(28.dp)
-                                .background(Color(0xFF1976D2).copy(alpha = 0.08f), RoundedCornerShape(6.dp)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (logoRes != null) {
-                                Image(
-                                    painter = painterResource(id = logoRes),
-                                    contentDescription = bankName,
-                                    modifier = Modifier.size(18.dp).clip(RoundedCornerShape(4.dp)),
-                                    contentScale = ContentScale.Fit
-                                )
-                            } else {
-                                Icon(
-                                    imageVector = Icons.Outlined.AccountBalance,
-                                    contentDescription = "Fallback",
-                                    tint = Color(0xFF1976D2),
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                        }
-                        
-                        Spacer(modifier = Modifier.width(12.dp))
-                        
-                        Column {
-                            Text(
-                                text = bankName,
-                                fontSize = 13.sp,
-                                color = Color.Black,
-                                fontWeight = FontWeight.Medium
-                            )
-                            Text(
-                                text = if (logoRes != null) "Source: Local Storage (0ms)" else "Source: System Fallback",
-                                fontSize = 10.sp,
-                                color = if (logoRes != null) Color(0xFF388E3C) else Color(0xFFF57C00),
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
-                    }
-                    HorizontalDivider(color = Color.LightGray.copy(alpha = 0.3f))
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp)) 
+        Spacer(modifier = Modifier.height(24.dp)) // System diagnosis hata diya
         
         ExpenseSummaryCard(
             thisMonthExpenses = thisMonthExpenses, 
@@ -137,7 +81,6 @@ fun HomeDashboardDesign(
         
         Spacer(modifier = Modifier.height(16.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            // UPDATED CONTRI CARD (Dynamic count & 5-Segment Progress Line)
             ContriDashboardCard(
                 contriCount = contriCount,
                 modifier = Modifier.weight(1f).clickable { onContriClick() }
@@ -163,7 +106,7 @@ fun HomeDashboardDesign(
 }
 
 // ==========================================
-// NEW: DYNAMIC CONTRI DASHBOARD CARD
+// DYNAMIC CONTRI DASHBOARD CARD
 // ==========================================
 @Composable
 fun ContriDashboardCard(
@@ -197,7 +140,6 @@ fun ContriDashboardCard(
             )
             Spacer(modifier = Modifier.height(12.dp))
 
-            // 5-Segment Progress Line (0%, 20%, 40%, 60%, 80%, 100%)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -216,40 +158,6 @@ fun ContriDashboardCard(
                             )
                     )
                 }
-            }
-        }
-    }
-}
-
-@Composable
-fun SystemDiagnosisCard(
-    testName: String,
-    isExpanded: Boolean,
-    onToggle: () -> Unit,
-    detailsContent: @Composable () -> Unit
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable { onToggle() },
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFE1F5FE)),
-        elevation = CardDefaults.cardElevation(0.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = "System Diagnosis ($testName)", 
-                    fontWeight = FontWeight.Bold, 
-                    color = Color(0xFF0277BD), 
-                    fontSize = 14.sp
-                )
-                Icon(
-                    imageVector = if (isExpanded) Icons.Outlined.KeyboardArrowUp else Icons.Outlined.KeyboardArrowDown,
-                    contentDescription = "Toggle Diagnosis",
-                    tint = Color(0xFF0277BD)
-                )
-            }
-            
-            AnimatedVisibility(visible = isExpanded) {
-                detailsContent()
             }
         }
     }
