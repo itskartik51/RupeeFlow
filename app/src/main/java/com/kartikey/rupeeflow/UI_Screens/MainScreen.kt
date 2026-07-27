@@ -50,7 +50,7 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
     var expenseToDelete by remember { mutableStateOf<TransactionModel?>(null) }
     
     var showAddMenu by remember { mutableStateOf(false) }
-    var openProfileDetails by remember { mutableStateOf(false) } // Naya State Profile Details open karne ke liye
+    var openProfileDetails by remember { mutableStateOf(false) } 
 
     var userFullName by remember { mutableStateOf("") } 
     var userEmail by remember { mutableStateOf("") } 
@@ -406,25 +406,40 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                     )
                 } else {
                     when (currentTab) {
-                        0 -> HomeDashboardDesign(
-                            username = username, 
-                            userFullName = userFullName, 
-                            paddingValues = paddingValues, 
-                            thisMonthExpenses = thisMonthExpenses, 
-                            thisYearExpenses = thisYearExpenses, 
-                            isLoadingExpenses = isLoadingExpenses, 
-                            dNavState = dNavState, 
-                            dBackPresses = dBackPresses, 
-                            onLogout = onLogout, 
-                            onRefreshExpenses = { refreshTrigger++ }, 
-                            onExpenseCardClick = { showExpenseHistory = true },
-                            onContriClick = { showContriScreen = true },
-                            onAvatarClick = { 
-                                selectedTab = 4 
-                                openProfileDetails = true 
-                            },
-                            contriCount = contriRoomsList.size
-                        )
+                        0 -> {
+                            val totalInv = investmentList.sumOf { it.quantity * it.currentPrice }
+                            val totalBank = bankList.sumOf { it.currentBalance }
+                            
+                            HomeDashboardDesign(
+                                username = username, 
+                                userFullName = userFullName, 
+                                paddingValues = paddingValues, 
+                                thisMonthExpenses = thisMonthExpenses, 
+                                thisYearExpenses = thisYearExpenses, 
+                                isLoadingExpenses = isLoadingExpenses, 
+                                dNavState = dNavState, 
+                                dBackPresses = dBackPresses, 
+                                onLogout = onLogout, 
+                                onRefreshExpenses = { refreshTrigger++ }, 
+                                onExpenseCardClick = { showExpenseHistory = true },
+                                onContriClick = { showContriScreen = true },
+                                onAvatarClick = { 
+                                    selectedTab = 4 
+                                    openProfileDetails = true 
+                                },
+                                contriCount = contriRoomsList.size,
+                                totalInvestment = totalInv,
+                                totalBankBalance = totalBank,
+                                onInvestmentClick = {
+                                    assetsCurrentView = "InvestmentDetails"
+                                    selectedTab = 1
+                                },
+                                onBankClick = {
+                                    assetsCurrentView = "DirectBankAccounts"
+                                    selectedTab = 1
+                                }
+                            )
+                        }
                         1 -> AssetsScreen(
                             paddingValues = paddingValues, 
                             username = username, 
