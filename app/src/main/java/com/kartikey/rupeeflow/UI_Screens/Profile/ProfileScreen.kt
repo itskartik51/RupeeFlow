@@ -32,10 +32,20 @@ fun ProfileScreen(
     dob: String, 
     paddingValues: PaddingValues, 
     onLogout: () -> Unit,
-    onProfileRefresh: () -> Unit
+    onProfileRefresh: () -> Unit,
+    startInDetails: Boolean = false, // Naya parameter (Home screen se direct details open karne ke liye)
+    onResetDetailsState: () -> Unit = {}
 ) {
     var currentProfileView by remember { mutableStateOf("Main") }
     var selectedOptionTitle by remember { mutableStateOf("") }
+
+    // Jaise hi Home se Avatar click hoga, ye effect chalu hoga
+    LaunchedEffect(startInDetails) {
+        if (startInDetails) {
+            currentProfileView = "Details"
+            onResetDetailsState() // State reset taaki back aane par wapas open na ho
+        }
+    }
 
     BackHandler(enabled = currentProfileView != "Main") {
         currentProfileView = "Main"
@@ -69,7 +79,7 @@ fun ProfileScreen(
                     password = password,
                     dob = dob,
                     onBackClick = { currentProfileView = "Main" },
-                    onProfileUpdated = { onProfileRefresh() } // Sheet update reload
+                    onProfileUpdated = { onProfileRefresh() }
                 )
             }
             "Preference" -> {
