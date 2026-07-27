@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
@@ -23,10 +24,21 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.kartikey.rupeeflow.Cloud_Database.Constants
 import com.kartikey.rupeeflow.R
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONObject
 import java.text.NumberFormat
 import java.util.Locale
 
@@ -37,6 +49,7 @@ fun HomeDashboardDesign(
     paddingValues: PaddingValues, 
     thisMonthExpenses: Double, 
     thisYearExpenses: Double, 
+    budgetLimit: Double,
     isLoadingExpenses: Boolean,
     dNavState: String, 
     dBackPresses: Int, 
@@ -46,15 +59,15 @@ fun HomeDashboardDesign(
     onContriClick: () -> Unit,
     onAvatarClick: () -> Unit, 
     contriCount: Int = 0,
-    // NEW: Asset Values pass karne ke liye
     totalInvestment: Double,
     totalBankBalance: Double,
     onInvestmentClick: () -> Unit,
-    onBankClick: () -> Unit
+    onBankClick: () -> Unit,
+    onBudgetSaved: () -> Unit
 ) {
     val context = LocalContext.current
+    var showBudgetDialog by remember { mutableStateOf(false) }
 
-    // Currency Formatting function
     fun formatRupee(amount: Double): String {
         val format = NumberFormat.getCurrencyInstance(Locale("en", "IN"))
         format.maximumFractionDigits = 2
@@ -98,9 +111,14 @@ fun HomeDashboardDesign(
         
         Spacer(modifier = Modifier.height(16.dp))
 
-        // SMART 0-CHECK LOGIC FOR CARDS
         val invDisplayValue = if (totalInvestment > 0) formatRupee(totalInvestment) else "Add Details"
         val bankDisplayValue = if (totalBankBalance > 0) formatRupee(totalBankBalance) else "Add Details"
+        
+        // BUDGET LIMIT SMART DISPLAY
+        val budgetDisplayValue = if (budgetLimit > 0) {
+            val pct = (thisMonthExpenses / budgetLimit) * 100
+            "${String.format("%.1f", pct)}% Used"
+        } else "Add Details"
 
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             ContriDashboardCard(
@@ -110,9 +128,9 @@ fun HomeDashboardDesign(
             GridCard(
                 title = "TOTAL INVESTMENT", 
                 value = invDisplayValue, 
-                lineColor = Color.Transparent, // Line Removed
+                lineColor = Color.Transparent, 
                 modifier = Modifier.weight(1f),
-                onClick = onInvestmentClick // Linked to My Investments
+                onClick = onInvestmentClick 
             )
         }
         Spacer(modifier = Modifier.height(12.dp))
@@ -120,16 +138,16 @@ fun HomeDashboardDesign(
             GridCard(
                 title = "BANK ACCOUNTS", 
                 value = bankDisplayValue, 
-                lineColor = Color(0xFFFFB300), 
+                lineColor = Color.Transparent, // Yellow line removed
                 modifier = Modifier.weight(1f),
-                onClick = onBankClick // Linked to Bank Accounts
+                onClick = onBankClick 
             )
             GridCard(
                 title = "BUDGET LIMIT", 
-                value = "Add Details", 
+                value = budgetDisplayValue, 
                 lineColor = Color.Transparent, 
                 modifier = Modifier.weight(1f),
-                onClick = { Toast.makeText(context, "Budget feature coming soon!", Toast.LENGTH_SHORT).show() }
+                onClick = { showBudgetDialog = true }
             )
         }
         Spacer(modifier = Modifier.height(24.dp))
@@ -142,6 +160,144 @@ fun HomeDashboardDesign(
             TextButton(onClick = onLogout) { Text("Logout", color = Color(0xFFD32F2F)) }
         }
         Spacer(modifier = Modifier.height(60.dp)) 
+    }
+
+    // ==========================================
+    // BUDGET LIMIT DIALOG POPUP
+    // ==========================================
+    if (showBudgetDialog) {
+        BudgetDialog(
+            username = username,
+            currentLimit = budgetLimit,
+            thisMonthUsed = thisMonthExpenses,
+            onDismiss = { showBudgetDialog = false },
+            onSuccess = { 
+                showBudgetDialog = false
+                onBudgetSaved()
+            }
+        )
+    }
+}
+
+@Composable
+fun BudgetDialog(
+    username: String,
+    currentLimit: Double,
+    thisMonthUsed: Double,
+    onDismiss: () -> Unit,
+    onSuccess: () -> Unit
+) {
+    var limitInput by remember { mutableStateOf(if (currentLimit > 0) currentLimit.toInt().toString() else "") }
+    var isSaving by remember { mutableStateOf(false) }
+    
+    val coroutineScope = rememberCoroutineScope()
+    val context = LocalContext.current
+
+    val displayLimit = currentLimit
+    val usedPct = if (displayLimit > 0) (thisMonthUsed / displayLimit) * 100 else 0.0
+    val availAmount = maxOf(0.0, displayLimit - thisMonthUsed) // Will never be negative
+    val availPct = if (displayLimit > 0) maxOf(0.0, (availAmount / displayLimit) * 100) else 0.0
+
+    fun formatRupee(amount: Double): String {
+        val format = NumberFormat.getCurrencyInstance(Locale("en", "IN"))
+        format.maximumFractionDigits = 0
+        return format.format(amount).replace("-₹", "-₹ ")
+    }
+
+    Dialog(
+        onDismissRequest = { if (!isSaving) onDismiss() },
+        properties = DialogProperties(dismissOnClickOutside = false)
+    ) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(8.dp)
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Text("Set Monthly Budget", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
+                Spacer(modifier = Modifier.height(16.dp))
+
+                OutlinedTextField(
+                    value = limitInput,
+                    onValueChange = { if (it.isEmpty() || it.all { char -> char.isDigit() }) limitInput = it },
+                    label = { Text("Add Monthly Limit") },
+                    prefix = { Text("₹ ", color = Color.Black, fontWeight = FontWeight.Bold) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF2E7D32), focusedLabelColor = Color(0xFF2E7D32))
+                )
+
+                if (displayLimit > 0) {
+                    Spacer(modifier = Modifier.height(20.dp))
+                    Column(modifier = Modifier.fillMaxWidth().background(Color(0xFFF5F5F5), RoundedCornerShape(12.dp)).padding(16.dp)) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Used (${String.format("%.1f", usedPct)}%)", fontSize = 13.sp, color = Color.DarkGray, fontWeight = FontWeight.Medium)
+                            Text(formatRupee(thisMonthUsed), fontSize = 13.sp, color = Color.Black, fontWeight = FontWeight.Bold)
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Available (${String.format("%.1f", availPct)}%)", fontSize = 13.sp, color = Color(0xFF2E7D32), fontWeight = FontWeight.Medium)
+                            Text(formatRupee(availAmount), fontSize = 13.sp, color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = onDismiss) { Text("Cancel", color = Color.Gray, fontWeight = FontWeight.Bold) }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = {
+                            val limitVal = limitInput.toDoubleOrNull()
+                            if (limitVal != null && limitVal >= 0) {
+                                isSaving = true
+                                coroutineScope.launch(Dispatchers.IO) {
+                                    try {
+                                        val jsonBody = JSONObject().apply {
+                                            put("action", "update_budget")
+                                            put("username", username)
+                                            put("limit", limitVal)
+                                        }
+                                        val request = Request.Builder()
+                                            .url(Constants.GOOGLE_SHEET_API_URL)
+                                            .post(jsonBody.toString().toRequestBody("application/json".toMediaType()))
+                                            .build()
+                                        
+                                        val response = OkHttpClient().newCall(request).execute()
+                                        val resData = response.body?.string() ?: ""
+                                        
+                                        withContext(Dispatchers.Main) {
+                                            isSaving = false
+                                            if (resData.contains("success")) {
+                                                Toast.makeText(context, "Budget Saved!", Toast.LENGTH_SHORT).show()
+                                                onSuccess()
+                                            } else {
+                                                Toast.makeText(context, "Error saving budget", Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
+                                    } catch (e: Exception) {
+                                        withContext(Dispatchers.Main) {
+                                            isSaving = false
+                                            Toast.makeText(context, "Network Error", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
+                        shape = RoundedCornerShape(10.dp),
+                        enabled = !isSaving
+                    ) {
+                        if (isSaving) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                        else Text("Save", color = Color.White, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
     }
 }
 
