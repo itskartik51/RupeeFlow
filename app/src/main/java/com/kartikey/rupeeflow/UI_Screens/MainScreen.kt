@@ -30,7 +30,7 @@ import kotlinx.coroutines.withContext
 
 @Composable
 fun MainScreen(username: String, onLogout: () -> Unit) {
-    val context = LocalContext.current // Context to load cache
+    val context = LocalContext.current
 
     var selectedTab by remember { mutableIntStateOf(0) } 
     var showExpenseHistory by remember { mutableStateOf(false) }
@@ -56,7 +56,6 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
     var thisMonthExpenses by remember { mutableDoubleStateOf(0.0) }
     var thisYearExpenses by remember { mutableDoubleStateOf(0.0) }
     var isLoadingExpenses by remember { mutableStateOf(true) }
-    
     var budgetLimit by remember { mutableDoubleStateOf(0.0) }
 
     var transactionList by remember { mutableStateOf(emptyList<TransactionModel>()) }
@@ -68,8 +67,11 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
     var contriRoomsList by remember { mutableStateOf(emptyList<com.kartikey.rupeeflow.UI_Screens.Home.ContriRoomModel>()) }
     
     var dNavState by remember { mutableStateOf("Connecting to Sheet...") }
-    var dBackPresses by remember { mutableIntStateOf(0) }
+    
+    // Naya Manual Refresh Flag Manager
     var refreshTrigger by remember { mutableIntStateOf(0) }
+    var isManualRefresh by remember { mutableStateOf(false) }
+    var dBackPresses by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(selectedTab, showExpenseHistory, showContriScreen, isLoadingExpenses, transactionList.size, bankToEdit, ccToEdit, fdToEdit, showAddMenu) {
         if (showAddMenu) dNavState = "Add Menu Open"
@@ -97,7 +99,10 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
     LaunchedEffect(refreshTrigger) {
         isLoadingExpenses = true
 
-        // 1. OFFLINE CACHE LAGA DIYA (0.01 sec loading)
+        // Yahan manual state capture karke reset kiya taaki agla auto-load normal rahe
+        val shouldForceRefresh = isManualRefresh
+        isManualRefresh = false 
+
         val cachedData = CacheManager.getCachedData(context, username)
         if (cachedData != null && transactionList.isEmpty()) {
             userFullName = cachedData.userFullName
@@ -115,12 +120,11 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
             fdList = cachedData.fdList
             ccList = cachedData.ccList
             contriRoomsList = cachedData.contriRoomsList
-            // Loader ghumta rahega as visual feed, lekin Data turant aayega
         }
 
-        // 2. BACKGROUND API CALL (Ye silent sync karega)
         launch(Dispatchers.IO) {
-            val freshData = CacheManager.fetchAndCacheData(context, username)
+            // Pass the force refresh instruction
+            val freshData = CacheManager.fetchAndCacheData(context, username, forceRefresh = shouldForceRefresh)
             withContext(Dispatchers.Main) {
                 if (freshData != null) {
                     userFullName = freshData.userFullName
@@ -139,10 +143,14 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                     ccList = freshData.ccList
                     contriRoomsList = freshData.contriRoomsList
                 }
-                // Sync puri hone par spinner rok diya jayega
                 isLoadingExpenses = false
             }
         }
+    }
+
+    fun triggerManualRefresh() {
+        isManualRefresh = true
+        refreshTrigger++
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -215,14 +223,14 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                         contriRooms = contriRoomsList,
                         paddingValues = paddingValues,
                         onBackClick = { showContriScreen = false },
-                        onRefresh = { refreshTrigger++ }
+                        onRefresh = { triggerManualRefresh() } // Modified
                     )
                 } else if (isHistoryVisible) {
                     com.kartikey.rupeeflow.UI_Screens.Home.ExpenseHistoryScreen(
                         paddingValues = paddingValues, 
                         history = transactionList, 
                         isLoading = isLoadingExpenses,
-                        onRefreshClick = { refreshTrigger++ }, 
+                        onRefreshClick = { triggerManualRefresh() }, // Modified
                         onBackClick = { showExpenseHistory = false },
                         onEditClick = { expenseToEdit = it }, 
                         onDeleteClick = { expenseToDelete = it }
@@ -244,7 +252,7 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                                 dNavState = dNavState, 
                                 dBackPresses = dBackPresses, 
                                 onLogout = onLogout, 
-                                onRefreshExpenses = { refreshTrigger++ }, 
+                                onRefreshExpenses = { triggerManualRefresh() }, // Modified
                                 onExpenseCardClick = { showExpenseHistory = true },
                                 onContriClick = { showContriScreen = true },
                                 onAvatarClick = { 
@@ -262,7 +270,7 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                                     assetsCurrentView = "DirectBankAccounts"
                                     selectedTab = 1
                                 },
-                                onBudgetSaved = { refreshTrigger++ }
+                                onBudgetSaved = { triggerManualRefresh() } // Force fetch new limit
                             )
                         }
                         1 -> AssetsScreen(
@@ -274,7 +282,7 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                             ccList = ccList, 
                             cashData = cashData, 
                             isLoading = isLoadingExpenses, 
-                            onRefreshClick = { refreshTrigger++ }, 
+                            onRefreshClick = { triggerManualRefresh() }, // Modified
                             currentView = assetsCurrentView, 
                             onViewChange = { assetsCurrentView = it }, 
                             onEditBankClick = { bankToEdit = it }, 
@@ -291,7 +299,7 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                             dob = userDob, 
                             paddingValues = paddingValues, 
                             onLogout = onLogout, 
-                            onProfileRefresh = { refreshTrigger++ },
+                            onProfileRefresh = { triggerManualRefresh() }, // Modified
                             startInDetails = openProfileDetails,
                             onResetDetailsState = { openProfileDetails = false }
                         )
@@ -305,28 +313,28 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
             showMenu = showAddMenu, 
             onToggleMenu = { showAddMenu = !showAddMenu }, 
             onExpenseAdded = { newEntry -> transactionList = listOf(newEntry) + transactionList }, 
-            onInvestmentAdded = { refreshTrigger++ }, 
-            onFinanceAdded = { refreshTrigger++ }, 
+            onInvestmentAdded = { triggerManualRefresh() }, 
+            onFinanceAdded = { triggerManualRefresh() }, 
             bankList = bankList, 
             ccList = ccList, 
             cashData = cashData
         )
 
         if (bankToEdit != null) { 
-            EditBankDialog(bank = bankToEdit!!, username = username, onDismiss = { bankToEdit = null }, onUpdateSuccess = { bankToEdit = null; refreshTrigger++ }) 
+            EditBankDialog(bank = bankToEdit!!, username = username, onDismiss = { bankToEdit = null }, onUpdateSuccess = { bankToEdit = null; triggerManualRefresh() }) 
         }
         if (ccToEdit != null) { 
-            EditCreditCardDialog(cc = ccToEdit!!, username = username, onDismiss = { ccToEdit = null }, onUpdateSuccess = { ccToEdit = null; refreshTrigger++ }) 
+            EditCreditCardDialog(cc = ccToEdit!!, username = username, onDismiss = { ccToEdit = null }, onUpdateSuccess = { ccToEdit = null; triggerManualRefresh() }) 
         }
         if (fdToEdit != null) { 
-            EditFDDialog(fd = fdToEdit!!, username = username, onDismiss = { fdToEdit = null }, onUpdateSuccess = { fdToEdit = null; refreshTrigger++ }) 
+            EditFDDialog(fd = fdToEdit!!, username = username, onDismiss = { fdToEdit = null }, onUpdateSuccess = { fdToEdit = null; triggerManualRefresh() }) 
         }
         
         if (expenseToDelete != null) { 
-            DeleteExpenseDialog(expense = expenseToDelete!!, username = username, onDismiss = { expenseToDelete = null }, onSuccess = { expenseToDelete = null; refreshTrigger++ }) 
+            DeleteExpenseDialog(expense = expenseToDelete!!, username = username, onDismiss = { expenseToDelete = null }, onSuccess = { expenseToDelete = null; triggerManualRefresh() }) 
         }
         if (expenseToEdit != null) { 
-            EditExpenseDialog(expense = expenseToEdit!!, username = username, bankList = bankList, ccList = ccList, onDismiss = { expenseToEdit = null }, onSuccess = { expenseToEdit = null; refreshTrigger++ }) 
+            EditExpenseDialog(expense = expenseToEdit!!, username = username, bankList = bankList, ccList = ccList, onDismiss = { expenseToEdit = null }, onSuccess = { expenseToEdit = null; triggerManualRefresh() }) 
         }
     }
 }
