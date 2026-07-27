@@ -62,6 +62,9 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
     var thisYearExpenses by remember { mutableDoubleStateOf(0.0) }
     var isLoadingExpenses by remember { mutableStateOf(true) }
     
+    // NEW Budget State
+    var budgetLimit by remember { mutableDoubleStateOf(0.0) }
+
     var transactionList by remember { mutableStateOf(emptyList<TransactionModel>()) }
     var investmentList by remember { mutableStateOf(emptyList<InvestmentItem>()) }
     var bankList by remember { mutableStateOf(emptyList<BankAccountItem>()) } 
@@ -291,6 +294,8 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                             }
                         }
 
+                        val fetchedBudgetLimit = jsonResponse.optDouble("budget_limit", 0.0)
+
                         withContext(Dispatchers.Main) {
                             userFullName = tempName
                             userEmail = tempEmail
@@ -300,6 +305,7 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                             
                             thisMonthExpenses = if (tempMonth > 0) tempMonth else tempTotal 
                             thisYearExpenses = if (tempYear > 0) tempYear else tempTotal
+                            budgetLimit = fetchedBudgetLimit
                             transactionList = tempHistory.reversed()
                             investmentList = fetchedInvList
                             bankList = fetchedBankList
@@ -416,6 +422,7 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                                 paddingValues = paddingValues, 
                                 thisMonthExpenses = thisMonthExpenses, 
                                 thisYearExpenses = thisYearExpenses, 
+                                budgetLimit = budgetLimit,
                                 isLoadingExpenses = isLoadingExpenses, 
                                 dNavState = dNavState, 
                                 dBackPresses = dBackPresses, 
@@ -437,7 +444,8 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                                 onBankClick = {
                                     assetsCurrentView = "DirectBankAccounts"
                                     selectedTab = 1
-                                }
+                                },
+                                onBudgetSaved = { refreshTrigger++ }
                             )
                         }
                         1 -> AssetsScreen(
