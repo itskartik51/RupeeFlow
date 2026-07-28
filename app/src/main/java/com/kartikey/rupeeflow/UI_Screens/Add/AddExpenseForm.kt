@@ -36,11 +36,11 @@ import com.kartikey.rupeeflow.UI_Screens.Assets.BankAccountItem
 import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.CashItem
 import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.CreditCardItem
 import com.kartikey.rupeeflow.UI_Screens.CustomDatePicker
+import com.kartikey.rupeeflow.UI_Screens.NetworkClient
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
@@ -48,7 +48,6 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-// NEW DATA CLASS: Added sourceType and sourceId for Refund Tracking
 data class TransactionModel(
     val date: String,
     val amount: Double,
@@ -103,8 +102,6 @@ fun AddExpenseForm(
     var amount by remember { mutableStateOf("") }
     var expenseDateMillis by remember { mutableStateOf<Long>(System.currentTimeMillis()) }
     var expanded by remember { mutableStateOf(false) }
-    var isSubmitting by remember { mutableStateOf(false) }
-    val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
 
     var isPressed by remember { mutableStateOf(false) }
@@ -349,8 +346,9 @@ fun AddExpenseForm(
                             return@Button
                         }
 
-                        isSubmitting = true
                         val expenseAmt = amount.toDoubleOrNull() ?: 0.0
+                        
+                        // 1. OPTIMISTIC UI UPDATE: Instant callback to update local UI and close dialog
                         val newEntry = TransactionModel(
                             date = finalExpenseDateStr, 
                             amount = expenseAmt, 
@@ -362,8 +360,10 @@ fun AddExpenseForm(
                             sourceId = selectedSourceId
                         )
                         onExpenseAdded(newEntry)
+                        onDismiss() // Dialog instantly closes
 
-                        coroutineScope.launch(Dispatchers.IO) {
+                        // 2. BACKGROUND API SYNC (Fire and Forget)
+                        CoroutineScope(Dispatchers.IO).launch {
                             try {
                                 val json = JSONObject().apply {
                                     put("action", "add_expense")
@@ -377,32 +377,12 @@ fun AddExpenseForm(
                                     put("source_type", selectedSourceType) 
                                     put("source_identifier", selectedSourceId) 
                                 }
-                                val client = OkHttpClient()
+                                val client = NetworkClient.instance
                                 val body = json.toString().toRequestBody("application/json".toMediaType())
                                 val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(body).build()
                                 client.newCall(request).execute()
-
-                                withContext(Dispatchers.Main) {
-                                    isSubmitting = false
-                                    Toast.makeText(context, "Saved & Balance Adjusted! ✅", Toast.LENGTH_LONG).show()
-                                    amount = ""
-                                    remark1 = ""
-                                    remark2 = ""
-                                    categoryText = ""
-                                    modeText = ""
-                                    selectedSourceId = ""
-                                    selectedSourceName = ""
-                                    selectedSourceType = ""
-                                    selectedSourceLogo = null
-                                    isCategoryEditable = false 
-                                    expenseDateMillis = System.currentTimeMillis() 
-                                    onDismiss() 
-                                }
                             } catch (e: Exception) {
-                                withContext(Dispatchers.Main) {
-                                    isSubmitting = false
-                                    Toast.makeText(context, "Failed to connect to sheet ❌", Toast.LENGTH_SHORT).show()
-                                }
+                                // Background fail fallback (Silently ignored to keep UI smooth)
                             }
                         }
                     } else {
@@ -423,14 +403,9 @@ fun AddExpenseForm(
                         )
                     },
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
-                shape = RoundedCornerShape(12.dp),
-                enabled = !isSubmitting
+                shape = RoundedCornerShape(12.dp)
             ) {
-                if (isSubmitting) {
-                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(26.dp), strokeWidth = 3.dp)
-                } else {
-                    Text("Save Expense", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White)
-                }
+                Text("Save Expense", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White)
             }
             
             Spacer(modifier = Modifier.height(24.dp))
