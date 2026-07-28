@@ -23,8 +23,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.BaselineShift
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -68,10 +73,16 @@ fun HomeDashboardDesign(
     val context = LocalContext.current
     var showBudgetDialog by remember { mutableStateOf(false) }
 
-    fun formatRupee(amount: Double): String {
+    fun formatRupeeStr(amount: Double): String {
         val format = NumberFormat.getCurrencyInstance(Locale("en", "IN"))
         format.maximumFractionDigits = 2
         return format.format(amount).replace("-₹", "-₹ ")
+    }
+    
+    fun formatNumberOnly(amount: Double): String {
+        val format = NumberFormat.getNumberInstance(Locale("en", "IN"))
+        format.maximumFractionDigits = 0
+        return format.format(amount)
     }
 
     Column(modifier = Modifier.fillMaxSize().padding(paddingValues).padding(horizontal = 16.dp).verticalScroll(rememberScrollState())) {
@@ -104,21 +115,32 @@ fun HomeDashboardDesign(
         ExpenseSummaryCard(
             thisMonthExpenses = thisMonthExpenses, 
             thisYearExpenses = thisYearExpenses, 
+            budgetLimit = budgetLimit,
             isLoadingExpenses = isLoadingExpenses,
             onRefreshExpenses = onRefreshExpenses, 
-            onExpenseCardClick = onExpenseCardClick
+            onExpenseCardClick = onExpenseCardClick,
+            onAddBudgetClick = { showBudgetDialog = true } // Naya connection pass
         )
         
         Spacer(modifier = Modifier.height(16.dp))
 
-        val invDisplayValue = if (totalInvestment > 0) formatRupee(totalInvestment) else "Add Details"
-        val bankDisplayValue = if (totalBankBalance > 0) formatRupee(totalBankBalance) else "Add Details"
+        val invDisplayValue = if (totalInvestment > 0) AnnotatedString(formatRupeeStr(totalInvestment)) else AnnotatedString("Add Details")
+        val bankDisplayValue = if (totalBankBalance > 0) AnnotatedString(formatRupeeStr(totalBankBalance)) else AnnotatedString("Add Details")
         
-        // BUDGET LIMIT SMART DISPLAY
+        // BUDGET LIMIT SMART DISPLAY WITH REMAINING LOGIC & ANNOTATED STRING
+        val availAmount = maxOf(0.0, budgetLimit - thisMonthExpenses)
+        val availPct = if (budgetLimit > 0) (availAmount / budgetLimit) * 100 else 0.0
+
         val budgetDisplayValue = if (budgetLimit > 0) {
-            val pct = (thisMonthExpenses / budgetLimit) * 100
-            "${String.format("%.1f", pct)}% Used"
-        } else "Add Details"
+            buildAnnotatedString {
+                // Baseline shift se ₹ symbol center me align hoga aur size chota dikhega
+                withStyle(style = SpanStyle(fontSize = 13.sp, baselineShift = BaselineShift(0.2f))) { append("₹ ") }
+                append(formatNumberOnly(availAmount))
+                withStyle(style = SpanStyle(fontSize = 12.sp, color = Color.Gray)) { append(" (${String.format("%.1f", availPct)}%)") }
+            }
+        } else {
+            AnnotatedString("Add Details")
+        }
 
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             ContriDashboardCard(
@@ -138,12 +160,12 @@ fun HomeDashboardDesign(
             GridCard(
                 title = "BANK ACCOUNTS", 
                 value = bankDisplayValue, 
-                lineColor = Color.Transparent, // Yellow line removed
+                lineColor = Color.Transparent, 
                 modifier = Modifier.weight(1f),
                 onClick = onBankClick 
             )
             GridCard(
-                title = "BUDGET LIMIT", 
+                title = "BUDGET REMAINING", 
                 value = budgetDisplayValue, 
                 lineColor = Color.Transparent, 
                 modifier = Modifier.weight(1f),
@@ -195,7 +217,7 @@ fun BudgetDialog(
 
     val displayLimit = currentLimit
     val usedPct = if (displayLimit > 0) (thisMonthUsed / displayLimit) * 100 else 0.0
-    val availAmount = maxOf(0.0, displayLimit - thisMonthUsed) // Will never be negative
+    val availAmount = maxOf(0.0, displayLimit - thisMonthUsed) 
     val availPct = if (displayLimit > 0) maxOf(0.0, (availAmount / displayLimit) * 100) else 0.0
 
     fun formatRupee(amount: Double): String {
