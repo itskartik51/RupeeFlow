@@ -34,11 +34,12 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.kartikey.rupeeflow.Cloud_Database.Constants
 import com.kartikey.rupeeflow.UI_Screens.Assets.BankAccountItem
+import com.kartikey.rupeeflow.UI_Screens.NetworkClient
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
@@ -191,12 +192,10 @@ fun BankDetailCard(bank: BankAccountItem, username: String, onEditClick: (BankAc
 @Composable
 fun QuickUpdateDialog(bank: BankAccountItem, username: String, onDismiss: () -> Unit, onSuccess: () -> Unit) {
     var updateAmount by remember { mutableStateOf("") }
-    var isUpdating by remember { mutableStateOf(false) }
-    val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
     
     Dialog(
-        onDismissRequest = { if (!isUpdating) onDismiss() },
+        onDismissRequest = onDismiss,
         properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = false, usePlatformDefaultWidth = false)
     ) {
         Card(
@@ -227,7 +226,7 @@ fun QuickUpdateDialog(bank: BankAccountItem, username: String, onDismiss: () -> 
                 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedButton(
-                        onClick = { if (!isUpdating) onDismiss() },
+                        onClick = onDismiss,
                         modifier = Modifier.weight(1f).height(50.dp),
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Black)
@@ -239,10 +238,13 @@ fun QuickUpdateDialog(bank: BankAccountItem, username: String, onDismiss: () -> 
                         onClick = {
                             val amountEntered = updateAmount.toDoubleOrNull()
                             if (amountEntered != null && amountEntered != 0.0) {
-                                isUpdating = true
                                 val newCalculatedBalance = bank.currentBalance + amountEntered 
                                 
-                                coroutineScope.launch(Dispatchers.IO) {
+                                // OPTIMISTIC UI: Instant Dialog Dismiss
+                                onDismiss()
+                                Toast.makeText(context, "Updating balance...", Toast.LENGTH_SHORT).show()
+                                
+                                CoroutineScope(Dispatchers.IO).launch {
                                     try {
                                         val jsonBody = JSONObject().apply {
                                             put("action", "edit_bank")
@@ -254,26 +256,22 @@ fun QuickUpdateDialog(bank: BankAccountItem, username: String, onDismiss: () -> 
                                             put("new_current_bal", newCalculatedBalance)
                                         }
                                         
-                                        val client = OkHttpClient()
-                                        val body = jsonBody.toString().toRequestBody("application/json".toMediaType())
-                                        val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(body).build()
-                                        val response = client.newCall(request).execute()
+                                        val request = Request.Builder()
+                                            .url(Constants.GOOGLE_SHEET_API_URL)
+                                            .post(jsonBody.toString().toRequestBody("application/json".toMediaType()))
+                                            .build()
+                                        val response = NetworkClient.instance.newCall(request).execute()
                                         val resData = response.body?.string() ?: ""
 
                                         withContext(Dispatchers.Main) {
-                                            isUpdating = false
                                             if (resData.contains("success")) {
-                                                Toast.makeText(context, "Balance Updated Successfully!", Toast.LENGTH_SHORT).show()
-                                                onSuccess()
+                                                onSuccess() // Silent background refresh
                                             } else {
-                                                Toast.makeText(context, "Update Failed!", Toast.LENGTH_SHORT).show()
+                                                Toast.makeText(context, "Balance Update Failed!", Toast.LENGTH_SHORT).show()
                                             }
                                         }
                                     } catch (e: Exception) {
-                                        withContext(Dispatchers.Main) {
-                                            isUpdating = false
-                                            Toast.makeText(context, "Network Error", Toast.LENGTH_SHORT).show()
-                                        }
+                                        // Ignore background failures to keep UI seamless
                                     }
                                 }
                             } else {
@@ -282,11 +280,9 @@ fun QuickUpdateDialog(bank: BankAccountItem, username: String, onDismiss: () -> 
                         },
                         modifier = Modifier.weight(1f).height(50.dp),
                         shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF388E3C)),
-                        enabled = !isUpdating
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF388E3C))
                     ) {
-                        if (isUpdating) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp), strokeWidth = 3.dp)
-                        else Text("Update", fontWeight = FontWeight.Bold, color = Color.White)
+                        Text("Update", fontWeight = FontWeight.Bold, color = Color.White)
                     }
                 }
             }
