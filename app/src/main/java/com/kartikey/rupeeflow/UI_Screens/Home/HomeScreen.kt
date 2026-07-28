@@ -73,16 +73,15 @@ fun HomeDashboardDesign(
     val context = LocalContext.current
     var showBudgetDialog by remember { mutableStateOf(false) }
 
-    // UNIVERSAL HELPER: Sabhi grid cards me chota ₹ aur comma format lagane ke liye
+    // UNIVERSAL HELPER: Sabhi grid cards me ₹ ko ab amount ki exact size ka kar diya gaya hai
     fun getAnnotatedAmount(amount: Double): AnnotatedString {
         val format = NumberFormat.getNumberInstance(Locale("en", "IN"))
         format.maximumFractionDigits = 2
         val formattedNum = format.format(amount)
         
         return buildAnnotatedString {
-            withStyle(style = SpanStyle(fontSize = 13.sp, baselineShift = BaselineShift(0.2f))) { 
-                append("₹ ") 
-            }
+            // Yahan se chota SpanStyle hata diya gaya hai taaki size match kare
+            append("₹ ") 
             append(formattedNum)
         }
     }
@@ -127,22 +126,20 @@ fun HomeDashboardDesign(
             isLoadingExpenses = isLoadingExpenses,
             onRefreshExpenses = onRefreshExpenses, 
             onExpenseCardClick = onExpenseCardClick,
-            onAddBudgetClick = { showBudgetDialog = true } 
         )
         
         Spacer(modifier = Modifier.height(16.dp))
 
-        // SMART UI: Agar amount 0 se bada hai, toh chota ₹ laga ke dikhao, warna "Add Details"
         val invDisplayValue = if (totalInvestment > 0) getAnnotatedAmount(totalInvestment) else AnnotatedString("Add Details")
         val bankDisplayValue = if (totalBankBalance > 0) getAnnotatedAmount(totalBankBalance) else AnnotatedString("Add Details")
         
-        // BUDGET LIMIT SMART DISPLAY WITH REMAINING LOGIC & ANNOTATED STRING
         val availAmount = maxOf(0.0, budgetLimit - thisMonthExpenses)
         val availPct = if (budgetLimit > 0) (availAmount / budgetLimit) * 100 else 0.0
 
         val budgetDisplayValue = if (budgetLimit > 0) {
             buildAnnotatedString {
-                withStyle(style = SpanStyle(fontSize = 13.sp, baselineShift = BaselineShift(0.2f))) { append("₹ ") }
+                // Yahan se bhi chota SpanStyle hata diya gaya hai
+                append("₹ ") 
                 append(formatNumberOnly(availAmount))
                 withStyle(style = SpanStyle(fontSize = 12.sp, color = Color.Gray)) { append(" (${String.format("%.1f", availPct)}%)") }
             }
@@ -340,7 +337,7 @@ fun ContriDashboardCard(
     modifier: Modifier = Modifier
 ) {
     Card(
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         modifier = modifier
@@ -348,28 +345,27 @@ fun ContriDashboardCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
+                .padding(12.dp)
         ) {
             Text(
                 text = "CONTRI",
-                fontSize = 12.sp,
+                fontSize = 10.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.Gray,
-                letterSpacing = 0.5.sp
+                color = Color.Gray
             )
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = "$contriCount Contri",
                 fontSize = 18.sp,
                 fontWeight = FontWeight.ExtraBold,
                 color = Color.Black
             )
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             Row(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(4.dp),
+                    .fillMaxWidth(0.6f)
+                    .height(3.dp),
                 horizontalArrangement = Arrangement.spacedBy(3.dp)
             ) {
                 val safeCount = contriCount.coerceIn(0, 5)
@@ -380,7 +376,7 @@ fun ContriDashboardCard(
                             .fillMaxHeight()
                             .background(
                                 color = if (i <= safeCount) Color(0xFF2E7D32) else Color(0xFFE0E0E0),
-                                shape = RoundedCornerShape(2.dp)
+                                shape = RoundedCornerShape(50)
                             )
                     )
                 }
