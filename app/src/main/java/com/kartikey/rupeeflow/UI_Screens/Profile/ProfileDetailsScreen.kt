@@ -21,6 +21,8 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kartikey.rupeeflow.UI_Screens.updateUserProfile
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -36,9 +38,7 @@ fun ProfileDetailsScreen(
     onProfileUpdated: () -> Unit
 ) {
     var isEditing by remember { mutableStateOf(false) }
-    var isSubmitting by remember { mutableStateOf(false) }
 
-    // Pre-fill fields with backend data
     var currentName by remember { mutableStateOf(name) }
     var currentUsername by remember { mutableStateOf(username) }
     var currentMobile by remember { mutableStateOf(mobile) }
@@ -50,7 +50,6 @@ fun ProfileDetailsScreen(
     var usernameError by remember { mutableStateOf(false) }
     
     val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
 
     Scaffold(
         topBar = {
@@ -62,52 +61,46 @@ fun ProfileDetailsScreen(
                     }
                 },
                 actions = {
-                    if (isSubmitting) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.padding(end = 16.dp).size(24.dp), 
-                            color = Color(0xFF2E7D32), 
-                            strokeWidth = 2.dp
-                        )
-                    } else {
-                        IconButton(onClick = { 
-                            if (isEditing) {
-                                isSubmitting = true
-                                coroutineScope.launch {
-                                    updateUserProfile(
-                                        oldUsername = username,
-                                        newName = currentName,
-                                        newUsername = currentUsername,
-                                        newMobile = currentMobile,
-                                        newEmail = currentEmail,
-                                        newPassword = currentPassword,
-                                        newDob = currentDob,
-                                        onSuccess = {
-                                            isSubmitting = false
-                                            isEditing = false
-                                            usernameError = false
-                                            onProfileUpdated() // Fetch latest changes globally
-                                            Toast.makeText(context, "Profile Details Updated!", Toast.LENGTH_SHORT).show()
-                                        },
-                                        onError = { errorType ->
-                                            isSubmitting = false
-                                            if (errorType == "username_taken") {
-                                                usernameError = true 
-                                            } else {
-                                                Toast.makeText(context, "Update Failed!", Toast.LENGTH_SHORT).show()
-                                            }
+                    IconButton(onClick = { 
+                        if (isEditing) {
+                            // OPTIMISTIC UI: Instantly lock fields
+                            isEditing = false
+                            Toast.makeText(context, "Saving changes...", Toast.LENGTH_SHORT).show()
+                            
+                            CoroutineScope(Dispatchers.IO).launch {
+                                updateUserProfile(
+                                    oldUsername = username,
+                                    newName = currentName,
+                                    newUsername = currentUsername,
+                                    newMobile = currentMobile,
+                                    newEmail = currentEmail,
+                                    newPassword = currentPassword,
+                                    newDob = currentDob,
+                                    onSuccess = {
+                                        usernameError = false
+                                        onProfileUpdated() 
+                                        Toast.makeText(context, "Profile Details Updated!", Toast.LENGTH_SHORT).show()
+                                    },
+                                    onError = { errorType ->
+                                        if (errorType == "username_taken") {
+                                            isEditing = true
+                                            usernameError = true 
+                                        } else {
+                                            isEditing = true
+                                            Toast.makeText(context, "Update Failed!", Toast.LENGTH_SHORT).show()
                                         }
-                                    )
-                                }
-                            } else {
-                                isEditing = true 
+                                    }
+                                )
                             }
-                        }) {
-                            Icon(
-                                imageVector = if (isEditing) Icons.Default.Check else Icons.Outlined.Edit, 
-                                contentDescription = if (isEditing) "Save" else "Edit", 
-                                tint = Color(0xFF2E7D32)
-                            )
+                        } else {
+                            isEditing = true 
                         }
+                    }) {
+                        Icon(
+                            imageVector = if (isEditing) Icons.Default.Check else Icons.Outlined.Edit, 
+                            contentDescription = if (isEditing) "Save" else "Edit", 
+                            tint = Color(0xFF2E7D32)
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFFF8F9FA))
