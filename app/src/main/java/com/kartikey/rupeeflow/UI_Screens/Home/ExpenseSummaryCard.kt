@@ -134,13 +134,13 @@ fun ExpenseSummaryCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // YAHAN HAI MAIN FIX: Green Rupee + Black Amount, Dono ko Normal Weight (not bold) kar diya hai
                 Text(
                     text = buildAnnotatedString {
-                        withStyle(style = SpanStyle(color = Color(0xFF2E7D32), fontWeight = FontWeight.Normal, fontSize = 30.sp)) {
+                        // FIX: FontWeight.SemiBold lagaya gaya hai dono me "halka sa bold" effect ke liye
+                        withStyle(style = SpanStyle(color = Color(0xFF2E7D32), fontWeight = FontWeight.SemiBold, fontSize = 30.sp)) {
                             append("₹ ")
                         }
-                        withStyle(style = SpanStyle(color = Color.Black, fontWeight = FontWeight.Normal, fontSize = 30.sp)) {
+                        withStyle(style = SpanStyle(color = Color.Black, fontWeight = FontWeight.SemiBold, fontSize = 30.sp)) {
                             append(formatNumber(currentAmount))
                         }
                     }
