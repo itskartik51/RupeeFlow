@@ -19,7 +19,10 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.text.NumberFormat
@@ -66,13 +69,12 @@ fun ExpenseSummaryCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        shape = RoundedCornerShape(20.dp), // Roundish corners
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp) // Soft shadow, no hard border
+        shape = RoundedCornerShape(20.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp) 
     ) {
         Column(
-            modifier = Modifier.padding(16.dp) // Overall padding kam kar di hai
+            modifier = Modifier.padding(16.dp) 
         ) {
-            // Header Row: Title & Dropdown
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -125,24 +127,28 @@ fun ExpenseSummaryCard(
                 }
             }
             
-            Spacer(modifier = Modifier.height(4.dp)) // Gap drastically reduced
+            Spacer(modifier = Modifier.height(4.dp)) 
             
-            // Middle Row: Amount & Refresh Button
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // YAHAN HAI MAIN FIX: Green Rupee + Black Amount, Dono ko Normal Weight (not bold) kar diya hai
                 Text(
-                    text = "₹${formatNumber(currentAmount)}", // Wapas normal Black text size me
-                    fontSize = 30.sp, // Chota kiya (pehle 36sp tha)
-                    fontWeight = FontWeight.ExtraBold,
-                    color = Color.Black
+                    text = buildAnnotatedString {
+                        withStyle(style = SpanStyle(color = Color(0xFF2E7D32), fontWeight = FontWeight.Normal, fontSize = 30.sp)) {
+                            append("₹ ")
+                        }
+                        withStyle(style = SpanStyle(color = Color.Black, fontWeight = FontWeight.Normal, fontSize = 30.sp)) {
+                            append(formatNumber(currentAmount))
+                        }
+                    }
                 )
                 
                 Box(
                     modifier = Modifier
-                        .size(28.dp) // Bahar ka circle drastically chota kar diya
+                        .size(28.dp) 
                         .clip(CircleShape)
                         .background(Color(0xFFF5F5F5))
                         .clickable { onRefreshExpenses() },
@@ -153,19 +159,18 @@ fun ExpenseSummaryCard(
                         contentDescription = "Refresh", 
                         tint = Color.DarkGray,
                         modifier = Modifier
-                            .size(18.dp) // Icon same size hai, bas surrounding space cut ho gayi
+                            .size(18.dp) 
                             .rotate(if (isLoadingExpenses) angle else 0f)
                     )
                 }
             }
             
-            Spacer(modifier = Modifier.height(14.dp)) // Gap drastically reduced
+            Spacer(modifier = Modifier.height(14.dp)) 
             
-            // Progress Bar
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(8.dp) // Thoda patla kiya
+                    .height(8.dp) 
                     .clip(RoundedCornerShape(50))
                     .background(Color(0xFFEEEEEE))
             ) {
@@ -180,7 +185,6 @@ fun ExpenseSummaryCard(
             
             Spacer(modifier = Modifier.height(6.dp))
             
-            // Progress Details
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -196,9 +200,8 @@ fun ExpenseSummaryCard(
                 Text(text = "₹${formatNumber(currentBudget)}", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Medium)
             }
             
-            Spacer(modifier = Modifier.height(14.dp)) // Gap drastically reduced
+            Spacer(modifier = Modifier.height(14.dp)) 
             
-            // Action Button
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End
@@ -206,7 +209,7 @@ fun ExpenseSummaryCard(
                 Button(
                     onClick = onExpenseCardClick,
                     modifier = Modifier
-                        .height(34.dp) // Button ki height choti kar di
+                        .height(34.dp) 
                         .scale(buttonScale)
                         .pointerInput(Unit) {
                             detectTapGestures(
@@ -217,7 +220,7 @@ fun ExpenseSummaryCard(
                                 }
                             )
                         },
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp), // Extra width padding remove ki
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp), 
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
                     shape = RoundedCornerShape(50) 
                 ) {
