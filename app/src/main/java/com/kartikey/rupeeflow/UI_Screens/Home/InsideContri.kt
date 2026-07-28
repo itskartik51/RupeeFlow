@@ -42,12 +42,13 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.kartikey.rupeeflow.Cloud_Database.Constants
+import com.kartikey.rupeeflow.UI_Screens.NetworkClient
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
@@ -144,7 +145,7 @@ fun InsideContriScreen(
                     .post(jsonBody.toString().toRequestBody("application/json".toMediaType()))
                     .build()
 
-                val response = OkHttpClient().newCall(request).execute()
+                val response = NetworkClient.instance.newCall(request).execute()
                 val resData = response.body?.string() ?: ""
 
                 withContext(Dispatchers.Main) {
@@ -242,7 +243,7 @@ fun InsideContriScreen(
                                 color = Color.Black
                             )
                             Spacer(modifier = Modifier.width(10.dp))
-                            // SYNC/REFRESH WHEEL
+                            
                             Icon(
                                 imageVector = Icons.Outlined.Sync,
                                 contentDescription = "Sync",
@@ -375,7 +376,7 @@ fun InsideContriScreen(
                                                         .url(Constants.GOOGLE_SHEET_API_URL)
                                                         .post(reqBody.toString().toRequestBody("application/json".toMediaType()))
                                                         .build()
-                                                    val response = OkHttpClient().newCall(request).execute()
+                                                    val response = NetworkClient.instance.newCall(request).execute()
                                                     val resStr = response.body?.string() ?: ""
 
                                                     withContext(Dispatchers.Main) {
@@ -389,7 +390,6 @@ fun InsideContriScreen(
                                                 } catch (e: Exception) {
                                                     withContext(Dispatchers.Main) { 
                                                         loadingState[cycle.dateRange] = false 
-                                                        Toast.makeText(context, "Network Error", Toast.LENGTH_SHORT).show()
                                                     }
                                                 }
                                             }
@@ -454,7 +454,6 @@ fun InsideContriScreen(
                         Text("Room Settings", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
                         Spacer(modifier = Modifier.height(16.dp))
 
-                        // Edit Name
                         OutlinedTextField(
                             value = editName,
                             onValueChange = { 
@@ -479,7 +478,6 @@ fun InsideContriScreen(
                         
                         Spacer(modifier = Modifier.height(12.dp))
 
-                        // Edit Pin
                         OutlinedTextField(
                             value = editPin,
                             onValueChange = { newValue -> 
@@ -557,9 +555,13 @@ fun InsideContriScreen(
                             Button(
                                 onClick = { 
                                     if (editName.isNotBlank() && editPin.length == 6) {
+                                        // OPTIMISTIC UI
                                         showSettingsDialog = false
-                                        isLoading = true
-                                        coroutineScope.launch(Dispatchers.IO) {
+                                        localRoomName = editName
+                                        localRoomPin = editPin
+                                        Toast.makeText(context, "Saving settings...", Toast.LENGTH_SHORT).show()
+                                        
+                                        CoroutineScope(Dispatchers.IO).launch {
                                             try {
                                                 val reqBody = JSONObject().apply {
                                                     put("action", "edit_contri_room")
@@ -573,27 +575,16 @@ fun InsideContriScreen(
                                                     .post(reqBody.toString().toRequestBody("application/json".toMediaType()))
                                                     .build()
 
-                                                val response = OkHttpClient().newCall(request).execute()
+                                                val response = NetworkClient.instance.newCall(request).execute()
                                                 val resStr = response.body?.string() ?: ""
 
                                                 withContext(Dispatchers.Main) {
                                                     if (resStr.contains("\"status\":\"success\"")) {
-                                                        localRoomName = editName
-                                                        localRoomPin = editPin
-                                                        Toast.makeText(context, "Settings Saved!", Toast.LENGTH_SHORT).show()
                                                         sharedPreferences.edit().remove(cacheKey).apply()
                                                         refreshTrigger++
-                                                    } else {
-                                                        Toast.makeText(context, "Update Failed", Toast.LENGTH_SHORT).show()
-                                                        isLoading = false
                                                     }
                                                 }
-                                            } catch (e: Exception) {
-                                                withContext(Dispatchers.Main) {
-                                                    Toast.makeText(context, "Network Error", Toast.LENGTH_SHORT).show()
-                                                    isLoading = false
-                                                }
-                                            }
+                                            } catch (e: Exception) {}
                                         }
                                     } else {
                                         Toast.makeText(context, "Invalid Name or Pin (must be 6 digits)", Toast.LENGTH_SHORT).show()
@@ -619,11 +610,13 @@ fun InsideContriScreen(
                     TextButton(
                         onClick = { 
                             val target = memberToRemove!!
+                            
+                            // OPTIMISTIC UI
                             memberToRemove = null
                             showSettingsDialog = false
-                            isLoading = true
+                            Toast.makeText(context, "Removing $target...", Toast.LENGTH_SHORT).show()
                             
-                            coroutineScope.launch(Dispatchers.IO) {
+                            CoroutineScope(Dispatchers.IO).launch {
                                 try {
                                     val jsonBody = JSONObject().apply {
                                         put("action", "leave_contri")
@@ -636,25 +629,16 @@ fun InsideContriScreen(
                                         .post(jsonBody.toString().toRequestBody("application/json".toMediaType()))
                                         .build()
 
-                                    val response = OkHttpClient().newCall(request).execute()
+                                    val response = NetworkClient.instance.newCall(request).execute()
                                     val resData = response.body?.string() ?: ""
 
                                     withContext(Dispatchers.Main) {
                                         if (resData.contains("\"status\":\"success\"")) {
-                                            Toast.makeText(context, "$target Removed Successfully!", Toast.LENGTH_SHORT).show()
                                             sharedPreferences.edit().remove(cacheKey).apply()
                                             refreshTrigger++ 
-                                        } else {
-                                            Toast.makeText(context, "Error removing member", Toast.LENGTH_SHORT).show()
-                                            isLoading = false
                                         }
                                     }
-                                } catch (e: Exception) {
-                                    withContext(Dispatchers.Main) {
-                                        Toast.makeText(context, "Network Error", Toast.LENGTH_SHORT).show()
-                                        isLoading = false
-                                    }
-                                }
+                                } catch (e: Exception) {}
                             }
                         }
                     ) { Text("Remove", color = Color.Red, fontWeight = FontWeight.Bold) }
@@ -679,9 +663,11 @@ fun InsideContriScreen(
                 confirmButton = {
                     TextButton(
                         onClick = { 
+                            // OPTIMISTIC UI
                             showNewCycleDialog = false
-                            isLoading = true
-                            coroutineScope.launch(Dispatchers.IO) {
+                            Toast.makeText(context, "Starting new cycle...", Toast.LENGTH_SHORT).show()
+                            
+                            CoroutineScope(Dispatchers.IO).launch {
                                 try {
                                     val jsonBody = JSONObject().apply {
                                         put("action", "start_new_cycle")
@@ -689,15 +675,12 @@ fun InsideContriScreen(
                                         put("room_code", room.roomCode)
                                     }
                                     val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(jsonBody.toString().toRequestBody("application/json".toMediaType())).build()
-                                    val response = OkHttpClient().newCall(request).execute()
+                                    NetworkClient.instance.newCall(request).execute()
                                     withContext(Dispatchers.Main) {
-                                        Toast.makeText(context, "New Cycle Started!", Toast.LENGTH_SHORT).show()
                                         sharedPreferences.edit().remove(cacheKey).apply()
                                         refreshTrigger++ 
                                     }
-                                } catch (e: Exception) {
-                                    withContext(Dispatchers.Main) { isLoading = false }
-                                }
+                                } catch (e: Exception) {}
                             }
                         }
                     ) { Text("New", color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold) }
@@ -715,9 +698,11 @@ fun InsideContriScreen(
                 confirmButton = {
                     TextButton(
                         onClick = { 
+                            // OPTIMISTIC UI
                             showLeaveDialog = false
-                            isLoading = true
-                            coroutineScope.launch(Dispatchers.IO) {
+                            Toast.makeText(context, "Leaving room...", Toast.LENGTH_SHORT).show()
+                            
+                            CoroutineScope(Dispatchers.IO).launch {
                                 try {
                                     val jsonBody = JSONObject().apply {
                                         put("action", "leave_contri")
@@ -725,14 +710,12 @@ fun InsideContriScreen(
                                         put("room_code", room.roomCode)
                                     }
                                     val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(jsonBody.toString().toRequestBody("application/json".toMediaType())).build()
-                                    val response = OkHttpClient().newCall(request).execute()
+                                    NetworkClient.instance.newCall(request).execute()
                                     withContext(Dispatchers.Main) {
                                         sharedPreferences.edit().remove(cacheKey).apply()
                                         onLeaveClick()
                                     }
-                                } catch (e: Exception) {
-                                    withContext(Dispatchers.Main) { isLoading = false }
-                                }
+                                } catch (e: Exception) {}
                             }
                         }
                     ) { Text("Leave", color = Color.Red, fontWeight = FontWeight.Bold) }
@@ -745,9 +728,12 @@ fun InsideContriScreen(
             AddContriExpenseDialog(
                 onDismiss = { showAddExpenseDialog = false },
                 onAdd = { title, dateMillis, amount ->
+                    
+                    // OPTIMISTIC UI
                     showAddExpenseDialog = false
-                    isLoading = true 
-                    coroutineScope.launch(Dispatchers.IO) {
+                    Toast.makeText(context, "Adding expense...", Toast.LENGTH_SHORT).show()
+                    
+                    CoroutineScope(Dispatchers.IO).launch {
                         try {
                             val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
                             val jsonBody = JSONObject().apply {
@@ -759,14 +745,12 @@ fun InsideContriScreen(
                                 put("amount", amount)
                             }
                             val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(jsonBody.toString().toRequestBody("application/json".toMediaType())).build()
-                            val response = OkHttpClient().newCall(request).execute()
+                            NetworkClient.instance.newCall(request).execute()
                             withContext(Dispatchers.Main) {
                                 sharedPreferences.edit().remove(cacheKey).apply()
                                 refreshTrigger++ 
                             }
-                        } catch (e: Exception) {
-                            withContext(Dispatchers.Main) { isLoading = false }
-                        }
+                        } catch (e: Exception) {}
                     }
                 }
             )
