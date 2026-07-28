@@ -15,6 +15,25 @@ android {
         versionName = "1.0"
     }
 
+    // NEW LOGIC: Forcing GitHub Actions to use the exact same key every time
+    signingConfigs {
+        getByName("debug") {
+            val keystoreFile = file("../debug.keystore")
+            if (keystoreFile.exists()) {
+                storeFile = keystoreFile
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
+            }
+        }
+    }
+
+    buildTypes {
+        getByName("debug") {
+            signingConfig = signingConfigs.getByName("debug")
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
