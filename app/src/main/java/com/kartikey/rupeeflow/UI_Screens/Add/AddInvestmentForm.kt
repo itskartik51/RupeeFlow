@@ -21,6 +21,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kartikey.rupeeflow.Cloud_Database.Constants
+import com.kartikey.rupeeflow.UI_Screens.NetworkClient
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -47,8 +49,6 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
     var searchResults by remember { mutableStateOf<List<SearchRow>>(emptyList()) }
     var isSearching by remember { mutableStateOf(false) }
 
-    var isSubmitting by remember { mutableStateOf(false) }
-    val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
 
     var isPressed by remember { mutableStateOf(false) }
@@ -66,6 +66,7 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
         
         withContext(Dispatchers.IO) {
             try {
+                // Yahoo search independent hai, ise default client chalane denge
                 val client = OkHttpClient()
                 val request = Request.Builder()
                     .url("https://query2.finance.yahoo.com/v1/finance/search?q=${assetName.replace(" ", "%20")}&quotesCount=30&newsCount=0")
@@ -278,10 +279,12 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                     val price = buyPrice.toDoubleOrNull() ?: 0.0
                     
                     if (selectedSymbol.isNotBlank() && qty > 0 && price > 0) {
-                        isSubmitting = true
-                        onInvestmentAdded()
                         
-                        coroutineScope.launch(Dispatchers.IO) {
+                        // OPTIMISTIC UI: Instant Callback & Dismiss
+                        onInvestmentAdded()
+                        onDismiss() 
+                        
+                        CoroutineScope(Dispatchers.IO).launch {
                             try {
                                 val jsonBody = JSONObject().apply {
                                     put("action", "add_investment")
@@ -294,22 +297,12 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                                     put("broker", "")
                                     put("notes", "")
                                 }
-                                val client = OkHttpClient()
+                                val client = NetworkClient.instance
                                 val body = jsonBody.toString().toRequestBody("application/json".toMediaType())
                                 val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(body).build()
                                 client.newCall(request).execute()
-
-                                withContext(Dispatchers.Main) {
-                                    isSubmitting = false
-                                    Toast.makeText(context, "Investment Saved! Sheet will calculate live returns.", Toast.LENGTH_SHORT).show()
-                                    assetName = ""; selectedSymbol = ""; quantity = ""; buyPrice = ""; date = "" 
-                                    onDismiss() 
-                                }
                             } catch (e: Exception) {
-                                withContext(Dispatchers.Main) {
-                                    isSubmitting = false
-                                    Toast.makeText(context, "Error saving investment", Toast.LENGTH_SHORT).show()
-                                }
+                                // Background fail fallback
                             }
                         }
                     } else {
@@ -330,17 +323,11 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                         )
                     },
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF388E3C)),
-                shape = RoundedCornerShape(12.dp),
-                enabled = !isSubmitting
+                shape = RoundedCornerShape(12.dp)
             ) {
-                if (isSubmitting) {
-                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
-                } else {
-                    Text("Save Investment", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White)
-                }
+                Text("Save Investment", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White)
             }
             
-            // FIX: Padding Buffer
             Spacer(modifier = Modifier.height(24.dp))
         }
     }
