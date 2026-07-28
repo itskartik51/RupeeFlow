@@ -10,6 +10,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -17,13 +18,13 @@ import androidx.compose.ui.unit.sp
 @Composable
 fun GridCard(
     title: String, 
-    value: String, 
+    value: AnnotatedString, 
     lineColor: Color, 
     modifier: Modifier = Modifier,
-    onClick: () -> Unit = {} // NEW: Card ko clickable banane ke liye
+    onClick: () -> Unit = {} 
 ) {
     Card(
-        modifier = modifier.clickable { onClick() }, // Click Trigger
+        modifier = modifier.clickable { onClick() }, 
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(2.dp),
         shape = RoundedCornerShape(12.dp)
@@ -32,8 +33,7 @@ fun GridCard(
             Text(title, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
             Spacer(modifier = Modifier.height(8.dp))
             
-            // SMART LOGIC: Agar "Add Details" bheja gaya hai to design alag hoga
-            val isAddDetails = value.equals("Add Details", ignoreCase = true)
+            val isAddDetails = value.text.equals("Add Details", ignoreCase = true)
             Text(
                 text = value, 
                 fontSize = if (isAddDetails) 14.sp else 18.sp, 
