@@ -107,7 +107,6 @@ fun CCDetailCard(cc: CreditCardItem, username: String, onEditClick: (CreditCardI
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
             
-            // --- TOP ROW: IDENTITY & ICONS ---
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     modifier = Modifier.size(44.dp).background(Color(0xFF1976D2).copy(alpha = 0.05f), RoundedCornerShape(10.dp)),
@@ -129,11 +128,9 @@ fun CCDetailCard(cc: CreditCardItem, username: String, onEditClick: (CreditCardI
                     Text(text = "Card: ${cc.cardNo} | ${cc.type}", color = Color.Gray, fontSize = 12.sp, letterSpacing = 1.sp)
                 }
                 
-                // Bell Icon (Future Reminders)
                 IconButton(onClick = { /* TODO: Notification Settings */ }) {
                     Icon(Icons.Outlined.Notifications, contentDescription = "Reminders", tint = Color.Gray, modifier = Modifier.size(22.dp))
                 }
-                // Edit Icon
                 IconButton(onClick = { onEditClick(cc) }) {
                     Icon(Icons.Outlined.Edit, contentDescription = "Edit Card", tint = Color.Gray, modifier = Modifier.size(22.dp))
                 }
@@ -141,7 +138,6 @@ fun CCDetailCard(cc: CreditCardItem, username: String, onEditClick: (CreditCardI
             
             Spacer(modifier = Modifier.height(20.dp))
             
-            // --- MIDDLE ROW: LIMIT & ADD BUTTON ---
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                 Column {
                     Text(text = formatRupeeAmount(cc.limit), fontWeight = FontWeight.ExtraBold, fontSize = 24.sp, color = Color.Black)
@@ -158,18 +154,16 @@ fun CCDetailCard(cc: CreditCardItem, username: String, onEditClick: (CreditCardI
             
             Spacer(modifier = Modifier.height(12.dp))
             
-            // --- PROGRESS BAR & UTILIZATION ---
             val progressVal = (cc.utilization / 100f).toFloat().coerceIn(0f, 1f)
             LinearProgressIndicator(
                 progress = { progressVal },
                 modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
-                color = Color(0xFF1976D2), // Premium Blue
+                color = Color(0xFF1976D2),
                 trackColor = Color(0xFFEEEEEE),
             )
             
             Spacer(modifier = Modifier.height(6.dp))
             
-            // Decimal formatting to exactly 2 places
             Text(
                 text = String.format(Locale.US, "%.2f%%", cc.utilization),
                 fontSize = 11.sp,
@@ -180,7 +174,6 @@ fun CCDetailCard(cc: CreditCardItem, username: String, onEditClick: (CreditCardI
             
             Spacer(modifier = Modifier.height(8.dp))
             
-            // --- OUTSTANDING & AVAILABLE ---
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Column(horizontalAlignment = Alignment.Start) {
                     Text(text = formatRupeeAmount(cc.outstanding), fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color.Black)
@@ -196,7 +189,6 @@ fun CCDetailCard(cc: CreditCardItem, username: String, onEditClick: (CreditCardI
             HorizontalDivider(color = Color.LightGray.copy(alpha = 0.4f))
             Spacer(modifier = Modifier.height(16.dp))
             
-            // --- BOTTOM METRICS ---
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 MetricItem(label = "Billing Day", value = "${cc.billingDay}", valueColor = Color.DarkGray, alignment = Alignment.Start)
                 MetricItem(label = "Due Day", value = "${cc.dueDay}", valueColor = Color.Black, alignment = Alignment.CenterHorizontally)
