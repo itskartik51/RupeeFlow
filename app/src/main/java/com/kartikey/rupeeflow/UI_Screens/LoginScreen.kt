@@ -36,7 +36,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
@@ -47,17 +46,15 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
     var name by remember { mutableStateOf("") }
     var mobile by remember { mutableStateOf("") }
     var username by remember { mutableStateOf("") }
-    var email by remember { mutableStateOf("") } // Naya state Email ke liye
+    var email by remember { mutableStateOf("") } 
     var password by remember { mutableStateOf("") }
     var statusMessage by remember { mutableStateOf("") }
     val coroutineScope = rememberCoroutineScope()
 
-    // UI Controllers
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val isLoading = statusMessage == "Processing..."
 
-    // Keyboard Avoidance and Smooth Scroll Setup
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -69,7 +66,6 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
     ) {
         Spacer(modifier = Modifier.height(60.dp))
 
-        // --- APP LOGO & HEADER ---
         Image(
             painter = painterResource(id = R.mipmap.ic_launcher),
             contentDescription = "App Logo",
@@ -92,7 +88,6 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
 
         Spacer(modifier = Modifier.height(40.dp))
 
-        // --- SUBTITLE ---
         Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
             Text(
                 text = if (isLoginMode) "Sign In" else "New Profile",
@@ -104,7 +99,6 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // --- INPUT FIELDS ---
         if (!isLoginMode) {
             OutlinedTextField(
                 value = name,
@@ -140,7 +134,6 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
             )
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Naya Mandatory Email Field
             OutlinedTextField(
                 value = email,
                 onValueChange = { email = it },
@@ -206,7 +199,6 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
             })
         )
 
-        // Forget Password Option (Left Aligned, Only in Login Mode)
         if (isLoginMode) {
             Box(
                 modifier = Modifier
@@ -220,7 +212,6 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
                     fontWeight = FontWeight.SemiBold,
                     color = Color(0xFF2E7D32),
                     modifier = Modifier.clickable { 
-                        // Empty action as requested
                     }
                 )
             }
@@ -228,20 +219,17 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
         
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Error message handling
         if (statusMessage.isNotEmpty() && !isLoading) {
             Text(statusMessage, color = Color.Red, fontSize = 12.sp, modifier = Modifier.align(Alignment.Start))
         }
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // --- MAIN ACTION BUTTON ---
         Button(
             onClick = {
                 keyboardController?.hide()
                 focusManager.clearFocus()
 
-                // Mandatory fields check
                 if (!isLoginMode) {
                     if (name.isBlank() || mobile.isBlank() || username.isBlank() || password.isBlank() || email.isBlank()) {
                         statusMessage = "All fields including Email are mandatory!"
@@ -264,11 +252,12 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
                             put("username", username)
                             put("password", password)
                             if (!isLoginMode) {
-                                put("email", email) // Backend me email send kar rahe hain
+                                put("email", email) 
                             }
                         }
 
-                        val client = OkHttpClient()
+                        // Yahan ab naya client nahi banega, purana fast wala use hoga
+                        val client = NetworkClient.instance
                         val body = json.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
                         val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(body).build()
                         val response = client.newCall(request).execute()
@@ -312,7 +301,6 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
         
         Spacer(modifier = Modifier.height(32.dp))
 
-        // --- BOTTOM TOGGLE LINK ---
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.clickable { 
