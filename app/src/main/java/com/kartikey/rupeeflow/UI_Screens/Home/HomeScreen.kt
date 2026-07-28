@@ -73,10 +73,18 @@ fun HomeDashboardDesign(
     val context = LocalContext.current
     var showBudgetDialog by remember { mutableStateOf(false) }
 
-    fun formatRupeeStr(amount: Double): String {
-        val format = NumberFormat.getCurrencyInstance(Locale("en", "IN"))
+    // UNIVERSAL HELPER: Sabhi grid cards me chota ₹ aur comma format lagane ke liye
+    fun getAnnotatedAmount(amount: Double): AnnotatedString {
+        val format = NumberFormat.getNumberInstance(Locale("en", "IN"))
         format.maximumFractionDigits = 2
-        return format.format(amount).replace("-₹", "-₹ ")
+        val formattedNum = format.format(amount)
+        
+        return buildAnnotatedString {
+            withStyle(style = SpanStyle(fontSize = 13.sp, baselineShift = BaselineShift(0.2f))) { 
+                append("₹ ") 
+            }
+            append(formattedNum)
+        }
     }
     
     fun formatNumberOnly(amount: Double): String {
@@ -119,13 +127,14 @@ fun HomeDashboardDesign(
             isLoadingExpenses = isLoadingExpenses,
             onRefreshExpenses = onRefreshExpenses, 
             onExpenseCardClick = onExpenseCardClick,
-            onAddBudgetClick = { showBudgetDialog = true } // Naya connection pass
+            onAddBudgetClick = { showBudgetDialog = true } 
         )
         
         Spacer(modifier = Modifier.height(16.dp))
 
-        val invDisplayValue = if (totalInvestment > 0) AnnotatedString(formatRupeeStr(totalInvestment)) else AnnotatedString("Add Details")
-        val bankDisplayValue = if (totalBankBalance > 0) AnnotatedString(formatRupeeStr(totalBankBalance)) else AnnotatedString("Add Details")
+        // SMART UI: Agar amount 0 se bada hai, toh chota ₹ laga ke dikhao, warna "Add Details"
+        val invDisplayValue = if (totalInvestment > 0) getAnnotatedAmount(totalInvestment) else AnnotatedString("Add Details")
+        val bankDisplayValue = if (totalBankBalance > 0) getAnnotatedAmount(totalBankBalance) else AnnotatedString("Add Details")
         
         // BUDGET LIMIT SMART DISPLAY WITH REMAINING LOGIC & ANNOTATED STRING
         val availAmount = maxOf(0.0, budgetLimit - thisMonthExpenses)
@@ -133,7 +142,6 @@ fun HomeDashboardDesign(
 
         val budgetDisplayValue = if (budgetLimit > 0) {
             buildAnnotatedString {
-                // Baseline shift se ₹ symbol center me align hoga aur size chota dikhega
                 withStyle(style = SpanStyle(fontSize = 13.sp, baselineShift = BaselineShift(0.2f))) { append("₹ ") }
                 append(formatNumberOnly(availAmount))
                 withStyle(style = SpanStyle(fontSize = 12.sp, color = Color.Gray)) { append(" (${String.format("%.1f", availPct)}%)") }
