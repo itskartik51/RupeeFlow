@@ -1,5 +1,6 @@
 package com.kartikey.rupeeflow.UI_Screens.Home
 
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -7,9 +8,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -23,11 +25,23 @@ fun ExpenseSummaryCard(
     onRefreshExpenses: () -> Unit,
     onExpenseCardClick: () -> Unit
 ) {
+    // PREMIUM UI: Smooth continuous rotation animation jab isLoading true ho
+    val infiniteTransition = rememberInfiniteTransition(label = "refreshAnim")
+    val angle by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "spinAnim"
+    )
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onExpenseCardClick() }, // Yahan click karne se History khulegi
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF2E7D32)), // App Theme Green
+            .clickable { onExpenseCardClick() }, 
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF2E7D32)), 
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
     ) {
@@ -41,12 +55,15 @@ fun ExpenseSummaryCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text("Expense Summary", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                
                 IconButton(onClick = onRefreshExpenses, modifier = Modifier.size(24.dp)) {
-                    if (isLoadingExpenses) {
-                        CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
-                    } else {
-                        Icon(Icons.Outlined.Refresh, contentDescription = "Refresh", tint = Color.White)
-                    }
+                    // Yahan se mota CircularProgressIndicator hata kar smooth rotate laga diya gaya hai
+                    Icon(
+                        imageVector = Icons.Outlined.Refresh, 
+                        contentDescription = "Refresh", 
+                        tint = Color.White,
+                        modifier = Modifier.rotate(if (isLoadingExpenses) angle else 0f)
+                    )
                 }
             }
             
