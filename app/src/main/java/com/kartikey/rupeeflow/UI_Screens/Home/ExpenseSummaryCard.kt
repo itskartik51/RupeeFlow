@@ -19,10 +19,7 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.text.NumberFormat
@@ -32,11 +29,10 @@ import java.util.Locale
 fun ExpenseSummaryCard(
     thisMonthExpenses: Double,
     thisYearExpenses: Double,
-    budgetLimit: Double, 
+    budgetLimit: Double,
     isLoadingExpenses: Boolean,
     onRefreshExpenses: () -> Unit,
-    onExpenseCardClick: () -> Unit,
-    onAddBudgetClick: () -> Unit // NAYA PARAMETER
+    onExpenseCardClick: () -> Unit
 ) {
     var selectedPeriod by remember { mutableStateOf("Month") }
     var expanded by remember { mutableStateOf(false) }
@@ -70,91 +66,162 @@ fun ExpenseSummaryCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        shape = RoundedCornerShape(20.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+        shape = RoundedCornerShape(20.dp), // Roundish corners
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp) // Soft shadow, no hard border
     ) {
-        Column(modifier = Modifier.padding(24.dp)) {
-            
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text(text = "Total Expenses", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+        Column(
+            modifier = Modifier.padding(16.dp) // Overall padding kam kar di hai
+        ) {
+            // Header Row: Title & Dropdown
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Total Expenses", 
+                    color = Color.Black, 
+                    fontWeight = FontWeight.Bold, 
+                    fontSize = 15.sp 
+                )
                 
                 Box {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
+                            .clip(RoundedCornerShape(6.dp))
                             .clickable { expanded = true }
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
                     ) {
-                        Text(text = selectedPeriod, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color.DarkGray)
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Icon(imageVector = Icons.Outlined.KeyboardArrowDown, contentDescription = "Select", tint = Color(0xFF2E7D32), modifier = Modifier.size(20.dp))
+                        Text(
+                            text = selectedPeriod, 
+                            fontSize = 13.sp, 
+                            fontWeight = FontWeight.Medium, 
+                            color = Color.DarkGray
+                        )
+                        Spacer(modifier = Modifier.width(2.dp))
+                        Icon(
+                            imageVector = Icons.Outlined.KeyboardArrowDown, 
+                            contentDescription = "Select", 
+                            tint = Color(0xFF2E7D32),
+                            modifier = Modifier.size(18.dp)
+                        )
                     }
                     
-                    DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }, modifier = Modifier.background(Color.White)) {
-                        DropdownMenuItem(text = { Text("Month", color = Color.Black) }, onClick = { selectedPeriod = "Month"; expanded = false })
-                        DropdownMenuItem(text = { Text("Year", color = Color.Black) }, onClick = { selectedPeriod = "Year"; expanded = false })
+                    DropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false },
+                        modifier = Modifier.background(Color.White)
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Month", color = Color.Black) },
+                            onClick = { selectedPeriod = "Month"; expanded = false }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Year", color = Color.Black) },
+                            onClick = { selectedPeriod = "Year"; expanded = false }
+                        )
                     }
                 }
             }
             
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(4.dp)) // Gap drastically reduced
             
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            // Middle Row: Amount & Refresh Button
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text(
-                    text = buildAnnotatedString {
-                        withStyle(style = SpanStyle(color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold, fontSize = 36.sp)) { append("₹ ") }
-                        withStyle(style = SpanStyle(color = Color(0xFF1E1E1E), fontWeight = FontWeight.ExtraBold, fontSize = 36.sp)) { append(formatNumber(currentAmount)) }
-                    }
+                    text = "₹${formatNumber(currentAmount)}", // Wapas normal Black text size me
+                    fontSize = 30.sp, // Chota kiya (pehle 36sp tha)
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color.Black
                 )
+                
                 Box(
-                    modifier = Modifier.size(40.dp).clip(CircleShape).background(Color(0xFFF5F5F5)).clickable { onRefreshExpenses() },
+                    modifier = Modifier
+                        .size(28.dp) // Bahar ka circle drastically chota kar diya
+                        .clip(CircleShape)
+                        .background(Color(0xFFF5F5F5))
+                        .clickable { onRefreshExpenses() },
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(imageVector = Icons.Outlined.Refresh, contentDescription = "Refresh", tint = Color.DarkGray, modifier = Modifier.size(20.dp).rotate(if (isLoadingExpenses) angle else 0f))
-                }
-            }
-            
-            Spacer(modifier = Modifier.height(24.dp))
-            
-            Box(modifier = Modifier.fillMaxWidth().height(10.dp).clip(RoundedCornerShape(50)).background(Color(0xFFEEEEEE))) {
-                Box(modifier = Modifier.fillMaxWidth(progressRatio).fillMaxHeight().clip(RoundedCornerShape(50)).background(Color(0xFF2E7D32)))
-            }
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            // SMART LOGIC: Show Add Budget if no limit is set
-            if (currentBudget <= 0.0) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = "Add Budget", 
-                        color = Color(0xFF1976D2), 
-                        fontSize = 13.sp, 
-                        fontWeight = FontWeight.Bold,
+                    Icon(
+                        imageVector = Icons.Outlined.Refresh, 
+                        contentDescription = "Refresh", 
+                        tint = Color.DarkGray,
                         modifier = Modifier
-                            .clip(RoundedCornerShape(4.dp))
-                            .clickable { onAddBudgetClick() }
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                            .size(18.dp) // Icon same size hai, bas surrounding space cut ho gayi
+                            .rotate(if (isLoadingExpenses) angle else 0f)
                     )
                 }
-            } else {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text(text = "₹0", color = Color.Gray, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                    Text(text = "${String.format(Locale.US, "%.1f", percentUsed)}% used", color = Color.DarkGray, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                    Text(text = "₹${formatNumber(currentBudget)}", color = Color.Gray, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                }
             }
             
-            Spacer(modifier = Modifier.height(28.dp))
+            Spacer(modifier = Modifier.height(14.dp)) // Gap drastically reduced
             
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            // Progress Bar
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp) // Thoda patla kiya
+                    .clip(RoundedCornerShape(50))
+                    .background(Color(0xFFEEEEEE))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(progressRatio)
+                        .fillMaxHeight()
+                        .clip(RoundedCornerShape(50))
+                        .background(Color(0xFF2E7D32))
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(6.dp))
+            
+            // Progress Details
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(text = "₹0", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                Text(
+                    text = "${String.format(Locale.US, "%.1f", percentUsed)}% used", 
+                    color = Color.DarkGray, 
+                    fontSize = 12.sp, 
+                    fontWeight = FontWeight.Bold
+                )
+                Text(text = "₹${formatNumber(currentBudget)}", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+            }
+            
+            Spacer(modifier = Modifier.height(14.dp)) // Gap drastically reduced
+            
+            // Action Button
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
                 Button(
                     onClick = onExpenseCardClick,
-                    modifier = Modifier.height(44.dp).scale(buttonScale).pointerInput(Unit) { detectTapGestures(onPress = { isPressed = true; tryAwaitRelease(); isPressed = false }) },
+                    modifier = Modifier
+                        .height(34.dp) // Button ki height choti kar di
+                        .scale(buttonScale)
+                        .pointerInput(Unit) {
+                            detectTapGestures(
+                                onPress = {
+                                    isPressed = true
+                                    tryAwaitRelease()
+                                    isPressed = false
+                                }
+                            )
+                        },
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp), // Extra width padding remove ki
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
                     shape = RoundedCornerShape(50) 
                 ) {
-                    Text("View History", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Text("View History", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 }
             }
         }
