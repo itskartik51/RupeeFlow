@@ -311,6 +311,7 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
             username = username, 
             showMenu = showAddMenu, 
             onToggleMenu = { showAddMenu = !showAddMenu }, 
+            // OPTIMISTIC UI: Expense instantly list me upar append hoga
             onExpenseAdded = { newEntry -> transactionList = listOf(newEntry) + transactionList }, 
             onInvestmentAdded = { refreshTrigger++ }, 
             onFinanceAdded = { refreshTrigger++ }, 
@@ -330,7 +331,20 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
         }
         
         if (expenseToDelete != null) { 
-            DeleteExpenseDialog(expense = expenseToDelete!!, username = username, onDismiss = { expenseToDelete = null }, onSuccess = { expenseToDelete = null; refreshTrigger++ }) 
+            DeleteExpenseDialog(
+                expense = expenseToDelete!!, 
+                username = username, 
+                onDismiss = { expenseToDelete = null }, 
+                onSuccess = { 
+                    // OPTIMISTIC UI: Expense list se instantly remove hoga (0ms wait)
+                    val targetDate = expenseToDelete?.date
+                    expenseToDelete = null
+                    if(targetDate != null) {
+                        transactionList = transactionList.filter { it.date != targetDate }
+                    }
+                    refreshTrigger++ 
+                }
+            ) 
         }
         if (expenseToEdit != null) { 
             EditExpenseDialog(expense = expenseToEdit!!, username = username, bankList = bankList, ccList = ccList, onDismiss = { expenseToEdit = null }, onSuccess = { expenseToEdit = null; refreshTrigger++ }) 
