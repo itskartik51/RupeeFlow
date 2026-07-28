@@ -37,11 +37,11 @@ import com.kartikey.rupeeflow.UI_Screens.Add.TransactionModel
 import com.kartikey.rupeeflow.UI_Screens.Assets.BankAccountItem
 import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.CreditCardItem
 import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.FDItem
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
@@ -60,10 +60,7 @@ fun EditBankDialog(bank: BankAccountItem, username: String, onDismiss: () -> Uni
     val filteredBanks = if (bankName.isNotBlank()) Constants.IndianBanksList.filter { it.contains(bankName, ignoreCase = true) && !it.equals(bankName, ignoreCase = true) } else emptyList()
     val showDropdown = expanded && filteredBanks.isNotEmpty()
     
-    var isSubmitting by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
-    var isDeleting by remember { mutableStateOf(false) }
-    val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
     
     var isUpdatePressed by remember { mutableStateOf(false) }
@@ -73,14 +70,18 @@ fun EditBankDialog(bank: BankAccountItem, username: String, onDismiss: () -> Uni
 
     if (showDeleteConfirm) {
         AlertDialog(
-            onDismissRequest = { if (!isDeleting) showDeleteConfirm = false },
+            onDismissRequest = { showDeleteConfirm = false },
             title = { Text("Delete Bank Account", fontWeight = FontWeight.Bold, color = Color.Black) },
             text = { Text("Are you sure you want to permanently remove this bank account? This action cannot be undone.", color = Color.DarkGray) },
             confirmButton = {
                 Button(
                     onClick = {
-                        isDeleting = true
-                        coroutineScope.launch(Dispatchers.IO) {
+                        // OPTIMISTIC UI: Instant Dismiss
+                        showDeleteConfirm = false
+                        onDismiss()
+                        Toast.makeText(context, "Deleting bank...", Toast.LENGTH_SHORT).show()
+                        
+                        CoroutineScope(Dispatchers.IO).launch {
                             try {
                                 val jsonBody = JSONObject().apply { 
                                     put("action", "delete_data")
@@ -89,41 +90,32 @@ fun EditBankDialog(bank: BankAccountItem, username: String, onDismiss: () -> Uni
                                     put("identifier", bank.accountNo) 
                                 }
                                 val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(jsonBody.toString().toRequestBody("application/json".toMediaType())).build()
-                                val response = OkHttpClient().newCall(request).execute()
+                                val response = NetworkClient.instance.newCall(request).execute()
                                 val resData = response.body?.string() ?: ""
                                 withContext(Dispatchers.Main) {
-                                    isDeleting = false
                                     if (resData.contains("success")) { 
-                                        Toast.makeText(context, "Bank Account Removed!", Toast.LENGTH_SHORT).show()
-                                        showDeleteConfirm = false
-                                        onUpdateSuccess() 
+                                        onUpdateSuccess() // Background refresh
                                     } else { 
                                         Toast.makeText(context, "Failed to delete account!", Toast.LENGTH_SHORT).show() 
                                     }
                                 }
-                            } catch (e: Exception) { 
-                                withContext(Dispatchers.Main) { 
-                                    isDeleting = false
-                                    Toast.makeText(context, "Error deleting bank", Toast.LENGTH_SHORT).show() 
-                                } 
-                            }
+                            } catch (e: Exception) {}
                         }
                     }, 
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F))
                 ) { 
-                    if (isDeleting) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp) 
-                    else Text("Delete", color = Color.White, fontWeight = FontWeight.Bold) 
+                    Text("Delete", color = Color.White, fontWeight = FontWeight.Bold) 
                 }
             }, 
             dismissButton = { 
-                TextButton(onClick = { if (!isDeleting) showDeleteConfirm = false }) { 
+                TextButton(onClick = { showDeleteConfirm = false }) { 
                     Text("Cancel", color = Color.Gray, fontWeight = FontWeight.Bold) 
                 } 
             }
         )
     }
 
-    Dialog(onDismissRequest = { if (!isSubmitting && !isDeleting) onDismiss() }, properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = false)) {
+    Dialog(onDismissRequest = { onDismiss() }, properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = false)) {
         Card(modifier = Modifier.fillMaxWidth().padding(8.dp), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(8.dp)) {
             Column(modifier = Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -179,7 +171,7 @@ fun EditBankDialog(bank: BankAccountItem, username: String, onDismiss: () -> Uni
                 Spacer(modifier = Modifier.height(28.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedButton(
-                        onClick = { if (!isSubmitting) onDismiss() }, 
+                        onClick = { onDismiss() }, 
                         modifier = Modifier.weight(1f).height(50.dp).scale(cancelButtonScale).pointerInput(Unit) { detectTapGestures(onPress = { isCancelPressed = true; tryAwaitRelease(); isCancelPressed = false }) }, 
                         shape = RoundedCornerShape(12.dp), 
                         border = BorderStroke(1.dp, Color.LightGray), 
@@ -197,8 +189,12 @@ fun EditBankDialog(bank: BankAccountItem, username: String, onDismiss: () -> Uni
                                     Toast.makeText(context, "Please select a valid bank from the dropdown!", Toast.LENGTH_SHORT).show()
                                     return@Button 
                                 }
-                                isSubmitting = true
-                                coroutineScope.launch(Dispatchers.IO) {
+                                
+                                // OPTIMISTIC UI: Instant Dismiss
+                                onDismiss()
+                                Toast.makeText(context, "Updating bank...", Toast.LENGTH_SHORT).show()
+                                
+                                CoroutineScope(Dispatchers.IO).launch {
                                     try {
                                         val jsonBody = JSONObject().apply { 
                                             put("action", "edit_bank")
@@ -210,23 +206,16 @@ fun EditBankDialog(bank: BankAccountItem, username: String, onDismiss: () -> Uni
                                             put("new_interest_rate", newRate) 
                                         }
                                         val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(jsonBody.toString().toRequestBody("application/json".toMediaType())).build()
-                                        val response = OkHttpClient().newCall(request).execute()
+                                        val response = NetworkClient.instance.newCall(request).execute()
                                         val resData = response.body?.string() ?: ""
                                         withContext(Dispatchers.Main) {
-                                            isSubmitting = false
                                             if (resData.contains("success")) { 
-                                                Toast.makeText(context, "Bank Details Updated!", Toast.LENGTH_SHORT).show()
                                                 onUpdateSuccess() 
                                             } else { 
                                                 Toast.makeText(context, "Update Failed!", Toast.LENGTH_SHORT).show() 
                                             }
                                         }
-                                    } catch (e: Exception) { 
-                                        withContext(Dispatchers.Main) { 
-                                            isSubmitting = false
-                                            Toast.makeText(context, "Error updating bank", Toast.LENGTH_SHORT).show() 
-                                        } 
-                                    }
+                                    } catch (e: Exception) {}
                                 }
                             } else { 
                                 Toast.makeText(context, "Please enter valid details", Toast.LENGTH_SHORT).show() 
@@ -234,14 +223,9 @@ fun EditBankDialog(bank: BankAccountItem, username: String, onDismiss: () -> Uni
                         }, 
                         modifier = Modifier.weight(1f).height(50.dp).scale(updateButtonScale).pointerInput(Unit) { detectTapGestures(onPress = { isUpdatePressed = true; tryAwaitRelease(); isUpdatePressed = false }) }, 
                         shape = RoundedCornerShape(12.dp), 
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF388E3C)), 
-                        enabled = !isSubmitting
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF388E3C))
                     ) { 
-                        if (isSubmitting) { 
-                            CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp), strokeWidth = 3.dp) 
-                        } else { 
-                            Text("Update", fontWeight = FontWeight.Bold, color = Color.White) 
-                        } 
+                        Text("Update", fontWeight = FontWeight.Bold, color = Color.White) 
                     }
                 }
             }
@@ -253,12 +237,10 @@ fun EditBankDialog(bank: BankAccountItem, username: String, onDismiss: () -> Uni
 @Composable
 fun QuickUpdateCCDialog(cc: CreditCardItem, username: String, onDismiss: () -> Unit, onSuccess: () -> Unit) {
     var updateAmount by remember { mutableStateOf("") }
-    var isUpdating by remember { mutableStateOf(false) }
-    val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
     
     Dialog(
-        onDismissRequest = { if (!isUpdating) onDismiss() },
+        onDismissRequest = { onDismiss() },
         properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = false, usePlatformDefaultWidth = false)
     ) {
         Card(
@@ -289,7 +271,7 @@ fun QuickUpdateCCDialog(cc: CreditCardItem, username: String, onDismiss: () -> U
                 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedButton(
-                        onClick = { if (!isUpdating) onDismiss() },
+                        onClick = { onDismiss() },
                         modifier = Modifier.weight(1f).height(50.dp),
                         shape = RoundedCornerShape(12.dp)
                     ) {
@@ -300,10 +282,13 @@ fun QuickUpdateCCDialog(cc: CreditCardItem, username: String, onDismiss: () -> U
                         onClick = {
                             val amountEntered = updateAmount.toDoubleOrNull()
                             if (amountEntered != null && amountEntered != 0.0) {
-                                isUpdating = true
                                 val newCalculatedOutstanding = cc.outstanding + amountEntered 
                                 
-                                coroutineScope.launch(Dispatchers.IO) {
+                                // OPTIMISTIC UI
+                                onDismiss()
+                                Toast.makeText(context, "Updating card...", Toast.LENGTH_SHORT).show()
+                                
+                                CoroutineScope(Dispatchers.IO).launch {
                                     try {
                                         val jsonBody = JSONObject().apply {
                                             put("action", "edit_cc")
@@ -312,25 +297,22 @@ fun QuickUpdateCCDialog(cc: CreditCardItem, username: String, onDismiss: () -> U
                                             put("new_outstanding", newCalculatedOutstanding)
                                         }
                                         val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(jsonBody.toString().toRequestBody("application/json".toMediaType())).build()
-                                        val response = OkHttpClient().newCall(request).execute()
+                                        val response = NetworkClient.instance.newCall(request).execute()
                                         val resData = response.body?.string() ?: ""
 
                                         withContext(Dispatchers.Main) {
-                                            isUpdating = false
-                                            if (resData.contains("success")) { Toast.makeText(context, "Card Updated!", Toast.LENGTH_SHORT).show(); onSuccess() } 
+                                            if (resData.contains("success")) { onSuccess() } 
                                             else { Toast.makeText(context, "Update Failed!", Toast.LENGTH_SHORT).show() }
                                         }
-                                    } catch (e: Exception) { withContext(Dispatchers.Main) { isUpdating = false; Toast.makeText(context, "Network Error", Toast.LENGTH_SHORT).show() } }
+                                    } catch (e: Exception) {}
                                 }
                             } else { Toast.makeText(context, "Enter a valid amount", Toast.LENGTH_SHORT).show() }
                         },
                         modifier = Modifier.weight(1f).height(50.dp),
                         shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF388E3C)),
-                        enabled = !isUpdating
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF388E3C))
                     ) {
-                        if (isUpdating) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp), strokeWidth = 3.dp)
-                        else Text("Update", fontWeight = FontWeight.Bold, color = Color.White)
+                        Text("Update", fontWeight = FontWeight.Bold, color = Color.White)
                     }
                 }
             }
@@ -346,41 +328,40 @@ fun EditCreditCardDialog(cc: CreditCardItem, username: String, onDismiss: () -> 
     var dueDay by remember { mutableStateOf(cc.dueDay.toString()) }
     var annualFee by remember { mutableStateOf(cc.annualFee.toString()) }
     
-    var isSubmitting by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
-    var isDeleting by remember { mutableStateOf(false) }
-    val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
 
     if (showDeleteConfirm) {
         AlertDialog(
-            onDismissRequest = { if (!isDeleting) showDeleteConfirm = false },
+            onDismissRequest = { showDeleteConfirm = false },
             title = { Text("Remove Card", fontWeight = FontWeight.Bold) },
             text = { Text("Are you sure you want to permanently delete this Credit Card record?", color = Color.DarkGray) },
             confirmButton = {
                 Button(
                     onClick = {
-                        isDeleting = true
-                        coroutineScope.launch(Dispatchers.IO) {
+                        showDeleteConfirm = false
+                        onDismiss()
+                        Toast.makeText(context, "Deleting card...", Toast.LENGTH_SHORT).show()
+                        
+                        CoroutineScope(Dispatchers.IO).launch {
                             try {
                                 val jsonBody = JSONObject().apply { put("action", "delete_data"); put("username", username); put("data_type", "cc"); put("identifier", cc.cardNo) }
                                 val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(jsonBody.toString().toRequestBody("application/json".toMediaType())).build()
-                                val response = OkHttpClient().newCall(request).execute()
+                                val response = NetworkClient.instance.newCall(request).execute()
                                 val resData = response.body?.string() ?: ""
                                 withContext(Dispatchers.Main) {
-                                    isDeleting = false
-                                    if (resData.contains("success")) { Toast.makeText(context, "Card Removed!", Toast.LENGTH_SHORT).show(); showDeleteConfirm = false; onUpdateSuccess() } 
+                                    if (resData.contains("success")) { onUpdateSuccess() } 
                                     else { Toast.makeText(context, "Failed to delete card!", Toast.LENGTH_SHORT).show() }
                                 }
-                            } catch (e: Exception) { withContext(Dispatchers.Main) { isDeleting = false; Toast.makeText(context, "Error deleting", Toast.LENGTH_SHORT).show() } }
+                            } catch (e: Exception) {}
                         }
                     }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F))
-                ) { if (isDeleting) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp) else Text("Delete", color = Color.White) }
-            }, dismissButton = { TextButton(onClick = { if (!isDeleting) showDeleteConfirm = false }) { Text("Cancel", color = Color.Gray) } }
+                ) { Text("Delete", color = Color.White) }
+            }, dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel", color = Color.Gray) } }
         )
     }
 
-    Dialog(onDismissRequest = { if (!isSubmitting && !isDeleting) onDismiss() }, properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = false)) {
+    Dialog(onDismissRequest = { onDismiss() }, properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = false)) {
         Card(modifier = Modifier.fillMaxWidth().padding(8.dp), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(8.dp)) {
             Column(modifier = Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -402,31 +383,32 @@ fun EditCreditCardDialog(cc: CreditCardItem, username: String, onDismiss: () -> 
                 
                 Spacer(modifier = Modifier.height(28.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedButton(onClick = { if (!isSubmitting) onDismiss() }, modifier = Modifier.weight(1f).height(50.dp), shape = RoundedCornerShape(12.dp)) { Text("Cancel", color = Color.Black, fontWeight = FontWeight.Bold) }
+                    OutlinedButton(onClick = { onDismiss() }, modifier = Modifier.weight(1f).height(50.dp), shape = RoundedCornerShape(12.dp)) { Text("Cancel", color = Color.Black, fontWeight = FontWeight.Bold) }
                     Button(
                         onClick = {
                             val newLimit = limit.toDoubleOrNull()
                             if (newLimit != null) {
-                                isSubmitting = true
-                                coroutineScope.launch(Dispatchers.IO) {
+                                onDismiss()
+                                Toast.makeText(context, "Updating card...", Toast.LENGTH_SHORT).show()
+                                
+                                CoroutineScope(Dispatchers.IO).launch {
                                     try {
                                         val jsonBody = JSONObject().apply { 
                                             put("action", "edit_cc"); put("username", username); put("original_card_no", cc.cardNo)
                                             put("new_limit", newLimit); put("new_billing_day", billingDay.toIntOrNull()?:0); put("new_due_day", dueDay.toIntOrNull()?:0); put("new_annual_fee", annualFee.toDoubleOrNull()?:0.0) 
                                         }
                                         val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(jsonBody.toString().toRequestBody("application/json".toMediaType())).build()
-                                        val response = OkHttpClient().newCall(request).execute()
+                                        val response = NetworkClient.instance.newCall(request).execute()
                                         val resData = response.body?.string() ?: ""
                                         withContext(Dispatchers.Main) {
-                                            isSubmitting = false
-                                            if (resData.contains("success")) { Toast.makeText(context, "Card Updated!", Toast.LENGTH_SHORT).show(); onUpdateSuccess() } 
+                                            if (resData.contains("success")) { onUpdateSuccess() } 
                                             else { Toast.makeText(context, "Update Failed!", Toast.LENGTH_SHORT).show() }
                                         }
-                                    } catch (e: Exception) { withContext(Dispatchers.Main) { isSubmitting = false; Toast.makeText(context, "Error updating", Toast.LENGTH_SHORT).show() } }
+                                    } catch (e: Exception) {}
                                 }
                             } else { Toast.makeText(context, "Check inputs!", Toast.LENGTH_SHORT).show() }
-                        }, modifier = Modifier.weight(1f).height(50.dp), shape = RoundedCornerShape(12.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF388E3C)), enabled = !isSubmitting
-                    ) { if (isSubmitting) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp)) else Text("Save", color = Color.White, fontWeight = FontWeight.Bold) }
+                        }, modifier = Modifier.weight(1f).height(50.dp), shape = RoundedCornerShape(12.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF388E3C))
+                    ) { Text("Save", color = Color.White, fontWeight = FontWeight.Bold) }
                 }
             }
         }
@@ -437,39 +419,39 @@ fun EditCreditCardDialog(cc: CreditCardItem, username: String, onDismiss: () -> 
 @Composable
 fun EditFDDialog(fd: FDItem, username: String, onDismiss: () -> Unit, onUpdateSuccess: () -> Unit) {
     var showDeleteConfirm by remember { mutableStateOf(false) }
-    var isDeleting by remember { mutableStateOf(false) }
-    val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
 
     if (showDeleteConfirm) {
         AlertDialog(
-            onDismissRequest = { if (!isDeleting) showDeleteConfirm = false },
+            onDismissRequest = { showDeleteConfirm = false },
             title = { Text("Break / Delete FD", fontWeight = FontWeight.Bold) },
             text = { Text("Are you sure you want to delete this Fixed Deposit record?", color = Color.DarkGray) },
             confirmButton = {
                 Button(
                     onClick = {
-                        isDeleting = true
-                        coroutineScope.launch(Dispatchers.IO) {
+                        showDeleteConfirm = false
+                        onDismiss()
+                        Toast.makeText(context, "Deleting FD...", Toast.LENGTH_SHORT).show()
+                        
+                        CoroutineScope(Dispatchers.IO).launch {
                             try {
                                 val jsonBody = JSONObject().apply { put("action", "delete_data"); put("username", username); put("data_type", "fd"); put("identifier", fd.accountNo) }
                                 val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(jsonBody.toString().toRequestBody("application/json".toMediaType())).build()
-                                val response = OkHttpClient().newCall(request).execute()
+                                val response = NetworkClient.instance.newCall(request).execute()
                                 val resData = response.body?.string() ?: ""
                                 withContext(Dispatchers.Main) {
-                                    isDeleting = false
-                                    if (resData.contains("success")) { Toast.makeText(context, "FD Removed!", Toast.LENGTH_SHORT).show(); showDeleteConfirm = false; onUpdateSuccess() } 
+                                    if (resData.contains("success")) { onUpdateSuccess() } 
                                     else { Toast.makeText(context, "Failed to delete FD!", Toast.LENGTH_SHORT).show() }
                                 }
-                            } catch (e: Exception) { withContext(Dispatchers.Main) { isDeleting = false; Toast.makeText(context, "Error deleting", Toast.LENGTH_SHORT).show() } }
+                            } catch (e: Exception) {}
                         }
                     }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F))
-                ) { if (isDeleting) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp)) else Text("Delete", color = Color.White) }
-            }, dismissButton = { TextButton(onClick = { if (!isDeleting) showDeleteConfirm = false }) { Text("Cancel", color = Color.Gray) } }
+                ) { Text("Delete", color = Color.White) }
+            }, dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel", color = Color.Gray) } }
         )
     }
 
-    Dialog(onDismissRequest = { if (!isDeleting) onDismiss() }, properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = false)) {
+    Dialog(onDismissRequest = { onDismiss() }, properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = false)) {
         Card(modifier = Modifier.fillMaxWidth().padding(8.dp), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(8.dp)) {
             Column(modifier = Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -479,7 +461,7 @@ fun EditFDDialog(fd: FDItem, username: String, onDismiss: () -> Unit, onUpdateSu
                 Spacer(modifier = Modifier.height(16.dp))
                 Text("Fixed Deposit records cannot be freely edited to maintain interest accuracy. If you need to make changes, please Delete this record and recreate a new FD.", color = Color.Gray, fontSize = 14.sp)
                 Spacer(modifier = Modifier.height(28.dp))
-                OutlinedButton(onClick = { if (!isDeleting) onDismiss() }, modifier = Modifier.fillMaxWidth().height(50.dp), shape = RoundedCornerShape(12.dp)) { Text("Close", color = Color.Black, fontWeight = FontWeight.Bold) }
+                OutlinedButton(onClick = { onDismiss() }, modifier = Modifier.fillMaxWidth().height(50.dp), shape = RoundedCornerShape(12.dp)) { Text("Close", color = Color.Black, fontWeight = FontWeight.Bold) }
             }
         }
     }
@@ -501,7 +483,7 @@ suspend fun updateUserProfile(
                 if (newDob.isNotBlank()) put("new_dob", newDob)
             }
             val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(jsonBody.toString().toRequestBody("application/json".toMediaType())).build()
-            val response = OkHttpClient().newCall(request).execute()
+            val response = NetworkClient.instance.newCall(request).execute()
             val resData = response.body?.string() ?: ""
 
             withContext(Dispatchers.Main) {
@@ -515,7 +497,6 @@ suspend fun updateUserProfile(
     }
 }
 
-// THE NEW EXPENSE DELETE DIALOG
 @Composable
 fun DeleteExpenseDialog(
     expense: TransactionModel,
@@ -523,20 +504,20 @@ fun DeleteExpenseDialog(
     onDismiss: () -> Unit,
     onSuccess: () -> Unit
 ) {
-    var isDeleting by remember { mutableStateOf(false) }
-    val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
 
     AlertDialog(
-        onDismissRequest = { if (!isDeleting) onDismiss() },
+        onDismissRequest = { onDismiss() },
         containerColor = Color.White,
         title = { Text("Delete Expense?", fontWeight = FontWeight.Bold, color = Color.Black) },
         text = { Text("Are you sure you want to delete this ₹${expense.amount} expense? The deducted balance will be securely refunded to your account.", color = Color.DarkGray) },
         confirmButton = {
             Button(
                 onClick = {
-                    isDeleting = true
-                    coroutineScope.launch(Dispatchers.IO) {
+                    onDismiss()
+                    Toast.makeText(context, "Deleting expense...", Toast.LENGTH_SHORT).show()
+                    
+                    CoroutineScope(Dispatchers.IO).launch {
                         try {
                             val jsonBody = JSONObject().apply { 
                                 put("action", "delete_data")
@@ -545,39 +526,29 @@ fun DeleteExpenseDialog(
                                 put("identifier", expense.date) 
                             }
                             val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(jsonBody.toString().toRequestBody("application/json".toMediaType())).build()
-                            val response = OkHttpClient().newCall(request).execute()
+                            val response = NetworkClient.instance.newCall(request).execute()
                             val resData = response.body?.string() ?: ""
                             withContext(Dispatchers.Main) {
-                                isDeleting = false
                                 if (resData.contains("success")) { 
-                                    Toast.makeText(context, "Deleted & Balance Refunded!", Toast.LENGTH_SHORT).show()
                                     onSuccess() 
-                                } 
-                                else { Toast.makeText(context, "Failed to delete!", Toast.LENGTH_SHORT).show() }
+                                } else { Toast.makeText(context, "Failed to delete!", Toast.LENGTH_SHORT).show() }
                             }
-                        } catch (e: Exception) { 
-                            withContext(Dispatchers.Main) { 
-                                isDeleting = false
-                                Toast.makeText(context, "Error deleting", Toast.LENGTH_SHORT).show() 
-                            } 
-                        }
+                        } catch (e: Exception) {}
                     }
                 }, 
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F))
             ) { 
-                if (isDeleting) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp) 
-                else Text("Delete", color = Color.White, fontWeight = FontWeight.Bold) 
+                Text("Delete", color = Color.White, fontWeight = FontWeight.Bold) 
             }
         }, 
         dismissButton = { 
-            TextButton(onClick = { if (!isDeleting) onDismiss() }) { 
+            TextButton(onClick = { onDismiss() }) { 
                 Text("Cancel", color = Color.Gray, fontWeight = FontWeight.Bold) 
             } 
         }
     )
 }
 
-// THE NEW FULL EXPENSE EDIT DIALOG WITH DATE & SMART PAID-BY
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditExpenseDialog(
@@ -638,11 +609,9 @@ fun EditExpenseDialog(
     var selectedSourceName by remember { mutableStateOf(initialName) }
     var selectedSourceLogo by remember { mutableStateOf(initialLogo) }
 
-    var isSubmitting by remember { mutableStateOf(false) }
-    val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
 
-    Dialog(onDismissRequest = { if (!isSubmitting) onDismiss() }, properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = false)) {
+    Dialog(onDismissRequest = { onDismiss() }, properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = false)) {
         Card(modifier = Modifier.fillMaxWidth().padding(8.dp), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(8.dp)) {
             Column(modifier = Modifier.padding(20.dp)) {
                 Text("Edit Expense", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
@@ -784,7 +753,7 @@ fun EditExpenseDialog(
                 Spacer(modifier = Modifier.height(24.dp))
                 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedButton(onClick = { if (!isSubmitting) onDismiss() }, modifier = Modifier.weight(1f).height(50.dp), shape = RoundedCornerShape(12.dp)) { Text("Cancel", color = Color.Black, fontWeight = FontWeight.Bold) }
+                    OutlinedButton(onClick = { onDismiss() }, modifier = Modifier.weight(1f).height(50.dp), shape = RoundedCornerShape(12.dp)) { Text("Cancel", color = Color.Black, fontWeight = FontWeight.Bold) }
                     Button(
                         onClick = {
                             val finalCategory = if(isCustomCategory) customCategoryText.trim() else categoryText.trim()
@@ -794,8 +763,11 @@ fun EditExpenseDialog(
                                 if (selectedSourceType.isNotEmpty() && selectedSourceId.isEmpty()) {
                                     Toast.makeText(context, "Select exact account/card!", Toast.LENGTH_SHORT).show(); return@Button
                                 }
-                                isSubmitting = true
-                                coroutineScope.launch(Dispatchers.IO) {
+                                
+                                onDismiss()
+                                Toast.makeText(context, "Updating expense...", Toast.LENGTH_SHORT).show()
+                                
+                                CoroutineScope(Dispatchers.IO).launch {
                                     try {
                                         val jsonBody = JSONObject().apply { 
                                             put("action", "edit_expense")
@@ -811,23 +783,16 @@ fun EditExpenseDialog(
                                             put("source_identifier", selectedSourceId)
                                         }
                                         val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(jsonBody.toString().toRequestBody("application/json".toMediaType())).build()
-                                        val response = OkHttpClient().newCall(request).execute()
+                                        val response = NetworkClient.instance.newCall(request).execute()
                                         val resData = response.body?.string() ?: ""
                                         withContext(Dispatchers.Main) {
-                                            isSubmitting = false
                                             if (resData.contains("success")) { 
-                                                Toast.makeText(context, "Saved & Adjusted! ✅", Toast.LENGTH_SHORT).show()
                                                 onSuccess() 
                                             } else { 
                                                 Toast.makeText(context, "Update Failed!", Toast.LENGTH_SHORT).show() 
                                             }
                                         }
-                                    } catch (e: Exception) { 
-                                        withContext(Dispatchers.Main) { 
-                                            isSubmitting = false
-                                            Toast.makeText(context, "Error updating", Toast.LENGTH_SHORT).show() 
-                                        } 
-                                    }
+                                    } catch (e: Exception) {}
                                 }
                             } else { 
                                 Toast.makeText(context, "Fill required fields!", Toast.LENGTH_SHORT).show() 
@@ -835,11 +800,9 @@ fun EditExpenseDialog(
                         }, 
                         modifier = Modifier.weight(1f).height(50.dp), 
                         shape = RoundedCornerShape(12.dp), 
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF388E3C)), 
-                        enabled = !isSubmitting
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF388E3C))
                     ) { 
-                        if (isSubmitting) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp)) 
-                        else Text("Save", color = Color.White, fontWeight = FontWeight.Bold) 
+                        Text("Save", color = Color.White, fontWeight = FontWeight.Bold) 
                     }
                 }
             }
