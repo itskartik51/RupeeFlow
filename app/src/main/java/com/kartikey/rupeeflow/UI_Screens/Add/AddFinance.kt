@@ -1,7 +1,6 @@
 package com.kartikey.rupeeflow.UI_Screens.Add
 
 import android.widget.Toast
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -27,11 +26,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kartikey.rupeeflow.Cloud_Database.Constants
 import com.kartikey.rupeeflow.UI_Screens.CustomDatePicker
+import com.kartikey.rupeeflow.UI_Screens.NetworkClient
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
@@ -51,28 +50,23 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
         (Constants.IndianBanksList + "Utkarsh Small Finance Bank").distinct().sorted() 
     }
 
-    // Bank States
     var bankName by remember { mutableStateOf("") }
     var expandedBank by remember { mutableStateOf(false) }
     var bankAccountNo by remember { mutableStateOf("") }
     var currentBalance by remember { mutableStateOf("") }
     var bankInterestRate by remember { mutableStateOf("") }
     
-    // FD States
     var fdAccountNo by remember { mutableStateOf("") }
     var fdAmount by remember { mutableStateOf("") }
     var fdInterestRate by remember { mutableStateOf("") }
     var createDateMillis by remember { mutableStateOf<Long?>(null) }
     var maturityDateMillis by remember { mutableStateOf<Long?>(null) }
     
-    // Cash State
     var cashAmount by remember { mutableStateOf("") }
 
-    // --- NEW: CREDIT CARD STATES ---
     var ccIssuer by remember { mutableStateOf("") }
     var expandedCcIssuer by remember { mutableStateOf(false) }
     var ccCardNo by remember { mutableStateOf("") }
-    
     var ccAnnualFee by remember { mutableStateOf("") }
     var ccJoiningFee by remember { mutableStateOf("") }
     
@@ -89,10 +83,8 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
     val daysList = (1..31).map { it.toString() }
     var ccBillingDay by remember { mutableStateOf("") }
     var expandedBilling by remember { mutableStateOf(false) }
-    
     var ccDueDay by remember { mutableStateOf("") }
     var expandedDue by remember { mutableStateOf(false) }
-    
     var ccReminderDay by remember { mutableStateOf("") }
     var expandedReminder by remember { mutableStateOf(false) }
 
@@ -104,8 +96,6 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
         dynamicBankList.filter { it.contains(ccIssuer, ignoreCase = true) && !it.equals(ccIssuer, ignoreCase = true) }
     } else emptyList()
     
-    var isSubmitting by remember { mutableStateOf(false) }
-    val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
     var isPressed by remember { mutableStateOf(false) }
     val buttonScale by animateFloatAsState(targetValue = if (isPressed) 0.95f else 1f, label = "ButtonScale")
@@ -115,7 +105,7 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
     }
 
     // ==========================================
-    // MODULAR LOGIC BLOCKS
+    // OPTIMISTIC LOGIC BLOCKS (Zero Wait)
     // ==========================================
 
     val submitBankAccount = {
@@ -127,12 +117,16 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
         } else if (!dynamicBankList.contains(bankName)) {
             Toast.makeText(context, "Select a valid bank from dropdown!", Toast.LENGTH_SHORT).show()
         } else {
-            isSubmitting = true
             val formattedAcc = "XXXXX$bankAccountNo"
             
-            coroutineScope.launch(Dispatchers.IO) {
+            // 1. Optimistic Update
+            onFinanceAdded()
+            onDismiss()
+
+            // 2. Background Sync
+            CoroutineScope(Dispatchers.IO).launch {
                 try {
-                    val client = OkHttpClient()
+                    val client = NetworkClient.instance
                     val jsonBody = JSONObject().apply {
                         put("action", "add_bank")
                         put("username", username)
@@ -143,11 +137,7 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                     }
                     val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(jsonBody.toString().toRequestBody("application/json".toMediaType())).build()
                     client.newCall(request).execute()
-                    
-                    withContext(Dispatchers.Main) {
-                        isSubmitting = false; Toast.makeText(context, "Bank Account Added!", Toast.LENGTH_SHORT).show(); onFinanceAdded(); onDismiss()
-                    }
-                } catch (e: Exception) { withContext(Dispatchers.Main) { isSubmitting = false; Toast.makeText(context, "Network Error", Toast.LENGTH_SHORT).show() } }
+                } catch (e: Exception) {}
             }
         }
     }
@@ -161,10 +151,12 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
         } else if (!dynamicBankList.contains(bankName)) {
             Toast.makeText(context, "Select a valid institution from dropdown!", Toast.LENGTH_SHORT).show()
         } else {
-            isSubmitting = true
-            coroutineScope.launch(Dispatchers.IO) {
+            onFinanceAdded()
+            onDismiss()
+
+            CoroutineScope(Dispatchers.IO).launch {
                 try {
-                    val client = OkHttpClient()
+                    val client = NetworkClient.instance
                     val jsonBody = JSONObject().apply {
                         put("action", "add_fd")
                         put("username", username)
@@ -177,11 +169,7 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                     }
                     val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(jsonBody.toString().toRequestBody("application/json".toMediaType())).build()
                     client.newCall(request).execute()
-                    
-                    withContext(Dispatchers.Main) {
-                        isSubmitting = false; Toast.makeText(context, "FD Added Successfully!", Toast.LENGTH_SHORT).show(); onFinanceAdded(); onDismiss()
-                    }
-                } catch (e: Exception) { withContext(Dispatchers.Main) { isSubmitting = false; Toast.makeText(context, "Network Error", Toast.LENGTH_SHORT).show() } }
+                } catch (e: Exception) {}
             }
         }
     }
@@ -191,10 +179,12 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
         if (cAmt == null || cAmt <= 0) {
             Toast.makeText(context, "Enter valid cash amount", Toast.LENGTH_SHORT).show()
         } else {
-            isSubmitting = true
-            coroutineScope.launch(Dispatchers.IO) {
+            onFinanceAdded()
+            onDismiss()
+
+            CoroutineScope(Dispatchers.IO).launch {
                 try {
-                    val client = OkHttpClient()
+                    val client = NetworkClient.instance
                     val mediaType = "application/json".toMediaType()
                     
                     val fetchJson = JSONObject().apply { put("action", "get_all_data"); put("username", username) }
@@ -209,11 +199,7 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                     val updateJson = JSONObject().apply { put("action", "update_cash"); put("username", username); put("amount", finalAmount) }
                     val updateReq = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(updateJson.toString().toRequestBody(mediaType)).build()
                     client.newCall(updateReq).execute()
-                    
-                    withContext(Dispatchers.Main) {
-                        isSubmitting = false; Toast.makeText(context, "Cash Added Successfully!", Toast.LENGTH_SHORT).show(); onFinanceAdded(); onDismiss()
-                    }
-                } catch (e: Exception) { withContext(Dispatchers.Main) { isSubmitting = false; Toast.makeText(context, "Network Error", Toast.LENGTH_SHORT).show() } }
+                } catch (e: Exception) {}
             }
         }
     }
@@ -231,12 +217,13 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
         } else if (!dynamicBankList.contains(ccIssuer)) {
             Toast.makeText(context, "Select a valid Issuer from dropdown!", Toast.LENGTH_SHORT).show()
         } else {
-            isSubmitting = true
             val finalType = "$ccNetwork/$ccSecurity"
+            onFinanceAdded()
+            onDismiss()
             
-            coroutineScope.launch(Dispatchers.IO) {
+            CoroutineScope(Dispatchers.IO).launch {
                 try {
-                    val client = OkHttpClient()
+                    val client = NetworkClient.instance
                     val jsonBody = JSONObject().apply {
                         put("action", "add_cc")
                         put("username", username)
@@ -254,11 +241,7 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                     }
                     val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(jsonBody.toString().toRequestBody("application/json".toMediaType())).build()
                     client.newCall(request).execute()
-                    
-                    withContext(Dispatchers.Main) {
-                        isSubmitting = false; Toast.makeText(context, "Credit Card Added!", Toast.LENGTH_SHORT).show(); onFinanceAdded(); onDismiss()
-                    }
-                } catch (e: Exception) { withContext(Dispatchers.Main) { isSubmitting = false; Toast.makeText(context, "Network Error", Toast.LENGTH_SHORT).show() } }
+                } catch (e: Exception) {}
             }
         }
     }
@@ -381,9 +364,8 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                     Text("This amount will be added to your current cash balance automatically.", color = Color.Gray, fontSize = 11.sp, modifier = Modifier.padding(horizontal = 4.dp))
                 }
 
-                // --- CREDIT CARD UI (REFINED) ---
+                // --- CREDIT CARD UI ---
                 if (selectedType == "Credit Card") {
-                    // 1. Issuer Dropdown (With Icon)
                     ExposedDropdownMenuBox(expanded = expandedCcIssuer && filteredCCIssuers.isNotEmpty(), onExpandedChange = { expandedCcIssuer = it }) {
                         OutlinedTextField(
                             value = ccIssuer, onValueChange = { ccIssuer = it; expandedCcIssuer = true }, label = { Text("Issuer Bank") },
@@ -399,7 +381,6 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                     }
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    // 2. Card No.
                     OutlinedTextField(
                         value = ccCardNo, onValueChange = { if (it.length <= 4 && it.all { char -> char.isDigit() }) ccCardNo = it },
                         label = { Text("Credit Card No. (Last 4 Digits)") }, prefix = { Text("XXXXX ", color = Color.Black, fontWeight = FontWeight.Bold, letterSpacing = 2.sp) },
@@ -408,7 +389,6 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                     )
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    // 3. Joining & Annual Fee Row
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedTextField(
                             value = ccJoiningFee, onValueChange = { ccJoiningFee = it }, label = { Text("Joining Fee") },
@@ -425,7 +405,6 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                     }
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    // 4. Security & Network
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         ExposedDropdownMenuBox(expanded = expandedSecurity, onExpandedChange = { expandedSecurity = it }, modifier = Modifier.weight(1f)) {
                             OutlinedTextField(
@@ -450,7 +429,6 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                     }
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    // 5. Limit
                     OutlinedTextField(
                         value = ccLimit, onValueChange = { ccLimit = it }, label = { Text("Total Limit") }, prefix = { Text("₹ ", fontWeight = FontWeight.Bold, color = Color.Black) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth(), singleLine = true, shape = RoundedCornerShape(12.dp),
@@ -458,7 +436,6 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                     )
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // 6. Days Section
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Outlined.CalendarMonth, contentDescription = "Days", tint = Color.Gray, modifier = Modifier.size(20.dp))
                         Spacer(modifier = Modifier.width(6.dp))
@@ -488,7 +465,7 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                         }
                         ExposedDropdownMenuBox(expanded = expandedReminder, onExpandedChange = { expandedReminder = it }, modifier = Modifier.weight(1f)) {
                             OutlinedTextField(
-                                value = ccReminderDay, onValueChange = {}, readOnly = true, label = { Text("Remind") }, // Reminder renamed to Remind
+                                value = ccReminderDay, onValueChange = {}, readOnly = true, label = { Text("Remind") }, 
                                 modifier = Modifier.fillMaxWidth().menuAnchor(), singleLine = true, shape = RoundedCornerShape(12.dp),
                                 colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF2E7D32), focusedLabelColor = Color(0xFF2E7D32))
                             )
@@ -501,7 +478,6 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // ================== SMART SUBMIT BUTTON ==================
                 Button(
                     onClick = {
                         when (selectedType) {
@@ -515,20 +491,15 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                         detectTapGestures(onPress = { isPressed = true; tryAwaitRelease(); isPressed = false })
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF388E3C)),
-                    shape = RoundedCornerShape(12.dp),
-                    enabled = !isSubmitting
+                    shape = RoundedCornerShape(12.dp)
                 ) {
-                    if (isSubmitting) {
-                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
-                    } else {
-                        val btnText = when (selectedType) { 
-                            "Bank Account" -> "Add to Vault"
-                            "Cash" -> "Add Cash"
-                            "Credit Card" -> "Add Card"
-                            else -> "Create FD" 
-                        }
-                        Text(btnText, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White)
+                    val btnText = when (selectedType) { 
+                        "Bank Account" -> "Add to Vault"
+                        "Cash" -> "Add Cash"
+                        "Credit Card" -> "Add Card"
+                        else -> "Create FD" 
                     }
+                    Text(btnText, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White)
                 }
             }
             Spacer(modifier = Modifier.height(24.dp))
