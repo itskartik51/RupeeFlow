@@ -18,6 +18,19 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.util.Calendar
 import java.util.Locale
+import java.util.concurrent.TimeUnit
+
+// Naya Singleton Network Engine (Connection Pooling & Keep-Alive ke liye)
+object NetworkClient {
+    val instance: OkHttpClient by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(15, TimeUnit.SECONDS)
+            .writeTimeout(15, TimeUnit.SECONDS)
+            .retryOnConnectionFailure(true) // Network drop hone par auto-retry
+            .build()
+    }
+}
 
 data class AppData(
     val userFullName: String,
@@ -50,17 +63,17 @@ object CacheManager {
         }
     }
 
-    // forceRefresh parameter joda gaya hai
     suspend fun fetchAndCacheData(context: Context, username: String, forceRefresh: Boolean = false): AppData? {
         return withContext(Dispatchers.IO) {
             try {
                 val json = JSONObject().apply { 
                     put("action", "get_all_data")
                     put("username", username) 
-                    put("force_refresh", forceRefresh) // Backend ko instruction
+                    put("force_refresh", forceRefresh) 
                 }
                 
-                val client = OkHttpClient()
+                // Ab naya client nahi banega, purana fast connection reuse hoga
+                val client = NetworkClient.instance 
                 val body = json.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
                 val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(body).build()
                 val response = client.newCall(request).execute()
