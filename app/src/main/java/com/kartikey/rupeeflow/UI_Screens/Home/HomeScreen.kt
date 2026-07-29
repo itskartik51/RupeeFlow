@@ -226,53 +226,6 @@ fun HomeDashboardDesign(
 }
 
 // ==========================================
-// GRID CARD COMPONENT
-// ==========================================
-@Composable
-fun GridCard(
-    title: String,
-    value: AnnotatedString,
-    lineColor: Color,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
-) {
-    Card(
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        modifier = modifier.clickable { onClick() }
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp)
-        ) {
-            Text(
-                text = title,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.Gray
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = value,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = Color.Black,
-                maxLines = 1
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(0.6f)
-                    .height(3.dp)
-                    .background(color = lineColor, shape = RoundedCornerShape(50))
-            )
-        }
-    }
-}
-
-// ==========================================
 // SPENDING TRACKER CARD
 // ==========================================
 @Composable
