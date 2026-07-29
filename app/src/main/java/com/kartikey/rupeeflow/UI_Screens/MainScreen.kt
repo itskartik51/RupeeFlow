@@ -1,8 +1,10 @@
+@file:OptIn(ExperimentalSharedTransitionApi::class) // 1.7.0 ke naye features allow karne ke liye
 package com.kartikey.rupeeflow.UI_Screens
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.tween
@@ -37,6 +39,13 @@ import com.kartikey.rupeeflow.UI_Screens.Profile.ProfileScreen
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+// ==========================================
+// MASTER SETUP: Scopes for Apple Expand Animation
+// Inko global banane se hume har screen ka constructor nahi badalna padega
+// ==========================================
+val LocalSharedTransitionScope = compositionLocalOf<SharedTransitionScope?> { null }
+val LocalAnimatedVisibilityScope = compositionLocalOf<AnimatedVisibilityScope?> { null }
 
 @Composable
 fun MainScreen(username: String, onLogout: () -> Unit) {
@@ -79,9 +88,8 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
     var dNavState by remember { mutableStateOf("Connecting to Sheet...") }
     var dBackPresses by remember { mutableIntStateOf(0) }
     
-    // Refresh Triggers
     var refreshTrigger by remember { mutableIntStateOf(0) }
-    var forceFetchNext by remember { mutableStateOf(false) } // Sirf Contri ke liye flag
+    var forceFetchNext by remember { mutableStateOf(false) } 
 
     LaunchedEffect(selectedTab, showExpenseHistory, showContriScreen, isLoadingExpenses, transactionList.size, bankToEdit, ccToEdit, fdToEdit, showAddMenu) {
         if (showAddMenu) dNavState = "Add Menu Open"
@@ -108,8 +116,6 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
 
     LaunchedEffect(refreshTrigger) {
         isLoadingExpenses = true
-
-        // Force fetch flag capture kiya aur reset kar diya
         val shouldForceRefresh = forceFetchNext
         forceFetchNext = false 
 
@@ -133,7 +139,6 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
         }
 
         launch(Dispatchers.IO) {
-            // Agar Contri se refresh hua hai to shouldForceRefresh true jayega, baki sab me false
             val freshData = CacheManager.fetchAndCacheData(context, username, forceRefresh = shouldForceRefresh)
             withContext(Dispatchers.Main) {
                 if (freshData != null) {
@@ -158,235 +163,164 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        Scaffold(
-            bottomBar = {
-                NavigationBar(containerColor = Color.White, tonalElevation = 8.dp) {
-                    NavigationBarItem(
-                        modifier = Modifier.bounceClick(),
-                        selected = selectedTab == 0 && !showExpenseHistory && !showContriScreen, 
-                        onClick = { 
-                            selectedTab = 0
-                            showExpenseHistory = false
-                            showContriScreen = false
-                        }, 
-                        icon = { Icon(Icons.Outlined.Home, contentDescription = "Home") }, 
-                        label = { Text("Home") }, 
-                        colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
-                    )
-                    NavigationBarItem(
-                        modifier = Modifier.bounceClick(),
-                        selected = selectedTab == 1, 
-                        onClick = { 
-                            if (selectedTab == 1) assetsCurrentView = "Main"
-                            selectedTab = 1
-                            showExpenseHistory = false
-                            showContriScreen = false 
-                        }, 
-                        icon = { Icon(Icons.Outlined.AccountBalanceWallet, contentDescription = "Assets") }, 
-                        label = { Text("Assets") }, 
-                        colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
-                    )
-                    NavigationBarItem(
-                        modifier = Modifier.bounceClick(),
-                        selected = false, 
-                        onClick = { showAddMenu = !showAddMenu }, 
-                        icon = { Spacer(modifier = Modifier.size(48.dp)) }
-                    )
-                    NavigationBarItem(
-                        modifier = Modifier.bounceClick(),
-                        selected = selectedTab == 3, 
-                        onClick = { 
-                            selectedTab = 3
-                            showExpenseHistory = false
-                            showContriScreen = false
-                        }, 
-                        icon = { Icon(Icons.Outlined.PieChart, contentDescription = "Analytics") }, 
-                        label = { Text("Analytics") }, 
-                        colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
-                    )
-                    NavigationBarItem(
-                        modifier = Modifier.bounceClick(),
-                        selected = selectedTab == 4, 
-                        onClick = { 
-                            selectedTab = 4
-                            showExpenseHistory = false
-                            showContriScreen = false
-                        }, 
-                        icon = { Icon(Icons.Outlined.Person, contentDescription = "Profile") }, 
-                        label = { Text("Profile") }, 
-                        colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
-                    )
-                }
-            }
-        ) { paddingValues ->
-            AnimatedContent(
-                targetState = Triple(selectedTab, showExpenseHistory, showContriScreen),
-                transitionSpec = {
-                    val targetIsSecondary = targetState.second || targetState.third
-                    val initialIsSecondary = initialState.second || initialState.third
-                    
-                    if (targetIsSecondary && !initialIsSecondary) {
-                        (slideInHorizontally(animationSpec = tween(250)) { width -> width } + fadeIn(tween(250))).togetherWith(
-                            slideOutHorizontally(animationSpec = tween(250)) { width -> -width / 2 } + fadeOut(tween(250))
-                        )
-                    } else if (!targetIsSecondary && initialIsSecondary) {
-                        (slideInHorizontally(animationSpec = tween(250)) { width -> -width / 2 } + fadeIn(tween(250))).togetherWith(
-                            slideOutHorizontally(animationSpec = tween(250)) { width -> width } + fadeOut(tween(250))
-                        )
-                    } else {
-                        fadeIn(tween(250)) togetherWith fadeOut(tween(250))
-                    }
-                }, 
-                label = "Screen Transition"
-            ) { state ->
-                val (currentTab, isHistoryVisible, isContriVisible) = state
-                if (isContriVisible) {
-                    com.kartikey.rupeeflow.UI_Screens.Home.ContriScreen(
-                        username = username,
-                        contriRooms = contriRoomsList,
-                        paddingValues = paddingValues,
-                        onBackClick = { showContriScreen = false },
-                        onRefresh = { 
-                            // YAHAN SIRF CONTRI ME FORCE REFRESH HOGA
-                            forceFetchNext = true
-                            refreshTrigger++ 
-                        } 
-                    )
-                } else if (isHistoryVisible) {
-                    com.kartikey.rupeeflow.UI_Screens.Home.ExpenseHistoryScreen(
-                        paddingValues = paddingValues, 
-                        history = transactionList, 
-                        isLoading = isLoadingExpenses,
-                        onRefreshClick = { refreshTrigger++ }, // Normal Fast Cache Refresh
-                        onBackClick = { showExpenseHistory = false },
-                        onEditClick = { expenseToEdit = it }, 
-                        onDeleteClick = { expenseToDelete = it }
-                    )
-                } else {
-                    when (currentTab) {
-                        0 -> {
-                            val totalInv = investmentList.sumOf { it.quantity * it.currentPrice }
-                            val totalBank = bankList.sumOf { it.currentBalance }
-                            
-                            HomeDashboardDesign(
-                                username = username, 
-                                userFullName = userFullName, 
-                                paddingValues = paddingValues, 
-                                thisMonthExpenses = thisMonthExpenses, 
-                                thisYearExpenses = thisYearExpenses, 
-                                budgetLimit = budgetLimit,
-                                isLoadingExpenses = isLoadingExpenses, 
-                                dNavState = dNavState, 
-                                dBackPresses = dBackPresses, 
-                                onLogout = onLogout, 
-                                onRefreshExpenses = { refreshTrigger++ }, // Normal Fast Cache Refresh
-                                onExpenseCardClick = { showExpenseHistory = true },
-                                onContriClick = { showContriScreen = true },
-                                onAvatarClick = { 
-                                    selectedTab = 4 
-                                    openProfileDetails = true 
-                                },
-                                contriCount = contriRoomsList.size,
-                                totalInvestment = totalInv,
-                                totalBankBalance = totalBank,
-                                onInvestmentClick = {
-                                    assetsCurrentView = "InvestmentDetails"
-                                    selectedTab = 1
-                                },
-                                onBankClick = {
-                                    assetsCurrentView = "DirectBankAccounts"
-                                    selectedTab = 1
-                                },
-                                onBudgetSaved = { refreshTrigger++ } 
+    // YAHAN MASTER SHARED TRANSITION LAYOUT ADD KIYA HAI
+    SharedTransitionLayout(modifier = Modifier.fillMaxSize()) {
+        CompositionLocalProvider(LocalSharedTransitionScope provides this) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                Scaffold(
+                    bottomBar = {
+                        NavigationBar(containerColor = Color.White, tonalElevation = 8.dp) {
+                            NavigationBarItem(
+                                modifier = Modifier.bounceClick(),
+                                selected = selectedTab == 0 && !showExpenseHistory && !showContriScreen, 
+                                onClick = { selectedTab = 0; showExpenseHistory = false; showContriScreen = false }, 
+                                icon = { Icon(Icons.Outlined.Home, contentDescription = "Home") }, 
+                                label = { Text("Home") }, 
+                                colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
+                            )
+                            NavigationBarItem(
+                                modifier = Modifier.bounceClick(),
+                                selected = selectedTab == 1, 
+                                onClick = { if (selectedTab == 1) assetsCurrentView = "Main"; selectedTab = 1; showExpenseHistory = false; showContriScreen = false }, 
+                                icon = { Icon(Icons.Outlined.AccountBalanceWallet, contentDescription = "Assets") }, 
+                                label = { Text("Assets") }, 
+                                colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
+                            )
+                            NavigationBarItem(
+                                modifier = Modifier.bounceClick(),
+                                selected = false, 
+                                onClick = { showAddMenu = !showAddMenu }, 
+                                icon = { Spacer(modifier = Modifier.size(48.dp)) }
+                            )
+                            NavigationBarItem(
+                                modifier = Modifier.bounceClick(),
+                                selected = selectedTab == 3, 
+                                onClick = { selectedTab = 3; showExpenseHistory = false; showContriScreen = false }, 
+                                icon = { Icon(Icons.Outlined.PieChart, contentDescription = "Analytics") }, 
+                                label = { Text("Analytics") }, 
+                                colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
+                            )
+                            NavigationBarItem(
+                                modifier = Modifier.bounceClick(),
+                                selected = selectedTab == 4, 
+                                onClick = { selectedTab = 4; showExpenseHistory = false; showContriScreen = false }, 
+                                icon = { Icon(Icons.Outlined.Person, contentDescription = "Profile") }, 
+                                label = { Text("Profile") }, 
+                                colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
                             )
                         }
-                        1 -> AssetsScreen(
-                            paddingValues = paddingValues, 
-                            username = username, 
-                            investmentList = investmentList, 
-                            bankList = bankList, 
-                            fdList = fdList, 
-                            ccList = ccList, 
-                            cashData = cashData, 
-                            isLoading = isLoadingExpenses, 
-                            onRefreshClick = { refreshTrigger++ }, // Normal Fast Cache Refresh
-                            currentView = assetsCurrentView, 
-                            onViewChange = { assetsCurrentView = it }, 
-                            onEditBankClick = { bankToEdit = it }, 
-                            onEditCCClick = { ccToEdit = it }, 
-                            onEditFDClick = { fdToEdit = it }
-                        )
-                        3 -> AnalyticsScreen(paddingValues = paddingValues)
-                        4 -> ProfileScreen(
-                            username = username, 
-                            name = userFullName, 
-                            email = userEmail, 
-                            mobile = userMobile, 
-                            password = userPassword, 
-                            dob = userDob, 
-                            paddingValues = paddingValues, 
-                            onLogout = onLogout, 
-                            onProfileRefresh = { refreshTrigger++ }, // Normal Fast Cache Refresh
-                            startInDetails = openProfileDetails,
-                            onResetDetailsState = { openProfileDetails = false }
-                        )
+                    }
+                ) { paddingValues ->
+                    AnimatedContent(
+                        targetState = Triple(selectedTab, showExpenseHistory, showContriScreen),
+                        transitionSpec = {
+                            val targetIsSecondary = targetState.second || targetState.third
+                            val initialIsSecondary = initialState.second || initialState.third
+                            
+                            if (targetIsSecondary && !initialIsSecondary) {
+                                (slideInHorizontally(animationSpec = tween(350, easing = FastOutSlowInEasing)) { width -> width } + 
+                                 fadeIn(animationSpec = tween(350))).togetherWith(
+                                    slideOutHorizontally(animationSpec = tween(350, easing = FastOutSlowInEasing)) { width -> -width / 3 } + 
+                                    fadeOut(animationSpec = tween(350))
+                                )
+                            } else if (!targetIsSecondary && initialIsSecondary) {
+                                (slideInHorizontally(animationSpec = tween(350, easing = FastOutSlowInEasing)) { width -> -width / 3 } + 
+                                 fadeIn(animationSpec = tween(350))).togetherWith(
+                                    slideOutHorizontally(animationSpec = tween(350, easing = FastOutSlowInEasing)) { width -> width } + 
+                                    fadeOut(animationSpec = tween(350))
+                                )
+                            } else {
+                                fadeIn(animationSpec = tween(150)).togetherWith(fadeOut(animationSpec = tween(150)))
+                            }
+                        }, 
+                        label = "Apple Style Screen Transition"
+                    ) { state ->
+                        // YAHAN ANIMATED VISIBILITY SCOPE BHI PROVIDE KIYA HAI
+                        CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
+                            val (currentTab, isHistoryVisible, isContriVisible) = state
+                            if (isContriVisible) {
+                                com.kartikey.rupeeflow.UI_Screens.Home.ContriScreen(
+                                    username = username, contriRooms = contriRoomsList, paddingValues = paddingValues,
+                                    onBackClick = { showContriScreen = false }, onRefresh = { forceFetchNext = true; refreshTrigger++ } 
+                                )
+                            } else if (isHistoryVisible) {
+                                com.kartikey.rupeeflow.UI_Screens.Home.ExpenseHistoryScreen(
+                                    paddingValues = paddingValues, history = transactionList, isLoading = isLoadingExpenses,
+                                    onRefreshClick = { refreshTrigger++ }, onBackClick = { showExpenseHistory = false },
+                                    onEditClick = { expenseToEdit = it }, onDeleteClick = { expenseToDelete = it }
+                                )
+                            } else {
+                                when (currentTab) {
+                                    0 -> {
+                                        val totalInv = investmentList.sumOf { it.quantity * it.currentPrice }
+                                        val totalBank = bankList.sumOf { it.currentBalance }
+                                        
+                                        HomeDashboardDesign(
+                                            username = username, userFullName = userFullName, paddingValues = paddingValues, 
+                                            thisMonthExpenses = thisMonthExpenses, thisYearExpenses = thisYearExpenses, budgetLimit = budgetLimit,
+                                            isLoadingExpenses = isLoadingExpenses, dNavState = dNavState, dBackPresses = dBackPresses, 
+                                            onLogout = onLogout, onRefreshExpenses = { refreshTrigger++ },
+                                            onExpenseCardClick = { showExpenseHistory = true }, onContriClick = { showContriScreen = true },
+                                            onAvatarClick = { selectedTab = 4; openProfileDetails = true },
+                                            contriCount = contriRoomsList.size, totalInvestment = totalInv, totalBankBalance = totalBank,
+                                            onInvestmentClick = { assetsCurrentView = "InvestmentDetails"; selectedTab = 1 },
+                                            onBankClick = { assetsCurrentView = "DirectBankAccounts"; selectedTab = 1 },
+                                            onBudgetSaved = { refreshTrigger++ } 
+                                        )
+                                    }
+                                    1 -> AssetsScreen(
+                                        paddingValues = paddingValues, username = username, investmentList = investmentList, 
+                                        bankList = bankList, fdList = fdList, ccList = ccList, cashData = cashData, 
+                                        isLoading = isLoadingExpenses, onRefreshClick = { refreshTrigger++ },
+                                        currentView = assetsCurrentView, onViewChange = { assetsCurrentView = it }, 
+                                        onEditBankClick = { bankToEdit = it }, onEditCCClick = { ccToEdit = it }, onEditFDClick = { fdToEdit = it }
+                                    )
+                                    3 -> AnalyticsScreen(paddingValues = paddingValues)
+                                    4 -> ProfileScreen(
+                                        username = username, name = userFullName, email = userEmail, mobile = userMobile, 
+                                        password = userPassword, dob = userDob, paddingValues = paddingValues, 
+                                        onLogout = onLogout, onProfileRefresh = { refreshTrigger++ },
+                                        startInDetails = openProfileDetails, onResetDetailsState = { openProfileDetails = false }
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
+
+                AddScreen(
+                    username = username, showMenu = showAddMenu, onToggleMenu = { showAddMenu = !showAddMenu }, 
+                    onExpenseAdded = { newEntry -> transactionList = listOf(newEntry) + transactionList }, 
+                    onInvestmentAdded = { refreshTrigger++ }, onFinanceAdded = { refreshTrigger++ }, 
+                    bankList = bankList, ccList = ccList, cashData = cashData
+                )
+
+                if (bankToEdit != null) { EditBankDialog(bank = bankToEdit!!, username = username, onDismiss = { bankToEdit = null }, onUpdateSuccess = { bankToEdit = null; refreshTrigger++ }) }
+                if (ccToEdit != null) { EditCreditCardDialog(cc = ccToEdit!!, username = username, onDismiss = { ccToEdit = null }, onUpdateSuccess = { ccToEdit = null; refreshTrigger++ }) }
+                if (fdToEdit != null) { EditFDDialog(fd = fdToEdit!!, username = username, onDismiss = { fdToEdit = null }, onUpdateSuccess = { fdToEdit = null; refreshTrigger++ }) }
+                if (expenseToDelete != null) { 
+                    DeleteExpenseDialog(
+                        expense = expenseToDelete!!, username = username, onDismiss = { expenseToDelete = null }, 
+                        onSuccess = { 
+                            val targetDate = expenseToDelete?.date
+                            expenseToDelete = null
+                            if(targetDate != null) { transactionList = transactionList.filter { it.date != targetDate } }
+                            refreshTrigger++ 
+                        }
+                    ) 
+                }
+                if (expenseToEdit != null) { EditExpenseDialog(expense = expenseToEdit!!, username = username, bankList = bankList, ccList = ccList, onDismiss = { expenseToEdit = null }, onSuccess = { expenseToEdit = null; refreshTrigger++ }) }
             }
-        }
-
-        AddScreen(
-            username = username, 
-            showMenu = showAddMenu, 
-            onToggleMenu = { showAddMenu = !showAddMenu }, 
-            // OPTIMISTIC UI: Expense instantly list me upar append hoga
-            onExpenseAdded = { newEntry -> transactionList = listOf(newEntry) + transactionList }, 
-            onInvestmentAdded = { refreshTrigger++ }, 
-            onFinanceAdded = { refreshTrigger++ }, 
-            bankList = bankList, 
-            ccList = ccList, 
-            cashData = cashData
-        )
-
-        if (bankToEdit != null) { 
-            EditBankDialog(bank = bankToEdit!!, username = username, onDismiss = { bankToEdit = null }, onUpdateSuccess = { bankToEdit = null; refreshTrigger++ }) 
-        }
-        if (ccToEdit != null) { 
-            EditCreditCardDialog(cc = ccToEdit!!, username = username, onDismiss = { ccToEdit = null }, onUpdateSuccess = { ccToEdit = null; refreshTrigger++ }) 
-        }
-        if (fdToEdit != null) { 
-            EditFDDialog(fd = fdToEdit!!, username = username, onDismiss = { fdToEdit = null }, onUpdateSuccess = { fdToEdit = null; refreshTrigger++ }) 
-        }
-        
-        if (expenseToDelete != null) { 
-            DeleteExpenseDialog(
-                expense = expenseToDelete!!, 
-                username = username, 
-                onDismiss = { expenseToDelete = null }, 
-                onSuccess = { 
-                    // OPTIMISTIC UI: Expense list se instantly remove hoga (0ms wait)
-                    val targetDate = expenseToDelete?.date
-                    expenseToDelete = null
-                    if(targetDate != null) {
-                        transactionList = transactionList.filter { it.date != targetDate }
-                    }
-                    refreshTrigger++ 
-                }
-            ) 
-        }
-        if (expenseToEdit != null) { 
-            EditExpenseDialog(expense = expenseToEdit!!, username = username, bankList = bankList, ccList = ccList, onDismiss = { expenseToEdit = null }, onSuccess = { expenseToEdit = null; refreshTrigger++ }) 
         }
     }
 }
 
 // ==========================================
-// CUSTOM APPLE-STYLE BOUNCE CLICK ANIMATION
+// 1. BOUNCE CLICK ANIMATION (144Hz Butter Smooth)
 // ==========================================
 fun Modifier.bounceClick(
     scaleDown: Float = 0.90f,
-    onClick: (() -> Unit)? = null // Isko smart bana diya hai
+    onClick: (() -> Unit)? = null 
 ) = composed {
     var isPressed by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(
@@ -404,18 +338,15 @@ fun Modifier.bounceClick(
             scaleY = scale
         }
         .then(
-            // Agar bahar se onClick bheja hai (jaise kisi custom Box/Row me), tabhi Ripple hatayega
             if (onClick != null) {
                 Modifier.clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
                     onClick = onClick
                 )
-            } else {
-                Modifier // NavigationBarItem jese inbuilt buttons ke liye
-            }
+            } else { Modifier }
         )
-        .pointerInput(Unit) { // 'Unit' lagane se gesture infinite restart nahi hoga
+        .pointerInput(Unit) { 
             awaitPointerEventScope {
                 while (true) {
                     awaitFirstDown(false)
@@ -425,4 +356,30 @@ fun Modifier.bounceClick(
                 }
             }
         }
+}
+
+// ==========================================
+// 2. APPLE EXPAND (SHARED ELEMENT) MODIFIER
+// Isko hum kisi bhi card par lagaenge, bas key deni hogi
+// ==========================================
+fun Modifier.appleExpand(key: String): Modifier = composed {
+    val sharedScope = LocalSharedTransitionScope.current
+    val animScope = LocalAnimatedVisibilityScope.current
+
+    if (sharedScope != null && animScope != null) {
+        with(sharedScope) {
+            this@composed.sharedBounds(
+                sharedContentState = rememberSharedContentState(key = key),
+                animatedVisibilityScope = animScope,
+                boundsTransform = { _, _ -> 
+                    spring(
+                        dampingRatio = 0.85f, // Smooth transition, not too bouncy
+                        stiffness = Spring.StiffnessLow 
+                    ) 
+                }
+            )
+        }
+    } else {
+        this@composed
+    }
 }
