@@ -67,8 +67,7 @@ fun ExpenseSummaryCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .appleExpand("expense_flow") // Yahan tag lagaya gaya hai Expand animation ke liye
-            .bounceClick { onExpenseCardClick() }, // Pura card ab iOS jesa clickable aur bouncy hai
+            .bounceClick(), // Sirf visual bounce hoga, click par kuch open nahi hoga
         colors = CardDefaults.cardColors(containerColor = Color.White),
         shape = RoundedCornerShape(20.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp) 
@@ -93,7 +92,7 @@ fun ExpenseSummaryCard(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .clip(RoundedCornerShape(6.dp))
-                            .clickable { expanded = true } // Dropdown ka click alag se kaam karega
+                            .clickable { expanded = true }
                             .padding(horizontal = 6.dp, vertical = 2.dp)
                     ) {
                         Text(
@@ -151,7 +150,7 @@ fun ExpenseSummaryCard(
                         .size(28.dp) 
                         .clip(CircleShape)
                         .background(Color(0xFFF5F5F5))
-                        .bounceClick { onRefreshExpenses() }, // Refresh button par bhi bounce click
+                        .bounceClick { onRefreshExpenses() }, // Refresh par bounce
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -206,15 +205,23 @@ fun ExpenseSummaryCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End
             ) {
-                // Button ab sirf visual purpose ke liye hai, click logic Card me handle ho raha hai
-                Button(
-                    onClick = { /* Handled by Card bounceClick */ },
-                    modifier = Modifier.height(34.dp),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp), 
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
-                    shape = RoundedCornerShape(50) 
+                // Yahan se Animation Expand hogi aur yahi Clickable hai
+                Box(
+                    modifier = Modifier
+                        .height(34.dp)
+                        .appleExpand("expense_flow") // Expand tag button par shift kar diya
+                        .bounceClick { onExpenseCardClick() } // Asli click action yahan aagya
+                        .clip(RoundedCornerShape(50))
+                        .background(Color(0xFF2E7D32)),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Text("View History", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    Text(
+                        text = "View History", 
+                        color = Color.White, 
+                        fontWeight = FontWeight.Bold, 
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    )
                 }
             }
         }
