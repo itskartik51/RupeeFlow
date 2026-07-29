@@ -115,8 +115,9 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = Color(0xFF2E7D32),
                     unfocusedBorderColor = Color(0xFFEEEEEE),
-                    focusedContainerColor = Color.White,
-                    unfocusedContainerColor = Color.White
+                    // TRANSPARENT BACKGROUND RESTORED
+                    focusedContainerColor = Color.Transparent,
+                    unfocusedContainerColor = Color.Transparent
                 ),
                 keyboardOptions = KeyboardOptions(
                     capitalization = KeyboardCapitalization.Words,
@@ -136,8 +137,8 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = Color(0xFF2E7D32),
                     unfocusedBorderColor = Color(0xFFEEEEEE),
-                    focusedContainerColor = Color.White,
-                    unfocusedContainerColor = Color.White
+                    focusedContainerColor = Color.Transparent,
+                    unfocusedContainerColor = Color.Transparent
                 ),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                 keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
@@ -165,8 +166,8 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = if (emailError) Color.Red else Color(0xFF2E7D32),
                     unfocusedBorderColor = if (emailError) Color.Red else Color(0xFFEEEEEE),
-                    focusedContainerColor = Color.White,
-                    unfocusedContainerColor = Color.White
+                    focusedContainerColor = Color.Transparent,
+                    unfocusedContainerColor = Color.Transparent
                 ),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
                 keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
@@ -203,8 +204,8 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = Color(0xFF2E7D32),
                 unfocusedBorderColor = Color(0xFFEEEEEE),
-                focusedContainerColor = Color.White,
-                unfocusedContainerColor = Color.White
+                focusedContainerColor = Color.Transparent,
+                unfocusedContainerColor = Color.Transparent
             ),
             keyboardOptions = KeyboardOptions(
                 keyboardType = if (isLoginMode) KeyboardType.Text else KeyboardType.Phone,
@@ -225,8 +226,8 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = Color(0xFF2E7D32),
                 unfocusedBorderColor = Color(0xFFEEEEEE),
-                focusedContainerColor = Color.White,
-                unfocusedContainerColor = Color.White
+                focusedContainerColor = Color.Transparent,
+                unfocusedContainerColor = Color.Transparent
             ),
             visualTransformation = PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(
