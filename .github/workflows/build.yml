@@ -24,22 +24,19 @@ jobs:
     - name: Safe Environment Setup
       run: gradle wrapper --gradle-version 8.7
 
-    - name: Setup Permanent Debug Keystore
+    - name: Setup Permanent Release Keystore
       run: |
-        mkdir -p ~/.android
-        if [ ! -f debug.keystore ]; then
-          echo "Generating new permanent debug keystore..."
-          keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
-          cp debug.keystore ~/.android/debug.keystore
+        if [ ! -f release.keystore ]; then
+          echo "Generating new permanent release keystore..."
+          keytool -genkey -v -keystore release.keystore -storepass rupeeflow2026 -alias rupeeflow -keypass rupeeflow2026 -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=RupeeFlow,O=Kartikey,C=IN"
           
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add debug.keystore
-          git commit -m "Add permanent debug keystore [skip ci]" || echo "Nothing to commit"
+          git add release.keystore
+          git commit -m "Add permanent release keystore [skip ci]" || echo "Nothing to commit"
           git push || echo "Failed to push"
         else
-          echo "Using existing permanent debug keystore..."
-          cp debug.keystore ~/.android/debug.keystore
+          echo "Using existing permanent release keystore..."
         fi
 
     - name: Build Release APK
