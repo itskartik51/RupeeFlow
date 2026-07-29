@@ -24,6 +24,7 @@ import androidx.compose.ui.composed
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.kartikey.rupeeflow.UI_Screens.Home.HomeDashboardDesign
@@ -167,7 +168,6 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
         CompositionLocalProvider(LocalSharedTransitionScope provides this) {
             Box(modifier = Modifier.fillMaxSize()) {
                 Scaffold(
-                    // Yahan ekdum premium aur clean Off-White color set kiya hai taaki white cards pop karein
                     containerColor = Color(0xFFF8F8F8),
                     bottomBar = {
                         NavigationBar(containerColor = Color.White, tonalElevation = 8.dp) {
@@ -370,13 +370,10 @@ fun Modifier.appleExpand(key: String): Modifier = composed {
             this@composed.sharedBounds(
                 sharedContentState = rememberSharedContentState(key = key),
                 animatedVisibilityScope = animScope,
-                resizeMode = SharedTransitionScope.ResizeMode.RemeasureToBounds, // Text stretch hone se rokega aur fluidly reflow karega
-                
-                // Apple's Secret Illusion: Fade colors lightning fast at the start (100ms)
-                // so the rest of the animation is just a solid shape expanding!
+                // TEXT JUMP FIX: Text apni jagah fix rahega aur shape ke saath scale hoga!
+                resizeMode = SharedTransitionScope.ResizeMode.ScaleToBounds(), 
                 enter = fadeIn(animationSpec = tween(100, easing = LinearEasing)),
                 exit = fadeOut(animationSpec = tween(100, easing = LinearEasing)),
-                
                 boundsTransform = { _, _ -> 
                     spring(
                         dampingRatio = 0.85f,
