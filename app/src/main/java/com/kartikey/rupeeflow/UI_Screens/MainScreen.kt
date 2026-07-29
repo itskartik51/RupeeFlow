@@ -4,7 +4,6 @@ package com.kartikey.rupeeflow.UI_Screens
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.LinearEasing
@@ -24,7 +23,6 @@ import androidx.compose.ui.composed
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.kartikey.rupeeflow.UI_Screens.Home.HomeDashboardDesign
@@ -215,24 +213,9 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                     AnimatedContent(
                         targetState = Triple(selectedTab, showExpenseHistory, showContriScreen),
                         transitionSpec = {
-                            val targetIsSecondary = targetState.second || targetState.third
-                            val initialIsSecondary = initialState.second || initialState.third
-                            
-                            if (targetIsSecondary && !initialIsSecondary) {
-                                (slideInHorizontally(animationSpec = tween(350, easing = FastOutSlowInEasing)) { width -> width } + 
-                                 fadeIn(animationSpec = tween(350))).togetherWith(
-                                    slideOutHorizontally(animationSpec = tween(350, easing = FastOutSlowInEasing)) { width -> -width / 3 } + 
-                                    fadeOut(animationSpec = tween(350))
-                                )
-                            } else if (!targetIsSecondary && initialIsSecondary) {
-                                (slideInHorizontally(animationSpec = tween(350, easing = FastOutSlowInEasing)) { width -> -width / 3 } + 
-                                 fadeIn(animationSpec = tween(350))).togetherWith(
-                                    slideOutHorizontally(animationSpec = tween(350, easing = FastOutSlowInEasing)) { width -> width } + 
-                                    fadeOut(animationSpec = tween(350))
-                                )
-                            } else {
-                                fadeIn(animationSpec = tween(150)).togetherWith(fadeOut(animationSpec = tween(150)))
-                            }
+                            // CULPRIT REMOVED: Yahan se background slide hone wala ghatiya logic puri tarah hata diya gaya hai.
+                            // Ab sirf basic fade hoga jisse tumhara main background apni jagah se nahi hilega.
+                            fadeIn(animationSpec = tween(150)).togetherWith(fadeOut(animationSpec = tween(150)))
                         }, 
                         label = "Apple Style Screen Transition"
                     ) { state ->
@@ -327,7 +310,7 @@ fun Modifier.bounceClick(
         targetValue = if (isPressed) scaleDown else 1f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessLow
+            stiffness = Spring.StiffnessMedium // CULPRIT REMOVED: Ye yaha StiffnessLow par atka tha isliye touch lag tha. Ab turant set hoga!
         ),
         label = "BounceAnimation"
     )
@@ -370,14 +353,13 @@ fun Modifier.appleExpand(key: String): Modifier = composed {
             this@composed.sharedBounds(
                 sharedContentState = rememberSharedContentState(key = key),
                 animatedVisibilityScope = animScope,
-                // TEXT JUMP FIX: Text apni jagah fix rahega aur shape ke saath scale hoga!
                 resizeMode = SharedTransitionScope.ResizeMode.ScaleToBounds(), 
                 enter = fadeIn(animationSpec = tween(100, easing = LinearEasing)),
                 exit = fadeOut(animationSpec = tween(100, easing = LinearEasing)),
                 boundsTransform = { _, _ -> 
                     spring(
                         dampingRatio = 0.85f,
-                        stiffness = Spring.StiffnessLow 
+                        stiffness = Spring.StiffnessMedium // CULPRIT REMOVED: Animation ab tez settle hoga taaki clicks jaldi register hon.
                     ) 
                 }
             )
