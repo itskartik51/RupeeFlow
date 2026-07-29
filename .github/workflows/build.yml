@@ -32,7 +32,6 @@ jobs:
           keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
           cp debug.keystore ~/.android/debug.keystore
           
-          # Is key ko repo me save karne ka logic taaki hamesha same key use ho
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add debug.keystore
@@ -43,12 +42,11 @@ jobs:
           cp debug.keystore ~/.android/debug.keystore
         fi
 
-    - name: Build APK (Bina PC hang kiye)
-      run: ./gradlew assembleDebug
+    - name: Build Release APK
+      run: ./gradlew assembleRelease
 
-    - name: Upload APK (Download Link ke liye)
+    - name: Upload Release APK
       uses: actions/upload-artifact@v4
       with:
-        name: RupeeFlow-App
-        path: app/build/outputs/apk/debug/app-debug.apk
-        
+        name: RupeeFlow-App-Release
+        path: app/build/outputs/apk/release/app-release.apk
