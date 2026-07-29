@@ -1,8 +1,6 @@
 @file:OptIn(androidx.compose.animation.ExperimentalSharedTransitionApi::class)
 package com.kartikey.rupeeflow.UI_Screens
 
-import androidx.compose.animation.*
-import androidx.compose.animation.core.*
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -21,13 +19,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
@@ -58,7 +53,6 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
     var password by remember { mutableStateOf("") }
     var statusMessage by remember { mutableStateOf("") }
     
-    // Email focus validation state
     var emailError by remember { mutableStateOf(false) }
 
     val coroutineScope = rememberCoroutineScope()
@@ -111,7 +105,6 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
         Spacer(modifier = Modifier.height(16.dp))
 
         if (!isLoginMode) {
-            // 1. FULL NAME WITH AUTO-CAPITALIZATION (Words level)
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it },
@@ -133,7 +126,6 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
             )
             Spacer(modifier = Modifier.height(12.dp))
             
-            // USERNAME (No capitalization rule)
             OutlinedTextField(
                 value = username,
                 onValueChange = { username = it },
@@ -152,7 +144,6 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
             )
             Spacer(modifier = Modifier.height(12.dp))
 
-            // 2. EMAIL WITH FOCUS-LOSS VALIDATION
             OutlinedTextField(
                 value = email,
                 onValueChange = { 
@@ -183,7 +174,6 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
             Spacer(modifier = Modifier.height(12.dp))
         }
         
-        // 3. MOBILE NUMBER / USERNAME FIELD WITH PREFIX "+91" & 10 DIGIT LIMIT (For signup mode)
         OutlinedTextField(
             value = mobile,
             onValueChange = { input ->
@@ -275,12 +265,11 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // 4. ACTION BUTTON WITH BOUNCE & APPLE EXPAND MORPHING
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(52.dp)
-                .appleExpand("login_button_flow") // Seamless Morph tag connected with MainActivity
+                .appleExpand("login_button_flow")
                 .bounceClick {
                     keyboardController?.hide()
                     focusManager.clearFocus()
@@ -383,69 +372,5 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
         }
 
         Spacer(modifier = Modifier.height(40.dp)) 
-    }
-}
-
-// ==========================================
-// BOUNCE & SHARED ELEMENT APPLE MODIFIERS
-// ==========================================
-fun Modifier.bounceClick(
-    scaleDown: Float = 0.95f,
-    onClick: () -> Unit 
-) = composed {
-    var isPressed by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(
-        targetValue = if (isPressed) scaleDown else 1f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessLow
-        ),
-        label = "BounceAnimation"
-    )
-
-    this
-        .graphicsLayer {
-            scaleX = scale
-            scaleY = scale
-        }
-        .clickable(
-            interactionSource = remember { MutableInteractionSource() },
-            indication = null,
-            onClick = onClick
-        )
-        .pointerInput(Unit) { 
-            awaitPointerEventScope {
-                while (true) {
-                    awaitFirstDown(false)
-                    isPressed = true
-                    waitForUpOrCancellation()
-                    isPressed = false
-                }
-            }
-        }
-}
-
-fun Modifier.appleExpand(key: String): Modifier = composed {
-    val sharedScope = LocalSharedTransitionScope.current
-    val animScope = LocalAnimatedVisibilityScope.current
-
-    if (sharedScope != null && animScope != null) {
-        with(sharedScope) {
-            this@composed.sharedBounds(
-                sharedContentState = rememberSharedContentState(key = key),
-                animatedVisibilityScope = animScope,
-                resizeMode = SharedTransitionScope.ResizeMode.RemeasureToBounds,
-                enter = fadeIn(animationSpec = tween(100, easing = LinearEasing)),
-                exit = fadeOut(animationSpec = tween(100, easing = LinearEasing)),
-                boundsTransform = { _, _ -> 
-                    spring(
-                        dampingRatio = 0.85f,
-                        stiffness = Spring.StiffnessLow 
-                    ) 
-                }
-            )
-        }
-    } else {
-        this@composed
     }
 }
