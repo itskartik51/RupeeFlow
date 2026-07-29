@@ -42,6 +42,8 @@ android {
         }
         getByName("release") {
             isMinifyEnabled = false
+            // Ye naya code hai jo strict PNG checking ko band karega
+            isCrunchPngs = false 
             signingConfig = signingConfigs.getByName("release")
         }
     }
