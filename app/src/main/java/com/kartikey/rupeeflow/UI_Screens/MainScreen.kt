@@ -7,6 +7,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -316,7 +317,7 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
 
 // ==========================================
 // 1. BOUNCE CLICK ANIMATION (144Hz Butter Smooth)
-// ====================
+// ==========================================
 fun Modifier.bounceClick(
     scaleDown: Float = 0.90f,
     onClick: (() -> Unit)? = null 
@@ -369,6 +370,13 @@ fun Modifier.appleExpand(key: String): Modifier = composed {
             this@composed.sharedBounds(
                 sharedContentState = rememberSharedContentState(key = key),
                 animatedVisibilityScope = animScope,
+                resizeMode = SharedTransitionScope.ResizeMode.RemeasureToBounds, // Text stretch hone se rokega aur fluidly reflow karega
+                
+                // Apple's Secret Illusion: Fade colors lightning fast at the start (100ms)
+                // so the rest of the animation is just a solid shape expanding!
+                enter = fadeIn(animationSpec = tween(100, easing = LinearEasing)),
+                exit = fadeOut(animationSpec = tween(100, easing = LinearEasing)),
+                
                 boundsTransform = { _, _ -> 
                     spring(
                         dampingRatio = 0.85f,
