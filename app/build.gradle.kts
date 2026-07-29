@@ -15,6 +15,11 @@ android {
         versionName = "1.0"
     }
 
+    // AAPT Image Crunching ko disable kar rahe hain taaki PNG compile error na aaye
+    aaptOptions {
+        cruncherEnabled = false
+    }
+
     signingConfigs {
         getByName("debug") {
             val keystoreFile = file("../debug.keystore")
