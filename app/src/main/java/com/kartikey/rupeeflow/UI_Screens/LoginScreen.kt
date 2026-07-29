@@ -1,5 +1,8 @@
+@file:OptIn(androidx.compose.animation.ExperimentalSharedTransitionApi::class)
 package com.kartikey.rupeeflow.UI_Screens
 
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -18,14 +21,19 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -49,8 +57,11 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
     var email by remember { mutableStateOf("") } 
     var password by remember { mutableStateOf("") }
     var statusMessage by remember { mutableStateOf("") }
-    val coroutineScope = rememberCoroutineScope()
+    
+    // Email focus validation state
+    var emailError by remember { mutableStateOf(false) }
 
+    val coroutineScope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val isLoading = statusMessage == "Processing..."
@@ -58,7 +69,7 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.White)
+            .background(Color(0xFFF8F8F8))
             .imePadding() 
             .padding(horizontal = 24.dp)
             .verticalScroll(rememberScrollState()),
@@ -100,6 +111,7 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
         Spacer(modifier = Modifier.height(16.dp))
 
         if (!isLoginMode) {
+            // 1. FULL NAME WITH AUTO-CAPITALIZATION (Words level)
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it },
@@ -110,14 +122,18 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = Color(0xFF2E7D32),
                     unfocusedBorderColor = Color(0xFFEEEEEE),
-                    focusedContainerColor = Color.Transparent,
-                    unfocusedContainerColor = Color.Transparent
+                    focusedContainerColor = Color.White,
+                    unfocusedContainerColor = Color.White
                 ),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                keyboardOptions = KeyboardOptions(
+                    capitalization = KeyboardCapitalization.Words,
+                    imeAction = ImeAction.Next
+                ),
                 keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
             )
             Spacer(modifier = Modifier.height(12.dp))
             
+            // USERNAME (No capitalization rule)
             OutlinedTextField(
                 value = username,
                 onValueChange = { username = it },
@@ -127,23 +143,39 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
                 shape = RoundedCornerShape(12.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = Color(0xFF2E7D32),
-                    unfocusedBorderColor = Color(0xFFEEEEEE)
+                    unfocusedBorderColor = Color(0xFFEEEEEE),
+                    focusedContainerColor = Color.White,
+                    unfocusedContainerColor = Color.White
                 ),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                 keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
             )
             Spacer(modifier = Modifier.height(12.dp))
 
+            // 2. EMAIL WITH FOCUS-LOSS VALIDATION
             OutlinedTextField(
                 value = email,
-                onValueChange = { email = it },
-                label = { Text("Email ID", color = Color.Gray) },
-                leadingIcon = { Icon(Icons.Outlined.Email, contentDescription = "Email", tint = Color.Gray) },
-                modifier = Modifier.fillMaxWidth(),
+                onValueChange = { 
+                    email = it 
+                    if (emailError) emailError = false
+                },
+                label = { Text(if (emailError) "Invalid Email Format!" else "Email ID", color = if (emailError) Color.Red else Color.Gray) },
+                isError = emailError,
+                leadingIcon = { Icon(Icons.Outlined.Email, contentDescription = "Email", tint = if (emailError) Color.Red else Color.Gray) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onFocusChanged { focusState ->
+                        if (!focusState.isFocused && email.isNotBlank()) {
+                            val emailRegex = "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}".toRegex()
+                            emailError = !email.matches(emailRegex)
+                        }
+                    },
                 shape = RoundedCornerShape(12.dp),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color(0xFF2E7D32),
-                    unfocusedBorderColor = Color(0xFFEEEEEE)
+                    focusedBorderColor = if (emailError) Color.Red else Color(0xFF2E7D32),
+                    unfocusedBorderColor = if (emailError) Color.Red else Color(0xFFEEEEEE),
+                    focusedContainerColor = Color.White,
+                    unfocusedContainerColor = Color.White
                 ),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
                 keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
@@ -151,10 +183,24 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
             Spacer(modifier = Modifier.height(12.dp))
         }
         
+        // 3. MOBILE NUMBER / USERNAME FIELD WITH PREFIX "+91" & 10 DIGIT LIMIT (For signup mode)
         OutlinedTextField(
             value = mobile,
-            onValueChange = { mobile = it },
+            onValueChange = { input ->
+                if (isLoginMode) {
+                    mobile = input
+                } else {
+                    if (input.all { char -> char.isDigit() } && input.length <= 10) {
+                        mobile = input
+                    }
+                }
+            },
             label = { Text(if (isLoginMode) "Username or Mobile No." else "Mobile Number", color = Color.Gray) },
+            prefix = {
+                if (!isLoginMode) {
+                    Text("+91 ", color = Color.Black, fontWeight = FontWeight.Bold)
+                }
+            },
             leadingIcon = { 
                 Icon(
                     imageVector = if (isLoginMode) Icons.Outlined.Person else Icons.Outlined.Phone, 
@@ -166,7 +212,9 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
             shape = RoundedCornerShape(12.dp),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = Color(0xFF2E7D32),
-                unfocusedBorderColor = Color(0xFFEEEEEE)
+                unfocusedBorderColor = Color(0xFFEEEEEE),
+                focusedContainerColor = Color.White,
+                unfocusedContainerColor = Color.White
             ),
             keyboardOptions = KeyboardOptions(
                 keyboardType = if (isLoginMode) KeyboardType.Text else KeyboardType.Phone,
@@ -186,7 +234,9 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
             shape = RoundedCornerShape(12.dp),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = Color(0xFF2E7D32),
-                unfocusedBorderColor = Color(0xFFEEEEEE)
+                unfocusedBorderColor = Color(0xFFEEEEEE),
+                focusedContainerColor = Color.White,
+                unfocusedContainerColor = Color.White
             ),
             visualTransformation = PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(
@@ -225,68 +275,78 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        Button(
-            onClick = {
-                keyboardController?.hide()
-                focusManager.clearFocus()
-
-                if (!isLoginMode) {
-                    if (name.isBlank() || mobile.isBlank() || username.isBlank() || password.isBlank() || email.isBlank()) {
-                        statusMessage = "All fields including Email are mandatory!"
-                        return@Button
-                    }
-                } else {
-                    if (mobile.isBlank() || password.isBlank()) {
-                        statusMessage = "Please enter your credentials."
-                        return@Button
-                    }
-                }
-
-                coroutineScope.launch(Dispatchers.IO) {
-                    try {
-                        statusMessage = "Processing..."
-                        val json = JSONObject().apply {
-                            put("action", if (isLoginMode) "login" else "signup")
-                            put("name", name)
-                            put("mobile", mobile)
-                            put("username", username)
-                            put("password", password)
-                            if (!isLoginMode) {
-                                put("email", email) 
-                            }
-                        }
-
-                        // Yahan ab naya client nahi banega, purana fast wala use hoga
-                        val client = NetworkClient.instance
-                        val body = json.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
-                        val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(body).build()
-                        val response = client.newCall(request).execute()
-                        val responseData = response.body?.string() ?: ""
-                        
-                        withContext(Dispatchers.Main) {
-                            try {
-                                val jsonResponse = JSONObject(responseData)
-                                val status = jsonResponse.optString("status")
-                                val message = jsonResponse.optString("message")
-
-                                if (status == "success") {
-                                    val loggedInUser = jsonResponse.optString("username")
-                                    onLoginSuccess(loggedInUser)
-                                } else {
-                                    statusMessage = message
-                                }
-                            } catch (e: Exception) {
-                                statusMessage = "Error parsing data!"
-                            }
-                        }
-                    } catch (e: Exception) { withContext(Dispatchers.Main) { statusMessage = "Network Error!" } }
-                }
-            }, 
+        // 4. ACTION BUTTON WITH BOUNCE & APPLE EXPAND MORPHING
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(52.dp),
-            shape = RoundedCornerShape(12.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)) 
+                .height(52.dp)
+                .appleExpand("login_button_flow") // Seamless Morph tag connected with MainActivity
+                .bounceClick {
+                    keyboardController?.hide()
+                    focusManager.clearFocus()
+
+                    if (!isLoginMode) {
+                        if (name.isBlank() || mobile.isBlank() || username.isBlank() || password.isBlank() || email.isBlank()) {
+                            statusMessage = "All fields including Email are mandatory!"
+                            return@bounceClick
+                        }
+                        if (mobile.length != 10) {
+                            statusMessage = "Mobile number must be exactly 10 digits!"
+                            return@bounceClick
+                        }
+                        if (emailError) {
+                            statusMessage = "Please fix the email format!"
+                            return@bounceClick
+                        }
+                    } else {
+                        if (mobile.isBlank() || password.isBlank()) {
+                            statusMessage = "Please enter your credentials."
+                            return@bounceClick
+                        }
+                    }
+
+                    coroutineScope.launch(Dispatchers.IO) {
+                        try {
+                            statusMessage = "Processing..."
+                            val json = JSONObject().apply {
+                                put("action", if (isLoginMode) "login" else "signup")
+                                put("name", name)
+                                put("mobile", if (!isLoginMode) "+91$mobile" else mobile)
+                                put("username", username)
+                                put("password", password)
+                                if (!isLoginMode) {
+                                    put("email", email) 
+                                }
+                            }
+
+                            val client = NetworkClient.instance
+                            val body = json.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
+                            val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(body).build()
+                            val response = client.newCall(request).execute()
+                            val responseData = response.body?.string() ?: ""
+                            
+                            withContext(Dispatchers.Main) {
+                                try {
+                                    val jsonResponse = JSONObject(responseData)
+                                    val status = jsonResponse.optString("status")
+                                    val message = jsonResponse.optString("message")
+
+                                    if (status == "success") {
+                                        val loggedInUser = jsonResponse.optString("username")
+                                        onLoginSuccess(loggedInUser)
+                                    } else {
+                                        statusMessage = message
+                                    }
+                                } catch (e: Exception) {
+                                    statusMessage = "Error parsing data!"
+                                }
+                            }
+                        } catch (e: Exception) { withContext(Dispatchers.Main) { statusMessage = "Network Error!" } }
+                    }
+                }
+                .clip(RoundedCornerShape(12.dp))
+                .background(Color(0xFF2E7D32)),
+            contentAlignment = Alignment.Center
         ) { 
             if (isLoading) {
                 CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp), strokeWidth = 2.5.dp)
@@ -294,7 +354,8 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
                 Text(
                     text = if (isLoginMode) "Access My Flow" else "Create & Seed Profile", 
                     fontSize = 16.sp, 
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
                 ) 
             }
         }
@@ -322,5 +383,69 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
         }
 
         Spacer(modifier = Modifier.height(40.dp)) 
+    }
+}
+
+// ==========================================
+// BOUNCE & SHARED ELEMENT APPLE MODIFIERS
+// ==========================================
+fun Modifier.bounceClick(
+    scaleDown: Float = 0.95f,
+    onClick: () -> Unit 
+) = composed {
+    var isPressed by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) scaleDown else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "BounceAnimation"
+    )
+
+    this
+        .graphicsLayer {
+            scaleX = scale
+            scaleY = scale
+        }
+        .clickable(
+            interactionSource = remember { MutableInteractionSource() },
+            indication = null,
+            onClick = onClick
+        )
+        .pointerInput(Unit) { 
+            awaitPointerEventScope {
+                while (true) {
+                    awaitFirstDown(false)
+                    isPressed = true
+                    waitForUpOrCancellation()
+                    isPressed = false
+                }
+            }
+        }
+}
+
+fun Modifier.appleExpand(key: String): Modifier = composed {
+    val sharedScope = LocalSharedTransitionScope.current
+    val animScope = LocalAnimatedVisibilityScope.current
+
+    if (sharedScope != null && animScope != null) {
+        with(sharedScope) {
+            this@composed.sharedBounds(
+                sharedContentState = rememberSharedContentState(key = key),
+                animatedVisibilityScope = animScope,
+                resizeMode = SharedTransitionScope.ResizeMode.RemeasureToBounds,
+                enter = fadeIn(animationSpec = tween(100, easing = LinearEasing)),
+                exit = fadeOut(animationSpec = tween(100, easing = LinearEasing)),
+                boundsTransform = { _, _ -> 
+                    spring(
+                        dampingRatio = 0.85f,
+                        stiffness = Spring.StiffnessLow 
+                    ) 
+                }
+            )
+        }
+    } else {
+        this@composed
     }
 }
