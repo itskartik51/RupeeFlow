@@ -15,7 +15,6 @@ android {
         versionName = "1.0"
     }
 
-    // NEW LOGIC: Forcing GitHub Actions to use the exact same key every time
     signingConfigs {
         getByName("debug") {
             val keystoreFile = file("../debug.keystore")
@@ -30,6 +29,10 @@ android {
 
     buildTypes {
         getByName("debug") {
+            signingConfig = signingConfigs.getByName("debug")
+        }
+        getByName("release") {
+            isMinifyEnabled = false
             signingConfig = signingConfigs.getByName("debug")
         }
     }
