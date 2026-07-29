@@ -73,14 +73,12 @@ fun HomeDashboardDesign(
     val context = LocalContext.current
     var showBudgetDialog by remember { mutableStateOf(false) }
 
-    // UNIVERSAL HELPER: Sabhi grid cards me ₹ ko ab amount ki exact size ka kar diya gaya hai
     fun getAnnotatedAmount(amount: Double): AnnotatedString {
         val format = NumberFormat.getNumberInstance(Locale("en", "IN"))
         format.maximumFractionDigits = 2
         val formattedNum = format.format(amount)
         
         return buildAnnotatedString {
-            // Yahan se chota SpanStyle hata diya gaya hai taaki size match kare
             append("₹ ") 
             append(formattedNum)
         }
@@ -92,101 +90,135 @@ fun HomeDashboardDesign(
         return format.format(amount)
     }
 
-    Column(modifier = Modifier.fillMaxSize().padding(paddingValues).padding(horizontal = 16.dp).verticalScroll(rememberScrollState())) {
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Image(painter = painterResource(id = R.mipmap.ic_launcher), contentDescription = "App Logo", modifier = Modifier.size(44.dp).clip(CircleShape))
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text("RupeeFlow", fontWeight = FontWeight.ExtraBold, fontSize = 20.sp)
-                Text("Hi, $username", color = Color.Gray, fontSize = 12.sp)
-            }
-            
-            val displayLetter = if (userFullName.isNotBlank()) userFullName.take(1).uppercase() else username.take(1).uppercase()
-            
-            Box(
+    // Main Container
+    Column(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+        
+        // ==========================================
+        // 1. PREMIUM WHITE STICKY HEADER
+        // ==========================================
+        Surface(
+            color = Color.White,
+            shadowElevation = 3.dp, // Halki si 3D parchaai (shadow) off-white par pop karne ke liye
+            shape = RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp), // Niche se smooth curve
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically, 
                 modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFFE8F5E9))
-                    .clickable { onAvatarClick() }, 
-                contentAlignment = Alignment.Center
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, top = 16.dp, bottom = 20.dp) // Proper breathing space
             ) {
-                Text(displayLetter, color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Image(
+                    painter = painterResource(id = R.mipmap.ic_launcher), 
+                    contentDescription = "App Logo", 
+                    modifier = Modifier.size(46.dp).clip(CircleShape)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("RupeeFlow", fontWeight = FontWeight.ExtraBold, fontSize = 22.sp, color = Color.Black)
+                    Text("Hi, $username", color = Color.Gray, fontSize = 13.sp)
+                }
+                
+                val displayLetter = if (userFullName.isNotBlank()) userFullName.take(1).uppercase() else username.take(1).uppercase()
+                
+                Box(
+                    modifier = Modifier
+                        .size(42.dp) // Avatar ka size thoda bada aur premium kiya
+                        .clip(CircleShape)
+                        .background(Color(0xFFE8F5E9))
+                        .clickable { onAvatarClick() }, 
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(displayLetter, color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                }
             }
         }
-        
-        Spacer(modifier = Modifier.height(24.dp))
-        
-        ExpenseSummaryCard(
-            thisMonthExpenses = thisMonthExpenses, 
-            thisYearExpenses = thisYearExpenses, 
-            budgetLimit = budgetLimit,
-            isLoadingExpenses = isLoadingExpenses,
-            onRefreshExpenses = onRefreshExpenses, 
-            onExpenseCardClick = onExpenseCardClick,
-        )
-        
-        Spacer(modifier = Modifier.height(16.dp))
 
-        val invDisplayValue = if (totalInvestment > 0) getAnnotatedAmount(totalInvestment) else AnnotatedString("Add Details")
-        val bankDisplayValue = if (totalBankBalance > 0) getAnnotatedAmount(totalBankBalance) else AnnotatedString("Add Details")
-        
-        val availAmount = maxOf(0.0, budgetLimit - thisMonthExpenses)
-        val availPct = if (budgetLimit > 0) (availAmount / budgetLimit) * 100 else 0.0
+        // ==========================================
+        // 2. SCROLLABLE DASHBOARD BODY
+        // ==========================================
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp)
+        ) {
+            Spacer(modifier = Modifier.height(20.dp))
+            
+            ExpenseSummaryCard(
+                thisMonthExpenses = thisMonthExpenses, 
+                thisYearExpenses = thisYearExpenses, 
+                budgetLimit = budgetLimit,
+                isLoadingExpenses = isLoadingExpenses,
+                onRefreshExpenses = onRefreshExpenses, 
+                onExpenseCardClick = onExpenseCardClick,
+            )
+            
+            Spacer(modifier = Modifier.height(16.dp))
 
-        val budgetDisplayValue = if (budgetLimit > 0) {
-            buildAnnotatedString {
-                // Yahan se bhi chota SpanStyle hata diya gaya hai
-                append("₹ ") 
-                append(formatNumberOnly(availAmount))
-                withStyle(style = SpanStyle(fontSize = 12.sp, color = Color.Gray)) { append(" (${String.format("%.1f", availPct)}%)") }
+            val invDisplayValue = if (totalInvestment > 0) getAnnotatedAmount(totalInvestment) else AnnotatedString("Add Details")
+            val bankDisplayValue = if (totalBankBalance > 0) getAnnotatedAmount(totalBankBalance) else AnnotatedString("Add Details")
+            
+            val availAmount = maxOf(0.0, budgetLimit - thisMonthExpenses)
+            val availPct = if (budgetLimit > 0) (availAmount / budgetLimit) * 100 else 0.0
+
+            val budgetDisplayValue = if (budgetLimit > 0) {
+                buildAnnotatedString {
+                    append("₹ ") 
+                    append(formatNumberOnly(availAmount))
+                    withStyle(style = SpanStyle(fontSize = 12.sp, color = Color.Gray)) { append(" (${String.format("%.1f", availPct)}%)") }
+                }
+            } else {
+                AnnotatedString("Add Details")
             }
-        } else {
-            AnnotatedString("Add Details")
-        }
 
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            ContriDashboardCard(
-                contriCount = contriCount,
-                modifier = Modifier.weight(1f).clickable { onContriClick() }
-            ) 
-            GridCard(
-                title = "TOTAL INVESTMENT", 
-                value = invDisplayValue, 
-                lineColor = Color.Transparent, 
-                modifier = Modifier.weight(1f),
-                onClick = onInvestmentClick 
-            )
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                ContriDashboardCard(
+                    contriCount = contriCount,
+                    modifier = Modifier.weight(1f).clickable { onContriClick() }
+                ) 
+                GridCard(
+                    title = "TOTAL INVESTMENT", 
+                    value = invDisplayValue, 
+                    lineColor = Color.Transparent, 
+                    modifier = Modifier.weight(1f),
+                    onClick = onInvestmentClick 
+                )
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                GridCard(
+                    title = "BANK ACCOUNTS", 
+                    value = bankDisplayValue, 
+                    lineColor = Color.Transparent, 
+                    modifier = Modifier.weight(1f),
+                    onClick = onBankClick 
+                )
+                GridCard(
+                    title = "BUDGET REMAINING", 
+                    value = budgetDisplayValue, 
+                    lineColor = Color.Transparent, 
+                    modifier = Modifier.weight(1f),
+                    onClick = { showBudgetDialog = true }
+                )
+            }
+            Spacer(modifier = Modifier.height(24.dp))
+            
+            SpendingTrackerCard()
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            ReminderBanner()
+            
+            Spacer(modifier = Modifier.height(24.dp))
+            
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text("Recent Transactions", fontWeight = FontWeight.ExtraBold, fontSize = 16.sp)
+                TextButton(onClick = onLogout) { Text("Logout", color = Color(0xFFD32F2F)) }
+            }
+            Spacer(modifier = Modifier.height(60.dp)) 
         }
-        Spacer(modifier = Modifier.height(12.dp))
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            GridCard(
-                title = "BANK ACCOUNTS", 
-                value = bankDisplayValue, 
-                lineColor = Color.Transparent, 
-                modifier = Modifier.weight(1f),
-                onClick = onBankClick 
-            )
-            GridCard(
-                title = "BUDGET REMAINING", 
-                value = budgetDisplayValue, 
-                lineColor = Color.Transparent, 
-                modifier = Modifier.weight(1f),
-                onClick = { showBudgetDialog = true }
-            )
-        }
-        Spacer(modifier = Modifier.height(24.dp))
-        SpendingTrackerCard()
-        Spacer(modifier = Modifier.height(16.dp))
-        ReminderBanner()
-        Spacer(modifier = Modifier.height(24.dp))
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text("Recent Transactions", fontWeight = FontWeight.ExtraBold, fontSize = 16.sp)
-            TextButton(onClick = onLogout) { Text("Logout", color = Color(0xFFD32F2F)) }
-        }
-        Spacer(modifier = Modifier.height(60.dp)) 
     }
 
     // ==========================================
@@ -328,9 +360,6 @@ fun BudgetDialog(
     }
 }
 
-// ==========================================
-// DYNAMIC CONTRI DASHBOARD CARD
-// ==========================================
 @Composable
 fun ContriDashboardCard(
     contriCount: Int,
