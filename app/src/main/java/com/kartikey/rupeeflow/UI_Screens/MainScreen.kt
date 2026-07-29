@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalSharedTransitionApi::class) // 1.7.0 ke naye features allow karne ke liye
+@file:OptIn(ExperimentalSharedTransitionApi::class) 
 package com.kartikey.rupeeflow.UI_Screens
 
 import androidx.activity.compose.BackHandler
@@ -42,7 +42,6 @@ import kotlinx.coroutines.withContext
 
 // ==========================================
 // MASTER SETUP: Scopes for Apple Expand Animation
-// Inko global banane se hume har screen ka constructor nahi badalna padega
 // ==========================================
 val LocalSharedTransitionScope = compositionLocalOf<SharedTransitionScope?> { null }
 val LocalAnimatedVisibilityScope = compositionLocalOf<AnimatedVisibilityScope?> { null }
@@ -163,11 +162,12 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
         }
     }
 
-    // YAHAN MASTER SHARED TRANSITION LAYOUT ADD KIYA HAI
     SharedTransitionLayout(modifier = Modifier.fillMaxSize()) {
         CompositionLocalProvider(LocalSharedTransitionScope provides this) {
             Box(modifier = Modifier.fillMaxSize()) {
                 Scaffold(
+                    // Yahan ekdum premium aur clean Off-White color set kiya hai taaki white cards pop karein
+                    containerColor = Color(0xFFF8F8F8),
                     bottomBar = {
                         NavigationBar(containerColor = Color.White, tonalElevation = 8.dp) {
                             NavigationBarItem(
@@ -235,7 +235,6 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                         }, 
                         label = "Apple Style Screen Transition"
                     ) { state ->
-                        // YAHAN ANIMATED VISIBILITY SCOPE BHI PROVIDE KIYA HAI
                         CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
                             val (currentTab, isHistoryVisible, isContriVisible) = state
                             if (isContriVisible) {
@@ -317,7 +316,7 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
 
 // ==========================================
 // 1. BOUNCE CLICK ANIMATION (144Hz Butter Smooth)
-// ==========================================
+// ====================
 fun Modifier.bounceClick(
     scaleDown: Float = 0.90f,
     onClick: (() -> Unit)? = null 
@@ -360,7 +359,6 @@ fun Modifier.bounceClick(
 
 // ==========================================
 // 2. APPLE EXPAND (SHARED ELEMENT) MODIFIER
-// Isko hum kisi bhi card par lagaenge, bas key deni hogi
 // ==========================================
 fun Modifier.appleExpand(key: String): Modifier = composed {
     val sharedScope = LocalSharedTransitionScope.current
@@ -373,7 +371,7 @@ fun Modifier.appleExpand(key: String): Modifier = composed {
                 animatedVisibilityScope = animScope,
                 boundsTransform = { _, _ -> 
                     spring(
-                        dampingRatio = 0.85f, // Smooth transition, not too bouncy
+                        dampingRatio = 0.85f,
                         stiffness = Spring.StiffnessLow 
                     ) 
                 }
