@@ -90,23 +90,21 @@ fun HomeDashboardDesign(
         return format.format(amount)
     }
 
-    // Main Container
     Column(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
         
-        // ==========================================
-        // 1. PREMIUM WHITE STICKY HEADER
-        // ==========================================
+        // PREMIUM WHITE STICKY HEADER
         Surface(
             color = Color.White,
-            shadowElevation = 3.dp, // Halki si 3D parchaai (shadow) off-white par pop karne ke liye
-            shape = RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp), // Niche se smooth curve
+            shadowElevation = 3.dp,
+            shape = RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically, 
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, top = 16.dp, bottom = 20.dp) // Proper breathing space
+                    .padding(horizontal = 16.dp)
+                    .padding(top = 16.dp, bottom = 20.dp) // Fixed padding parameters
             ) {
                 Image(
                     painter = painterResource(id = R.mipmap.ic_launcher), 
@@ -124,7 +122,7 @@ fun HomeDashboardDesign(
                 
                 Box(
                     modifier = Modifier
-                        .size(42.dp) // Avatar ka size thoda bada aur premium kiya
+                        .size(42.dp)
                         .clip(CircleShape)
                         .background(Color(0xFFE8F5E9))
                         .clickable { onAvatarClick() }, 
@@ -135,9 +133,6 @@ fun HomeDashboardDesign(
             }
         }
 
-        // ==========================================
-        // 2. SCROLLABLE DASHBOARD BODY
-        // ==========================================
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -221,9 +216,6 @@ fun HomeDashboardDesign(
         }
     }
 
-    // ==========================================
-    // BUDGET LIMIT DIALOG POPUP
-    // ==========================================
     if (showBudgetDialog) {
         BudgetDialog(
             username = username,
