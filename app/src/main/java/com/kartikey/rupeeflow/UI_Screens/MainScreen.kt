@@ -4,6 +4,7 @@ package com.kartikey.rupeeflow.UI_Screens
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.LinearEasing
@@ -213,9 +214,10 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                     AnimatedContent(
                         targetState = Triple(selectedTab, showExpenseHistory, showContriScreen),
                         transitionSpec = {
-                            // CULPRIT REMOVED: Yahan se background slide hone wala ghatiya logic puri tarah hata diya gaya hai.
-                            // Ab sirf basic fade hoga jisse tumhara main background apni jagah se nahi hilega.
-                            fadeIn(animationSpec = tween(150)).togetherWith(fadeOut(animationSpec = tween(150)))
+                            // SMOOTHNESS RESTORED: 300ms ka waqt diya gaya hai taaki aaram se khule aur band ho
+                            fadeIn(animationSpec = tween(300, easing = FastOutSlowInEasing)).togetherWith(
+                                fadeOut(animationSpec = tween(300, easing = FastOutSlowInEasing))
+                            )
                         }, 
                         label = "Apple Style Screen Transition"
                     ) { state ->
@@ -310,7 +312,7 @@ fun Modifier.bounceClick(
         targetValue = if (isPressed) scaleDown else 1f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMedium // CULPRIT REMOVED: Ye yaha StiffnessLow par atka tha isliye touch lag tha. Ab turant set hoga!
+            stiffness = Spring.StiffnessMedium // FAST CLICK: Taaki touch freeze wala delay na aaye.
         ),
         label = "BounceAnimation"
     )
@@ -359,7 +361,7 @@ fun Modifier.appleExpand(key: String): Modifier = composed {
                 boundsTransform = { _, _ -> 
                     spring(
                         dampingRatio = 0.85f,
-                        stiffness = Spring.StiffnessMedium // CULPRIT REMOVED: Animation ab tez settle hoga taaki clicks jaldi register hon.
+                        stiffness = Spring.StiffnessLow // PREMIUM SMOOTHNESS RESTORED: Screen aaram se makhan ki tarah badi hogi.
                     ) 
                 }
             )
