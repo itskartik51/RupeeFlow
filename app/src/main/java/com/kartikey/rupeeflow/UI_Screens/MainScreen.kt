@@ -2,7 +2,14 @@ package com.kartikey.rupeeflow.UI_Screens
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -10,7 +17,10 @@ import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.kartikey.rupeeflow.UI_Screens.Home.HomeDashboardDesign
@@ -153,37 +163,58 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
             bottomBar = {
                 NavigationBar(containerColor = Color.White, tonalElevation = 8.dp) {
                     NavigationBarItem(
+                        modifier = Modifier.bounceClick {
+                            selectedTab = 0
+                            showExpenseHistory = false
+                            showContriScreen = false
+                        },
                         selected = selectedTab == 0 && !showExpenseHistory && !showContriScreen, 
-                        onClick = { selectedTab = 0; showExpenseHistory = false; showContriScreen = false }, 
+                        onClick = { }, // Click bounceClick modifier se handle hoga
                         icon = { Icon(Icons.Outlined.Home, contentDescription = "Home") }, 
                         label = { Text("Home") }, 
                         colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
                     )
                     NavigationBarItem(
-                        selected = selectedTab == 1, 
-                        onClick = { 
+                        modifier = Modifier.bounceClick {
                             if (selectedTab == 1) assetsCurrentView = "Main"
-                            selectedTab = 1; showExpenseHistory = false; showContriScreen = false 
-                        }, 
+                            selectedTab = 1
+                            showExpenseHistory = false
+                            showContriScreen = false 
+                        },
+                        selected = selectedTab == 1, 
+                        onClick = { }, // Click bounceClick modifier se handle hoga
                         icon = { Icon(Icons.Outlined.AccountBalanceWallet, contentDescription = "Assets") }, 
                         label = { Text("Assets") }, 
                         colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
                     )
                     NavigationBarItem(
+                        modifier = Modifier.bounceClick {
+                            showAddMenu = !showAddMenu
+                        },
                         selected = false, 
-                        onClick = { showAddMenu = !showAddMenu }, 
+                        onClick = { }, // Click bounceClick modifier se handle hoga
                         icon = { Spacer(modifier = Modifier.size(48.dp)) }
                     )
                     NavigationBarItem(
+                        modifier = Modifier.bounceClick {
+                            selectedTab = 3
+                            showExpenseHistory = false
+                            showContriScreen = false
+                        },
                         selected = selectedTab == 3, 
-                        onClick = { selectedTab = 3; showExpenseHistory = false; showContriScreen = false }, 
+                        onClick = { }, // Click bounceClick modifier se handle hoga
                         icon = { Icon(Icons.Outlined.PieChart, contentDescription = "Analytics") }, 
                         label = { Text("Analytics") }, 
                         colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
                     )
                     NavigationBarItem(
+                        modifier = Modifier.bounceClick {
+                            selectedTab = 4
+                            showExpenseHistory = false
+                            showContriScreen = false
+                        },
                         selected = selectedTab == 4, 
-                        onClick = { selectedTab = 4; showExpenseHistory = false; showContriScreen = false }, 
+                        onClick = { }, // Click bounceClick modifier se handle hoga
                         icon = { Icon(Icons.Outlined.Person, contentDescription = "Profile") }, 
                         label = { Text("Profile") }, 
                         colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
@@ -350,4 +381,44 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
             EditExpenseDialog(expense = expenseToEdit!!, username = username, bankList = bankList, ccList = ccList, onDismiss = { expenseToEdit = null }, onSuccess = { expenseToEdit = null; refreshTrigger++ }) 
         }
     }
+}
+
+// ==========================================
+// CUSTOM APPLE-STYLE BOUNCE CLICK ANIMATION
+// ==========================================
+fun Modifier.bounceClick(
+    scaleDown: Float = 0.90f,
+    onClick: () -> Unit
+) = composed {
+    var isPressed by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) scaleDown else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "BounceAnimation"
+    )
+
+    this
+        .graphicsLayer {
+            scaleX = scale
+            scaleY = scale
+        }
+        .pointerInput(isPressed) {
+            awaitPointerEventScope {
+                isPressed = if (isPressed) {
+                    waitForUpOrCancellation()
+                    false
+                } else {
+                    awaitFirstDown(false)
+                    true
+                }
+            }
+        }
+        .clickable(
+            interactionSource = remember { MutableInteractionSource() },
+            indication = null, // Yeh purana Android Ripple effect (gol ghera) hatayega
+            onClick = onClick
+        )
 }
