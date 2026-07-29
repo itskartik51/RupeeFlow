@@ -163,58 +163,56 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
             bottomBar = {
                 NavigationBar(containerColor = Color.White, tonalElevation = 8.dp) {
                     NavigationBarItem(
-                        modifier = Modifier.bounceClick {
+                        modifier = Modifier.bounceClick(),
+                        selected = selectedTab == 0 && !showExpenseHistory && !showContriScreen, 
+                        onClick = { 
                             selectedTab = 0
                             showExpenseHistory = false
                             showContriScreen = false
-                        },
-                        selected = selectedTab == 0 && !showExpenseHistory && !showContriScreen, 
-                        onClick = { }, // Click bounceClick modifier se handle hoga
+                        }, 
                         icon = { Icon(Icons.Outlined.Home, contentDescription = "Home") }, 
                         label = { Text("Home") }, 
                         colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
                     )
                     NavigationBarItem(
-                        modifier = Modifier.bounceClick {
+                        modifier = Modifier.bounceClick(),
+                        selected = selectedTab == 1, 
+                        onClick = { 
                             if (selectedTab == 1) assetsCurrentView = "Main"
                             selectedTab = 1
                             showExpenseHistory = false
                             showContriScreen = false 
-                        },
-                        selected = selectedTab == 1, 
-                        onClick = { }, // Click bounceClick modifier se handle hoga
+                        }, 
                         icon = { Icon(Icons.Outlined.AccountBalanceWallet, contentDescription = "Assets") }, 
                         label = { Text("Assets") }, 
                         colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
                     )
                     NavigationBarItem(
-                        modifier = Modifier.bounceClick {
-                            showAddMenu = !showAddMenu
-                        },
+                        modifier = Modifier.bounceClick(),
                         selected = false, 
-                        onClick = { }, // Click bounceClick modifier se handle hoga
+                        onClick = { showAddMenu = !showAddMenu }, 
                         icon = { Spacer(modifier = Modifier.size(48.dp)) }
                     )
                     NavigationBarItem(
-                        modifier = Modifier.bounceClick {
+                        modifier = Modifier.bounceClick(),
+                        selected = selectedTab == 3, 
+                        onClick = { 
                             selectedTab = 3
                             showExpenseHistory = false
                             showContriScreen = false
-                        },
-                        selected = selectedTab == 3, 
-                        onClick = { }, // Click bounceClick modifier se handle hoga
+                        }, 
                         icon = { Icon(Icons.Outlined.PieChart, contentDescription = "Analytics") }, 
                         label = { Text("Analytics") }, 
                         colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
                     )
                     NavigationBarItem(
-                        modifier = Modifier.bounceClick {
+                        modifier = Modifier.bounceClick(),
+                        selected = selectedTab == 4, 
+                        onClick = { 
                             selectedTab = 4
                             showExpenseHistory = false
                             showContriScreen = false
-                        },
-                        selected = selectedTab == 4, 
-                        onClick = { }, // Click bounceClick modifier se handle hoga
+                        }, 
                         icon = { Icon(Icons.Outlined.Person, contentDescription = "Profile") }, 
                         label = { Text("Profile") }, 
                         colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
@@ -388,7 +386,7 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
 // ==========================================
 fun Modifier.bounceClick(
     scaleDown: Float = 0.90f,
-    onClick: () -> Unit
+    onClick: (() -> Unit)? = null // Isko smart bana diya hai
 ) = composed {
     var isPressed by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(
@@ -405,20 +403,26 @@ fun Modifier.bounceClick(
             scaleX = scale
             scaleY = scale
         }
-        .pointerInput(isPressed) {
+        .then(
+            // Agar bahar se onClick bheja hai (jaise kisi custom Box/Row me), tabhi Ripple hatayega
+            if (onClick != null) {
+                Modifier.clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = onClick
+                )
+            } else {
+                Modifier // NavigationBarItem jese inbuilt buttons ke liye
+            }
+        )
+        .pointerInput(Unit) { // 'Unit' lagane se gesture infinite restart nahi hoga
             awaitPointerEventScope {
-                isPressed = if (isPressed) {
-                    waitForUpOrCancellation()
-                    false
-                } else {
+                while (true) {
                     awaitFirstDown(false)
-                    true
+                    isPressed = true
+                    waitForUpOrCancellation()
+                    isPressed = false
                 }
             }
         }
-        .clickable(
-            interactionSource = remember { MutableInteractionSource() },
-            indication = null, // Yeh purana Android Ripple effect (gol ghera) hatayega
-            onClick = onClick
-        )
 }
