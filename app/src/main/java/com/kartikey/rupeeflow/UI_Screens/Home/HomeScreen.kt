@@ -1,7 +1,6 @@
 package com.kartikey.rupeeflow.UI_Screens.Home
 
 import android.widget.Toast
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -11,16 +10,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.GroupAdd
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.AnnotatedString
@@ -28,7 +23,6 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.BaselineShift
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -92,11 +86,10 @@ fun HomeDashboardDesign(
 
     Column(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
         
-        // PREMIUM WHITE STICKY HEADER
+        // FLAT STICKY HEADER (Curve removed)
         Surface(
             color = Color.White,
             shadowElevation = 3.dp,
-            shape = RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
             Row(
@@ -104,7 +97,8 @@ fun HomeDashboardDesign(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp)
-                    .padding(top = 16.dp, bottom = 20.dp) // Fixed padding parameters
+                    // Gap aur spacing fixed (Balanced height)
+                    .padding(top = 16.dp, bottom = 12.dp)
             ) {
                 Image(
                     painter = painterResource(id = R.mipmap.ic_launcher), 
@@ -139,7 +133,8 @@ fun HomeDashboardDesign(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp)
         ) {
-            Spacer(modifier = Modifier.height(20.dp))
+            // Gap reduced between Header and first card
+            Spacer(modifier = Modifier.height(12.dp))
             
             ExpenseSummaryCard(
                 thisMonthExpenses = thisMonthExpenses, 
@@ -230,6 +225,124 @@ fun HomeDashboardDesign(
     }
 }
 
+// ==========================================
+// GRID CARD COMPONENT
+// ==========================================
+@Composable
+fun GridCard(
+    title: String,
+    value: AnnotatedString,
+    lineColor: Color,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Card(
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        modifier = modifier.clickable { onClick() }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp)
+        ) {
+            Text(
+                text = title,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.Gray
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = value,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = Color.Black,
+                maxLines = 1
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.6f)
+                    .height(3.dp)
+                    .background(color = lineColor, shape = RoundedCornerShape(50))
+            )
+        }
+    }
+}
+
+// ==========================================
+// SPENDING TRACKER CARD
+// ==========================================
+@Composable
+fun SpendingTrackerCard() {
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(text = "Spending Habits Tracker", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color.Black)
+                Text(text = "VIEW ANALYTICS", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2E7D32))
+            }
+            Spacer(modifier = Modifier.height(24.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Bottom
+            ) {
+                val heights = listOf(0.3f, 0.4f, 0.2f, 0.9f, 0.4f, 0.35f, 0.5f)
+                val colors = listOf(Color(0xFFD1C4E9), Color(0xFFB39DDB), Color(0xFFD1C4E9), Color(0xFF512DA8), Color(0xFFB39DDB), Color(0xFFD1C4E9), Color(0xFFD1C4E9))
+                
+                heights.forEachIndexed { index, h ->
+                    Box(
+                        modifier = Modifier
+                            .width(28.dp)
+                            .height((60 * h).dp)
+                            .background(color = colors[index], shape = RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
+                    )
+                }
+            }
+        }
+    }
+}
+
+// ==========================================
+// REMINDER BANNER
+// ==========================================
+@Composable
+fun ReminderBanner() {
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFE8F5E9)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = "Smart Budget Tip", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color(0xFF2E7D32))
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(text = "Track your daily expenses regularly to keep your savings on track.", fontSize = 12.sp, color = Color.DarkGray)
+            }
+        }
+    }
+}
+
+// ==========================================
+// BUDGET DIALOG POPUP
+// ==========================================
 @Composable
 fun BudgetDialog(
     username: String,
