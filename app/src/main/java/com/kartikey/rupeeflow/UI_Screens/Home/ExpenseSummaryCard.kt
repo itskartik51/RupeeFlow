@@ -1,9 +1,10 @@
+@file:OptIn(ExperimentalSharedTransitionApi::class)
 package com.kartikey.rupeeflow.UI_Screens.Home
 
+import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -16,15 +17,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.kartikey.rupeeflow.UI_Screens.appleExpand
+import com.kartikey.rupeeflow.UI_Screens.bounceClick
 import java.text.NumberFormat
 import java.util.Locale
 
@@ -57,9 +58,6 @@ fun ExpenseSummaryCard(
         label = "spinAnim"
     )
 
-    var isPressed by remember { mutableStateOf(false) }
-    val buttonScale by animateFloatAsState(targetValue = if (isPressed) 0.95f else 1f, label = "btnScale")
-
     fun formatNumber(amount: Double): String {
         val format = NumberFormat.getNumberInstance(Locale("en", "IN"))
         format.maximumFractionDigits = 2
@@ -67,7 +65,10 @@ fun ExpenseSummaryCard(
     }
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .appleExpand("expense_flow") // Yahan tag lagaya gaya hai Expand animation ke liye
+            .bounceClick { onExpenseCardClick() }, // Pura card ab iOS jesa clickable aur bouncy hai
         colors = CardDefaults.cardColors(containerColor = Color.White),
         shape = RoundedCornerShape(20.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp) 
@@ -92,7 +93,7 @@ fun ExpenseSummaryCard(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .clip(RoundedCornerShape(6.dp))
-                            .clickable { expanded = true }
+                            .clickable { expanded = true } // Dropdown ka click alag se kaam karega
                             .padding(horizontal = 6.dp, vertical = 2.dp)
                     ) {
                         Text(
@@ -136,7 +137,6 @@ fun ExpenseSummaryCard(
             ) {
                 Text(
                     text = buildAnnotatedString {
-                        // FIX: FontWeight.SemiBold lagaya gaya hai dono me "halka sa bold" effect ke liye
                         withStyle(style = SpanStyle(color = Color(0xFF2E7D32), fontWeight = FontWeight.SemiBold, fontSize = 30.sp)) {
                             append("₹ ")
                         }
@@ -151,7 +151,7 @@ fun ExpenseSummaryCard(
                         .size(28.dp) 
                         .clip(CircleShape)
                         .background(Color(0xFFF5F5F5))
-                        .clickable { onRefreshExpenses() },
+                        .bounceClick { onRefreshExpenses() }, // Refresh button par bhi bounce click
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -206,20 +206,10 @@ fun ExpenseSummaryCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End
             ) {
+                // Button ab sirf visual purpose ke liye hai, click logic Card me handle ho raha hai
                 Button(
-                    onClick = onExpenseCardClick,
-                    modifier = Modifier
-                        .height(34.dp) 
-                        .scale(buttonScale)
-                        .pointerInput(Unit) {
-                            detectTapGestures(
-                                onPress = {
-                                    isPressed = true
-                                    tryAwaitRelease()
-                                    isPressed = false
-                                }
-                            )
-                        },
+                    onClick = { /* Handled by Card bounceClick */ },
+                    modifier = Modifier.height(34.dp),
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp), 
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
                     shape = RoundedCornerShape(50) 
