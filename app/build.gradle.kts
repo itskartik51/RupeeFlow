@@ -25,6 +25,15 @@ android {
                 keyPassword = "android"
             }
         }
+        create("release") {
+            val keystoreFile = file("../release.keystore")
+            if (keystoreFile.exists()) {
+                storeFile = keystoreFile
+                storePassword = "rupeeflow2026"
+                keyAlias = "rupeeflow"
+                keyPassword = "rupeeflow2026"
+            }
+        }
     }
 
     buildTypes {
@@ -33,7 +42,7 @@ android {
         }
         getByName("release") {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 
