@@ -1,3 +1,4 @@
+@file:OptIn(ExperimentalSharedTransitionApi::class)
 package com.kartikey.rupeeflow.UI_Screens.Home
 
 import androidx.compose.animation.*
@@ -22,6 +23,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kartikey.rupeeflow.UI_Screens.Add.TransactionModel
+import com.kartikey.rupeeflow.UI_Screens.appleExpand
+import com.kartikey.rupeeflow.UI_Screens.bounceClick
 import java.text.SimpleDateFormat
 import java.util.Locale
 
@@ -77,6 +80,7 @@ fun ExpenseHistoryScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .appleExpand("expense_flow") // Yahan same ID tag lagaya gaya hai
             .background(Color.White) 
             .padding(paddingValues)
     ) {
@@ -89,14 +93,14 @@ fun ExpenseHistoryScreen(
                 .padding(16.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Default.ArrowBack,
-                    contentDescription = "Back",
-                    tint = Color.Black,
-                    modifier = Modifier
-                        .size(28.dp)
-                        .clickable { onBackClick() }
-                )
+                Box(modifier = Modifier.bounceClick { onBackClick() }) {
+                    Icon(
+                        imageVector = Icons.Default.ArrowBack,
+                        contentDescription = "Back",
+                        tint = Color.Black,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
                 Spacer(modifier = Modifier.width(12.dp))
                 Text(
                     text = "Expense History",
@@ -288,23 +292,23 @@ fun TransactionFlatItem(
                 horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = Icons.Outlined.Edit, 
-                    contentDescription = "Edit", 
-                    tint = Color(0xFF1976D2),
-                    modifier = Modifier
-                        .size(22.dp)
-                        .clickable { onEditClick() }
-                )
+                Box(modifier = Modifier.bounceClick { onEditClick() }) {
+                    Icon(
+                        imageVector = Icons.Outlined.Edit, 
+                        contentDescription = "Edit", 
+                        tint = Color(0xFF1976D2),
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
                 Spacer(modifier = Modifier.width(20.dp))
-                Icon(
-                    imageVector = Icons.Outlined.Delete, 
-                    contentDescription = "Delete", 
-                    tint = Color(0xFFD32F2F),
-                    modifier = Modifier
-                        .size(22.dp)
-                        .clickable { onDeleteClick() }
-                )
+                Box(modifier = Modifier.bounceClick { onDeleteClick() }) {
+                    Icon(
+                        imageVector = Icons.Outlined.Delete, 
+                        contentDescription = "Delete", 
+                        tint = Color(0xFFD32F2F),
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
             }
         }
     }
