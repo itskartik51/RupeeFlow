@@ -24,6 +24,9 @@ import com.kartikey.rupeeflow.UI_Screens.updateUserProfile
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -50,6 +53,14 @@ fun ProfileDetailsScreen(
     var usernameError by remember { mutableStateOf(false) }
     
     val context = LocalContext.current
+
+    // Date Parser for CustomDatePicker
+    val sdf = remember { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()) }
+    val dobMillis = remember(currentDob) {
+        try {
+            if (currentDob.isNotBlank()) sdf.parse(currentDob)?.time else null
+        } catch (e: Exception) { null }
+    }
 
     Scaffold(
         topBar = {
@@ -188,7 +199,21 @@ fun ProfileDetailsScreen(
             DetailField("Mobile No.", currentMobile, { currentMobile = it }, Icons.Outlined.Phone, KeyboardType.Phone)
             DetailField("Password", currentPassword, { currentPassword = it }, Icons.Outlined.Lock, isPassword = true)
             DetailField("Email ID", currentEmail, { currentEmail = it }, Icons.Outlined.Email, KeyboardType.Email)
-            DetailField("Date of Birth (DD/MM/YYYY)", currentDob, { currentDob = it }, Icons.Outlined.Cake)
+            
+            // Connected CustomDatePicker logic 
+            if (isEditing) {
+                com.kartikey.rupeeflow.UI_Screens.CustomDatePicker(
+                    label = "Date of Birth (DD/MM/YYYY)",
+                    selectedDateMillis = dobMillis,
+                    onDateSelected = { millis ->
+                        currentDob = sdf.format(Date(millis))
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    restrictToCurrentMonth = false
+                )
+            } else {
+                DetailField("Date of Birth (DD/MM/YYYY)", currentDob, { }, Icons.Outlined.Cake)
+            }
             
             Spacer(modifier = Modifier.height(32.dp))
         }
