@@ -11,8 +11,8 @@ android {
         applicationId = "com.kartikey.rupeeflow"
         minSdk = 24
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2          // <-- Update done here
+        versionName = "1.1.0"    // <-- Update done here
     }
 
     signingConfigs {
@@ -42,7 +42,6 @@ android {
         }
         getByName("release") {
             isMinifyEnabled = false
-            // Ye naya code hai jo strict PNG checking ko band karega
             isCrunchPngs = false 
             signingConfig = signingConfigs.getByName("release")
         }
@@ -62,7 +61,6 @@ android {
     }
     
     composeOptions {
-        // Updated to support Kotlin 1.9.22 perfectly
         kotlinCompilerExtensionVersion = "1.5.10" 
     }
 }
@@ -72,13 +70,13 @@ dependencies {
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
     
-    // UI & Design (Mint/Lavender Theme) - UPDATED TO 1.7.0 FOR APPLE ANIMATIONS
+    // UI & Design (Mint/Lavender Theme) 
     implementation("androidx.compose.ui:ui:1.7.0")
-    implementation("androidx.compose.animation:animation:1.7.0") // Animation library explicitly added
+    implementation("androidx.compose.animation:animation:1.7.0") 
     implementation("androidx.compose.material3:material3:1.3.0")
     implementation("androidx.activity:activity-compose:1.9.0")
     
-    // Material Icons Extended - UPDATED TO MATCH UI
+    // Material Icons Extended 
     implementation("androidx.compose.material:material-icons-extended:1.7.0")
     
     // Google Sheets API & Images
@@ -89,16 +87,16 @@ dependencies {
     // NEW LIBRARIES: QR & SCANNER ENGINE
     // ==========================================
     
-    // 1. ZXing (For Premium Rounded QR Generation)
+    // 1. ZXing 
     implementation("com.google.zxing:core:3.5.3")
     
-    // 2. CameraX (For Smooth 60FPS Camera Feed)
+    // 2. CameraX 
     val cameraxVersion = "1.3.2"
     implementation("androidx.camera:camera-core:$cameraxVersion")
     implementation("androidx.camera:camera-camera2:$cameraxVersion")
     implementation("androidx.camera:camera-lifecycle:$cameraxVersion")
     implementation("androidx.camera:camera-view:$cameraxVersion")
     
-    // 3. Google ML Kit (UNBUNDLED - 0 MB Size Increase)
+    // 3. Google ML Kit 
     implementation("com.google.android.gms:play-services-mlkit-barcode-scanning:18.3.0")
 }
