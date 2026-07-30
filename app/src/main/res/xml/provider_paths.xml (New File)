@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- DownloadManager के फोल्डर्स का एक्सेस देने के लिए -->
+    <external-path name="external_files" path="." />
+    <external-public-path name="downloads" path="Download/" />
+    <cache-path name="cache" path="." />
+</paths>
