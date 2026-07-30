@@ -33,7 +33,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.kartikey.rupeeflow.Cloud_Database.Constants
 import com.kartikey.rupeeflow.R
-import com.kartikey.rupeeflow.UI_Screens.bounceClick // Import added for smooth bounce animation
+import com.kartikey.rupeeflow.UI_Screens.bounceClick 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -116,7 +116,6 @@ fun HomeDashboardDesign(
                 
                 val displayLetter = if (userFullName.isNotBlank()) userFullName.take(1).uppercase() else username.take(1).uppercase()
                 
-                // PROFILE AVATAR: Added bounceClick
                 Box(
                     modifier = Modifier
                         .size(42.dp)
@@ -166,12 +165,10 @@ fun HomeDashboardDesign(
             }
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                // CONTRI CARD: Added bounceClick
                 ContriDashboardCard(
                     contriCount = contriCount,
                     modifier = Modifier.weight(1f).bounceClick { onContriClick() }
                 ) 
-                // INVESTMENT CARD: GridCard internally updated with bounceClick below
                 GridCard(
                     title = "TOTAL INVESTMENT", 
                     value = invDisplayValue, 
@@ -226,77 +223,6 @@ fun HomeDashboardDesign(
                 onBudgetSaved()
             }
         )
-    }
-}
-
-// ==========================================
-// GRID CARD COMPONENT
-// ==========================================
-@Composable
-fun GridCard(
-    title: String,
-    value: AnnotatedString,
-    lineColor: Color,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
-) {
-    Card(
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        // GRID CARDS: bounceClick implementation applied here
-        modifier = modifier.bounceClick { onClick() }
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp)
-        ) {
-            Text(
-                text = title,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.Gray
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = value,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = Color.Black,
-                maxLines = 1
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(0.6f)
-                    .height(3.dp)
-                    .background(color = lineColor, shape = RoundedCornerShape(50))
-            )
-        }
-    }
-}
-
-// ==========================================
-// REMINDER BANNER 
-// ==========================================
-@Composable
-fun ReminderBanner(modifier: Modifier = Modifier) {
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(2.dp),
-        shape = RoundedCornerShape(16.dp)
-    ) {
-        Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.Notifications, contentDescription = "Reminder", tint = Color(0xFF2E7D32))
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text("Daily Expense Filling Reminder", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                Text("Default reminder set for 21:00", color = Color.Gray, fontSize = 10.sp)
-            }
-            Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Color.Gray, modifier = Modifier.size(20.dp))
-        }
     }
 }
 
