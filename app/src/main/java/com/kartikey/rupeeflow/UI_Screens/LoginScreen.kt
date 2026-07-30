@@ -1,4 +1,3 @@
-@file:OptIn(androidx.compose.animation.ExperimentalSharedTransitionApi::class)
 package com.kartikey.rupeeflow.UI_Screens
 
 import androidx.compose.foundation.Image
@@ -115,7 +114,6 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = Color(0xFF2E7D32),
                     unfocusedBorderColor = Color(0xFFEEEEEE),
-                    // TRANSPARENT BACKGROUND RESTORED
                     focusedContainerColor = Color.Transparent,
                     unfocusedContainerColor = Color.Transparent
                 ),
@@ -270,7 +268,6 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
             modifier = Modifier
                 .fillMaxWidth()
                 .height(52.dp)
-                .appleExpand("login_button_flow")
                 .bounceClick {
                     keyboardController?.hide()
                     focusManager.clearFocus()
