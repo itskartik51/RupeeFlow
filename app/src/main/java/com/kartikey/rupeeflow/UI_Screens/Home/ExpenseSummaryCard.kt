@@ -1,7 +1,5 @@
-@file:OptIn(ExperimentalSharedTransitionApi::class)
 package com.kartikey.rupeeflow.UI_Screens.Home
 
-import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -24,7 +22,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.kartikey.rupeeflow.UI_Screens.appleExpand
 import com.kartikey.rupeeflow.UI_Screens.bounceClick
 import java.text.NumberFormat
 import java.util.Locale
@@ -67,7 +64,7 @@ fun ExpenseSummaryCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .bounceClick(), // Sirf visual bounce hoga, click par kuch open nahi hoga
+            .bounceClick(),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         shape = RoundedCornerShape(20.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp) 
@@ -150,7 +147,7 @@ fun ExpenseSummaryCard(
                         .size(28.dp) 
                         .clip(CircleShape)
                         .background(Color(0xFFF5F5F5))
-                        .bounceClick { onRefreshExpenses() }, // Refresh par bounce
+                        .bounceClick { onRefreshExpenses() },
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -205,12 +202,10 @@ fun ExpenseSummaryCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End
             ) {
-                // Yahan se Animation Expand hogi aur yahi Clickable hai
                 Box(
                     modifier = Modifier
                         .height(34.dp)
-                        .appleExpand("expense_flow") // Expand tag button par shift kar diya
-                        .bounceClick { onExpenseCardClick() } // Asli click action yahan aagya
+                        .bounceClick { onExpenseCardClick() }
                         .clip(RoundedCornerShape(50))
                         .background(Color(0xFF2E7D32)),
                     contentAlignment = Alignment.Center
