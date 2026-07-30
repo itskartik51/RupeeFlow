@@ -1,8 +1,13 @@
 package com.kartikey.rupeeflow.UI_Screens.Profile
 
+import android.Manifest
 import android.app.DownloadManager
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
@@ -28,6 +33,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import com.kartikey.rupeeflow.UI_Screens.bounceClick
 import kotlinx.coroutines.Dispatchers
@@ -52,7 +59,7 @@ fun AppUpdateScreen(onBackClick: () -> Unit) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
-    var checkState by remember { mutableStateOf("CHECKING") } // CHECKING, UP_TO_DATE, AVAILABLE, DOWNLOADING, READY
+    var checkState by remember { mutableStateOf("CHECKING") }
     var updateInfo by remember { mutableStateOf<UpdateInfo?>(null) }
     var downloadProgress by remember { mutableFloatStateOf(0f) }
     var downloadedApkUri by remember { mutableStateOf<Uri?>(null) }
@@ -66,15 +73,28 @@ fun AppUpdateScreen(onBackClick: () -> Unit) {
     // Smart Permission Launcher for Unknown Sources
     val installLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         if (context.packageManager.canRequestPackageInstalls()) {
-            // User granted permission, Auto-Trigger installation!
             downloadedApkUri?.let { uri -> installApk(context, uri) }
         } else {
             Toast.makeText(context, "Permission Denied. Cannot Install.", Toast.LENGTH_SHORT).show()
         }
     }
 
+    // Android 13+ Notification Permission Launcher
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
+        if (!isGranted) {
+            Toast.makeText(context, "Notifications disabled. You won't be alerted when download finishes.", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     // Auto-check for updates on open
     LaunchedEffect(Unit) {
+        // Request Notification Permission for Android 13 (API 33) and above
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+
         withContext(Dispatchers.IO) {
             try {
                 val request = Request.Builder()
@@ -133,7 +153,6 @@ fun AppUpdateScreen(onBackClick: () -> Unit) {
         ) {
             Spacer(modifier = Modifier.height(20.dp))
             
-            // App Icon Graphic
             Box(
                 modifier = Modifier
                     .size(100.dp)
@@ -208,7 +227,6 @@ fun AppUpdateScreen(onBackClick: () -> Unit) {
                                         if (status == DownloadManager.STATUS_SUCCESSFUL) {
                                             isDownloading = false
                                             
-                                            // Handle URI carefully
                                             val localUriStr = cursor.getString(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_LOCAL_URI))
                                             val downloadedFile = File(Uri.parse(localUriStr).path!!)
                                             val finalUri = FileProvider.getUriForFile(context, "${context.packageName}.provider", downloadedFile)
@@ -216,7 +234,8 @@ fun AppUpdateScreen(onBackClick: () -> Unit) {
                                             withContext(Dispatchers.Main) {
                                                 downloadedApkUri = finalUri
                                                 checkState = "READY"
-                                                // TODO: Push Notification Logic Here
+                                                // Trigger Premium Push Notification
+                                                showUpdateReadyNotification(context, finalUri)
                                             }
                                         } else if (status == DownloadManager.STATUS_FAILED) {
                                             isDownloading = false
@@ -269,7 +288,6 @@ fun AppUpdateScreen(onBackClick: () -> Unit) {
                     Button(
                         onClick = {
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !context.packageManager.canRequestPackageInstalls()) {
-                                // Direct to Unknown Sources Settings
                                 val intent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
                                     data = Uri.parse("package:${context.packageName}")
                                 }
@@ -302,4 +320,48 @@ fun installApk(context: Context, apkUri: Uri) {
     } catch (e: Exception) {
         Toast.makeText(context, "Error starting installer.", Toast.LENGTH_SHORT).show()
     }
+}
+
+// PREMIUM PUSH NOTIFICATION LOGIC
+fun showUpdateReadyNotification(context: Context, apkUri: Uri) {
+    val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+    val channelId = "rupeeflow_update_channel"
+
+    // Create Notification Channel for Android 8+
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        val channel = NotificationChannel(
+            channelId,
+            "App Updates",
+            NotificationManager.IMPORTANCE_HIGH
+        ).apply {
+            description = "Notifications for RupeeFlow version updates"
+        }
+        notificationManager.createNotificationChannel(channel)
+    }
+
+    // Intent to auto-trigger the package installer when notification is tapped
+    val installIntent = Intent(Intent.ACTION_VIEW).apply {
+        setDataAndType(apkUri, "application/vnd.android.package-archive")
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+
+    val pendingIntent = PendingIntent.getActivity(
+        context,
+        0,
+        installIntent,
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
+
+    // Build the Heads-up Notification
+    val notification = NotificationCompat.Builder(context, channelId)
+        .setSmallIcon(android.R.drawable.stat_sys_download_done) 
+        .setContentTitle("\uD83D\uDE80 RupeeFlow Update Ready")
+        .setContentText("Download complete. Tap here to install the latest version.")
+        .setPriority(NotificationCompat.PRIORITY_HIGH) 
+        .setAutoCancel(true) 
+        .setContentIntent(pendingIntent) 
+        .build()
+
+    notificationManager.notify(1001, notification)
 }
