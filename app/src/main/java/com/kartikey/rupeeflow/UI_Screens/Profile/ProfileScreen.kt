@@ -33,17 +33,16 @@ fun ProfileScreen(
     paddingValues: PaddingValues, 
     onLogout: () -> Unit,
     onProfileRefresh: () -> Unit,
-    startInDetails: Boolean = false, // Naya parameter (Home screen se direct details open karne ke liye)
+    startInDetails: Boolean = false, 
     onResetDetailsState: () -> Unit = {}
 ) {
     var currentProfileView by remember { mutableStateOf("Main") }
     var selectedOptionTitle by remember { mutableStateOf("") }
 
-    // Jaise hi Home se Avatar click hoga, ye effect chalu hoga
     LaunchedEffect(startInDetails) {
         if (startInDetails) {
             currentProfileView = "Details"
-            onResetDetailsState() // State reset taaki back aane par wapas open na ho
+            onResetDetailsState() 
         }
     }
 
@@ -63,7 +62,10 @@ fun ProfileScreen(
                         selectedOptionTitle = option
                         if (option in listOf("Security Lock", "Currency", "Theme")) {
                             currentProfileView = "Preference"
-                        } else if (option in listOf("Data Download", "Help & Support", "App Update & Info")) {
+                        } else if (option == "App Update & Info") {
+                            // DIRECT ROUTING TO UPDATE SCREEN
+                            currentProfileView = "Update"
+                        } else if (option in listOf("Data Download", "Help & Support")) {
                             currentProfileView = "Utility"
                         }
                     },
@@ -87,6 +89,10 @@ fun ProfileScreen(
             }
             "Utility" -> {
                 ProfileUtility(optionType = selectedOptionTitle, onBackClick = { currentProfileView = "Main" })
+            }
+            "Update" -> {
+                // CALLING THE NEW UPDATES.KT SCREEN DIRECTLY
+                AppUpdateScreen(onBackClick = { currentProfileView = "Main" })
             }
         }
     }
