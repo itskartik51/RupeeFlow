@@ -1,4 +1,3 @@
-@file:OptIn(ExperimentalSharedTransitionApi::class)
 package com.kartikey.rupeeflow.UI_Screens.Home
 
 import androidx.compose.animation.*
@@ -23,7 +22,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kartikey.rupeeflow.UI_Screens.Add.TransactionModel
-import com.kartikey.rupeeflow.UI_Screens.appleExpand
 import com.kartikey.rupeeflow.UI_Screens.bounceClick
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -80,7 +78,6 @@ fun ExpenseHistoryScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .appleExpand("expense_flow") // Yahan same ID tag lagaya gaya hai
             .background(Color.White) 
             .padding(paddingValues)
     ) {
