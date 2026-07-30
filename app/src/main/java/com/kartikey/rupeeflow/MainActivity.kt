@@ -1,11 +1,9 @@
-@file:OptIn(androidx.compose.animation.ExperimentalSharedTransitionApi::class)
 package com.kartikey.rupeeflow
 
 import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -13,7 +11,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import com.kartikey.rupeeflow.UI_Screens.MainScreen
 import com.kartikey.rupeeflow.UI_Screens.LoginScreen
-import com.kartikey.rupeeflow.UI_Screens.LocalSharedTransitionScope
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -29,30 +26,25 @@ class MainActivity : ComponentActivity() {
                     var isLoggedIn by remember { mutableStateOf(savedLoginState) }
                     var currentUser by remember { mutableStateOf(savedUsername) }
 
-                    // Master SharedTransitionLayout to allow seamless button morphing between Login and MainScreen
-                    SharedTransitionLayout(modifier = Modifier.fillMaxSize()) {
-                        CompositionLocalProvider(com.kartikey.rupeeflow.UI_Screens.LocalSharedTransitionScope provides this) {
-                            if (isLoggedIn && currentUser.isNotEmpty()) {
-                                MainScreen(
-                                    username = currentUser,
-                                    onLogout = {
-                                        sharedPreferences.edit().clear().apply()
-                                        isLoggedIn = false
-                                        currentUser = ""
-                                    }
-                                )
-                            } else {
-                                LoginScreen(onLoginSuccess = { username -> 
-                                    sharedPreferences.edit().apply {
-                                        putBoolean("isLoggedIn", true)
-                                        putString("username", username)
-                                        apply()
-                                    }
-                                    currentUser = username
-                                    isLoggedIn = true 
-                                })
+                    if (isLoggedIn && currentUser.isNotEmpty()) {
+                        MainScreen(
+                            username = currentUser,
+                            onLogout = {
+                                sharedPreferences.edit().clear().apply()
+                                isLoggedIn = false
+                                currentUser = ""
                             }
-                        }
+                        )
+                    } else {
+                        LoginScreen(onLoginSuccess = { username -> 
+                            sharedPreferences.edit().apply {
+                                putBoolean("isLoggedIn", true)
+                                putString("username", username)
+                                apply()
+                            }
+                            currentUser = username
+                            isLoggedIn = true 
+                        })
                     }
                 }
             }
