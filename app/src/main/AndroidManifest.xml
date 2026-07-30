@@ -9,8 +9,11 @@
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
 
-    <!-- NEW: In-App Update Permissions -->
+    <!-- In-App Update Permissions -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    
+    <!-- NEW: Notification Permission for Android 13+ -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:allowBackup="true"
@@ -34,7 +37,7 @@
             android:name="com.google.mlkit.vision.DEPENDENCIES"
             android:value="barcode" />
 
-        <!-- NEW: FileProvider For Seamless APK Installations -->
+        <!-- FileProvider For Seamless APK Installations -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.provider"
