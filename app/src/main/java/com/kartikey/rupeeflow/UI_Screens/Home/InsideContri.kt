@@ -40,7 +40,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.kartikey.rupeeflow.Cloud_Database.Constants
 import com.kartikey.rupeeflow.UI_Screens.NetworkClient
-import com.kartikey.rupeeflow.UI_Screens.bounceClick // Premium Bounce Effect Imported
+import com.kartikey.rupeeflow.UI_Screens.bounceClick
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -175,7 +175,6 @@ fun InsideContriScreen(
                     .statusBarsPadding(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Back Button (Bounce added)
                 Box(
                     modifier = Modifier.size(40.dp).clip(CircleShape).bounceClick { onBackClick() },
                     contentAlignment = Alignment.Center
@@ -187,22 +186,25 @@ fun InsideContriScreen(
                 
                 Text(text = formattedName, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp, color = Color.Black)
                 
-                if (isAdmin) {
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Box(
-                        modifier = Modifier
-                            .border(1.2.dp, Color(0xFF424242), RoundedCornerShape(50))
-                            .padding(horizontal = 8.dp, vertical = 2.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("Admin", fontSize = 10.sp, color = Color(0xFF424242), fontWeight = FontWeight.SemiBold)
-                    }
+                // ADMIN / MEMBER BADGE
+                Spacer(modifier = Modifier.width(8.dp))
+                Box(
+                    modifier = Modifier
+                        .border(1.2.dp, Color(0xFF424242), RoundedCornerShape(50))
+                        .padding(horizontal = 8.dp, vertical = 2.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = if (isAdmin) "Admin" else "Member", 
+                        fontSize = 10.sp, 
+                        color = Color(0xFF424242), 
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
                 
                 Spacer(modifier = Modifier.weight(1f))
                 
                 if (isAdmin) {
-                    // Settings Button (Bounce added)
                     Box(
                         modifier = Modifier.size(40.dp).clip(CircleShape).bounceClick { showSettingsDialog = true },
                         contentAlignment = Alignment.Center
@@ -211,7 +213,6 @@ fun InsideContriScreen(
                     }
                 }
                 
-                // Leave Button (Bounce added)
                 Box(
                     modifier = Modifier.size(40.dp).clip(CircleShape).bounceClick { showLeaveDialog = true },
                     contentAlignment = Alignment.Center
@@ -255,7 +256,6 @@ fun InsideContriScreen(
                             )
                             Spacer(modifier = Modifier.width(10.dp))
                             
-                            // Sync Icon (Bounce added)
                             Icon(
                                 imageVector = Icons.Outlined.Sync,
                                 contentDescription = "Sync",
@@ -271,7 +271,6 @@ fun InsideContriScreen(
                         Spacer(modifier = Modifier.height(6.dp))
                         
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            // Settle-up Button (Bounce added via Custom Box)
                             Box(
                                 modifier = Modifier
                                     .height(28.dp)
@@ -285,7 +284,6 @@ fun InsideContriScreen(
 
                             if (isAdmin) {
                                 Spacer(modifier = Modifier.width(8.dp))
-                                // New Cycle Button (Bounce added)
                                 Box(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(50))
@@ -302,7 +300,6 @@ fun InsideContriScreen(
 
                     Column(horizontalAlignment = Alignment.End) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            // Copy Icon (Bounce added)
                             Box(
                                 modifier = Modifier
                                     .clip(CircleShape)
@@ -375,7 +372,6 @@ fun InsideContriScreen(
                                 .fillMaxWidth()
                                 .padding(bottom = 8.dp)
                                 .animateContentSize() 
-                                // Past Cycle Card (Bounce added)
                                 .bounceClick {
                                     if (isExpanded) {
                                         expandedState[cycle.dateRange] = false
@@ -488,7 +484,6 @@ fun InsideContriScreen(
                                 unfocusedBorderColor = Color.LightGray
                             ),
                             trailingIcon = {
-                                // Edit Name Icon (Bounce added)
                                 Box(
                                     modifier = Modifier.size(36.dp).clip(CircleShape).bounceClick { isEditingName = !isEditingName },
                                     contentAlignment = Alignment.Center
@@ -518,7 +513,6 @@ fun InsideContriScreen(
                                 unfocusedBorderColor = Color.LightGray
                             ),
                             trailingIcon = {
-                                // Edit Pin Icon (Bounce added)
                                 Box(
                                     modifier = Modifier.size(36.dp).clip(CircleShape).bounceClick { isEditingPin = !isEditingPin },
                                     contentAlignment = Alignment.Center
@@ -555,7 +549,6 @@ fun InsideContriScreen(
                                             if (member.memberName == adminName) {
                                                 Text("Admin", fontSize = 12.sp, color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold)
                                             } else {
-                                                // Remove Member Icon (Bounce added)
                                                 Icon(
                                                     imageVector = Icons.AutoMirrored.Outlined.ExitToApp,
                                                     contentDescription = "Remove",
@@ -577,7 +570,6 @@ fun InsideContriScreen(
                         Spacer(modifier = Modifier.height(20.dp))
                         
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
-                            // Cancel Button (Bounce added)
                             Text(
                                 text = "Cancel", 
                                 color = Color.Gray, 
@@ -586,7 +578,6 @@ fun InsideContriScreen(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             
-                            // Save Changes Button (Bounce added via Custom Box)
                             Box(
                                 modifier = Modifier
                                     .bounceClick { 
@@ -946,7 +937,6 @@ fun SettleUpDialog(myName: String, ledgers: List<MemberLedger>, totalExpense: Do
                 HorizontalDivider(color = Color.LightGray, thickness = 1.dp)
                 Spacer(modifier = Modifier.height(16.dp))
                 
-                // Dismiss Button (Bounce added via Custom Box)
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1006,7 +996,6 @@ fun AddContriExpenseDialog(onDismiss: () -> Unit, onAdd: (String, Long, Double) 
                 Spacer(modifier = Modifier.height(20.dp))
 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
-                    // Cancel Button (Bounce added)
                     Text(
                         text = "Cancel", 
                         color = Color.Gray, 
@@ -1015,7 +1004,6 @@ fun AddContriExpenseDialog(onDismiss: () -> Unit, onAdd: (String, Long, Double) 
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     
-                    // Add Expense Button (Bounce added via Custom Box)
                     Box(
                         modifier = Modifier
                             .bounceClick { 
