@@ -10,6 +10,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -86,7 +89,6 @@ fun HomeDashboardDesign(
 
     Column(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
         
-        // FLAT STICKY HEADER (Curve removed)
         Surface(
             color = Color.White,
             shadowElevation = 3.dp,
@@ -97,7 +99,6 @@ fun HomeDashboardDesign(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp)
-                    // Gap aur spacing fixed (Balanced height)
                     .padding(top = 16.dp, bottom = 12.dp)
             ) {
                 Image(
@@ -133,7 +134,6 @@ fun HomeDashboardDesign(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp)
         ) {
-            // Gap reduced between Header and first card
             Spacer(modifier = Modifier.height(12.dp))
             
             ExpenseSummaryCard(
@@ -199,6 +199,7 @@ fun HomeDashboardDesign(
             
             Spacer(modifier = Modifier.height(16.dp))
             
+            // ORIGINAL REMINDER BANNER RESTORED 
             ReminderBanner()
             
             Spacer(modifier = Modifier.height(24.dp))
@@ -222,6 +223,29 @@ fun HomeDashboardDesign(
                 onBudgetSaved()
             }
         )
+    }
+}
+
+// ==========================================
+// ORIGINAL REMINDER BANNER 
+// ==========================================
+@Composable
+fun ReminderBanner(modifier: Modifier = Modifier) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(2.dp),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.Notifications, contentDescription = "Reminder", tint = Color(0xFF2E7D32))
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Daily Expense Filling Reminder", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("Default reminder set for 21:00", color = Color.Gray, fontSize = 10.sp)
+            }
+            Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Color.Gray, modifier = Modifier.size(20.dp))
+        }
     }
 }
 
@@ -262,32 +286,6 @@ fun SpendingTrackerCard() {
                             .background(color = colors[index], shape = RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
                     )
                 }
-            }
-        }
-    }
-}
-
-// ==========================================
-// REMINDER BANNER
-// ==========================================
-@Composable
-fun ReminderBanner() {
-    Card(
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFE8F5E9)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(text = "Smart Budget Tip", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color(0xFF2E7D32))
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(text = "Track your daily expenses regularly to keep your savings on track.", fontSize = 12.sp, color = Color.DarkGray)
             }
         }
     }
