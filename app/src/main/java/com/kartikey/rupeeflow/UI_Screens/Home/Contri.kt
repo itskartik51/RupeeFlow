@@ -2,10 +2,8 @@ package com.kartikey.rupeeflow.UI_Screens.Home
 
 import android.widget.Toast
 import androidx.compose.animation.*
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -20,10 +18,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -39,6 +35,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.kartikey.rupeeflow.Cloud_Database.Constants
+import com.kartikey.rupeeflow.UI_Screens.bounceClick // Imported the premium bounce click
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -154,7 +151,8 @@ fun ContriScreen(
                 verticalAlignment = Alignment.CenterVertically, 
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
             ) {
-                IconButton(onClick = onBackClick) {
+                // Back Button (Bounce added)
+                Box(modifier = Modifier.bounceClick { onBackClick() }.padding(4.dp)) {
                     Icon(Icons.Outlined.ArrowBack, contentDescription = "Back", tint = Color.Black)
                 }
                 Spacer(modifier = Modifier.width(8.dp))
@@ -162,20 +160,20 @@ fun ContriScreen(
 
                 Spacer(modifier = Modifier.weight(1f))
 
-                // MANUAL REFRESH WHEEL
-                IconButton(
-                    onClick = {
-                        if (!isRefreshing) {
-                            isRefreshing = true
-                            onRefresh() // Triggers the backend fetch
-                            
-                            // Spins for 1.2s to show visual activity
-                            coroutineScope.launch {
-                                delay(1200)
-                                isRefreshing = false
+                // MANUAL REFRESH WHEEL (Bounce added)
+                Box(
+                    modifier = Modifier
+                        .bounceClick {
+                            if (!isRefreshing) {
+                                isRefreshing = true
+                                onRefresh() 
+                                coroutineScope.launch {
+                                    delay(1200)
+                                    isRefreshing = false
+                                }
                             }
                         }
-                    }
+                        .padding(4.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.Sync,
@@ -404,30 +402,18 @@ fun AutoJoinContriDialog(
 }
 
 // ==========================================
-// ACTIVE ROOM CARD UI (With QR Icon)
+// ACTIVE ROOM CARD UI (Premium Bounce Logic)
 // ==========================================
 @Composable
 fun ActiveRoomCard(room: ContriRoomModel, onClick: () -> Unit, onQrClick: () -> Unit) {
-    var isPressed by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(targetValue = if (isPressed) 0.95f else 1f, label = "cardScale")
-
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .scale(scale)
-            .pointerInput(Unit) {
-                detectTapGestures(
-                    onPress = {
-                        isPressed = true
-                        tryAwaitRelease()
-                        isPressed = false
-                        onClick()
-                    }
-                )
-            }
+            // 1. Entire card bounces and navigates inside the room
+            .bounceClick { onClick() }
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
@@ -444,11 +430,14 @@ fun ActiveRoomCard(room: ContriRoomModel, onClick: () -> Unit, onQrClick: () -> 
                 }
             }
             
-            IconButton(
-                onClick = onQrClick,
+            // 2. QR Icon gets its own independent bounce effect
+            Box(
                 modifier = Modifier
                     .size(44.dp)
-                    .background(Color(0xFFE8F5E9), shape = CircleShape)
+                    .clip(CircleShape)
+                    .background(Color(0xFFE8F5E9))
+                    .bounceClick { onQrClick() },
+                contentAlignment = Alignment.Center
             ) {
                 Icon(Icons.Outlined.QrCode2, contentDescription = "Show QR", tint = Color(0xFF2E7D32), modifier = Modifier.size(24.dp))
             }
@@ -649,10 +638,13 @@ fun JoinContriDialog(
                         modifier = Modifier.fillMaxWidth().height(80.dp).background(Color(0xFFF5F5F5), RoundedCornerShape(16.dp)),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        // Scan QR Button (Bounce added)
                         Column(
-                            modifier = Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp)).clickable { 
-                                onScanClick()
-                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .clip(RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp))
+                                .bounceClick { onScanClick() },
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center
                         ) {
@@ -663,10 +655,13 @@ fun JoinContriDialog(
 
                         Box(modifier = Modifier.width(1.dp).height(40.dp).background(Color.LightGray))
 
+                        // Enter Manually Button (Bounce added)
                         Column(
-                            modifier = Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(topEnd = 16.dp, bottomEnd = 16.dp)).clickable { 
-                                viewState = 1 
-                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .clip(RoundedCornerShape(topEnd = 16.dp, bottomEnd = 16.dp))
+                                .bounceClick { viewState = 1 },
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center
                         ) {
@@ -830,7 +825,7 @@ class RoomCodeVisualTransformation : VisualTransformation {
 }
 
 // ==========================================
-// PREMIUM GRID CARD
+// PREMIUM GRID CARD (Create / Join buttons)
 // ==========================================
 @Composable
 fun ContriGridCard(
@@ -841,25 +836,12 @@ fun ContriGridCard(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    var isPressed by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(targetValue = if (isPressed) 0.95f else 1f, label = "cardScale")
-
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (isPressed) 2.dp else 6.dp),
-        modifier = modifier
-            .scale(scale)
-            .pointerInput(Unit) {
-                detectTapGestures(
-                    onPress = {
-                        isPressed = true
-                        tryAwaitRelease()
-                        isPressed = false
-                        onClick()
-                    }
-                )
-            }
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        // Simple and clean bounce effect applied directly to the modifier
+        modifier = modifier.bounceClick { onClick() }
     ) {
         Row(
             modifier = Modifier
