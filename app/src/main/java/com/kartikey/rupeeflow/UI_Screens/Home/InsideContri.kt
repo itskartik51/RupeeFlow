@@ -7,7 +7,6 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -26,9 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
@@ -43,6 +40,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.kartikey.rupeeflow.Cloud_Database.Constants
 import com.kartikey.rupeeflow.UI_Screens.NetworkClient
+import com.kartikey.rupeeflow.UI_Screens.bounceClick // Premium Bounce Effect Imported
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -177,9 +175,14 @@ fun InsideContriScreen(
                     .statusBarsPadding(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = onBackClick) {
+                // Back Button (Bounce added)
+                Box(
+                    modifier = Modifier.size(40.dp).clip(CircleShape).bounceClick { onBackClick() },
+                    contentAlignment = Alignment.Center
+                ) {
                     Icon(Icons.Outlined.ArrowBack, contentDescription = "Back", tint = Color.Black)
                 }
+                
                 Spacer(modifier = Modifier.width(4.dp))
                 
                 Text(text = formattedName, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp, color = Color.Black)
@@ -199,12 +202,20 @@ fun InsideContriScreen(
                 Spacer(modifier = Modifier.weight(1f))
                 
                 if (isAdmin) {
-                    IconButton(onClick = { showSettingsDialog = true }) {
+                    // Settings Button (Bounce added)
+                    Box(
+                        modifier = Modifier.size(40.dp).clip(CircleShape).bounceClick { showSettingsDialog = true },
+                        contentAlignment = Alignment.Center
+                    ) {
                         Icon(imageVector = Icons.Outlined.Settings, contentDescription = "Settings", tint = Color.Black)
                     }
                 }
                 
-                IconButton(onClick = { showLeaveDialog = true }) {
+                // Leave Button (Bounce added)
+                Box(
+                    modifier = Modifier.size(40.dp).clip(CircleShape).bounceClick { showLeaveDialog = true },
+                    contentAlignment = Alignment.Center
+                ) {
                     Icon(imageVector = Icons.AutoMirrored.Outlined.ExitToApp, contentDescription = "Leave Room", tint = Color.Red)
                 }
             }
@@ -244,36 +255,41 @@ fun InsideContriScreen(
                             )
                             Spacer(modifier = Modifier.width(10.dp))
                             
+                            // Sync Icon (Bounce added)
                             Icon(
                                 imageVector = Icons.Outlined.Sync,
                                 contentDescription = "Sync",
                                 tint = if (isLoading) Color(0xFF2E7D32) else Color.Gray,
                                 modifier = Modifier
-                                    .size(20.dp)
+                                    .size(24.dp)
                                     .rotate(currentRotation)
-                                    .clickable { if (!isLoading) refreshTrigger++ }
+                                    .bounceClick { if (!isLoading) refreshTrigger++ }
+                                    .padding(2.dp)
                             )
                         }
                         
                         Spacer(modifier = Modifier.height(6.dp))
                         
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Button(
-                                onClick = { showSettleDialog = true },
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                                modifier = Modifier.height(28.dp),
-                                shape = RoundedCornerShape(8.dp)
+                            // Settle-up Button (Bounce added via Custom Box)
+                            Box(
+                                modifier = Modifier
+                                    .height(28.dp)
+                                    .bounceClick { showSettleDialog = true }
+                                    .background(Color(0xFF2E7D32), RoundedCornerShape(8.dp))
+                                    .padding(horizontal = 12.dp, vertical = 4.dp),
+                                contentAlignment = Alignment.Center
                             ) {
                                 Text("Settle-up", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
                             }
 
                             if (isAdmin) {
                                 Spacer(modifier = Modifier.width(8.dp))
+                                // New Cycle Button (Bounce added)
                                 Box(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(50))
-                                        .clickable { showNewCycleDialog = true }
+                                        .bounceClick { showNewCycleDialog = true }
                                         .border(1.2.dp, Color(0xFF424242), RoundedCornerShape(50))
                                         .padding(horizontal = 12.dp, vertical = 4.dp),
                                     contentAlignment = Alignment.Center
@@ -286,10 +302,11 @@ fun InsideContriScreen(
 
                     Column(horizontalAlignment = Alignment.End) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
+                            // Copy Icon (Bounce added)
                             Box(
                                 modifier = Modifier
                                     .clip(CircleShape)
-                                    .clickable {
+                                    .bounceClick {
                                         clipboardManager.setText(AnnotatedString("Join my RupeeFlow Contri!\nCode: ${room.roomCode}\nPin: $localRoomPin"))
                                         Toast.makeText(context, "Code Copied!", Toast.LENGTH_SHORT).show()
                                     }
@@ -299,7 +316,7 @@ fun InsideContriScreen(
                                     imageVector = Icons.Outlined.ContentCopy, 
                                     contentDescription = "Copy", 
                                     tint = Color.Gray, 
-                                    modifier = Modifier.size(15.dp)
+                                    modifier = Modifier.size(16.dp)
                                 )
                             }
                             Spacer(modifier = Modifier.width(4.dp))
@@ -358,7 +375,8 @@ fun InsideContriScreen(
                                 .fillMaxWidth()
                                 .padding(bottom = 8.dp)
                                 .animateContentSize() 
-                                .clickable {
+                                // Past Cycle Card (Bounce added)
+                                .bounceClick {
                                     if (isExpanded) {
                                         expandedState[cycle.dateRange] = false
                                     } else {
@@ -470,7 +488,11 @@ fun InsideContriScreen(
                                 unfocusedBorderColor = Color.LightGray
                             ),
                             trailingIcon = {
-                                IconButton(onClick = { isEditingName = !isEditingName }) {
+                                // Edit Name Icon (Bounce added)
+                                Box(
+                                    modifier = Modifier.size(36.dp).clip(CircleShape).bounceClick { isEditingName = !isEditingName },
+                                    contentAlignment = Alignment.Center
+                                ) {
                                     Icon(Icons.Outlined.Edit, contentDescription = "Edit", tint = if (isEditingName) Color(0xFF2E7D32) else Color.Gray)
                                 }
                             }
@@ -496,7 +518,11 @@ fun InsideContriScreen(
                                 unfocusedBorderColor = Color.LightGray
                             ),
                             trailingIcon = {
-                                IconButton(onClick = { isEditingPin = !isEditingPin }) {
+                                // Edit Pin Icon (Bounce added)
+                                Box(
+                                    modifier = Modifier.size(36.dp).clip(CircleShape).bounceClick { isEditingPin = !isEditingPin },
+                                    contentAlignment = Alignment.Center
+                                ) {
                                     Icon(Icons.Outlined.Edit, contentDescription = "Edit", tint = if (isEditingPin) Color(0xFF2E7D32) else Color.Gray)
                                 }
                             }
@@ -529,11 +555,12 @@ fun InsideContriScreen(
                                             if (member.memberName == adminName) {
                                                 Text("Admin", fontSize = 12.sp, color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold)
                                             } else {
+                                                // Remove Member Icon (Bounce added)
                                                 Icon(
                                                     imageVector = Icons.AutoMirrored.Outlined.ExitToApp,
                                                     contentDescription = "Remove",
                                                     tint = Color.Red,
-                                                    modifier = Modifier.size(22.dp).clickable { memberToRemove = member.memberName }
+                                                    modifier = Modifier.size(24.dp).bounceClick { memberToRemove = member.memberName }
                                                 )
                                             }
                                         }
@@ -549,50 +576,61 @@ fun InsideContriScreen(
 
                         Spacer(modifier = Modifier.height(20.dp))
                         
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                            TextButton(onClick = { showSettingsDialog = false }) { Text("Cancel", color = Color.Gray, fontWeight = FontWeight.Bold) }
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+                            // Cancel Button (Bounce added)
+                            Text(
+                                text = "Cancel", 
+                                color = Color.Gray, 
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.bounceClick { showSettingsDialog = false }.padding(8.dp)
+                            )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Button(
-                                onClick = { 
-                                    if (editName.isNotBlank() && editPin.length == 6) {
-                                        // OPTIMISTIC UI
-                                        showSettingsDialog = false
-                                        localRoomName = editName
-                                        localRoomPin = editPin
-                                        Toast.makeText(context, "Saving settings...", Toast.LENGTH_SHORT).show()
-                                        
-                                        CoroutineScope(Dispatchers.IO).launch {
-                                            try {
-                                                val reqBody = JSONObject().apply {
-                                                    put("action", "edit_contri_room")
-                                                    put("username", username)
-                                                    put("room_code", room.roomCode)
-                                                    put("new_name", editName)
-                                                    put("new_pin", editPin)
-                                                }
-                                                val request = Request.Builder()
-                                                    .url(Constants.GOOGLE_SHEET_API_URL)
-                                                    .post(reqBody.toString().toRequestBody("application/json".toMediaType()))
-                                                    .build()
-
-                                                val response = NetworkClient.instance.newCall(request).execute()
-                                                val resStr = response.body?.string() ?: ""
-
-                                                withContext(Dispatchers.Main) {
-                                                    if (resStr.contains("\"status\":\"success\"")) {
-                                                        sharedPreferences.edit().remove(cacheKey).apply()
-                                                        refreshTrigger++
+                            
+                            // Save Changes Button (Bounce added via Custom Box)
+                            Box(
+                                modifier = Modifier
+                                    .bounceClick { 
+                                        if (editName.isNotBlank() && editPin.length == 6) {
+                                            showSettingsDialog = false
+                                            localRoomName = editName
+                                            localRoomPin = editPin
+                                            Toast.makeText(context, "Saving settings...", Toast.LENGTH_SHORT).show()
+                                            
+                                            CoroutineScope(Dispatchers.IO).launch {
+                                                try {
+                                                    val reqBody = JSONObject().apply {
+                                                        put("action", "edit_contri_room")
+                                                        put("username", username)
+                                                        put("room_code", room.roomCode)
+                                                        put("new_name", editName)
+                                                        put("new_pin", editPin)
                                                     }
-                                                }
-                                            } catch (e: Exception) {}
+                                                    val request = Request.Builder()
+                                                        .url(Constants.GOOGLE_SHEET_API_URL)
+                                                        .post(reqBody.toString().toRequestBody("application/json".toMediaType()))
+                                                        .build()
+
+                                                    val response = NetworkClient.instance.newCall(request).execute()
+                                                    val resStr = response.body?.string() ?: ""
+
+                                                    withContext(Dispatchers.Main) {
+                                                        if (resStr.contains("\"status\":\"success\"")) {
+                                                            sharedPreferences.edit().remove(cacheKey).apply()
+                                                            refreshTrigger++
+                                                        }
+                                                    }
+                                                } catch (e: Exception) {}
+                                            }
+                                        } else {
+                                            Toast.makeText(context, "Invalid Name or Pin (must be 6 digits)", Toast.LENGTH_SHORT).show()
                                         }
-                                    } else {
-                                        Toast.makeText(context, "Invalid Name or Pin (must be 6 digits)", Toast.LENGTH_SHORT).show()
                                     }
-                                },
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
-                                shape = RoundedCornerShape(10.dp)
-                            ) { Text("Save Changes", color = Color.White, fontWeight = FontWeight.Bold) }
+                                    .background(Color(0xFF2E7D32), RoundedCornerShape(10.dp))
+                                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                                contentAlignment = Alignment.Center
+                            ) { 
+                                Text("Save Changes", color = Color.White, fontWeight = FontWeight.Bold) 
+                            }
                         }
                     }
                 }
@@ -833,7 +871,7 @@ fun calculateUserSettlements(ledgers: List<MemberLedger>, totalExpense: Double):
     val balances = mutableMapOf<String, Double>()
     ledgers.forEach { balances[it.memberName] = it.totalSpent - perPerson }
     
-    val myNetBalance = 0.0 // Removed manual dependency
+    val myNetBalance = 0.0 
     val settlements = mutableListOf<Settlement>()
     val debtors = balances.filter { it.value < -0.01 }.toMutableMap()
     val creditors = balances.filter { it.value > 0.01 }.toMutableMap()
@@ -859,7 +897,6 @@ fun calculateUserSettlements(ledgers: List<MemberLedger>, totalExpense: Double):
 fun SettleUpDialog(myName: String, ledgers: List<MemberLedger>, totalExpense: Double, onDismiss: () -> Unit) {
     val (_, allSettlements) = calculateUserSettlements(ledgers, totalExpense)
     
-    // SMART SORTING: 'You' wala hisaab humesha upar aayega
     val sortedSettlements = allSettlements.sortedWith(
         compareByDescending<Settlement> { it.from == myName || it.to == myName }
         .thenByDescending { it.amount }
@@ -881,7 +918,6 @@ fun SettleUpDialog(myName: String, ledgers: List<MemberLedger>, totalExpense: Do
                     } else {
                         sortedSettlements.forEach { settlement ->
                             
-                            // "YOU" Logic & "Pay" Formatting
                             val fromText = if (settlement.from == myName) "You" else settlement.from
                             val toText = if (settlement.to == myName) "You" else settlement.to
 
@@ -909,7 +945,16 @@ fun SettleUpDialog(myName: String, ledgers: List<MemberLedger>, totalExpense: Do
                 Spacer(modifier = Modifier.height(16.dp))
                 HorizontalDivider(color = Color.LightGray, thickness = 1.dp)
                 Spacer(modifier = Modifier.height(16.dp))
-                Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth().height(48.dp), shape = RoundedCornerShape(12.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))) {
+                
+                // Dismiss Button (Bounce added via Custom Box)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .bounceClick { onDismiss() }
+                        .background(Color(0xFF2E7D32), RoundedCornerShape(12.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
                     Text("Dismiss", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 }
             }
@@ -960,13 +1005,29 @@ fun AddContriExpenseDialog(onDismiss: () -> Unit, onAdd: (String, Long, Double) 
                 }
                 Spacer(modifier = Modifier.height(20.dp))
 
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    TextButton(onClick = onDismiss) { Text("Cancel", color = Color.Gray, fontWeight = FontWeight.Bold) }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+                    // Cancel Button (Bounce added)
+                    Text(
+                        text = "Cancel", 
+                        color = Color.Gray, 
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.bounceClick { onDismiss() }.padding(8.dp)
+                    )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Button(onClick = { 
-                        val amt = amount.toDoubleOrNull()
-                        if (expenseTitle.isNotBlank() && amt != null && dateMillis != null) onAdd(expenseTitle, dateMillis!!, amt)
-                    }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)), shape = RoundedCornerShape(10.dp)) { Text("Add Expense", color = Color.White, fontWeight = FontWeight.Bold) }
+                    
+                    // Add Expense Button (Bounce added via Custom Box)
+                    Box(
+                        modifier = Modifier
+                            .bounceClick { 
+                                val amt = amount.toDoubleOrNull()
+                                if (expenseTitle.isNotBlank() && amt != null && dateMillis != null) onAdd(expenseTitle, dateMillis!!, amt)
+                            }
+                            .background(Color(0xFF2E7D32), RoundedCornerShape(10.dp))
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                        contentAlignment = Alignment.Center
+                    ) { 
+                        Text("Add Expense", color = Color.White, fontWeight = FontWeight.Bold) 
+                    }
                 }
             }
         }
@@ -1049,11 +1110,13 @@ fun parsePastCycleMembersOnly(jsonString: String): List<MemberLedger> {
 // ==========================================
 @Composable
 fun PremiumFloatingButton(onClick: () -> Unit) {
-    var isPressed by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(targetValue = if (isPressed) 0.85f else 1f, label = "fabScale")
     Box(
-        modifier = Modifier.scale(scale).size(56.dp).background(Color(0xFF2E7D32), shape = CircleShape)
-            .pointerInput(Unit) { detectTapGestures(onPress = { isPressed = true; tryAwaitRelease(); isPressed = false; onClick() }) },
+        modifier = Modifier
+            .size(56.dp)
+            .bounceClick { onClick() }
+            .background(Color(0xFF2E7D32), shape = CircleShape),
         contentAlignment = Alignment.Center
-    ) { Icon(imageVector = Icons.Outlined.Add, contentDescription = "Add Expense", tint = Color.White, modifier = Modifier.size(28.dp)) }
+    ) { 
+        Icon(imageVector = Icons.Outlined.Add, contentDescription = "Add Expense", tint = Color.White, modifier = Modifier.size(28.dp)) 
+    }
 }
