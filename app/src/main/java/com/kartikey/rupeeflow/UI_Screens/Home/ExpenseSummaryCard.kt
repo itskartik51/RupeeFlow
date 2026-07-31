@@ -65,7 +65,7 @@ fun ExpenseSummaryCard(
         modifier = Modifier
             .fillMaxWidth()
             .bounceClick(),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = RoundedCornerShape(20.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp) 
     ) {
@@ -79,7 +79,7 @@ fun ExpenseSummaryCard(
             ) {
                 Text(
                     text = "Total Expenses", 
-                    color = Color.Black, 
+                    color = MaterialTheme.colorScheme.onSurface, 
                     fontWeight = FontWeight.Bold, 
                     fontSize = 15.sp 
                 )
@@ -96,13 +96,13 @@ fun ExpenseSummaryCard(
                             text = selectedPeriod, 
                             fontSize = 13.sp, 
                             fontWeight = FontWeight.Medium, 
-                            color = Color.DarkGray
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.width(2.dp))
                         Icon(
                             imageVector = Icons.Outlined.KeyboardArrowDown, 
                             contentDescription = "Select", 
-                            tint = Color(0xFF2E7D32),
+                            tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(18.dp)
                         )
                     }
@@ -110,14 +110,14 @@ fun ExpenseSummaryCard(
                     DropdownMenu(
                         expanded = expanded,
                         onDismissRequest = { expanded = false },
-                        modifier = Modifier.background(Color.White)
+                        modifier = Modifier.background(MaterialTheme.colorScheme.surface)
                     ) {
                         DropdownMenuItem(
-                            text = { Text("Month", color = Color.Black) },
+                            text = { Text("Month", color = MaterialTheme.colorScheme.onSurface) },
                             onClick = { selectedPeriod = "Month"; expanded = false }
                         )
                         DropdownMenuItem(
-                            text = { Text("Year", color = Color.Black) },
+                            text = { Text("Year", color = MaterialTheme.colorScheme.onSurface) },
                             onClick = { selectedPeriod = "Year"; expanded = false }
                         )
                     }
@@ -133,10 +133,10 @@ fun ExpenseSummaryCard(
             ) {
                 Text(
                     text = buildAnnotatedString {
-                        withStyle(style = SpanStyle(color = Color(0xFF2E7D32), fontWeight = FontWeight.SemiBold, fontSize = 30.sp)) {
+                        withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold, fontSize = 30.sp)) {
                             append("₹ ")
                         }
-                        withStyle(style = SpanStyle(color = Color.Black, fontWeight = FontWeight.SemiBold, fontSize = 30.sp)) {
+                        withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold, fontSize = 30.sp)) {
                             append(formatNumber(currentAmount))
                         }
                     }
@@ -146,14 +146,14 @@ fun ExpenseSummaryCard(
                     modifier = Modifier
                         .size(28.dp) 
                         .clip(CircleShape)
-                        .background(Color(0xFFF5F5F5))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
                         .bounceClick { onRefreshExpenses() },
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.Refresh, 
                         contentDescription = "Refresh", 
-                        tint = Color.DarkGray,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier
                             .size(18.dp) 
                             .rotate(if (isLoadingExpenses) angle else 0f)
@@ -168,14 +168,14 @@ fun ExpenseSummaryCard(
                     .fillMaxWidth()
                     .height(8.dp) 
                     .clip(RoundedCornerShape(50))
-                    .background(Color(0xFFEEEEEE))
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
             ) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth(progressRatio)
                         .fillMaxHeight()
                         .clip(RoundedCornerShape(50))
-                        .background(Color(0xFF2E7D32))
+                        .background(MaterialTheme.colorScheme.primary)
                 )
             }
             
@@ -186,14 +186,14 @@ fun ExpenseSummaryCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(text = "₹0", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                Text(text = "₹0", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Medium)
                 Text(
                     text = "${String.format(Locale.US, "%.1f", percentUsed)}% used", 
-                    color = Color.DarkGray, 
+                    color = MaterialTheme.colorScheme.onSurfaceVariant, 
                     fontSize = 12.sp, 
                     fontWeight = FontWeight.Bold
                 )
-                Text(text = "₹${formatNumber(currentBudget)}", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                Text(text = "₹${formatNumber(currentBudget)}", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Medium)
             }
             
             Spacer(modifier = Modifier.height(14.dp)) 
@@ -207,12 +207,12 @@ fun ExpenseSummaryCard(
                         .height(34.dp)
                         .bounceClick { onExpenseCardClick() }
                         .clip(RoundedCornerShape(50))
-                        .background(Color(0xFF2E7D32)),
+                        .background(MaterialTheme.colorScheme.primary),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = "View History", 
-                        color = Color.White, 
+                        color = MaterialTheme.colorScheme.onPrimary, 
                         fontWeight = FontWeight.Bold, 
                         fontSize = 12.sp,
                         modifier = Modifier.padding(horizontal = 16.dp)
