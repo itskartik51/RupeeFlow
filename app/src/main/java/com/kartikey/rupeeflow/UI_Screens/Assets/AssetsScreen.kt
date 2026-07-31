@@ -23,6 +23,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.BankAccountsScreen
@@ -98,35 +99,43 @@ fun AssetsScreen(
             Text(text = "My Investments", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color.Black, modifier = Modifier.padding(horizontal = 4.dp))
             Spacer(modifier = Modifier.height(12.dp))
             
-            // Smart Filters for Investment Assets
-            val hasShares = investmentList.any { it.assetType.equals("Stock", true) || it.assetType.equals("Share", true) }
-            val totalShares = if (hasShares) investmentList.filter { it.assetType.equals("Stock", true) || it.assetType.equals("Share", true) }.sumOf { it.quantity * it.currentPrice } else 0.0
+            // Smart Filters for Investment Assets (With Dynamic Title Count)
+            val sharesList = investmentList.filter { it.assetType.equals("Stock", true) || it.assetType.equals("Share", true) }
+            val hasShares = sharesList.isNotEmpty()
+            val totalShares = if (hasShares) sharesList.sumOf { it.quantity * it.currentPrice } else 0.0
+            val sharesTitle = if (hasShares) "SHARES (${sharesList.size})" else "SHARES"
 
-            val hasMF = investmentList.any { it.assetType.equals("Mutual Fund", true) || it.assetType.equals("MF", true) }
-            val totalMF = if (hasMF) investmentList.filter { it.assetType.equals("Mutual Fund", true) || it.assetType.equals("MF", true) }.sumOf { it.quantity * it.currentPrice } else 0.0
+            val mfList = investmentList.filter { it.assetType.equals("Mutual Fund", true) || it.assetType.equals("MF", true) }
+            val hasMF = mfList.isNotEmpty()
+            val totalMF = if (hasMF) mfList.sumOf { it.quantity * it.currentPrice } else 0.0
+            val mfTitle = if (hasMF) "MUTUAL FUNDS (${mfList.size})" else "MUTUAL FUNDS"
 
-            val hasETF = investmentList.any { it.assetType.equals("ETF", true) }
-            val totalETF = if (hasETF) investmentList.filter { it.assetType.equals("ETF", true) }.sumOf { it.quantity * it.currentPrice } else 0.0
+            val etfList = investmentList.filter { it.assetType.equals("ETF", true) }
+            val hasETF = etfList.isNotEmpty()
+            val totalETF = if (hasETF) etfList.sumOf { it.quantity * it.currentPrice } else 0.0
+            val etfTitle = if (hasETF) "ETF (${etfList.size})" else "ETF"
 
-            val hasBonds = investmentList.any { it.assetType.equals("Bond", true) }
-            val totalBonds = if (hasBonds) investmentList.filter { it.assetType.equals("Bond", true) }.sumOf { it.quantity * it.currentPrice } else 0.0
+            val bondsList = investmentList.filter { it.assetType.equals("Bond", true) }
+            val hasBonds = bondsList.isNotEmpty()
+            val totalBonds = if (hasBonds) bondsList.sumOf { it.quantity * it.currentPrice } else 0.0
+            val bondsTitle = if (hasBonds) "BONDS (${bondsList.size})" else "BONDS"
 
             Column(modifier = Modifier.fillMaxWidth()) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Box(modifier = Modifier.weight(1f)) { 
-                        InvestmentGridCard("SHARES", totalShares, hasShares, "+ Add Share") { onViewChange("InvestmentDetails") } 
+                        InvestmentGridCard(sharesTitle, totalShares, hasShares, "+ Add Share") { onViewChange("InvestmentDetails") } 
                     }
                     Box(modifier = Modifier.weight(1f)) { 
-                        InvestmentGridCard("MUTUAL FUNDS", totalMF, hasMF, "+ Add MF") { onViewChange("InvestmentDetails") } 
+                        InvestmentGridCard(mfTitle, totalMF, hasMF, "+ Add MF") { onViewChange("InvestmentDetails") } 
                     }
                 }
                 Spacer(modifier = Modifier.height(12.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Box(modifier = Modifier.weight(1f)) { 
-                        InvestmentGridCard("ETF", totalETF, hasETF, "+ Add ETF") { onViewChange("InvestmentDetails") } 
+                        InvestmentGridCard(etfTitle, totalETF, hasETF, "+ Add ETF") { onViewChange("InvestmentDetails") } 
                     }
                     Box(modifier = Modifier.weight(1f)) { 
-                        InvestmentGridCard("BONDS", totalBonds, hasBonds, "+ Add Bond") { onViewChange("InvestmentDetails") } 
+                        InvestmentGridCard(bondsTitle, totalBonds, hasBonds, "+ Add Bond") { onViewChange("InvestmentDetails") } 
                     }
                 }
             }
@@ -229,11 +238,18 @@ fun InvestmentGridCard(title: String, amount: Double, hasData: Boolean, addText:
         border = BorderStroke(1.dp, Color(0xFFEEEEEE))
     ) {
         Column(modifier = Modifier.padding(16.dp).fillMaxWidth(), horizontalAlignment = Alignment.Start) {
-            Text(text = title, color = Color.Gray, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            Text(text = title, color = Color.Gray, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Spacer(modifier = Modifier.height(8.dp))
             
             if (hasData) {
-                Text(text = formatRupeeAmount(amount), color = Color.Black, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
+                Text(
+                    text = formatRupeeAmount(amount), 
+                    color = Color.Black, 
+                    fontSize = 19.sp, 
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             } else {
                 Text(text = addText, color = Color(0xFF2E7D32), fontSize = 14.sp, fontWeight = FontWeight.Bold)
             }
@@ -241,7 +257,6 @@ fun InvestmentGridCard(title: String, amount: Double, hasData: Boolean, addText:
     }
 }
 
-// NAYA UPDATE: Finance Card me Bounce aur Smart Empty State
 @Composable
 fun FinanceGridCard(
     title: String, 
@@ -279,13 +294,22 @@ fun FinanceGridCard(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(icon, contentDescription = title, tint = iconColor, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(6.dp))
-                Text(text = title, color = Color.Gray, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                Text(text = title, color = Color.Gray, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Spacer(modifier = Modifier.height(8.dp))
             
             if (hasData) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(text = formatRupeeAmount(amount), color = Color.Black, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = formatRupeeAmount(amount), 
+                        color = Color.Black, 
+                        fontSize = 19.sp, 
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        // Weight false ensures that it takes up only available space without pushing out the Link badge
+                        modifier = Modifier.weight(1f, fill = false) 
+                    )
                     if (linkCount != null) {
                         Spacer(modifier = Modifier.width(6.dp))
                         Row(
