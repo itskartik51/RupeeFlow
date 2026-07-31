@@ -170,7 +170,7 @@ fun InsideContriScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color.White)
+                    .background(MaterialTheme.colorScheme.surface)
                     .padding(horizontal = 12.dp, vertical = 10.dp)
                     .statusBarsPadding(),
                 verticalAlignment = Alignment.CenterVertically
@@ -179,25 +179,25 @@ fun InsideContriScreen(
                     modifier = Modifier.size(40.dp).clip(CircleShape).bounceClick { onBackClick() },
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Outlined.ArrowBack, contentDescription = "Back", tint = Color.Black)
+                    Icon(Icons.Outlined.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.onSurface)
                 }
                 
                 Spacer(modifier = Modifier.width(4.dp))
                 
-                Text(text = formattedName, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp, color = Color.Black)
+                Text(text = formattedName, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp, color = MaterialTheme.colorScheme.onSurface)
                 
                 // ADMIN / MEMBER BADGE
                 Spacer(modifier = Modifier.width(8.dp))
                 Box(
                     modifier = Modifier
-                        .border(1.2.dp, Color(0xFF424242), RoundedCornerShape(50))
+                        .border(1.2.dp, MaterialTheme.colorScheme.onSurfaceVariant, RoundedCornerShape(50))
                         .padding(horizontal = 8.dp, vertical = 2.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = if (isAdmin) "Admin" else "Member", 
                         fontSize = 10.sp, 
-                        color = Color(0xFF424242), 
+                        color = MaterialTheme.colorScheme.onSurfaceVariant, 
                         fontWeight = FontWeight.SemiBold
                     )
                 }
@@ -209,7 +209,7 @@ fun InsideContriScreen(
                         modifier = Modifier.size(40.dp).clip(CircleShape).bounceClick { showSettingsDialog = true },
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(imageVector = Icons.Outlined.Settings, contentDescription = "Settings", tint = Color.Black)
+                        Icon(imageVector = Icons.Outlined.Settings, contentDescription = "Settings", tint = MaterialTheme.colorScheme.onSurface)
                     }
                 }
                 
@@ -217,14 +217,14 @@ fun InsideContriScreen(
                     modifier = Modifier.size(40.dp).clip(CircleShape).bounceClick { showLeaveDialog = true },
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(imageVector = Icons.AutoMirrored.Outlined.ExitToApp, contentDescription = "Leave Room", tint = Color.Red)
+                    Icon(imageVector = Icons.AutoMirrored.Outlined.ExitToApp, contentDescription = "Leave Room", tint = MaterialTheme.colorScheme.error)
                 }
             }
         },
         floatingActionButton = {
             PremiumFloatingButton(onClick = { showAddExpenseDialog = true })
         },
-        containerColor = Color(0xFFFAFAFA)
+        containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
         Column(
             modifier = Modifier.fillMaxSize().padding(paddingValues).verticalScroll(rememberScrollState())
@@ -234,7 +234,7 @@ fun InsideContriScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 6.dp),
                 shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFFF5F5F5)),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                 elevation = CardDefaults.cardElevation(0.dp)
             ) {
                 Row(
@@ -246,20 +246,20 @@ fun InsideContriScreen(
                 ) {
                     Column(horizontalAlignment = Alignment.Start) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("₹", fontSize = 22.sp, color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold)
+                            Text("₹", fontSize = 22.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold)
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
                                 text = totalGroupExpense.toInt().toString(), 
                                 fontSize = 28.sp, 
                                 fontWeight = FontWeight.ExtraBold, 
-                                color = Color.Black
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                             Spacer(modifier = Modifier.width(10.dp))
                             
                             Icon(
                                 imageVector = Icons.Outlined.Sync,
                                 contentDescription = "Sync",
-                                tint = if (isLoading) Color(0xFF2E7D32) else Color.Gray,
+                                tint = if (isLoading) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier
                                     .size(24.dp)
                                     .rotate(currentRotation)
@@ -275,11 +275,11 @@ fun InsideContriScreen(
                                 modifier = Modifier
                                     .height(28.dp)
                                     .bounceClick { showSettleDialog = true }
-                                    .background(Color(0xFF2E7D32), RoundedCornerShape(8.dp))
+                                    .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(8.dp))
                                     .padding(horizontal = 12.dp, vertical = 4.dp),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text("Settle-up", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                Text("Settle-up", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimary)
                             }
 
                             if (isAdmin) {
@@ -288,11 +288,11 @@ fun InsideContriScreen(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(50))
                                         .bounceClick { showNewCycleDialog = true }
-                                        .border(1.2.dp, Color(0xFF424242), RoundedCornerShape(50))
+                                        .border(1.2.dp, MaterialTheme.colorScheme.onSurfaceVariant, RoundedCornerShape(50))
                                         .padding(horizontal = 12.dp, vertical = 4.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Text("New", fontSize = 12.sp, color = Color(0xFF424242), fontWeight = FontWeight.SemiBold)
+                                    Text("New", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.SemiBold)
                                 }
                             }
                         }
@@ -312,7 +312,7 @@ fun InsideContriScreen(
                                 Icon(
                                     imageVector = Icons.Outlined.ContentCopy, 
                                     contentDescription = "Copy", 
-                                    tint = Color.Gray, 
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant, 
                                     modifier = Modifier.size(16.dp)
                                 )
                             }
@@ -321,7 +321,7 @@ fun InsideContriScreen(
                                 text = room.roomCode, 
                                 fontSize = 17.sp, 
                                 fontWeight = FontWeight.ExtraBold, 
-                                color = Color.Black, 
+                                color = MaterialTheme.colorScheme.onSurface, 
                                 letterSpacing = 0.5.sp
                             )
                         }
@@ -329,7 +329,7 @@ fun InsideContriScreen(
                         Text(
                             text = "Pin: $localRoomPin", 
                             fontSize = 13.sp, 
-                            color = Color.Gray, 
+                            color = MaterialTheme.colorScheme.onSurfaceVariant, 
                             fontWeight = FontWeight.Medium
                         )
                     }
@@ -340,11 +340,11 @@ fun InsideContriScreen(
 
             if (isLoading && ledgers.isEmpty()) {
                 Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = Color(0xFF2E7D32))
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                 }
             } else if (ledgers.isEmpty()) {
                 Box(modifier = Modifier.fillMaxWidth().height(200.dp).padding(top = 40.dp), contentAlignment = Alignment.TopCenter) {
-                    Text("No expenses yet. Tap + to add!", color = Color.Gray, fontWeight = FontWeight.Medium)
+                    Text("No expenses yet. Tap + to add!", color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f), fontWeight = FontWeight.Medium)
                 }
             } else {
                 DynamicLedgerView(ledgers)
@@ -356,7 +356,7 @@ fun InsideContriScreen(
                     text = "Past Cycles", 
                     fontSize = 15.sp, 
                     fontWeight = FontWeight.Bold, 
-                    color = Color.Gray, 
+                    color = MaterialTheme.colorScheme.onSurfaceVariant, 
                     modifier = Modifier.padding(horizontal = 16.dp)
                 )
                 Spacer(modifier = Modifier.height(8.dp))
@@ -411,7 +411,7 @@ fun InsideContriScreen(
                                     }
                                 },
                             shape = RoundedCornerShape(12.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color.White),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                             elevation = CardDefaults.cardElevation(1.5.dp)
                         ) {
                             Column {
@@ -420,24 +420,24 @@ fun InsideContriScreen(
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text(text = cycle.dateRange, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = Color.DarkGray)
+                                    Text(text = cycle.dateRange, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         if (isFetching) {
-                                            CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color(0xFF2E7D32), strokeWidth = 2.dp)
+                                            CircularProgressIndicator(modifier = Modifier.size(16.dp), color = MaterialTheme.colorScheme.primary, strokeWidth = 2.dp)
                                             Spacer(modifier = Modifier.width(8.dp))
                                         }
-                                        Text(text = cycle.totalAmount, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFF2E7D32))
+                                        Text(text = cycle.totalAmount, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
                                     }
                                 }
 
                                 if (isExpanded) {
                                     if (cycleLedger != null && cycleLedger.isNotEmpty()) {
-                                        HorizontalDivider(color = Color.LightGray, thickness = 0.5.dp)
+                                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f), thickness = 0.5.dp)
                                         Spacer(modifier = Modifier.height(12.dp))
                                         DynamicLedgerView(cycleLedger)
                                         Spacer(modifier = Modifier.height(12.dp))
                                     } else if (!isFetching) {
-                                        Text("No data available.", color = Color.Gray, modifier = Modifier.fillMaxWidth().padding(16.dp), textAlign = TextAlign.Center)
+                                        Text("No data available.", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.fillMaxWidth().padding(16.dp), textAlign = TextAlign.Center)
                                     }
                                 }
                             }
@@ -461,11 +461,11 @@ fun InsideContriScreen(
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                     elevation = CardDefaults.cardElevation(8.dp)
                 ) {
                     Column(modifier = Modifier.padding(20.dp)) {
-                        Text("Room Settings", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
+                        Text("Room Settings", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onSurface)
                         Spacer(modifier = Modifier.height(16.dp))
 
                         OutlinedTextField(
@@ -480,15 +480,17 @@ fun InsideContriScreen(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp),
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = if(isEditingName) Color(0xFF2E7D32) else Color.LightGray, 
-                                unfocusedBorderColor = Color.LightGray
+                                focusedBorderColor = if(isEditingName) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), 
+                                unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                focusedTextColor = MaterialTheme.colorScheme.onSurface
                             ),
                             trailingIcon = {
                                 Box(
                                     modifier = Modifier.size(36.dp).clip(CircleShape).bounceClick { isEditingName = !isEditingName },
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Icon(Icons.Outlined.Edit, contentDescription = "Edit", tint = if (isEditingName) Color(0xFF2E7D32) else Color.Gray)
+                                    Icon(Icons.Outlined.Edit, contentDescription = "Edit", tint = if (isEditingName) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
                         )
@@ -509,30 +511,32 @@ fun InsideContriScreen(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp),
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = if(isEditingPin) Color(0xFF2E7D32) else Color.LightGray, 
-                                unfocusedBorderColor = Color.LightGray
+                                focusedBorderColor = if(isEditingPin) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), 
+                                unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                focusedTextColor = MaterialTheme.colorScheme.onSurface
                             ),
                             trailingIcon = {
                                 Box(
                                     modifier = Modifier.size(36.dp).clip(CircleShape).bounceClick { isEditingPin = !isEditingPin },
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Icon(Icons.Outlined.Edit, contentDescription = "Edit", tint = if (isEditingPin) Color(0xFF2E7D32) else Color.Gray)
+                                    Icon(Icons.Outlined.Edit, contentDescription = "Edit", tint = if (isEditingPin) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
                         )
 
                         Spacer(modifier = Modifier.height(20.dp))
-                        Text("Manage Members", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
+                        Text("Manage Members", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(modifier = Modifier.height(8.dp))
 
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .heightIn(max = 170.dp)
-                                .border(1.dp, Color(0xFFEEEEEE), RoundedCornerShape(12.dp))
+                                .border(1.dp, MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
                                 .clip(RoundedCornerShape(12.dp))
-                                .background(Color(0xFFFAFAFA))
+                                .background(MaterialTheme.colorScheme.background)
                         ) {
                             if (ledgers.isNotEmpty()) {
                                 val adminName = ledgers[0].memberName
@@ -544,26 +548,26 @@ fun InsideContriScreen(
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             val dispName = if (member.memberName.length > 10) member.memberName.take(10) + "..." else member.memberName
-                                            Text(text = dispName, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Color.Black)
+                                            Text(text = dispName, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onBackground)
                                             
                                             if (member.memberName == adminName) {
-                                                Text("Admin", fontSize = 12.sp, color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold)
+                                                Text("Admin", fontSize = 12.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                                             } else {
                                                 Icon(
                                                     imageVector = Icons.AutoMirrored.Outlined.ExitToApp,
                                                     contentDescription = "Remove",
-                                                    tint = Color.Red,
+                                                    tint = MaterialTheme.colorScheme.error,
                                                     modifier = Modifier.size(24.dp).bounceClick { memberToRemove = member.memberName }
                                                 )
                                             }
                                         }
                                         if (index < ledgers.size - 1) {
-                                            HorizontalDivider(color = Color(0xFFEEEEEE), thickness = 1.dp)
+                                            HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f), thickness = 1.dp)
                                         }
                                     }
                                 }
                             } else {
-                                Text("No members found.", modifier = Modifier.padding(16.dp), color = Color.Gray, fontSize = 13.sp)
+                                Text("No members found.", modifier = Modifier.padding(16.dp), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
                             }
                         }
 
@@ -572,7 +576,7 @@ fun InsideContriScreen(
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 text = "Cancel", 
-                                color = Color.Gray, 
+                                color = MaterialTheme.colorScheme.onSurfaceVariant, 
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.bounceClick { showSettingsDialog = false }.padding(8.dp)
                             )
@@ -616,11 +620,11 @@ fun InsideContriScreen(
                                             Toast.makeText(context, "Invalid Name or Pin (must be 6 digits)", Toast.LENGTH_SHORT).show()
                                         }
                                     }
-                                    .background(Color(0xFF2E7D32), RoundedCornerShape(10.dp))
+                                    .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(10.dp))
                                     .padding(horizontal = 16.dp, vertical = 10.dp),
                                 contentAlignment = Alignment.Center
                             ) { 
-                                Text("Save Changes", color = Color.White, fontWeight = FontWeight.Bold) 
+                                Text("Save Changes", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold) 
                             }
                         }
                     }
@@ -628,19 +632,17 @@ fun InsideContriScreen(
             }
         }
 
-        // CONFIRMATION DIALOG FOR REMOVING A MEMBER
         if (memberToRemove != null) {
             AlertDialog(
                 onDismissRequest = { memberToRemove = null },
-                title = { Text("Remove Member?", fontWeight = FontWeight.ExtraBold, color = Color.Black) },
-                text = { Text("Are you sure you want to kick '$memberToRemove' from this room? Unka saara individual share room se zero ho jayega.", color = Color.DarkGray) },
-                containerColor = Color.White,
+                title = { Text("Remove Member?", fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onSurface) },
+                text = { Text("Are you sure you want to kick '$memberToRemove' from this room? Unka saara individual share room se zero ho jayega.", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                containerColor = MaterialTheme.colorScheme.surface,
                 confirmButton = {
                     TextButton(
                         onClick = { 
                             val target = memberToRemove!!
                             
-                            // OPTIMISTIC UI
                             memberToRemove = null
                             showSettingsDialog = false
                             Toast.makeText(context, "Removing $target...", Toast.LENGTH_SHORT).show()
@@ -670,15 +672,14 @@ fun InsideContriScreen(
                                 } catch (e: Exception) {}
                             }
                         }
-                    ) { Text("Remove", color = Color.Red, fontWeight = FontWeight.Bold) }
+                    ) { Text("Remove", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold) }
                 },
                 dismissButton = {
-                    TextButton(onClick = { memberToRemove = null }) { Text("Cancel", color = Color.Gray, fontWeight = FontWeight.Bold) }
+                    TextButton(onClick = { memberToRemove = null }) { Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold) }
                 }
             )
         }
 
-        // ALL OTHER POPUPS
         if (showSettleDialog) {
             SettleUpDialog(myName = myName, ledgers = ledgers, totalExpense = totalGroupExpense, onDismiss = { showSettleDialog = false })
         }
@@ -686,13 +687,12 @@ fun InsideContriScreen(
         if (showNewCycleDialog) {
             AlertDialog(
                 onDismissRequest = { showNewCycleDialog = false },
-                title = { Text("Start New Cycle?", fontWeight = FontWeight.ExtraBold, color = Color.Black) },
-                text = { Text("Once created, users cannot change this. It will be saved and calculations will restart from zero.", color = Color.DarkGray) },
-                containerColor = Color.White,
+                title = { Text("Start New Cycle?", fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onSurface) },
+                text = { Text("Once created, users cannot change this. It will be saved and calculations will restart from zero.", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                containerColor = MaterialTheme.colorScheme.surface,
                 confirmButton = {
                     TextButton(
                         onClick = { 
-                            // OPTIMISTIC UI
                             showNewCycleDialog = false
                             Toast.makeText(context, "Starting new cycle...", Toast.LENGTH_SHORT).show()
                             
@@ -712,22 +712,21 @@ fun InsideContriScreen(
                                 } catch (e: Exception) {}
                             }
                         }
-                    ) { Text("New", color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold) }
+                    ) { Text("New", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold) }
                 },
-                dismissButton = { TextButton(onClick = { showNewCycleDialog = false }) { Text("Cancel", color = Color.Gray, fontWeight = FontWeight.Bold) } }
+                dismissButton = { TextButton(onClick = { showNewCycleDialog = false }) { Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold) } }
             )
         }
 
         if (showLeaveDialog) {
             AlertDialog(
                 onDismissRequest = { showLeaveDialog = false },
-                title = { Text("Leave Room?", fontWeight = FontWeight.ExtraBold, color = Color.Black) },
-                text = { Text("Are you sure you want to leave this Contri room? This action cannot be undone.", color = Color.DarkGray) },
-                containerColor = Color.White,
+                title = { Text("Leave Room?", fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onSurface) },
+                text = { Text("Are you sure you want to leave this Contri room? This action cannot be undone.", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                containerColor = MaterialTheme.colorScheme.surface,
                 confirmButton = {
                     TextButton(
                         onClick = { 
-                            // OPTIMISTIC UI
                             showLeaveDialog = false
                             Toast.makeText(context, "Leaving room...", Toast.LENGTH_SHORT).show()
                             
@@ -747,9 +746,9 @@ fun InsideContriScreen(
                                 } catch (e: Exception) {}
                             }
                         }
-                    ) { Text("Leave", color = Color.Red, fontWeight = FontWeight.Bold) }
+                    ) { Text("Leave", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold) }
                 },
-                dismissButton = { TextButton(onClick = { showLeaveDialog = false }) { Text("Cancel", color = Color.Gray, fontWeight = FontWeight.Bold) } }
+                dismissButton = { TextButton(onClick = { showLeaveDialog = false }) { Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold) } }
             )
         }
 
@@ -758,7 +757,6 @@ fun InsideContriScreen(
                 onDismiss = { showAddExpenseDialog = false },
                 onAdd = { title, dateMillis, amount ->
                     
-                    // OPTIMISTIC UI
                     showAddExpenseDialog = false
                     Toast.makeText(context, "Adding expense...", Toast.LENGTH_SHORT).show()
                     
@@ -812,7 +810,7 @@ fun DynamicLedgerView(ledgers: List<MemberLedger>) {
                         text = ledger.memberName, 
                         fontSize = 15.sp, 
                         fontWeight = FontWeight.ExtraBold, 
-                        color = Color.Black,
+                        color = MaterialTheme.colorScheme.onBackground,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -821,14 +819,14 @@ fun DynamicLedgerView(ledgers: List<MemberLedger>) {
                         text = "₹${ledger.totalSpent.toInt()}", 
                         fontSize = 16.sp, 
                         fontWeight = FontWeight.Bold, 
-                        color = Color(0xFF2E7D32)
+                        color = MaterialTheme.colorScheme.primary
                     )
                 }
             }
         }
 
         val dividerModifier = if (isScrollable) Modifier.width(fixedColumnWidth * memberCount) else Modifier.fillMaxWidth()
-        HorizontalDivider(modifier = dividerModifier.padding(vertical = 8.dp), thickness = 1.dp, color = Color.LightGray)
+        HorizontalDivider(modifier = dividerModifier.padding(vertical = 8.dp), thickness = 1.dp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f))
 
         Row(modifier = if (!isScrollable) Modifier.fillMaxWidth() else Modifier) {
             ledgers.forEach { ledger ->
@@ -838,12 +836,12 @@ fun DynamicLedgerView(ledgers: List<MemberLedger>) {
                 ) {
                     ledger.expenses.forEach { expense ->
                         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(bottom = 10.dp)) {
-                            Text(text = expense.itemName, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Color.Black, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(text = expense.itemName, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Spacer(modifier = Modifier.height(1.dp))
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(text = "₹${expense.amount.toInt()}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.DarkGray)
+                                Text(text = "₹${expense.amount.toInt()}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Text(text = expense.date, fontSize = 11.sp, color = Color.Gray, fontWeight = FontWeight.Medium)
+                                Text(text = expense.date, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Medium)
                             }
                         }
                     }
@@ -894,18 +892,18 @@ fun SettleUpDialog(myName: String, ledgers: List<MemberLedger>, totalExpense: Do
     )
 
     Dialog(onDismissRequest = onDismiss) {
-        Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(8.dp)) {
+        Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), elevation = CardDefaults.cardElevation(8.dp)) {
             Column(modifier = Modifier.padding(20.dp)) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-                    Text("Total: ₹${totalExpense.toInt()}", fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
+                    Text("Total: ₹${totalExpense.toInt()}", fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onSurface)
                 }
                 Spacer(modifier = Modifier.height(16.dp))
-                HorizontalDivider(color = Color.LightGray, thickness = 1.dp)
+                HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f), thickness = 1.dp)
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Column(modifier = Modifier.fillMaxWidth()) {
                     if (sortedSettlements.isEmpty()) {
-                        Text("No pending payments.", fontSize = 14.sp, color = Color.Gray, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                        Text("No pending payments.", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
                     } else {
                         sortedSettlements.forEach { settlement ->
                             
@@ -921,20 +919,20 @@ fun SettleUpDialog(myName: String, ledgers: List<MemberLedger>, totalExpense: Do
                                     text = "$fromText pay $toText", 
                                     fontSize = 14.sp, 
                                     fontWeight = if (fromText == "You" || toText == "You") FontWeight.ExtraBold else FontWeight.SemiBold, 
-                                    color = Color.Black
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
                                     text = "₹${settlement.amount.toInt()}", 
                                     fontSize = 15.sp, 
                                     fontWeight = FontWeight.ExtraBold, 
-                                    color = Color(0xFF2E7D32)
+                                    color = MaterialTheme.colorScheme.primary
                                 )
                             }
                         }
                     }
                 }
                 Spacer(modifier = Modifier.height(16.dp))
-                HorizontalDivider(color = Color.LightGray, thickness = 1.dp)
+                HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f), thickness = 1.dp)
                 Spacer(modifier = Modifier.height(16.dp))
                 
                 Box(
@@ -942,10 +940,10 @@ fun SettleUpDialog(myName: String, ledgers: List<MemberLedger>, totalExpense: Do
                         .fillMaxWidth()
                         .height(48.dp)
                         .bounceClick { onDismiss() }
-                        .background(Color(0xFF2E7D32), RoundedCornerShape(12.dp)),
+                        .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("Dismiss", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Text("Dismiss", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 }
             }
         }
@@ -962,9 +960,9 @@ fun AddContriExpenseDialog(onDismiss: () -> Unit, onAdd: (String, Long, Double) 
     var dateMillis by remember { mutableStateOf<Long?>(System.currentTimeMillis()) }
 
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(dismissOnClickOutside = false)) {
-        Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(8.dp)) {
+        Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), elevation = CardDefaults.cardElevation(8.dp)) {
             Column(modifier = Modifier.padding(20.dp)) {
-                Text("Add New Expense", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
+                Text("Add New Expense", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onSurface)
                 Spacer(modifier = Modifier.height(16.dp))
 
                 OutlinedTextField(
@@ -975,7 +973,13 @@ fun AddContriExpenseDialog(onDismiss: () -> Unit, onAdd: (String, Long, Double) 
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF2E7D32), focusedLabelColor = Color(0xFF2E7D32))
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary, 
+                        focusedLabelColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface
+                    )
                 )
                 Spacer(modifier = Modifier.height(12.dp))
 
@@ -985,12 +989,18 @@ fun AddContriExpenseDialog(onDismiss: () -> Unit, onAdd: (String, Long, Double) 
                         value = amount,
                         onValueChange = { if (it.isEmpty() || it.matches(Regex("^\\d*\\.?\\d*$"))) amount = it },
                         label = { Text("Amount", fontSize = 13.sp) },
-                        prefix = { Text("₹ ", color = Color.Black, fontWeight = FontWeight.Bold) },
+                        prefix = { Text("₹ ", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true,
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF2E7D32), focusedLabelColor = Color(0xFF2E7D32))
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MaterialTheme.colorScheme.primary, 
+                            focusedLabelColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            focusedTextColor = MaterialTheme.colorScheme.onSurface
+                        )
                     )
                 }
                 Spacer(modifier = Modifier.height(20.dp))
@@ -998,7 +1008,7 @@ fun AddContriExpenseDialog(onDismiss: () -> Unit, onAdd: (String, Long, Double) 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = "Cancel", 
-                        color = Color.Gray, 
+                        color = MaterialTheme.colorScheme.onSurfaceVariant, 
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.bounceClick { onDismiss() }.padding(8.dp)
                     )
@@ -1010,11 +1020,11 @@ fun AddContriExpenseDialog(onDismiss: () -> Unit, onAdd: (String, Long, Double) 
                                 val amt = amount.toDoubleOrNull()
                                 if (expenseTitle.isNotBlank() && amt != null && dateMillis != null) onAdd(expenseTitle, dateMillis!!, amt)
                             }
-                            .background(Color(0xFF2E7D32), RoundedCornerShape(10.dp))
+                            .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(10.dp))
                             .padding(horizontal = 16.dp, vertical = 10.dp),
                         contentAlignment = Alignment.Center
                     ) { 
-                        Text("Add Expense", color = Color.White, fontWeight = FontWeight.Bold) 
+                        Text("Add Expense", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold) 
                     }
                 }
             }
@@ -1102,9 +1112,9 @@ fun PremiumFloatingButton(onClick: () -> Unit) {
         modifier = Modifier
             .size(56.dp)
             .bounceClick { onClick() }
-            .background(Color(0xFF2E7D32), shape = CircleShape),
+            .background(MaterialTheme.colorScheme.primary, shape = CircleShape),
         contentAlignment = Alignment.Center
     ) { 
-        Icon(imageVector = Icons.Outlined.Add, contentDescription = "Add Expense", tint = Color.White, modifier = Modifier.size(28.dp)) 
+        Icon(imageVector = Icons.Outlined.Add, contentDescription = "Add Expense", tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(28.dp)) 
     }
 }
