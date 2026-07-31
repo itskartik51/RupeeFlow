@@ -5,12 +5,12 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import com.kartikey.rupeeflow.UI_Screens.MainScreen
 import com.kartikey.rupeeflow.UI_Screens.LoginScreen
+import com.kartikey.rupeeflow.UI_Screens.RupeeFlowTheme // <-- NAYA IMPORT
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -21,7 +21,8 @@ class MainActivity : ComponentActivity() {
         val savedUsername = sharedPreferences.getString("username", "") ?: ""
 
         setContent {
-            MaterialTheme {
+            // YAHAN FIX KIYA HAI: Ab hamara custom Theme Engine call hoga
+            RupeeFlowTheme { 
                 Surface(modifier = Modifier.fillMaxSize()) {
                     var isLoggedIn by remember { mutableStateOf(savedLoginState) }
                     var currentUser by remember { mutableStateOf(savedUsername) }
