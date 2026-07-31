@@ -70,7 +70,6 @@ fun AppUpdateScreen(onBackClick: () -> Unit) {
     }
     val currentVersionName = remember { packageInfo.versionName ?: "1.0" }
 
-    // Smart Permission Launcher for Unknown Sources
     val installLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         if (context.packageManager.canRequestPackageInstalls()) {
             downloadedApkUri?.let { uri -> installApk(context, uri) }
@@ -79,16 +78,13 @@ fun AppUpdateScreen(onBackClick: () -> Unit) {
         }
     }
 
-    // Android 13+ Notification Permission Launcher
     val notificationPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
         if (!isGranted) {
             Toast.makeText(context, "Notifications disabled. You won't be alerted when download finishes.", Toast.LENGTH_SHORT).show()
         }
     }
 
-    // Auto-check for updates on open
     LaunchedEffect(Unit) {
-        // Request Notification Permission for Android 13 (API 33) and above
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
                 notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
@@ -132,16 +128,17 @@ fun AppUpdateScreen(onBackClick: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("App Update & Info", fontWeight = FontWeight.Bold) },
+                title = { Text("App Update", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
                 navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color(0xFF2E7D32))
+                    // Applied Premium Bounce Here
+                    IconButton(onClick = onBackClick, modifier = Modifier.bounceClick()) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.onSurface)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFFF8F9FA))
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
             )
         },
-        containerColor = Color(0xFFF8F9FA)
+        containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
         Column(
             modifier = Modifier
@@ -157,34 +154,34 @@ fun AppUpdateScreen(onBackClick: () -> Unit) {
                 modifier = Modifier
                     .size(100.dp)
                     .clip(CircleShape)
-                    .background(Color(0xFFE8F5E9)),
+                    .background(MaterialTheme.colorScheme.primaryContainer),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Default.SystemUpdate, contentDescription = "Update", tint = Color(0xFF2E7D32), modifier = Modifier.size(50.dp))
+                Icon(Icons.Default.SystemUpdate, contentDescription = "Update", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(50.dp))
             }
             
             Spacer(modifier = Modifier.height(24.dp))
-            Text("RupeeFlow", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
-            Text("Current Version: v$currentVersionName", fontSize = 14.sp, color = Color.Gray)
+            Text("RupeeFlow", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onBackground)
+            Text("Current Version: v$currentVersionName", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             
             Spacer(modifier = Modifier.height(40.dp))
 
             when (checkState) {
                 "CHECKING" -> {
-                    CircularProgressIndicator(color = Color(0xFF2E7D32))
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                     Spacer(modifier = Modifier.height(16.dp))
-                    Text("Checking for updates...", color = Color.Gray, fontSize = 14.sp)
+                    Text("Checking for updates...", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
                 }
                 "UP_TO_DATE" -> {
-                    Icon(Icons.Default.CheckCircle, contentDescription = "Updated", tint = Color(0xFF2E7D32), modifier = Modifier.size(48.dp))
+                    Icon(Icons.Default.CheckCircle, contentDescription = "Updated", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(48.dp))
                     Spacer(modifier = Modifier.height(16.dp))
-                    Text("You're on the latest version!", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.Black)
-                    Text("No new updates available.", color = Color.Gray, fontSize = 14.sp)
+                    Text("You're on the latest version!", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onBackground)
+                    Text("No new updates available.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
                 }
                 "AVAILABLE" -> {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                         shape = RoundedCornerShape(16.dp),
                         elevation = CardDefaults.cardElevation(2.dp)
                     ) {
@@ -192,12 +189,12 @@ fun AppUpdateScreen(onBackClick: () -> Unit) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Default.NewReleases, contentDescription = "New", tint = Color(0xFFE65100))
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("Version ${updateInfo?.versionName} Available!", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.Black)
+                                Text("Version ${updateInfo?.versionName} Available!", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface)
                             }
                             Spacer(modifier = Modifier.height(12.dp))
-                            Text("What's New:", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = Color.DarkGray)
+                            Text("What's New:", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Spacer(modifier = Modifier.height(4.dp))
-                            Text(updateInfo?.releaseNotes ?: "", fontSize = 13.sp, color = Color.Gray)
+                            Text(updateInfo?.releaseNotes ?: "", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                     
@@ -216,7 +213,6 @@ fun AppUpdateScreen(onBackClick: () -> Unit) {
                             
                             val downloadId = downloadManager.enqueue(request)
                             
-                            // Background Progress Polling
                             coroutineScope.launch(Dispatchers.IO) {
                                 var isDownloading = true
                                 while (isDownloading) {
@@ -234,7 +230,6 @@ fun AppUpdateScreen(onBackClick: () -> Unit) {
                                             withContext(Dispatchers.Main) {
                                                 downloadedApkUri = finalUri
                                                 checkState = "READY"
-                                                // Trigger Premium Push Notification
                                                 showUpdateReadyNotification(context, finalUri)
                                             }
                                         } else if (status == DownloadManager.STATUS_FAILED) {
@@ -257,32 +252,32 @@ fun AppUpdateScreen(onBackClick: () -> Unit) {
                             }
                         },
                         modifier = Modifier.fillMaxWidth().height(52.dp).bounceClick(),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                         shape = RoundedCornerShape(12.dp)
                     ) {
-                        Icon(Icons.Default.Download, contentDescription = "Download")
+                        Icon(Icons.Default.Download, contentDescription = "Download", tint = MaterialTheme.colorScheme.onPrimary)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Download Update", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Text("Download Update", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onPrimary)
                     }
                 }
                 "DOWNLOADING" -> {
-                    Text("Downloading in background...", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.Black)
+                    Text("Downloading in background...", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onBackground)
                     Spacer(modifier = Modifier.height(16.dp))
                     LinearProgressIndicator(
                         progress = { downloadProgress },
                         modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(50)),
-                        color = Color(0xFF2E7D32),
-                        trackColor = Color(0xFFE8F5E9)
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = MaterialTheme.colorScheme.surfaceVariant
                     )
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text("${(downloadProgress * 100).toInt()}%", color = Color.Gray, fontWeight = FontWeight.Bold)
+                    Text("${(downloadProgress * 100).toInt()}%", color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(24.dp))
-                    Text("You can navigate away, the download will continue.", fontSize = 12.sp, color = Color.Gray)
+                    Text("You can navigate away, the download will continue.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 "READY" -> {
-                    Icon(Icons.Default.Inventory, contentDescription = "Ready", tint = Color(0xFF2E7D32), modifier = Modifier.size(48.dp))
+                    Icon(Icons.Default.Inventory, contentDescription = "Ready", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(48.dp))
                     Spacer(modifier = Modifier.height(16.dp))
-                    Text("Update Ready to Install", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color.Black)
+                    Text("Update Ready to Install", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.onBackground)
                     Spacer(modifier = Modifier.height(32.dp))
                     
                     Button(
@@ -298,10 +293,10 @@ fun AppUpdateScreen(onBackClick: () -> Unit) {
                             }
                         },
                         modifier = Modifier.fillMaxWidth().height(52.dp).bounceClick(),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                         shape = RoundedCornerShape(12.dp)
                     ) {
-                        Text("Install Now", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Text("Install Now", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onPrimary)
                     }
                 }
             }
@@ -322,12 +317,10 @@ fun installApk(context: Context, apkUri: Uri) {
     }
 }
 
-// PREMIUM PUSH NOTIFICATION LOGIC
 fun showUpdateReadyNotification(context: Context, apkUri: Uri) {
     val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
     val channelId = "rupeeflow_update_channel"
 
-    // Create Notification Channel for Android 8+
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
         val channel = NotificationChannel(
             channelId,
@@ -339,7 +332,6 @@ fun showUpdateReadyNotification(context: Context, apkUri: Uri) {
         notificationManager.createNotificationChannel(channel)
     }
 
-    // Intent to auto-trigger the package installer when notification is tapped
     val installIntent = Intent(Intent.ACTION_VIEW).apply {
         setDataAndType(apkUri, "application/vnd.android.package-archive")
         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -353,7 +345,6 @@ fun showUpdateReadyNotification(context: Context, apkUri: Uri) {
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     )
 
-    // Build the Heads-up Notification
     val notification = NotificationCompat.Builder(context, channelId)
         .setSmallIcon(android.R.drawable.stat_sys_download_done) 
         .setContentTitle("\uD83D\uDE80 RupeeFlow Update Ready")
