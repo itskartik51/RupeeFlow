@@ -100,31 +100,36 @@ fun CustomDatePicker(
                     datePickerState.selectedDateMillis?.let { onDateSelected(it) }
                     showDialog = false
                 }) {
-                    Text("OK", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                    Text("OK", color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDialog = false }) {
-                    Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Cancel", color = Color.Gray)
                 }
             },
-            colors = DatePickerDefaults.colors(containerColor = MaterialTheme.colorScheme.surface)
+            // PURE WHITE BACKGROUND FOR CONTAINER
+            colors = DatePickerDefaults.colors(containerColor = Color.White)
         ) {
             DatePicker(
                 state = datePickerState,
+                // OLD HARDCODED CLEAN COLORS (No Purple Tint)
                 colors = DatePickerDefaults.colors(
-                    selectedDayContainerColor = MaterialTheme.colorScheme.primary,
-                    selectedDayContentColor = MaterialTheme.colorScheme.onPrimary,
-                    todayDateBorderColor = MaterialTheme.colorScheme.primary,
-                    todayContentColor = MaterialTheme.colorScheme.primary,
-                    dayContentColor = MaterialTheme.colorScheme.onSurface,
-                    headlineContentColor = MaterialTheme.colorScheme.onSurface,
-                    weekdayContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    subheadContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    yearContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    currentYearContentColor = MaterialTheme.colorScheme.primary,
-                    selectedYearContainerColor = MaterialTheme.colorScheme.primary,
-                    selectedYearContentColor = MaterialTheme.colorScheme.onPrimary
+                    containerColor = Color.White,
+                    titleContentColor = Color.Gray,
+                    headlineContentColor = Color.Black,
+                    weekdayContentColor = Color.Gray,
+                    subheadContentColor = Color.Black,
+                    yearContentColor = Color.Black,
+                    currentYearContentColor = Color(0xFF2E7D32),
+                    selectedYearContainerColor = Color(0xFF2E7D32),
+                    selectedYearContentColor = Color.White,
+                    dayContentColor = Color.Black,
+                    disabledDayContentColor = Color.LightGray,
+                    selectedDayContainerColor = Color(0xFF2E7D32),
+                    selectedDayContentColor = Color.White,
+                    todayDateBorderColor = Color(0xFF2E7D32),
+                    todayContentColor = Color(0xFF2E7D32)
                 )
             )
         }
