@@ -74,6 +74,11 @@ fun AddExpenseForm(
         "Transport" to Icons.Outlined.DirectionsCar,
         "Shopping" to Icons.Outlined.ShoppingBag,
         "Bills" to Icons.Outlined.Receipt,
+        "Fuel" to Icons.Outlined.LocalGasStation,
+        "Personal Care" to Icons.Outlined.Spa,
+        "Health" to Icons.Outlined.MedicalServices,
+        "Education" to Icons.Outlined.School,
+        "Entertainment" to Icons.Outlined.SportsEsports,
         "Custom" to Icons.Outlined.Edit
     )
     val paymentModes = listOf(
@@ -85,6 +90,12 @@ fun AddExpenseForm(
         "Net Banking" to Icons.Outlined.Computer
     )
     
+    // Frontend Checks for Smart Disabled Mode
+    val hasBank = bankList.isNotEmpty()
+    val hasCC = ccList.isNotEmpty()
+    val hasCash = cashData != null && cashData.amount > 0.0
+    val hasNoFinance = !hasBank && !hasCC && !hasCash
+
     var categoryText by remember { mutableStateOf("") }
     var isCategoryEditable by remember { mutableStateOf(false) } 
     var remark1 by remember { mutableStateOf("") }
@@ -129,7 +140,9 @@ fun AddExpenseForm(
                     readOnly = !isCategoryEditable,
                     label = { Text("Category") },
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                    modifier = Modifier.fillMaxWidth().menuAnchor(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .menuAnchor(),
                     shape = RoundedCornerShape(12.dp)
                 )
                 ExposedDropdownMenu(
@@ -171,52 +184,87 @@ fun AddExpenseForm(
             Spacer(modifier = Modifier.height(16.dp))
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                ExposedDropdownMenuBox(expanded = modeExpanded, onExpandedChange = { modeExpanded = !modeExpanded }, modifier = Modifier.weight(0.35f)) {
+                ExposedDropdownMenuBox(
+                    expanded = modeExpanded, 
+                    onExpandedChange = { 
+                        if (hasNoFinance) {
+                            Toast.makeText(context, "Add Finance Detail", Toast.LENGTH_SHORT).show()
+                            modeExpanded = false
+                        } else {
+                            modeExpanded = !modeExpanded 
+                        }
+                    }, 
+                    modifier = Modifier.weight(0.35f)
+                ) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp)
                             .border(1.dp, if (modeExpanded) Color(0xFF2E7D32) else Color.Gray, RoundedCornerShape(12.dp))
                             .menuAnchor()
-                            .background(Color.Transparent, RoundedCornerShape(12.dp)),
+                            .background(if (hasNoFinance) Color(0xFFF5F5F5) else Color.Transparent, RoundedCornerShape(12.dp)),
                         contentAlignment = Alignment.CenterStart
                     ) {
-                        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Row(modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 text = if (modeText.isEmpty()) "Mode" else modeText,
-                                color = if (modeText.isEmpty()) Color.Gray else Color.Black,
+                                color = if (modeText.isEmpty() || hasNoFinance) Color.Gray else Color.Black,
                                 fontSize = 14.sp, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.weight(1f)
                             )
-                            Icon(Icons.Outlined.ArrowDropDown, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(20.dp).rotate(if (modeExpanded) 180f else 0f))
+                            Icon(Icons.Outlined.ArrowDropDown, contentDescription = null, tint = Color.Gray, modifier = Modifier
+                                .size(20.dp)
+                                .rotate(if (modeExpanded) 180f else 0f))
                         }
                     }
                     
-                    ExposedDropdownMenu(expanded = modeExpanded, onDismissRequest = { modeExpanded = false }, modifier = Modifier.background(Color.White).widthIn(min = 140.dp)) {
+                    ExposedDropdownMenu(expanded = modeExpanded, onDismissRequest = { modeExpanded = false }, modifier = Modifier
+                        .background(Color.White)
+                        .widthIn(min = 140.dp)) {
                         paymentModes.forEach { (name, icon) ->
+                            
+                            val isAvailable = when (name) {
+                                "Cash" -> hasCash
+                                "Credit Card" -> hasCC
+                                else -> hasBank
+                            }
+                            val itemColor = if (isAvailable) Color.DarkGray else Color.LightGray
+
                             DropdownMenuItem(
                                 text = { 
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(imageVector = icon, contentDescription = name, tint = Color.DarkGray, modifier = Modifier.size(20.dp))
+                                        Icon(imageVector = icon, contentDescription = name, tint = itemColor, modifier = Modifier.size(20.dp))
                                         Spacer(modifier = Modifier.width(12.dp))
-                                        Text(name, fontSize = 14.sp, maxLines = 1, softWrap = false)
+                                        Text(name, fontSize = 14.sp, color = itemColor, maxLines = 1, softWrap = false)
                                     }
                                 },
                                 onClick = {
-                                    modeText = name
-                                    modeExpanded = false
-                                    selectedSourceId = ""
-                                    selectedSourceName = ""
-                                    selectedSourceLogo = null 
-                                    
-                                    if (name == "Cash") {
-                                        selectedSourceType = "Cash"
-                                        selectedSourceId = "Cash"
-                                        selectedSourceName = "Cash in Hand"
-                                    } else if (name == "Credit Card") {
-                                        selectedSourceType = "Credit Card"
+                                    if (isAvailable) {
+                                        modeText = name
+                                        modeExpanded = false
+                                        selectedSourceId = ""
+                                        selectedSourceName = ""
+                                        selectedSourceLogo = null 
+                                        
+                                        if (name == "Cash") {
+                                            selectedSourceType = "Cash"
+                                            selectedSourceId = "Cash"
+                                            selectedSourceName = "Cash in Hand"
+                                        } else if (name == "Credit Card") {
+                                            selectedSourceType = "Credit Card"
+                                        } else {
+                                            selectedSourceType = "Bank"
+                                        }
                                     } else {
-                                        selectedSourceType = "Bank"
+                                        val msg = when(name) {
+                                            "Cash" -> "Please add Cash Balance first"
+                                            "Credit Card" -> "Please add a Credit Card first"
+                                            else -> "Please add a Bank Account to use $name"
+                                        }
+                                        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                        modeExpanded = false
                                     }
                                 }
                             )
@@ -236,21 +284,29 @@ fun AddExpenseForm(
                             .background(if (!isPaidByActive && selectedSourceType != "Cash") Color(0xFFF5F5F5) else Color.Transparent, RoundedCornerShape(12.dp)),
                         contentAlignment = Alignment.CenterStart
                     ) {
-                        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Row(modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                             if (selectedSourceType.isEmpty()) {
                                 Text("Select Mode", color = Color.Gray, fontSize = 14.sp, modifier = Modifier.weight(1f))
                                 Icon(Icons.Outlined.ArrowDropDown, null, tint = Color.Transparent, modifier = Modifier.size(20.dp))
                             } else if (selectedSourceId.isEmpty()) {
                                 Text(if(selectedSourceType == "Bank") "Choose Bank" else "Choose Card", color = Color.Gray, fontSize = 14.sp, modifier = Modifier.weight(1f))
-                                Icon(Icons.Outlined.ArrowDropDown, null, tint = Color.Gray, modifier = Modifier.size(20.dp).rotate(if (paidByExpanded) 180f else 0f))
+                                Icon(Icons.Outlined.ArrowDropDown, null, tint = Color.Gray, modifier = Modifier
+                                    .size(20.dp)
+                                    .rotate(if (paidByExpanded) 180f else 0f))
                             } else {
                                 if (selectedSourceLogo != null && selectedSourceType != "Cash") {
-                                    Image(painter = painterResource(id = selectedSourceLogo!!), contentDescription = null, modifier = Modifier.size(20.dp).clip(RoundedCornerShape(4.dp)), contentScale = ContentScale.Fit)
+                                    Image(painter = painterResource(id = selectedSourceLogo!!), contentDescription = null, modifier = Modifier
+                                        .size(20.dp)
+                                        .clip(RoundedCornerShape(4.dp)), contentScale = ContentScale.Fit)
                                     Spacer(modifier = Modifier.width(8.dp))
                                 }
                                 Text(text = selectedSourceName, color = if(selectedSourceType == "Cash") Color(0xFF2E7D32) else Color.Black, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                                 if (isPaidByActive) {
-                                    Icon(Icons.Outlined.ArrowDropDown, null, tint = Color.Gray, modifier = Modifier.size(20.dp).rotate(if (paidByExpanded) 180f else 0f))
+                                    Icon(Icons.Outlined.ArrowDropDown, null, tint = Color.Gray, modifier = Modifier
+                                        .size(20.dp)
+                                        .rotate(if (paidByExpanded) 180f else 0f))
                                 }
                             }
                         }
@@ -264,7 +320,9 @@ fun AddExpenseForm(
                                     text = { 
                                         Row(verticalAlignment = Alignment.CenterVertically) {
                                             val logo = Constants.BankLogoMap[bank.bankName]
-                                            if (logo != null) { Image(painter = painterResource(logo), contentDescription = null, modifier = Modifier.size(24.dp).clip(RoundedCornerShape(4.dp))) } 
+                                            if (logo != null) { Image(painter = painterResource(logo), contentDescription = null, modifier = Modifier
+                                                .size(24.dp)
+                                                .clip(RoundedCornerShape(4.dp))) } 
                                             else { Icon(Icons.Outlined.AccountBalance, null, tint = Color.DarkGray, modifier = Modifier.size(24.dp)) }
                                             Spacer(modifier = Modifier.width(12.dp))
                                             val shortAcc = if (bank.accountNo.length >= 4) bank.accountNo.takeLast(4) else bank.accountNo
@@ -287,7 +345,9 @@ fun AddExpenseForm(
                                     text = { 
                                         Row(verticalAlignment = Alignment.CenterVertically) {
                                             val logo = Constants.BankLogoMap[cc.issuer]
-                                            if (logo != null) { Image(painter = painterResource(logo), contentDescription = null, modifier = Modifier.size(24.dp).clip(RoundedCornerShape(4.dp))) } 
+                                            if (logo != null) { Image(painter = painterResource(logo), contentDescription = null, modifier = Modifier
+                                                .size(24.dp)
+                                                .clip(RoundedCornerShape(4.dp))) } 
                                             else { Icon(Icons.Outlined.CreditCard, null, tint = Color.DarkGray, modifier = Modifier.size(24.dp)) }
                                             Spacer(modifier = Modifier.width(12.dp))
                                             val shortAcc = if (cc.cardNo.length >= 4) cc.cardNo.takeLast(4) else cc.cardNo
@@ -339,14 +399,21 @@ fun AddExpenseForm(
                     val finalMode = modeText.trim()
                     val finalExpenseDateStr = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(expenseDateMillis))
 
-                    if (amount.isNotBlank() && finalCategory.isNotBlank() && finalMode.isNotBlank()) {
-                        
-                        if (selectedSourceType.isNotEmpty() && selectedSourceId.isEmpty()) {
-                            Toast.makeText(context, "Please select exact Paid By account/card", Toast.LENGTH_SHORT).show()
-                            return@Button
-                        }
+                    // Smart Bypass Validation: If no finance details exist, allow saving without mode.
+                    val canSave = if (hasNoFinance) {
+                        amount.isNotBlank() && finalCategory.isNotBlank()
+                    } else {
+                        amount.isNotBlank() && finalCategory.isNotBlank() && finalMode.isNotBlank() &&
+                        (selectedSourceType.isEmpty() || selectedSourceId.isNotEmpty())
+                    }
 
+                    if (canSave) {
                         val expenseAmt = amount.toDoubleOrNull() ?: 0.0
+                        
+                        // Set fallback data for backend to prevent breaking the script
+                        val actualMode = if (hasNoFinance) "Unspecified" else finalMode
+                        val actualSourceType = if (hasNoFinance) "None" else selectedSourceType
+                        val actualSourceId = if (hasNoFinance) "None" else selectedSourceId
                         
                         // 1. OPTIMISTIC UI UPDATE: Instant callback to update local UI and close dialog
                         val newEntry = TransactionModel(
@@ -355,9 +422,9 @@ fun AddExpenseForm(
                             category = finalCategory, 
                             remark1 = remark1, 
                             remark2 = remark2, 
-                            mode = finalMode,
-                            sourceType = selectedSourceType,
-                            sourceId = selectedSourceId
+                            mode = actualMode,
+                            sourceType = actualSourceType,
+                            sourceId = actualSourceId
                         )
                         onExpenseAdded(newEntry)
                         onDismiss() // Dialog instantly closes
@@ -373,9 +440,9 @@ fun AddExpenseForm(
                                     put("date", finalExpenseDateStr) 
                                     put("detail1", remark1)
                                     put("detail2", remark2)
-                                    put("payment_method", finalMode) 
-                                    put("source_type", selectedSourceType) 
-                                    put("source_identifier", selectedSourceId) 
+                                    put("payment_method", actualMode) 
+                                    put("source_type", actualSourceType) 
+                                    put("source_identifier", actualSourceId) 
                                 }
                                 val client = NetworkClient.instance
                                 val body = json.toString().toRequestBody("application/json".toMediaType())
@@ -386,7 +453,11 @@ fun AddExpenseForm(
                             }
                         }
                     } else {
-                        Toast.makeText(context, "Please fill Amount, Category & Mode", Toast.LENGTH_SHORT).show()
+                        if (!hasNoFinance && finalMode.isNotBlank() && selectedSourceType.isNotEmpty() && selectedSourceId.isEmpty()) {
+                            Toast.makeText(context, "Please select exact Paid By account/card", Toast.LENGTH_SHORT).show()
+                        } else {
+                            Toast.makeText(context, "Please fill required fields", Toast.LENGTH_SHORT).show()
+                        }
                     }
                 },
                 modifier = Modifier
