@@ -35,7 +35,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.kartikey.rupeeflow.Cloud_Database.Constants
-import com.kartikey.rupeeflow.UI_Screens.bounceClick // Imported the premium bounce click
+import com.kartikey.rupeeflow.UI_Screens.bounceClick 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -118,7 +118,7 @@ fun ContriScreen(
             }
         )
     } else if (openedRoom != null) {
-        // FULL-SCREEN DIALOG OVERLAY (Hides bottom bar)
+        // FULL-SCREEN DIALOG OVERLAY
         Dialog(
             onDismissRequest = { openedRoom = null },
             properties = DialogProperties(
@@ -143,7 +143,7 @@ fun ContriScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .background(Color(0xFFFAFAFA))
+                .background(MaterialTheme.colorScheme.background)
         ) {
             Spacer(modifier = Modifier.height(16.dp))
             
@@ -151,16 +151,14 @@ fun ContriScreen(
                 verticalAlignment = Alignment.CenterVertically, 
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
             ) {
-                // Back Button (Bounce added)
                 Box(modifier = Modifier.bounceClick { onBackClick() }.padding(4.dp)) {
-                    Icon(Icons.Outlined.ArrowBack, contentDescription = "Back", tint = Color.Black)
+                    Icon(Icons.Outlined.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.onBackground)
                 }
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Contri", fontWeight = FontWeight.ExtraBold, fontSize = 22.sp, color = Color.Black)
+                Text("Contri", fontWeight = FontWeight.ExtraBold, fontSize = 22.sp, color = MaterialTheme.colorScheme.onBackground)
 
                 Spacer(modifier = Modifier.weight(1f))
 
-                // MANUAL REFRESH WHEEL (Bounce added)
                 Box(
                     modifier = Modifier
                         .bounceClick {
@@ -178,7 +176,7 @@ fun ContriScreen(
                     Icon(
                         imageVector = Icons.Outlined.Sync,
                         contentDescription = "Sync",
-                        tint = if (isRefreshing) Color(0xFF2E7D32) else Color.Black,
+                        tint = if (isRefreshing) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground,
                         modifier = Modifier
                             .size(24.dp)
                             .rotate(currentRotation)
@@ -196,9 +194,6 @@ fun ContriScreen(
             ) {
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // ==========================================
-                // ACTIVE ROOMS LIST
-                // ==========================================
                 if (contriRooms.isNotEmpty()) {
                     contriRooms.forEach { room ->
                         ActiveRoomCard(
@@ -211,9 +206,6 @@ fun ContriScreen(
                     Spacer(modifier = Modifier.height(12.dp))
                 }
 
-                // ==========================================
-                // ACTION CARDS (Side-by-Side Grid Layout)
-                // ==========================================
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -221,8 +213,8 @@ fun ContriScreen(
                     ContriGridCard(
                         title = "Create Contri",
                         icon = Icons.Outlined.Add,
-                        iconTint = Color(0xFF2E7D32),
-                        bgColor = Color(0xFFE8F5E9),
+                        iconTint = MaterialTheme.colorScheme.primary,
+                        bgColor = MaterialTheme.colorScheme.primaryContainer,
                         modifier = Modifier.weight(1f),
                         onClick = { showCreateDialog = true }
                     )
@@ -230,8 +222,8 @@ fun ContriScreen(
                     ContriGridCard(
                         title = "Join Contri",
                         icon = Icons.Outlined.GroupAdd,
-                        iconTint = Color(0xFF2E7D32),
-                        bgColor = Color(0xFFE8F5E9),
+                        iconTint = MaterialTheme.colorScheme.primary,
+                        bgColor = MaterialTheme.colorScheme.primaryContainer,
                         modifier = Modifier.weight(1f),
                         onClick = { 
                             scannedRoomCode = ""
@@ -245,9 +237,6 @@ fun ContriScreen(
         }
     }
 
-    // ==========================================
-    // SMART QR DISPLAY DIALOG
-    // ==========================================
     if (qrRoomToDisplay != null) {
         Dialog(
             onDismissRequest = { qrRoomToDisplay = null },
@@ -255,15 +244,15 @@ fun ContriScreen(
         ) {
             Card(
                 shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 elevation = CardDefaults.cardElevation(8.dp)
             ) {
                 Column(
                     modifier = Modifier.padding(24.dp).fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(qrRoomToDisplay!!.roomName, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
-                    Text("Ask your friend to scan to join instantly", fontSize = 12.sp, color = Color.Gray)
+                    Text(qrRoomToDisplay!!.roomName, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onSurface)
+                    Text("Ask your friend to scan to join instantly", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     
                     Spacer(modifier = Modifier.height(24.dp))
                     
@@ -273,16 +262,13 @@ fun ContriScreen(
                     )
                     
                     Spacer(modifier = Modifier.height(24.dp))
-                    Text("Room Code", fontSize = 11.sp, color = Color.Gray)
-                    Text(qrRoomToDisplay!!.roomCode, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 2.sp, color = Color.Black)
+                    Text("Room Code", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(qrRoomToDisplay!!.roomCode, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 2.sp, color = MaterialTheme.colorScheme.onSurface)
                 }
             }
         }
     }
 
-    // ==========================================
-    // AUTO JOIN DIRECT PROCESSOR
-    // ==========================================
     if (autoJoinData != null) {
         AutoJoinContriDialog(
             username = username,
@@ -327,7 +313,7 @@ fun ContriScreen(
 }
 
 // ==========================================
-// DIRECT AUTO-JOIN DIALOG (SHOWS NAME & SPINNER)
+// DIRECT AUTO-JOIN DIALOG (ALIGNMENT BUG FIXED)
 // ==========================================
 @Composable
 fun AutoJoinContriDialog(
@@ -384,35 +370,31 @@ fun AutoJoinContriDialog(
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             elevation = CardDefaults.cardElevation(8.dp)
         ) {
             Column(
-                modifier = Modifier.padding(24.dp),
+                modifier = Modifier.fillMaxWidth().padding(24.dp), // BUG FIXED: Added fillMaxWidth() to center the content
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                CircularProgressIndicator(color = Color(0xFF2E7D32), modifier = Modifier.size(36.dp), strokeWidth = 3.dp)
+                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary, modifier = Modifier.size(36.dp), strokeWidth = 3.dp)
                 Spacer(modifier = Modifier.height(16.dp))
-                Text("Joining Room...", fontSize = 13.sp, color = Color.Gray, fontWeight = FontWeight.Medium)
+                Text("Joining Room...", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Medium)
                 Spacer(modifier = Modifier.height(4.dp))
-                Text(roomName, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
+                Text(roomName, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onSurface)
             }
         }
     }
 }
 
-// ==========================================
-// ACTIVE ROOM CARD UI (Premium Bounce Logic)
-// ==========================================
 @Composable
 fun ActiveRoomCard(room: ContriRoomModel, onClick: () -> Unit, onQrClick: () -> Unit) {
     Card(
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         modifier = Modifier
             .fillMaxWidth()
-            // 1. Entire card bounces and navigates inside the room
             .bounceClick { onClick() }
     ) {
         Row(
@@ -421,25 +403,24 @@ fun ActiveRoomCard(room: ContriRoomModel, onClick: () -> Unit, onQrClick: () -> 
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = room.roomName, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
+                Text(text = room.roomName, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onSurface)
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Outlined.Update, contentDescription = "Last Updated", tint = Color.Gray, modifier = Modifier.size(14.dp))
+                    Icon(Icons.Outlined.Update, contentDescription = "Last Updated", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(14.dp))
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text(text = formatToDayMonth(room.lastUpdated), fontSize = 12.sp, color = Color.Gray, fontWeight = FontWeight.Medium)
+                    Text(text = formatToDayMonth(room.lastUpdated), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Medium)
                 }
             }
             
-            // 2. QR Icon gets its own independent bounce effect
             Box(
                 modifier = Modifier
                     .size(44.dp)
                     .clip(CircleShape)
-                    .background(Color(0xFFE8F5E9))
+                    .background(MaterialTheme.colorScheme.primaryContainer)
                     .bounceClick { onQrClick() },
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Outlined.QrCode2, contentDescription = "Show QR", tint = Color(0xFF2E7D32), modifier = Modifier.size(24.dp))
+                Icon(Icons.Outlined.QrCode2, contentDescription = "Show QR", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
             }
         }
     }
@@ -457,9 +438,6 @@ fun formatToDayMonth(dateStr: String): String {
     }
 }
 
-// ==========================================
-// CREATE CONTRI DIALOG 
-// ==========================================
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CreateContriDialog(username: String, onDismiss: () -> Unit, onSuccess: () -> Unit) {
@@ -477,7 +455,7 @@ fun CreateContriDialog(username: String, onDismiss: () -> Unit, onSuccess: () ->
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             elevation = CardDefaults.cardElevation(8.dp)
         ) {
             Column(
@@ -485,10 +463,10 @@ fun CreateContriDialog(username: String, onDismiss: () -> Unit, onSuccess: () ->
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text("Create Room", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
+                    Text("Create Room", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onSurface)
                     if (!isSubmitting) {
                         IconButton(onClick = onDismiss, modifier = Modifier.size(24.dp)) {
-                            Icon(Icons.Outlined.Close, contentDescription = "Close", tint = Color.Gray)
+                            Icon(Icons.Outlined.Close, contentDescription = "Close", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
@@ -505,7 +483,13 @@ fun CreateContriDialog(username: String, onDismiss: () -> Unit, onSuccess: () ->
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF2E7D32), focusedLabelColor = Color(0xFF2E7D32))
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary, 
+                        focusedLabelColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface
+                    )
                 )
 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -518,13 +502,19 @@ fun CreateContriDialog(username: String, onDismiss: () -> Unit, onSuccess: () ->
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF2E7D32), focusedLabelColor = Color(0xFF2E7D32))
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary, 
+                        focusedLabelColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface
+                    )
                 )
 
                 AnimatedVisibility(visible = pin.isNotEmpty() && pin.length < 6) {
                     Text(
                         text = "Enter 6 digits", 
-                        color = Color.Red, 
+                        color = MaterialTheme.colorScheme.error, 
                         fontSize = 11.sp, 
                         modifier = Modifier.fillMaxWidth().padding(start = 8.dp, top = 2.dp),
                         textAlign = TextAlign.Start
@@ -576,20 +566,17 @@ fun CreateContriDialog(username: String, onDismiss: () -> Unit, onSuccess: () ->
                     },
                     modifier = Modifier.fillMaxWidth().height(50.dp),
                     shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                     enabled = !isSubmitting
                 ) {
-                    if (isSubmitting) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
-                    else Text("Create Contri", color = Color.White, fontWeight = FontWeight.Bold)
+                    if (isSubmitting) CircularProgressIndicator(color = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                    else Text("Create Contri", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
                 }
             }
         }
     }
 }
 
-// ==========================================
-// JOIN CONTRI DIALOG 
-// ==========================================
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun JoinContriDialog(
@@ -617,7 +604,7 @@ fun JoinContriDialog(
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             elevation = CardDefaults.cardElevation(8.dp)
         ) {
             if (viewState == 0) {
@@ -626,19 +613,18 @@ fun JoinContriDialog(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                        Text("Join Contri", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
+                        Text("Join Contri", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onSurface)
                         IconButton(onClick = onDismiss, modifier = Modifier.size(24.dp)) {
-                            Icon(Icons.Outlined.Close, contentDescription = "Close", tint = Color.Gray)
+                            Icon(Icons.Outlined.Close, contentDescription = "Close", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                     
                     Spacer(modifier = Modifier.height(20.dp))
 
                     Row(
-                        modifier = Modifier.fillMaxWidth().height(80.dp).background(Color(0xFFF5F5F5), RoundedCornerShape(16.dp)),
+                        modifier = Modifier.fillMaxWidth().height(80.dp).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(16.dp)),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Scan QR Button (Bounce added)
                         Column(
                             modifier = Modifier
                                 .weight(1f)
@@ -648,14 +634,13 @@ fun JoinContriDialog(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center
                         ) {
-                            Icon(Icons.Outlined.QrCodeScanner, contentDescription = "Scan QR", modifier = Modifier.size(28.dp), tint = Color.Black)
+                            Icon(Icons.Outlined.QrCodeScanner, contentDescription = "Scan QR", modifier = Modifier.size(28.dp), tint = MaterialTheme.colorScheme.onSurface)
                             Spacer(modifier = Modifier.height(4.dp))
-                            Text("Scan QR", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+                            Text("Scan QR", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                         }
 
-                        Box(modifier = Modifier.width(1.dp).height(40.dp).background(Color.LightGray))
+                        Box(modifier = Modifier.width(1.dp).height(40.dp).background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)))
 
-                        // Enter Manually Button (Bounce added)
                         Column(
                             modifier = Modifier
                                 .weight(1f)
@@ -665,9 +650,9 @@ fun JoinContriDialog(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center
                         ) {
-                            Icon(Icons.Outlined.Keyboard, contentDescription = "Manual", modifier = Modifier.size(28.dp), tint = Color.Black)
+                            Icon(Icons.Outlined.Keyboard, contentDescription = "Manual", modifier = Modifier.size(28.dp), tint = MaterialTheme.colorScheme.onSurface)
                             Spacer(modifier = Modifier.height(4.dp))
-                            Text("Enter Manually", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+                            Text("Enter Manually", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                         }
                     }
                 }
@@ -679,13 +664,13 @@ fun JoinContriDialog(
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         if (!isSubmitting) {
                             IconButton(onClick = { viewState = 0 }, modifier = Modifier.size(24.dp)) {
-                                Icon(Icons.Outlined.ArrowBack, contentDescription = "Back", tint = Color.Black)
+                                Icon(Icons.Outlined.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.onSurface)
                             }
                         } else {
                             Spacer(modifier = Modifier.size(24.dp))
                         }
                         Spacer(modifier = Modifier.weight(1f))
-                        Text("Enter Details", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
+                        Text("Enter Details", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onSurface)
                         Spacer(modifier = Modifier.weight(1f))
                         Spacer(modifier = Modifier.size(24.dp)) 
                     }
@@ -703,7 +688,13 @@ fun JoinContriDialog(
                         visualTransformation = RoomCodeVisualTransformation(),
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF2E7D32), focusedLabelColor = Color(0xFF2E7D32))
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MaterialTheme.colorScheme.primary, 
+                            focusedLabelColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            focusedTextColor = MaterialTheme.colorScheme.onSurface
+                        )
                     )
 
                     Spacer(modifier = Modifier.height(12.dp))
@@ -716,13 +707,19 @@ fun JoinContriDialog(
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF2E7D32), focusedLabelColor = Color(0xFF2E7D32))
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MaterialTheme.colorScheme.primary, 
+                            focusedLabelColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            focusedTextColor = MaterialTheme.colorScheme.onSurface
+                        )
                     )
 
                     AnimatedVisibility(visible = pin.isNotEmpty() && pin.length < 6) {
                         Text(
                             text = "Enter 6 digits", 
-                            color = Color.Red, 
+                            color = MaterialTheme.colorScheme.error, 
                             fontSize = 11.sp, 
                             modifier = Modifier.fillMaxWidth().padding(start = 8.dp, top = 2.dp),
                             textAlign = TextAlign.Start
@@ -775,11 +772,11 @@ fun JoinContriDialog(
                         },
                         modifier = Modifier.fillMaxWidth().height(50.dp),
                         shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                         enabled = !isSubmitting
                     ) {
-                        if (isSubmitting) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
-                        else Text("Join Contri", color = Color.White, fontWeight = FontWeight.Bold)
+                        if (isSubmitting) CircularProgressIndicator(color = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                        else Text("Join Contri", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -787,9 +784,6 @@ fun JoinContriDialog(
     }
 }
 
-// ==========================================
-// VISUAL TRANSFORMATION ENGINE (3-3-3 FORMAT)
-// ==========================================
 class RoomCodeVisualTransformation : VisualTransformation {
     override fun filter(text: AnnotatedString): TransformedText {
         val raw = text.text.take(9)
@@ -824,9 +818,6 @@ class RoomCodeVisualTransformation : VisualTransformation {
     }
 }
 
-// ==========================================
-// PREMIUM GRID CARD (Create / Join buttons)
-// ==========================================
 @Composable
 fun ContriGridCard(
     title: String,
@@ -838,9 +829,8 @@ fun ContriGridCard(
 ) {
     Card(
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        // Simple and clean bounce effect applied directly to the modifier
         modifier = modifier.bounceClick { onClick() }
     ) {
         Row(
@@ -869,7 +859,7 @@ fun ContriGridCard(
                 text = title, 
                 fontSize = 14.sp, 
                 fontWeight = FontWeight.ExtraBold, 
-                color = Color.Black,
+                color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,          
                 softWrap = false,      
                 overflow = TextOverflow.Ellipsis 
