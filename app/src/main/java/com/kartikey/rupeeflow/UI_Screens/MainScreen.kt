@@ -157,11 +157,11 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
-            containerColor = MaterialTheme.colorScheme.background, // NAYA UPDATE: Background ab dark/light mode par sync hoga
+            containerColor = MaterialTheme.colorScheme.background,
             bottomBar = {
                 NavigationBar(
-                    containerColor = MaterialTheme.colorScheme.surface, // NAYA UPDATE: Bottom bar ka color sync hoga
-                    tonalElevation = 8.dp
+                    containerColor = MaterialTheme.colorScheme.surface, 
+                    tonalElevation = 0.dp // UPDATE: Isse green tint bilkul hat jayega aur pure white/gray color aayega
                 ) {
                     NavigationBarItem(
                         modifier = Modifier.bounceClick(),
