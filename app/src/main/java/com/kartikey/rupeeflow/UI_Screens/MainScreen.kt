@@ -157,16 +157,25 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
-            containerColor = Color(0xFFF8F8F8),
+            containerColor = MaterialTheme.colorScheme.background, // NAYA UPDATE: Background ab dark/light mode par sync hoga
             bottomBar = {
-                NavigationBar(containerColor = Color.White, tonalElevation = 8.dp) {
+                NavigationBar(
+                    containerColor = MaterialTheme.colorScheme.surface, // NAYA UPDATE: Bottom bar ka color sync hoga
+                    tonalElevation = 8.dp
+                ) {
                     NavigationBarItem(
                         modifier = Modifier.bounceClick(),
                         selected = selectedTab == 0 && !showExpenseHistory && !showContriScreen, 
                         onClick = { selectedTab = 0; showExpenseHistory = false; showContriScreen = false }, 
                         icon = { Icon(Icons.Outlined.Home, contentDescription = "Home") }, 
                         label = { Text("Home") }, 
-                        colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = MaterialTheme.colorScheme.primary, 
+                            indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            selectedTextColor = MaterialTheme.colorScheme.primary
+                        )
                     )
                     NavigationBarItem(
                         modifier = Modifier.bounceClick(),
@@ -174,7 +183,13 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                         onClick = { if (selectedTab == 1) assetsCurrentView = "Main"; selectedTab = 1; showExpenseHistory = false; showContriScreen = false }, 
                         icon = { Icon(Icons.Outlined.AccountBalanceWallet, contentDescription = "Assets") }, 
                         label = { Text("Assets") }, 
-                        colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = MaterialTheme.colorScheme.primary, 
+                            indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            selectedTextColor = MaterialTheme.colorScheme.primary
+                        )
                     )
                     NavigationBarItem(
                         modifier = Modifier.bounceClick(),
@@ -188,7 +203,13 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                         onClick = { selectedTab = 3; showExpenseHistory = false; showContriScreen = false }, 
                         icon = { Icon(Icons.Outlined.PieChart, contentDescription = "Analytics") }, 
                         label = { Text("Analytics") }, 
-                        colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = MaterialTheme.colorScheme.primary, 
+                            indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            selectedTextColor = MaterialTheme.colorScheme.primary
+                        )
                     )
                     NavigationBarItem(
                         modifier = Modifier.bounceClick(),
@@ -196,7 +217,13 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                         onClick = { selectedTab = 4; showExpenseHistory = false; showContriScreen = false }, 
                         icon = { Icon(Icons.Outlined.Person, contentDescription = "Profile") }, 
                         label = { Text("Profile") }, 
-                        colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2E7D32), indicatorColor = Color(0xFFE8F5E9))
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = MaterialTheme.colorScheme.primary, 
+                            indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            selectedTextColor = MaterialTheme.colorScheme.primary
+                        )
                     )
                 }
             }
@@ -204,7 +231,6 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
             AnimatedContent(
                 targetState = Triple(selectedTab, showExpenseHistory, showContriScreen),
                 transitionSpec = {
-                    // PURE FADE TRANSITION RESTORED
                     fadeIn(animationSpec = tween(300, easing = FastOutSlowInEasing)).togetherWith(
                         fadeOut(animationSpec = tween(300, easing = FastOutSlowInEasing))
                     )
@@ -287,7 +313,7 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
 }
 
 // ==========================================
-// BOUNCE CLICK ANIMATION (144Hz Butter Smooth)
+// BOUNCE CLICK ANIMATION
 // ==========================================
 fun Modifier.bounceClick(
     scaleDown: Float = 0.90f,
