@@ -62,7 +62,7 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF8F8F8))
+            .background(MaterialTheme.colorScheme.background)
             .imePadding() 
             .padding(horizontal = 24.dp)
             .verticalScroll(rememberScrollState()),
@@ -81,13 +81,13 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
         Spacer(modifier = Modifier.height(16.dp))
 
         if (isLoginMode) {
-            Text("RupeeFlow", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
+            Text("RupeeFlow", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onBackground)
             Spacer(modifier = Modifier.height(4.dp))
-            Text("Personal Finance for Friends & Family", fontSize = 12.sp, color = Color.Gray)
+            Text("Personal Finance for Friends & Family", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         } else {
-            Text("Join RupeeFlow", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
+            Text("Join RupeeFlow", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onBackground)
             Spacer(modifier = Modifier.height(4.dp))
-            Text("Track expenses, budget, & net worth privately.", fontSize = 12.sp, color = Color.Gray)
+            Text("Track expenses, budget, & net worth privately.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
 
         Spacer(modifier = Modifier.height(40.dp))
@@ -97,7 +97,7 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
                 text = if (isLoginMode) "Sign In" else "New Profile",
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.Black
+                color = MaterialTheme.colorScheme.onBackground
             )
         }
 
@@ -107,15 +107,17 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it },
-                label = { Text("Full Name", color = Color.Gray) },
-                leadingIcon = { Icon(Icons.Outlined.Person, contentDescription = "Name", tint = Color.Gray) },
+                label = { Text("Full Name", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                leadingIcon = { Icon(Icons.Outlined.Person, contentDescription = "Name", tint = MaterialTheme.colorScheme.onSurfaceVariant) },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color(0xFF2E7D32),
-                    unfocusedBorderColor = Color(0xFFEEEEEE),
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant,
                     focusedContainerColor = Color.Transparent,
-                    unfocusedContainerColor = Color.Transparent
+                    unfocusedContainerColor = Color.Transparent,
+                    focusedTextColor = MaterialTheme.colorScheme.onBackground,
+                    unfocusedTextColor = MaterialTheme.colorScheme.onBackground
                 ),
                 keyboardOptions = KeyboardOptions(
                     capitalization = KeyboardCapitalization.Words,
@@ -128,15 +130,17 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
             OutlinedTextField(
                 value = username,
                 onValueChange = { username = it },
-                label = { Text("Username", color = Color.Gray) },
-                leadingIcon = { Icon(Icons.Outlined.Person, contentDescription = "Username", tint = Color.Gray) },
+                label = { Text("Username", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                leadingIcon = { Icon(Icons.Outlined.Person, contentDescription = "Username", tint = MaterialTheme.colorScheme.onSurfaceVariant) },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color(0xFF2E7D32),
-                    unfocusedBorderColor = Color(0xFFEEEEEE),
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant,
                     focusedContainerColor = Color.Transparent,
-                    unfocusedContainerColor = Color.Transparent
+                    unfocusedContainerColor = Color.Transparent,
+                    focusedTextColor = MaterialTheme.colorScheme.onBackground,
+                    unfocusedTextColor = MaterialTheme.colorScheme.onBackground
                 ),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                 keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
@@ -149,9 +153,9 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
                     email = it 
                     if (emailError) emailError = false
                 },
-                label = { Text(if (emailError) "Invalid Email Format!" else "Email ID", color = if (emailError) Color.Red else Color.Gray) },
+                label = { Text(if (emailError) "Invalid Email Format!" else "Email ID", color = if (emailError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant) },
                 isError = emailError,
-                leadingIcon = { Icon(Icons.Outlined.Email, contentDescription = "Email", tint = if (emailError) Color.Red else Color.Gray) },
+                leadingIcon = { Icon(Icons.Outlined.Email, contentDescription = "Email", tint = if (emailError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .onFocusChanged { focusState ->
@@ -162,10 +166,12 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
                     },
                 shape = RoundedCornerShape(12.dp),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = if (emailError) Color.Red else Color(0xFF2E7D32),
-                    unfocusedBorderColor = if (emailError) Color.Red else Color(0xFFEEEEEE),
+                    focusedBorderColor = if (emailError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = if (emailError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.surfaceVariant,
                     focusedContainerColor = Color.Transparent,
-                    unfocusedContainerColor = Color.Transparent
+                    unfocusedContainerColor = Color.Transparent,
+                    focusedTextColor = MaterialTheme.colorScheme.onBackground,
+                    unfocusedTextColor = MaterialTheme.colorScheme.onBackground
                 ),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
                 keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
@@ -184,26 +190,28 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
                     }
                 }
             },
-            label = { Text(if (isLoginMode) "Username or Mobile No." else "Mobile Number", color = Color.Gray) },
+            label = { Text(if (isLoginMode) "Username or Mobile No." else "Mobile Number", color = MaterialTheme.colorScheme.onSurfaceVariant) },
             prefix = {
                 if (!isLoginMode) {
-                    Text("+91 ", color = Color.Black, fontWeight = FontWeight.Bold)
+                    Text("+91 ", color = MaterialTheme.colorScheme.onBackground, fontWeight = FontWeight.Bold)
                 }
             },
             leadingIcon = { 
                 Icon(
                     imageVector = if (isLoginMode) Icons.Outlined.Person else Icons.Outlined.Phone, 
                     contentDescription = "Contact", 
-                    tint = Color.Gray
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                 ) 
             },
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = Color(0xFF2E7D32),
-                unfocusedBorderColor = Color(0xFFEEEEEE),
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant,
                 focusedContainerColor = Color.Transparent,
-                unfocusedContainerColor = Color.Transparent
+                unfocusedContainerColor = Color.Transparent,
+                focusedTextColor = MaterialTheme.colorScheme.onBackground,
+                unfocusedTextColor = MaterialTheme.colorScheme.onBackground
             ),
             keyboardOptions = KeyboardOptions(
                 keyboardType = if (isLoginMode) KeyboardType.Text else KeyboardType.Phone,
@@ -217,15 +225,17 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
         OutlinedTextField(
             value = password,
             onValueChange = { password = it },
-            label = { Text("Password", color = Color.Gray) },
-            leadingIcon = { Icon(Icons.Outlined.Lock, contentDescription = "Password", tint = Color.Gray) },
+            label = { Text("Password", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+            leadingIcon = { Icon(Icons.Outlined.Lock, contentDescription = "Password", tint = MaterialTheme.colorScheme.onSurfaceVariant) },
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = Color(0xFF2E7D32),
-                unfocusedBorderColor = Color(0xFFEEEEEE),
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant,
                 focusedContainerColor = Color.Transparent,
-                unfocusedContainerColor = Color.Transparent
+                unfocusedContainerColor = Color.Transparent,
+                focusedTextColor = MaterialTheme.colorScheme.onBackground,
+                unfocusedTextColor = MaterialTheme.colorScheme.onBackground
             ),
             visualTransformation = PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(
@@ -249,7 +259,7 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
                     text = "Forget Password?",
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = Color(0xFF2E7D32),
+                    color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.clickable { 
                     }
                 )
@@ -259,7 +269,7 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
         Spacer(modifier = Modifier.height(8.dp))
 
         if (statusMessage.isNotEmpty() && !isLoading) {
-            Text(statusMessage, color = Color.Red, fontSize = 12.sp, modifier = Modifier.align(Alignment.Start))
+            Text(statusMessage, color = MaterialTheme.colorScheme.error, fontSize = 12.sp, modifier = Modifier.align(Alignment.Start))
         }
 
         Spacer(modifier = Modifier.height(24.dp))
@@ -332,17 +342,17 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
                     }
                 }
                 .clip(RoundedCornerShape(12.dp))
-                .background(Color(0xFF2E7D32)),
+                .background(MaterialTheme.colorScheme.primary),
             contentAlignment = Alignment.Center
         ) { 
             if (isLoading) {
-                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp), strokeWidth = 2.5.dp)
+                CircularProgressIndicator(color = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(24.dp), strokeWidth = 2.5.dp)
             } else {
                 Text(
                     text = if (isLoginMode) "Access My Flow" else "Create & Seed Profile", 
                     fontSize = 16.sp, 
                     fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    color = MaterialTheme.colorScheme.onPrimary
                 ) 
             }
         }
@@ -358,12 +368,12 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
         ) {
             Text(
                 text = if (isLoginMode) "Don't have a profile? " else "Already have a profile? ", 
-                color = Color.Gray, 
+                color = MaterialTheme.colorScheme.onSurfaceVariant, 
                 fontSize = 14.sp
             )
             Text(
                 text = if (isLoginMode) "Create Profile" else "Sign In", 
-                color = Color(0xFF2E7D32), 
+                color = MaterialTheme.colorScheme.primary, 
                 fontWeight = FontWeight.Bold, 
                 fontSize = 14.sp
             )
