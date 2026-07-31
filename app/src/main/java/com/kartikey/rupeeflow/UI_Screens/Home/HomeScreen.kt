@@ -10,9 +10,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -91,7 +88,7 @@ fun HomeDashboardDesign(
     Column(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
         
         Surface(
-            color = Color.White,
+            color = MaterialTheme.colorScheme.surface,
             shadowElevation = 3.dp,
             modifier = Modifier.fillMaxWidth()
         ) {
@@ -110,8 +107,8 @@ fun HomeDashboardDesign(
                 Spacer(modifier = Modifier.width(12.dp))
                 
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("RupeeFlow", fontWeight = FontWeight.ExtraBold, fontSize = 22.sp, color = Color.Black)
-                    Text("Hi, $username", color = Color.Gray, fontSize = 13.sp)
+                    Text("RupeeFlow", fontWeight = FontWeight.ExtraBold, fontSize = 22.sp, color = MaterialTheme.colorScheme.onSurface)
+                    Text("Hi, $username", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
                 }
                 
                 val displayLetter = if (userFullName.isNotBlank()) userFullName.take(1).uppercase() else username.take(1).uppercase()
@@ -120,11 +117,11 @@ fun HomeDashboardDesign(
                     modifier = Modifier
                         .size(42.dp)
                         .clip(CircleShape)
-                        .background(Color(0xFFE8F5E9))
+                        .background(MaterialTheme.colorScheme.primaryContainer)
                         .bounceClick { onAvatarClick() }, 
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(displayLetter, color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    Text(displayLetter, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                 }
             }
         }
@@ -158,7 +155,7 @@ fun HomeDashboardDesign(
                 buildAnnotatedString {
                     append("₹ ") 
                     append(formatNumberOnly(availAmount))
-                    withStyle(style = SpanStyle(fontSize = 12.sp, color = Color.Gray)) { append(" (${String.format("%.1f", availPct)}%)") }
+                    withStyle(style = SpanStyle(fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)) { append(" (${String.format("%.1f", availPct)}%)") }
                 }
             } else {
                 AnnotatedString("Add Details")
@@ -205,8 +202,8 @@ fun HomeDashboardDesign(
             Spacer(modifier = Modifier.height(24.dp))
             
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text("Recent Transactions", fontWeight = FontWeight.ExtraBold, fontSize = 16.sp)
-                TextButton(onClick = onLogout) { Text("Logout", color = Color(0xFFD32F2F)) }
+                Text("Recent Transactions", fontWeight = FontWeight.ExtraBold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface)
+                TextButton(onClick = onLogout) { Text("Logout", color = MaterialTheme.colorScheme.error) }
             }
             Spacer(modifier = Modifier.height(60.dp)) 
         }
@@ -230,12 +227,12 @@ fun HomeDashboardDesign(
 // SPENDING TRACKER CARD
 // ==========================================
 @Composable
-fun SpendingTrackerCard() {
+fun SpendingTrackerCard(modifier: Modifier = Modifier) {
     Card(
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        modifier = Modifier.fillMaxWidth()
+        modifier = modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
@@ -243,8 +240,8 @@ fun SpendingTrackerCard() {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(text = "Spending Habits Tracker", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color.Black)
-                Text(text = "VIEW ANALYTICS", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2E7D32))
+                Text(text = "Spending Habits Tracker", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface)
+                Text(text = "VIEW ANALYTICS", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             }
             Spacer(modifier = Modifier.height(24.dp))
             Row(
@@ -303,36 +300,45 @@ fun BudgetDialog(
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             elevation = CardDefaults.cardElevation(8.dp)
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
-                Text("Set Monthly Budget", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
+                Text("Set Monthly Budget", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onSurface)
                 Spacer(modifier = Modifier.height(16.dp))
 
                 OutlinedTextField(
                     value = limitInput,
                     onValueChange = { if (it.isEmpty() || it.all { char -> char.isDigit() }) limitInput = it },
-                    label = { Text("Add Monthly Limit") },
-                    prefix = { Text("₹ ", color = Color.Black, fontWeight = FontWeight.Bold) },
+                    label = { Text("Add Monthly Limit", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                    prefix = { Text("₹ ", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF2E7D32), focusedLabelColor = Color(0xFF2E7D32))
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary, 
+                        focusedLabelColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
                 )
 
                 if (displayLimit > 0) {
                     Spacer(modifier = Modifier.height(20.dp))
-                    Column(modifier = Modifier.fillMaxWidth().background(Color(0xFFF5F5F5), RoundedCornerShape(12.dp)).padding(16.dp)) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp))
+                            .padding(16.dp)
+                    ) {
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("Used (${String.format("%.1f", usedPct)}%)", fontSize = 13.sp, color = Color.DarkGray, fontWeight = FontWeight.Medium)
-                            Text(formatRupee(thisMonthUsed), fontSize = 13.sp, color = Color.Black, fontWeight = FontWeight.Bold)
+                            Text("Used (${String.format("%.1f", usedPct)}%)", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Medium)
+                            Text(formatRupee(thisMonthUsed), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
                         }
                         Spacer(modifier = Modifier.height(8.dp))
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("Available (${String.format("%.1f", availPct)}%)", fontSize = 13.sp, color = Color(0xFF2E7D32), fontWeight = FontWeight.Medium)
-                            Text(formatRupee(availAmount), fontSize = 13.sp, color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold)
+                            Text("Available (${String.format("%.1f", availPct)}%)", fontSize = 13.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Medium)
+                            Text(formatRupee(availAmount), fontSize = 13.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -340,7 +346,7 @@ fun BudgetDialog(
                 Spacer(modifier = Modifier.height(20.dp))
 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    TextButton(onClick = onDismiss) { Text("Cancel", color = Color.Gray, fontWeight = FontWeight.Bold) }
+                    TextButton(onClick = onDismiss) { Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold) }
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(
                         onClick = {
@@ -380,12 +386,15 @@ fun BudgetDialog(
                                 }
                             }
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        ),
                         shape = RoundedCornerShape(10.dp),
                         enabled = !isSaving
                     ) {
-                        if (isSaving) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                        else Text("Save", color = Color.White, fontWeight = FontWeight.Bold)
+                        if (isSaving) CircularProgressIndicator(color = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                        else Text("Save", fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -400,7 +409,7 @@ fun ContriDashboardCard(
 ) {
     Card(
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         modifier = modifier
     ) {
@@ -413,14 +422,14 @@ fun ContriDashboardCard(
                 text = "CONTRI",
                 fontSize = 10.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.Gray
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = "$contriCount Contri",
                 fontSize = 18.sp,
                 fontWeight = FontWeight.ExtraBold,
-                color = Color.Black
+                color = MaterialTheme.colorScheme.onSurface
             )
             Spacer(modifier = Modifier.height(8.dp))
 
@@ -437,7 +446,7 @@ fun ContriDashboardCard(
                             .weight(1f)
                             .fillMaxHeight()
                             .background(
-                                color = if (i <= safeCount) Color(0xFF2E7D32) else Color(0xFFE0E0E0),
+                                color = if (i <= safeCount) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
                                 shape = RoundedCornerShape(50)
                             )
                     )
