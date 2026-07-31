@@ -224,48 +224,6 @@ fun HomeDashboardDesign(
 }
 
 // ==========================================
-// SPENDING TRACKER CARD
-// ==========================================
-@Composable
-fun SpendingTrackerCard(modifier: Modifier = Modifier) {
-    Card(
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        modifier = modifier.fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(text = "Spending Habits Tracker", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface)
-                Text(text = "VIEW ANALYTICS", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-            }
-            Spacer(modifier = Modifier.height(24.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Bottom
-            ) {
-                val heights = listOf(0.3f, 0.4f, 0.2f, 0.9f, 0.4f, 0.35f, 0.5f)
-                val colors = listOf(Color(0xFFD1C4E9), Color(0xFFB39DDB), Color(0xFFD1C4E9), Color(0xFF512DA8), Color(0xFFB39DDB), Color(0xFFD1C4E9), Color(0xFFD1C4E9))
-                
-                heights.forEachIndexed { index, h ->
-                    Box(
-                        modifier = Modifier
-                            .width(28.dp)
-                            .height((60 * h).dp)
-                            .background(color = colors[index], shape = RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
-                    )
-                }
-            }
-        }
-    }
-}
-
-// ==========================================
 // BUDGET DIALOG POPUP
 // ==========================================
 @Composable
