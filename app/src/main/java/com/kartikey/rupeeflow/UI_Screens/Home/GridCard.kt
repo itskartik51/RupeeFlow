@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -25,12 +26,12 @@ fun GridCard(
 ) {
     Card(
         modifier = modifier.clickable { onClick() }, 
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(2.dp),
         shape = RoundedCornerShape(12.dp)
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
-            Text(title, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
+            Text(title, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(modifier = Modifier.height(8.dp))
             
             val isAddDetails = value.text.equals("Add Details", ignoreCase = true)
@@ -38,7 +39,7 @@ fun GridCard(
                 text = value, 
                 fontSize = if (isAddDetails) 14.sp else 18.sp, 
                 fontWeight = if (isAddDetails) FontWeight.Bold else FontWeight.ExtraBold,
-                color = if (isAddDetails) Color(0xFF1976D2) else Color.Black
+                color = if (isAddDetails) Color(0xFF1976D2) else MaterialTheme.colorScheme.onSurface
             )
             
             Spacer(modifier = Modifier.height(8.dp))
