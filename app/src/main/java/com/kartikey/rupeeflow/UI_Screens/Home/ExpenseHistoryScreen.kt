@@ -15,7 +15,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -78,7 +77,7 @@ fun ExpenseHistoryScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.White) 
+            .background(MaterialTheme.colorScheme.background) 
             .padding(paddingValues)
     ) {
         Row(
@@ -86,7 +85,7 @@ fun ExpenseHistoryScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Color.White)
+                .background(MaterialTheme.colorScheme.background)
                 .padding(16.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -94,7 +93,7 @@ fun ExpenseHistoryScreen(
                     Icon(
                         imageVector = Icons.Default.ArrowBack,
                         contentDescription = "Back",
-                        tint = Color.Black,
+                        tint = MaterialTheme.colorScheme.onBackground,
                         modifier = Modifier.size(28.dp)
                     )
                 }
@@ -103,7 +102,7 @@ fun ExpenseHistoryScreen(
                     text = "Expense History",
                     fontWeight = FontWeight.Bold,
                     fontSize = 22.sp,
-                    color = Color.Black
+                    color = MaterialTheme.colorScheme.onBackground
                 )
             }
             
@@ -111,7 +110,7 @@ fun ExpenseHistoryScreen(
                 Icon(
                     imageVector = Icons.Outlined.Refresh,
                     contentDescription = "Refresh",
-                    tint = Color.Black,
+                    tint = MaterialTheme.colorScheme.onBackground,
                     modifier = Modifier
                         .size(26.dp)
                         .rotate(if (isLoading) angle else 0f)
@@ -121,7 +120,7 @@ fun ExpenseHistoryScreen(
 
         if (history.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("No Transactions Found", color = Color.Gray, fontSize = 16.sp)
+                Text("No Transactions Found", color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f), fontSize = 16.sp)
             }
         } else {
             LazyColumn(
@@ -136,7 +135,7 @@ fun ExpenseHistoryScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .background(Color(0xFFF5F5F5)) 
+                                .background(MaterialTheme.colorScheme.surfaceVariant) 
                                 .padding(horizontal = 16.dp, vertical = 20.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
@@ -144,13 +143,13 @@ fun ExpenseHistoryScreen(
                             Text(
                                 text = monthYear,
                                 fontWeight = FontWeight.ExtraBold,
-                                color = Color.DarkGray,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontSize = 24.sp 
                             )
                             Text(
                                 text = "₹ $formattedTotal", 
                                 fontWeight = FontWeight.ExtraBold,
-                                color = Color.Black,
+                                color = MaterialTheme.colorScheme.onSurface,
                                 fontSize = 24.sp 
                             )
                         }
@@ -166,7 +165,7 @@ fun ExpenseHistoryScreen(
                         if (index < monthTransactions.size - 1) {
                             HorizontalDivider(
                                 modifier = Modifier.padding(horizontal = 20.dp), 
-                                color = Color(0xFFEEEEEE),
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f),
                                 thickness = 1.dp
                             )
                         }
@@ -222,7 +221,7 @@ fun TransactionFlatItem(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color.White)
+            .background(MaterialTheme.colorScheme.surface)
             .clickable { expanded = !expanded }
     ) {
         Row(
@@ -236,14 +235,14 @@ fun TransactionFlatItem(
                     text = transaction.category,
                     fontWeight = FontWeight.Bold,
                     fontSize = 18.sp,
-                    color = Color.Black,
+                    color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     text = displayDate,
                     fontSize = 12.sp,
-                    color = Color.Gray,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.offset(y = (-2).dp) 
                 )
             }
@@ -256,7 +255,7 @@ fun TransactionFlatItem(
                     Icon(
                         imageVector = modeIcon,
                         contentDescription = transaction.mode,
-                        tint = Color.Gray,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(16.dp)
                     )
                     Spacer(modifier = Modifier.width(4.dp))
@@ -264,7 +263,7 @@ fun TransactionFlatItem(
                         text = "₹${transaction.amount}",
                         fontWeight = FontWeight.ExtraBold,
                         fontSize = 16.sp,
-                        color = Color.Black 
+                        color = MaterialTheme.colorScheme.onSurface 
                     )
                 }
                 
@@ -272,7 +271,7 @@ fun TransactionFlatItem(
                     Text(
                         text = remarksCombo,
                         fontSize = 12.sp,
-                        color = Color.Gray,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.End,
                         maxLines = 2, 
                         overflow = TextOverflow.Ellipsis
@@ -293,7 +292,7 @@ fun TransactionFlatItem(
                     Icon(
                         imageVector = Icons.Outlined.Edit, 
                         contentDescription = "Edit", 
-                        tint = Color(0xFF1976D2),
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(22.dp)
                     )
                 }
@@ -302,7 +301,7 @@ fun TransactionFlatItem(
                     Icon(
                         imageVector = Icons.Outlined.Delete, 
                         contentDescription = "Delete", 
-                        tint = Color(0xFFD32F2F),
+                        tint = MaterialTheme.colorScheme.error,
                         modifier = Modifier.size(22.dp)
                     )
                 }
