@@ -11,8 +11,8 @@ android {
         applicationId = "com.kartikey.rupeeflow"
         minSdk = 24
         targetSdk = 34
-        versionCode = 3
-        versionName = "1.0.0"
+        versionCode = 4
+        versionName = "1.00.01"
     }
 
     signingConfigs {
