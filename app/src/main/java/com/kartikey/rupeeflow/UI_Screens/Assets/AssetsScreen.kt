@@ -1,8 +1,9 @@
 package com.kartikey.rupeeflow.UI_Screens.Assets
 
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState 
 import androidx.compose.foundation.verticalScroll 
@@ -17,8 +18,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -34,6 +37,7 @@ import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.formatRupeeAmount
 
 data class InvestmentItem(
     val assetName: String,
+    val assetType: String, 
     val quantity: Double,
     val avgBuyPrice: Double,
     val currentPrice: Double,
@@ -90,44 +94,85 @@ fun AssetsScreen(
         ) {
             NetworthCard(networthAmount = networthAmount, isLoading = isLoading, onClick = { })
             Spacer(modifier = Modifier.height(24.dp))
-            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text(text = "My Investments", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color.Black)
-                TextButton(onClick = { onViewChange("InvestmentDetails") }) { Text("More", color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold) }
-            }
-            Spacer(modifier = Modifier.height(8.dp))
+            
+            Text(text = "My Investments", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color.Black, modifier = Modifier.padding(horizontal = 4.dp))
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            // Smart Filters for Investment Assets
+            val hasShares = investmentList.any { it.assetType.equals("Stock", true) || it.assetType.equals("Share", true) }
+            val totalShares = if (hasShares) investmentList.filter { it.assetType.equals("Stock", true) || it.assetType.equals("Share", true) }.sumOf { it.quantity * it.currentPrice } else 0.0
+
+            val hasMF = investmentList.any { it.assetType.equals("Mutual Fund", true) || it.assetType.equals("MF", true) }
+            val totalMF = if (hasMF) investmentList.filter { it.assetType.equals("Mutual Fund", true) || it.assetType.equals("MF", true) }.sumOf { it.quantity * it.currentPrice } else 0.0
+
+            val hasETF = investmentList.any { it.assetType.equals("ETF", true) }
+            val totalETF = if (hasETF) investmentList.filter { it.assetType.equals("ETF", true) }.sumOf { it.quantity * it.currentPrice } else 0.0
+
+            val hasBonds = investmentList.any { it.assetType.equals("Bond", true) }
+            val totalBonds = if (hasBonds) investmentList.filter { it.assetType.equals("Bond", true) }.sumOf { it.quantity * it.currentPrice } else 0.0
+
             Column(modifier = Modifier.fillMaxWidth()) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Box(modifier = Modifier.weight(1f)) { GridItemCard("TOTAL INVESTMENTS", formatRupeeAmount(totalInv)) }
-                    Box(modifier = Modifier.weight(1f)) { GridItemCard("MUTUAL FUNDS", "₹0") }
+                    Box(modifier = Modifier.weight(1f)) { 
+                        InvestmentGridCard("SHARES", totalShares, hasShares, "+ Add Share") { onViewChange("InvestmentDetails") } 
+                    }
+                    Box(modifier = Modifier.weight(1f)) { 
+                        InvestmentGridCard("MUTUAL FUNDS", totalMF, hasMF, "+ Add MF") { onViewChange("InvestmentDetails") } 
+                    }
                 }
                 Spacer(modifier = Modifier.height(12.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Box(modifier = Modifier.weight(1f)) { GridItemCard("ETF", "₹0") }
-                    Box(modifier = Modifier.weight(1f)) { GridItemCard("BONDS", "₹0") }
+                    Box(modifier = Modifier.weight(1f)) { 
+                        InvestmentGridCard("ETF", totalETF, hasETF, "+ Add ETF") { onViewChange("InvestmentDetails") } 
+                    }
+                    Box(modifier = Modifier.weight(1f)) { 
+                        InvestmentGridCard("BONDS", totalBonds, hasBonds, "+ Add Bond") { onViewChange("InvestmentDetails") } 
+                    }
                 }
             }
+            
             Spacer(modifier = Modifier.height(24.dp))
+            
             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Text(text = "My Finance", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color.Black)
                 TextButton(onClick = { onViewChange("FinanceDetails") }) { Text("More", color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold) }
             }
             Spacer(modifier = Modifier.height(8.dp))
+            
+            // Smart Filters for Finance Assets
+            val hasCash = cashData.amount > 0.0
+            val hasBank = bankList.isNotEmpty()
+            val hasCC = ccList.isNotEmpty()
+            val hasFD = fdList.isNotEmpty()
+
             Column(modifier = Modifier.fillMaxWidth()) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Box(modifier = Modifier.weight(1f)) { 
-                        FinanceGridCard("Cash", formatRupeeAmount(totalCash), null, Icons.Outlined.Money, Color(0xFF388E3C)) { onViewChange("DirectCash") } 
+                        FinanceGridCard(
+                            "Cash", totalCash, hasCash, "+ Add Cash", null, 
+                            Icons.Outlined.Money, Color(0xFF388E3C)
+                        ) { onViewChange("DirectCash") } 
                     }
                     Box(modifier = Modifier.weight(1f)) { 
-                        FinanceGridCard("Bank Balance", formatRupeeAmount(totalBank), "${bankList.size}", Icons.Outlined.AccountBalance, Color(0xFF1976D2)) { onViewChange("DirectBankAccounts") } 
+                        FinanceGridCard(
+                            "Bank Balance", totalBank, hasBank, "+ Add Bank", if (hasBank) "${bankList.size}" else null, 
+                            Icons.Outlined.AccountBalance, Color(0xFF1976D2)
+                        ) { onViewChange("DirectBankAccounts") } 
                     }
                 }
                 Spacer(modifier = Modifier.height(12.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Box(modifier = Modifier.weight(1f)) { 
-                        FinanceGridCard("Credit Card", formatRupeeAmount(totalCC), "${ccList.size}", Icons.Outlined.CreditCard, Color(0xFFD32F2F)) { onViewChange("DirectCreditCards") } 
+                        FinanceGridCard(
+                            "Credit Card", totalCC, hasCC, "+ Add Card", if (hasCC) "${ccList.size}" else null, 
+                            Icons.Outlined.CreditCard, Color(0xFFD32F2F)
+                        ) { onViewChange("DirectCreditCards") } 
                     }
                     Box(modifier = Modifier.weight(1f)) { 
-                        FinanceGridCard("FD : Fixed Deposit", formatRupeeAmount(totalFD), "${fdList.size}", Icons.Outlined.Savings, Color(0xFFF57C00)) { onViewChange("DirectFDs") } 
+                        FinanceGridCard(
+                            "FD : Fixed Deposit", totalFD, hasFD, "+ Add FD", if (hasFD) "${fdList.size}" else null, 
+                            Icons.Outlined.Savings, Color(0xFFF57C00)
+                        ) { onViewChange("DirectFDs") } 
                     }
                 }
             }
@@ -160,9 +205,71 @@ fun AssetsScreen(
 }
 
 @Composable
-fun FinanceGridCard(title: String, amount: String, linkCount: String?, icon: ImageVector, iconColor: Color, onClick: () -> Unit = {}) {
+fun InvestmentGridCard(title: String, amount: Double, hasData: Boolean, addText: String, onClick: () -> Unit) {
+    var isPressed by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(targetValue = if (isPressed) 0.95f else 1f, label = "ScaleAnim")
+    
     Card(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick), 
+        modifier = Modifier
+            .fillMaxWidth()
+            .scale(scale)
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onPress = { 
+                        isPressed = true
+                        tryAwaitRelease()
+                        isPressed = false
+                        onClick() 
+                    }
+                ) 
+            },
+        colors = CardDefaults.cardColors(containerColor = Color.White), 
+        shape = RoundedCornerShape(12.dp), 
+        elevation = CardDefaults.cardElevation(2.dp), 
+        border = BorderStroke(1.dp, Color(0xFFEEEEEE))
+    ) {
+        Column(modifier = Modifier.padding(16.dp).fillMaxWidth(), horizontalAlignment = Alignment.Start) {
+            Text(text = title, color = Color.Gray, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            if (hasData) {
+                Text(text = formatRupeeAmount(amount), color = Color.Black, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
+            } else {
+                Text(text = addText, color = Color(0xFF2E7D32), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+// NAYA UPDATE: Finance Card me Bounce aur Smart Empty State
+@Composable
+fun FinanceGridCard(
+    title: String, 
+    amount: Double, 
+    hasData: Boolean, 
+    addText: String, 
+    linkCount: String?, 
+    icon: ImageVector, 
+    iconColor: Color, 
+    onClick: () -> Unit
+) {
+    var isPressed by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(targetValue = if (isPressed) 0.95f else 1f, label = "ScaleAnim")
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .scale(scale)
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onPress = { 
+                        isPressed = true
+                        tryAwaitRelease()
+                        isPressed = false
+                        onClick() 
+                    }
+                ) 
+            },
         colors = CardDefaults.cardColors(containerColor = Color.White),
         shape = RoundedCornerShape(12.dp), 
         elevation = CardDefaults.cardElevation(2.dp), 
@@ -175,19 +282,24 @@ fun FinanceGridCard(title: String, amount: String, linkCount: String?, icon: Ima
                 Text(text = title, color = Color.Gray, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
             }
             Spacer(modifier = Modifier.height(8.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(text = amount, color = Color.Black, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
-                if (linkCount != null) {
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Row(
-                        modifier = Modifier.background(Color(0xFFE3F2FD), RoundedCornerShape(4.dp)).padding(horizontal = 4.dp, vertical = 2.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(Icons.Outlined.Link, contentDescription = "Link", tint = Color(0xFF1976D2), modifier = Modifier.size(10.dp))
-                        Spacer(modifier = Modifier.width(2.dp))
-                        Text(linkCount, color = Color(0xFF1976D2), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            
+            if (hasData) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(text = formatRupeeAmount(amount), color = Color.Black, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
+                    if (linkCount != null) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Row(
+                            modifier = Modifier.background(Color(0xFFE3F2FD), RoundedCornerShape(4.dp)).padding(horizontal = 4.dp, vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Outlined.Link, contentDescription = "Link", tint = Color(0xFF1976D2), modifier = Modifier.size(10.dp))
+                            Spacer(modifier = Modifier.width(2.dp))
+                            Text(linkCount, color = Color(0xFF1976D2), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
+            } else {
+                Text(text = addText, color = iconColor, fontSize = 14.sp, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -201,17 +313,6 @@ fun NetworthCard(networthAmount: Double, isLoading: Boolean, onClick: () -> Unit
             Spacer(modifier = Modifier.height(8.dp))
             if (isLoading) CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color(0xFF2E7D32))
             else Text(formatRupeeAmount(networthAmount), fontSize = 32.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
-        }
-    }
-}
-
-@Composable
-fun GridItemCard(title: String, amount: String) {
-    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color.White), shape = RoundedCornerShape(12.dp), elevation = CardDefaults.cardElevation(2.dp), border = BorderStroke(1.dp, Color(0xFFEEEEEE))) {
-        Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.Start) {
-            Text(text = title, color = Color.Gray, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(text = amount, color = Color.Black, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
         }
     }
 }
