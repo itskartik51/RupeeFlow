@@ -156,7 +156,8 @@ object CacheManager {
                 val item = invArray.getJSONObject(i)
                 fetchedInvList.add(
                     InvestmentItem(
-                        assetName = item.optString("asset_name", ""), 
+                        assetName = item.optString("asset_name", ""),
+                        assetType = item.optString("asset_type", "Stock"), // <-- YAHAN FIX KIYA HAI
                         quantity = item.optDouble("quantity", 0.0), 
                         avgBuyPrice = item.optDouble("buy_price", 0.0), 
                         currentPrice = item.optDouble("current_price", item.optDouble("buy_price", 0.0)), 
