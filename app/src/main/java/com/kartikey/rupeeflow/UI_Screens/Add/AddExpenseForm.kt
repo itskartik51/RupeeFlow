@@ -1,12 +1,9 @@
 package com.kartikey.rupeeflow.UI_Screens.Add
 
 import android.widget.Toast
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -20,9 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -37,6 +32,7 @@ import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.CashItem
 import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.CreditCardItem
 import com.kartikey.rupeeflow.UI_Screens.CustomDatePicker
 import com.kartikey.rupeeflow.UI_Screens.NetworkClient
+import com.kartikey.rupeeflow.UI_Screens.bounceClick
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -90,7 +86,6 @@ fun AddExpenseForm(
         "Net Banking" to Icons.Outlined.Computer
     )
     
-    // Frontend Checks for Smart Disabled Mode
     val hasBank = bankList.isNotEmpty()
     val hasCC = ccList.isNotEmpty()
     val hasCash = cashData != null && cashData.amount > 0.0
@@ -115,12 +110,9 @@ fun AddExpenseForm(
     var expanded by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
-    var isPressed by remember { mutableStateOf(false) }
-    val buttonScale by animateFloatAsState(targetValue = if (isPressed) 0.95f else 1f, label = "ButtonScale")
-
     Card(
         modifier = Modifier.fillMaxWidth(), 
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(0.dp),
         shape = RoundedCornerShape(16.dp)
     ) {
@@ -143,20 +135,26 @@ fun AddExpenseForm(
                     modifier = Modifier
                         .fillMaxWidth()
                         .menuAnchor(),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary, 
+                        unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                    )
                 )
                 ExposedDropdownMenu(
                     expanded = expanded,
                     onDismissRequest = { expanded = false },
-                    modifier = Modifier.background(Color.White)
+                    modifier = Modifier.background(MaterialTheme.colorScheme.surface)
                 ) {
                     categories.forEach { (name, icon) ->
                         DropdownMenuItem(
                             text = { 
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(imageVector = icon, contentDescription = name, tint = Color(0xFF2E7D32), modifier = Modifier.size(20.dp))
+                                    Icon(imageVector = icon, contentDescription = name, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
                                     Spacer(modifier = Modifier.width(12.dp))
-                                    Text(name, fontSize = 16.sp)
+                                    Text(name, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface)
                                 }
                             },
                             onClick = {
@@ -177,8 +175,14 @@ fun AddExpenseForm(
             Spacer(modifier = Modifier.height(16.dp))
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(value = remark1, onValueChange = { remark1 = it }, label = { Text("Remark 1") }, modifier = Modifier.weight(1f), singleLine = true, shape = RoundedCornerShape(12.dp))
-                OutlinedTextField(value = remark2, onValueChange = { remark2 = it }, label = { Text("Remark 2") }, modifier = Modifier.weight(1f), singleLine = true, shape = RoundedCornerShape(12.dp))
+                OutlinedTextField(
+                    value = remark1, onValueChange = { remark1 = it }, label = { Text("Remark 1") }, modifier = Modifier.weight(1f), singleLine = true, shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary, unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), focusedTextColor = MaterialTheme.colorScheme.onSurface, unfocusedTextColor = MaterialTheme.colorScheme.onSurface)
+                )
+                OutlinedTextField(
+                    value = remark2, onValueChange = { remark2 = it }, label = { Text("Remark 2") }, modifier = Modifier.weight(1f), singleLine = true, shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary, unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), focusedTextColor = MaterialTheme.colorScheme.onSurface, unfocusedTextColor = MaterialTheme.colorScheme.onSurface)
+                )
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -200,9 +204,9 @@ fun AddExpenseForm(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp)
-                            .border(1.dp, if (modeExpanded) Color(0xFF2E7D32) else Color.Gray, RoundedCornerShape(12.dp))
+                            .border(1.dp, if (modeExpanded) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
                             .menuAnchor()
-                            .background(if (hasNoFinance) Color(0xFFF5F5F5) else Color.Transparent, RoundedCornerShape(12.dp)),
+                            .background(if (hasNoFinance) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f) else Color.Transparent, RoundedCornerShape(12.dp)),
                         contentAlignment = Alignment.CenterStart
                     ) {
                         Row(modifier = Modifier
@@ -210,18 +214,18 @@ fun AddExpenseForm(
                             .padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 text = if (modeText.isEmpty()) "Mode" else modeText,
-                                color = if (modeText.isEmpty() || hasNoFinance) Color.Gray else Color.Black,
+                                color = if (modeText.isEmpty() || hasNoFinance) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
                                 fontSize = 14.sp, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.weight(1f)
                             )
-                            Icon(Icons.Outlined.ArrowDropDown, contentDescription = null, tint = Color.Gray, modifier = Modifier
+                            Icon(Icons.Outlined.ArrowDropDown, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier
                                 .size(20.dp)
                                 .rotate(if (modeExpanded) 180f else 0f))
                         }
                     }
                     
                     ExposedDropdownMenu(expanded = modeExpanded, onDismissRequest = { modeExpanded = false }, modifier = Modifier
-                        .background(Color.White)
+                        .background(MaterialTheme.colorScheme.surface)
                         .widthIn(min = 140.dp)) {
                         paymentModes.forEach { (name, icon) ->
                             
@@ -230,7 +234,7 @@ fun AddExpenseForm(
                                 "Credit Card" -> hasCC
                                 else -> hasBank
                             }
-                            val itemColor = if (isAvailable) Color.DarkGray else Color.LightGray
+                            val itemColor = if (isAvailable) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
 
                             DropdownMenuItem(
                                 text = { 
@@ -279,20 +283,20 @@ fun AddExpenseForm(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp)
-                            .border(1.dp, if(paidByExpanded) Color(0xFF2E7D32) else Color.Gray, RoundedCornerShape(12.dp))
+                            .border(1.dp, if(paidByExpanded) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
                             .menuAnchor()
-                            .background(if (!isPaidByActive && selectedSourceType != "Cash") Color(0xFFF5F5F5) else Color.Transparent, RoundedCornerShape(12.dp)),
+                            .background(if (!isPaidByActive && selectedSourceType != "Cash") MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f) else Color.Transparent, RoundedCornerShape(12.dp)),
                         contentAlignment = Alignment.CenterStart
                     ) {
                         Row(modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                             if (selectedSourceType.isEmpty()) {
-                                Text("Select Mode", color = Color.Gray, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                                Text("Select Mode", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp, modifier = Modifier.weight(1f))
                                 Icon(Icons.Outlined.ArrowDropDown, null, tint = Color.Transparent, modifier = Modifier.size(20.dp))
                             } else if (selectedSourceId.isEmpty()) {
-                                Text(if(selectedSourceType == "Bank") "Choose Bank" else "Choose Card", color = Color.Gray, fontSize = 14.sp, modifier = Modifier.weight(1f))
-                                Icon(Icons.Outlined.ArrowDropDown, null, tint = Color.Gray, modifier = Modifier
+                                Text(if(selectedSourceType == "Bank") "Choose Bank" else "Choose Card", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                                Icon(Icons.Outlined.ArrowDropDown, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier
                                     .size(20.dp)
                                     .rotate(if (paidByExpanded) 180f else 0f))
                             } else {
@@ -302,9 +306,9 @@ fun AddExpenseForm(
                                         .clip(RoundedCornerShape(4.dp)), contentScale = ContentScale.Fit)
                                     Spacer(modifier = Modifier.width(8.dp))
                                 }
-                                Text(text = selectedSourceName, color = if(selectedSourceType == "Cash") Color(0xFF2E7D32) else Color.Black, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                                Text(text = selectedSourceName, color = if(selectedSourceType == "Cash") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                                 if (isPaidByActive) {
-                                    Icon(Icons.Outlined.ArrowDropDown, null, tint = Color.Gray, modifier = Modifier
+                                    Icon(Icons.Outlined.ArrowDropDown, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier
                                         .size(20.dp)
                                         .rotate(if (paidByExpanded) 180f else 0f))
                                 }
@@ -312,9 +316,9 @@ fun AddExpenseForm(
                         }
                     }
 
-                    ExposedDropdownMenu(expanded = paidByExpanded && isPaidByActive, onDismissRequest = { paidByExpanded = false }, modifier = Modifier.background(Color.White)) {
+                    ExposedDropdownMenu(expanded = paidByExpanded && isPaidByActive, onDismissRequest = { paidByExpanded = false }, modifier = Modifier.background(MaterialTheme.colorScheme.surface)) {
                         if (selectedSourceType == "Bank") {
-                            if (bankList.isEmpty()) { DropdownMenuItem(text = { Text("No Banks Linked", color = Color.Gray) }, onClick = {}) }
+                            if (bankList.isEmpty()) { DropdownMenuItem(text = { Text("No Banks Linked", color = MaterialTheme.colorScheme.onSurfaceVariant) }, onClick = {}) }
                             bankList.forEach { bank ->
                                 DropdownMenuItem(
                                     text = { 
@@ -323,10 +327,10 @@ fun AddExpenseForm(
                                             if (logo != null) { Image(painter = painterResource(logo), contentDescription = null, modifier = Modifier
                                                 .size(24.dp)
                                                 .clip(RoundedCornerShape(4.dp))) } 
-                                            else { Icon(Icons.Outlined.AccountBalance, null, tint = Color.DarkGray, modifier = Modifier.size(24.dp)) }
+                                            else { Icon(Icons.Outlined.AccountBalance, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp)) }
                                             Spacer(modifier = Modifier.width(12.dp))
                                             val shortAcc = if (bank.accountNo.length >= 4) bank.accountNo.takeLast(4) else bank.accountNo
-                                            Text("• $shortAcc", maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold)
+                                            Text("• $shortAcc", color = MaterialTheme.colorScheme.onSurface, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold)
                                         }
                                     },
                                     onClick = { 
@@ -339,7 +343,7 @@ fun AddExpenseForm(
                                 )
                             }
                         } else if (selectedSourceType == "Credit Card") {
-                            if (ccList.isEmpty()) { DropdownMenuItem(text = { Text("No Cards Linked", color = Color.Gray) }, onClick = {}) }
+                            if (ccList.isEmpty()) { DropdownMenuItem(text = { Text("No Cards Linked", color = MaterialTheme.colorScheme.onSurfaceVariant) }, onClick = {}) }
                             ccList.forEach { cc ->
                                 DropdownMenuItem(
                                     text = { 
@@ -348,10 +352,10 @@ fun AddExpenseForm(
                                             if (logo != null) { Image(painter = painterResource(logo), contentDescription = null, modifier = Modifier
                                                 .size(24.dp)
                                                 .clip(RoundedCornerShape(4.dp))) } 
-                                            else { Icon(Icons.Outlined.CreditCard, null, tint = Color.DarkGray, modifier = Modifier.size(24.dp)) }
+                                            else { Icon(Icons.Outlined.CreditCard, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp)) }
                                             Spacer(modifier = Modifier.width(12.dp))
                                             val shortAcc = if (cc.cardNo.length >= 4) cc.cardNo.takeLast(4) else cc.cardNo
-                                            Text("• $shortAcc", maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold)
+                                            Text("• $shortAcc", color = MaterialTheme.colorScheme.onSurface, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold)
                                         }
                                     },
                                     onClick = { 
@@ -383,11 +387,12 @@ fun AddExpenseForm(
                     value = amount, 
                     onValueChange = { amount = it },
                     label = { Text("Amount") },
-                    prefix = { Text("₹ ", fontWeight = FontWeight.Bold, color = Color.Black) },
+                    prefix = { Text("₹ ", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.weight(1f), 
                     singleLine = true,
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary, unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), focusedTextColor = MaterialTheme.colorScheme.onSurface, unfocusedTextColor = MaterialTheme.colorScheme.onSurface)
                 )
             }
             
@@ -399,7 +404,6 @@ fun AddExpenseForm(
                     val finalMode = modeText.trim()
                     val finalExpenseDateStr = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(expenseDateMillis))
 
-                    // Smart Bypass Validation: If no finance details exist, allow saving without mode.
                     val canSave = if (hasNoFinance) {
                         amount.isNotBlank() && finalCategory.isNotBlank()
                     } else {
@@ -410,12 +414,10 @@ fun AddExpenseForm(
                     if (canSave) {
                         val expenseAmt = amount.toDoubleOrNull() ?: 0.0
                         
-                        // Set fallback data for backend to prevent breaking the script
                         val actualMode = if (hasNoFinance) "Unspecified" else finalMode
                         val actualSourceType = if (hasNoFinance) "None" else selectedSourceType
                         val actualSourceId = if (hasNoFinance) "None" else selectedSourceId
                         
-                        // 1. OPTIMISTIC UI UPDATE: Instant callback to update local UI and close dialog
                         val newEntry = TransactionModel(
                             date = finalExpenseDateStr, 
                             amount = expenseAmt, 
@@ -427,9 +429,8 @@ fun AddExpenseForm(
                             sourceId = actualSourceId
                         )
                         onExpenseAdded(newEntry)
-                        onDismiss() // Dialog instantly closes
+                        onDismiss() 
 
-                        // 2. BACKGROUND API SYNC (Fire and Forget)
                         CoroutineScope(Dispatchers.IO).launch {
                             try {
                                 val json = JSONObject().apply {
@@ -449,7 +450,6 @@ fun AddExpenseForm(
                                 val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(body).build()
                                 client.newCall(request).execute()
                             } catch (e: Exception) {
-                                // Background fail fallback (Silently ignored to keep UI smooth)
                             }
                         }
                     } else {
@@ -463,20 +463,11 @@ fun AddExpenseForm(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp)
-                    .scale(buttonScale)
-                    .pointerInput(Unit) {
-                        detectTapGestures(
-                            onPress = {
-                                isPressed = true
-                                tryAwaitRelease()
-                                isPressed = false
-                            }
-                        )
-                    },
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
+                    .bounceClick(),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                 shape = RoundedCornerShape(12.dp)
             ) {
-                Text("Save Expense", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White)
+                Text("Save Expense", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onPrimary)
             }
             
             Spacer(modifier = Modifier.height(24.dp))
