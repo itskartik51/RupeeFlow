@@ -40,7 +40,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @Composable
-fun MainScreen(username: String, onLogout: () -> Unit) {
+fun MainScreen(
+    username: String, 
+    themeMode: Int, 
+    onThemeChange: (Int) -> Unit, 
+    onLogout: () -> Unit
+) {
     val context = LocalContext.current
 
     var selectedTab by remember { mutableIntStateOf(0) } 
@@ -161,7 +166,7 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
             bottomBar = {
                 NavigationBar(
                     containerColor = MaterialTheme.colorScheme.surface, 
-                    tonalElevation = 0.dp // UPDATE: Isse green tint bilkul hat jayega aur pure white/gray color aayega
+                    tonalElevation = 0.dp
                 ) {
                     NavigationBarItem(
                         modifier = Modifier.bounceClick(),
@@ -279,6 +284,7 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
                         4 -> ProfileScreen(
                             username = username, name = userFullName, email = userEmail, mobile = userMobile, 
                             password = userPassword, dob = userDob, paddingValues = paddingValues, 
+                            themeMode = themeMode, onThemeChange = onThemeChange, // Theme passed here
                             onLogout = onLogout, onProfileRefresh = { refreshTrigger++ },
                             startInDetails = openProfileDetails, onResetDetailsState = { openProfileDetails = false }
                         )
@@ -312,9 +318,6 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
     }
 }
 
-// ==========================================
-// BOUNCE CLICK ANIMATION
-// ==========================================
 fun Modifier.bounceClick(
     scaleDown: Float = 0.90f,
     onClick: (() -> Unit)? = null 
