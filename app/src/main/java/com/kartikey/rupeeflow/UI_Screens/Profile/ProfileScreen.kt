@@ -34,8 +34,8 @@ fun ProfileScreen(
     password: String,
     dob: String, 
     paddingValues: PaddingValues, 
-    themeMode: Int,                     // Naya Parameter
-    onThemeChange: (Int) -> Unit,       // Naya Parameter
+    themeMode: Int,                     
+    onThemeChange: (Int) -> Unit,       
     onLogout: () -> Unit,
     onProfileRefresh: () -> Unit,
     startInDetails: Boolean = false, 
@@ -120,7 +120,7 @@ private fun ProfileMainContent(
         modifier = Modifier
             .fillMaxSize()
             .padding(paddingValues)
-            .padding(16.dp)
+            .padding(horizontal = 16.dp)
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -162,7 +162,6 @@ private fun ProfileMainContent(
         ProfileOptionRow(iconVector = Icons.Default.Lock, title = "Security Lock", onClick = { onOptionClick("Security Lock") })
         ProfileOptionRow(iconVector = Icons.Default.CurrencyRupee, title = "Currency", onClick = { onOptionClick("Currency") }) 
         
-        // NAYA: Expandable Theme Block
         Column {
             Row(
                 modifier = Modifier
@@ -183,7 +182,7 @@ private fun ProfileMainContent(
             }
             
             AnimatedVisibility(visible = themeExpanded) {
-                Column(modifier = Modifier.fillMaxWidth().padding(start = 40.dp, bottom = 16.dp)) {
+                Column(modifier = Modifier.fillMaxWidth().padding(start = 40.dp, bottom = 12.dp)) {
                     ThemeRadioOption("System Default", 0, themeMode, onThemeChange)
                     ThemeRadioOption("Light", 1, themeMode, onThemeChange)
                     ThemeRadioOption("Dark", 2, themeMode, onThemeChange)
@@ -201,21 +200,39 @@ private fun ProfileMainContent(
             onClick = { onOptionClick("App Update") }
         )
         
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
-        Button(
-            onClick = { onLogout() },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp)
-                .bounceClick(),
-            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-            shape = RoundedCornerShape(12.dp)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End
         ) {
-            Icon(Icons.Default.ExitToApp, contentDescription = "Logout", tint = MaterialTheme.colorScheme.error)
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("Logout", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.error)
+            Surface(
+                modifier = Modifier.bounceClick { onLogout() },
+                color = MaterialTheme.colorScheme.surfaceVariant, 
+                shape = RoundedCornerShape(50), 
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ExitToApp, 
+                        contentDescription = "Log out", 
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Log out", 
+                        fontWeight = FontWeight.Bold, 
+                        fontSize = 14.sp, 
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
         }
+        
+        Spacer(modifier = Modifier.height(40.dp))
     }
 }
 
@@ -225,18 +242,18 @@ fun ThemeRadioOption(title: String, modeValue: Int, currentMode: Int, onThemeCha
         modifier = Modifier
             .fillMaxWidth()
             .bounceClick(scaleDown = 0.98f) { onThemeChange(modeValue) }
-            .padding(vertical = 8.dp),
+            .padding(vertical = 2.dp), 
         verticalAlignment = Alignment.CenterVertically
     ) {
         RadioButton(
             selected = (currentMode == modeValue),
             onClick = { onThemeChange(modeValue) },
             colors = RadioButtonDefaults.colors(
-                selectedColor = MaterialTheme.colorScheme.primary, // Tumhara Neon Green
+                selectedColor = MaterialTheme.colorScheme.primary, 
                 unselectedColor = MaterialTheme.colorScheme.onSurfaceVariant
             )
         )
-        Spacer(modifier = Modifier.width(8.dp))
+        Spacer(modifier = Modifier.width(4.dp))
         Text(text = title, fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface)
     }
 }
