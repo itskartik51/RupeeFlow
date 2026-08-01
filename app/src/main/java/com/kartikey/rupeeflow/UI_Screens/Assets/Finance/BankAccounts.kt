@@ -35,6 +35,7 @@ import androidx.compose.ui.window.DialogProperties
 import com.kartikey.rupeeflow.Cloud_Database.Constants
 import com.kartikey.rupeeflow.UI_Screens.Assets.BankAccountItem
 import com.kartikey.rupeeflow.UI_Screens.NetworkClient
+import com.kartikey.rupeeflow.UI_Screens.bounceClick
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -66,17 +67,25 @@ fun BankAccountsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Linked Banks", fontWeight = FontWeight.Bold) },
-                navigationIcon = { IconButton(onClick = onBackClick) { Icon(Icons.Default.ArrowBack, contentDescription = "Back") } },
-                actions = { IconButton(onClick = onRefreshClick) { Icon(Icons.Outlined.Refresh, contentDescription = "Refresh", modifier = Modifier.rotate(if (isLoading) angle else 0f)) } },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFFF8F9FA))
+                title = { Text("Linked Banks", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
+                navigationIcon = { 
+                    IconButton(onClick = onBackClick, modifier = Modifier.bounceClick()) { 
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.onSurface) 
+                    } 
+                },
+                actions = { 
+                    IconButton(onClick = onRefreshClick, modifier = Modifier.bounceClick()) { 
+                        Icon(Icons.Outlined.Refresh, contentDescription = "Refresh", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.rotate(if (isLoading) angle else 0f)) 
+                    } 
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
             )
         },
-        containerColor = Color(0xFFF8F9FA)
+        containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
         if (bankList.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize().padding(paddingValues), contentAlignment = Alignment.Center) {
-                Text("No Bank Accounts Added Yet", color = Color.Gray)
+                Text("No Bank Accounts Added Yet", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         } else {
             LazyColumn(
@@ -99,7 +108,7 @@ fun BankDetailCard(bank: BankAccountItem, username: String, onEditClick: (BankAc
     
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(2.dp),
         shape = RoundedCornerShape(16.dp)
     ) {
@@ -110,7 +119,7 @@ fun BankDetailCard(bank: BankAccountItem, username: String, onEditClick: (BankAc
                 Box(
                     modifier = Modifier
                         .size(44.dp)
-                        .background(Color(0xFF1976D2).copy(alpha = 0.05f), RoundedCornerShape(10.dp)),
+                        .background(Color(0xFF1976D2).copy(alpha = 0.1f), RoundedCornerShape(10.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     if (logoRes != null) {
@@ -132,36 +141,36 @@ fun BankDetailCard(bank: BankAccountItem, username: String, onEditClick: (BankAc
                 
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(text = bank.bankName.uppercase(), fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color.Black)
-                    Text(text = bank.accountNo, color = Color.Gray, fontSize = 12.sp, letterSpacing = 1.sp)
+                    Text(text = bank.bankName.uppercase(), fontWeight = FontWeight.Bold, fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface)
+                    Text(text = bank.accountNo, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, letterSpacing = 1.sp)
                 }
                 
-                IconButton(onClick = { onEditClick(bank) }) {
-                    Icon(Icons.Outlined.Edit, contentDescription = "Edit Bank", tint = Color.Gray, modifier = Modifier.size(22.dp))
+                IconButton(onClick = { onEditClick(bank) }, modifier = Modifier.bounceClick()) {
+                    Icon(Icons.Outlined.Edit, contentDescription = "Edit Bank", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(22.dp))
                 }
             }
             
             Spacer(modifier = Modifier.height(16.dp))
             
-            Text(text = "Available Balance", color = Color.Gray, fontSize = 12.sp)
+            Text(text = "Available Balance", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(text = formatRupeeAmount(bank.currentBalance), fontWeight = FontWeight.ExtraBold, fontSize = 28.sp, color = Color.Black)
+                Text(text = formatRupeeAmount(bank.currentBalance), fontWeight = FontWeight.ExtraBold, fontSize = 28.sp, color = MaterialTheme.colorScheme.onSurface)
                 
                 IconButton(
                     onClick = { showQuickUpdate = true },
-                    modifier = Modifier.size(32.dp).background(Color(0xFFE8F5E9), CircleShape)
+                    modifier = Modifier.size(32.dp).bounceClick().background(MaterialTheme.colorScheme.primaryContainer, CircleShape)
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = "Update Balance", tint = Color(0xFF2E7D32), modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.Add, contentDescription = "Update Balance", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
                 }
             }
             
             Spacer(modifier = Modifier.height(16.dp))
-            HorizontalDivider(color = Color.LightGray.copy(alpha = 0.4f))
+            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
             Spacer(modifier = Modifier.height(16.dp))
             
             Column(modifier = Modifier.fillMaxWidth()) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    MetricItem(label = "Interest Rate", value = "${bank.interestRate}% Yr", valueColor = Color.DarkGray, alignment = Alignment.Start)
+                    MetricItem(label = "Interest Rate", value = "${bank.interestRate}% Yr", valueColor = MaterialTheme.colorScheme.onSurfaceVariant, alignment = Alignment.Start)
                     MetricItem(label = "Exp. Qtr", value = "+${formatRupeeAmount(bank.expQtrInt)}", valueColor = Color(0xFFF57C00), alignment = Alignment.CenterHorizontally)
                     MetricItem(label = "Exp. Yearly", value = "+${formatRupeeAmount(bank.expYrInt)}", valueColor = Color(0xFF1976D2), alignment = Alignment.End)
                 }
@@ -201,12 +210,12 @@ fun QuickUpdateDialog(bank: BankAccountItem, username: String, onDismiss: () -> 
         Card(
             modifier = Modifier.fillMaxWidth(0.9f).imePadding(), 
             shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             elevation = CardDefaults.cardElevation(8.dp)
         ) {
             Column(modifier = Modifier.padding(24.dp)) {
-                Text("Update Balance", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = Color.Black)
-                Text("Add or deduct amount from ${bank.bankName}", color = Color.Gray, fontSize = 13.sp)
+                Text("Update Balance", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = MaterialTheme.colorScheme.onSurface)
+                Text("Add or deduct amount from ${bank.bankName}", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
                 
                 Spacer(modifier = Modifier.height(20.dp))
                 
@@ -214,12 +223,18 @@ fun QuickUpdateDialog(bank: BankAccountItem, username: String, onDismiss: () -> 
                     value = updateAmount,
                     onValueChange = { updateAmount = it },
                     label = { Text("Amount (+ or -)") },
-                    prefix = { Text("₹ ", fontWeight = FontWeight.Bold, color = Color.Black) },
+                    prefix = { Text("₹ ", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF2E7D32), focusedLabelColor = Color(0xFF2E7D32))
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary, 
+                        focusedLabelColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                    )
                 )
                 
                 Spacer(modifier = Modifier.height(24.dp))
@@ -227,9 +242,9 @@ fun QuickUpdateDialog(bank: BankAccountItem, username: String, onDismiss: () -> 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedButton(
                         onClick = onDismiss,
-                        modifier = Modifier.weight(1f).height(50.dp),
+                        modifier = Modifier.weight(1f).height(50.dp).bounceClick(),
                         shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Black)
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface)
                     ) {
                         Text("Cancel", fontWeight = FontWeight.Bold)
                     }
@@ -240,7 +255,6 @@ fun QuickUpdateDialog(bank: BankAccountItem, username: String, onDismiss: () -> 
                             if (amountEntered != null && amountEntered != 0.0) {
                                 val newCalculatedBalance = bank.currentBalance + amountEntered 
                                 
-                                // OPTIMISTIC UI: Instant Dialog Dismiss
                                 onDismiss()
                                 Toast.makeText(context, "Updating balance...", Toast.LENGTH_SHORT).show()
                                 
@@ -265,24 +279,24 @@ fun QuickUpdateDialog(bank: BankAccountItem, username: String, onDismiss: () -> 
 
                                         withContext(Dispatchers.Main) {
                                             if (resData.contains("success")) {
-                                                onSuccess() // Silent background refresh
+                                                onSuccess() 
                                             } else {
                                                 Toast.makeText(context, "Balance Update Failed!", Toast.LENGTH_SHORT).show()
                                             }
                                         }
                                     } catch (e: Exception) {
-                                        // Ignore background failures to keep UI seamless
+                                        
                                     }
                                 }
                             } else {
                                 Toast.makeText(context, "Enter a valid amount", Toast.LENGTH_SHORT).show()
                             }
                         },
-                        modifier = Modifier.weight(1f).height(50.dp),
+                        modifier = Modifier.weight(1f).height(50.dp).bounceClick(),
                         shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF388E3C))
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                     ) {
-                        Text("Update", fontWeight = FontWeight.Bold, color = Color.White)
+                        Text("Update", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimary)
                     }
                 }
             }
@@ -293,7 +307,7 @@ fun QuickUpdateDialog(bank: BankAccountItem, username: String, onDismiss: () -> 
 @Composable
 fun MetricItem(label: String, value: String, valueColor: Color, alignment: Alignment.Horizontal) {
     Column(horizontalAlignment = alignment) {
-        Text(text = label, color = Color.Gray, fontSize = 11.sp)
+        Text(text = label, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
         Text(text = value, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = valueColor)
     }
 }
