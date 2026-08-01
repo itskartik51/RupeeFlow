@@ -67,7 +67,7 @@ fun ProfileScreen(
                     onNameClick = { currentProfileView = "Details" },
                     onOptionClick = { option ->
                         selectedOptionTitle = option
-                        if (option == "Security Lock" || option == "Currency") {
+                        if (option == "Security Lock") {
                             currentProfileView = "Preference"
                         } else if (option == "App Update") { 
                             currentProfileView = "Update"
@@ -115,6 +115,7 @@ private fun ProfileMainContent(
     onLogout: () -> Unit
 ) {
     var themeExpanded by remember { mutableStateOf(false) }
+    var currencyExpanded by remember { mutableStateOf(false) } // NAYA: Currency ke liye state
 
     Column(
         modifier = Modifier
@@ -160,8 +161,51 @@ private fun ProfileMainContent(
         Spacer(modifier = Modifier.height(32.dp))
 
         ProfileOptionRow(iconVector = Icons.Default.Lock, title = "Security Lock", onClick = { onOptionClick("Security Lock") })
-        ProfileOptionRow(iconVector = Icons.Default.CurrencyRupee, title = "Currency", onClick = { onOptionClick("Currency") }) 
         
+        // NAYA: Expandable Currency Block
+        Column {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .bounceClick(scaleDown = 0.97f) { currencyExpanded = !currencyExpanded } 
+                    .padding(vertical = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Default.CurrencyRupee, contentDescription = "Currency", tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(24.dp))
+                Spacer(modifier = Modifier.width(16.dp))
+                Text("Currency", fontSize = 16.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
+                Spacer(modifier = Modifier.weight(1f))
+                Icon(
+                    imageVector = if (currencyExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown, 
+                    contentDescription = null, 
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            
+            AnimatedVisibility(visible = currencyExpanded) {
+                Column(modifier = Modifier.fillMaxWidth().padding(start = 40.dp, bottom = 12.dp)) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .bounceClick(scaleDown = 0.98f) { /* Clickable hai, aage kabhi aur currency aayi to yaha add hoga */ }
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CheckCircle, 
+                            contentDescription = "Selected", 
+                            tint = MaterialTheme.colorScheme.primary, // Green Tick
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(text = "INR ₹", fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)
+                    }
+                }
+            }
+            HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+        }
+        
+        // Expandable Theme Block
         Column {
             Row(
                 modifier = Modifier
