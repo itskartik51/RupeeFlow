@@ -13,18 +13,17 @@ import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
 // ==========================================
-// STRICT CORE COLORS (NO MATERIAL YOU OVERRIDE)
+// STRICT CORE COLORS
 // ==========================================
 val PrimaryGreenLight = Color(0xFF2E7D32)
-val PrimaryGreenDark = Color(0xFF1ED760) // UPDATE: Naya Neon/Vibrant Green shade for Dark Mode
+val PrimaryGreenDark = Color(0xFF1ED760) // Naya Neon/Vibrant Green shade for Dark Mode
 
 val PrimaryContainerLight = Color(0xFFE8F5E9)
-val PrimaryContainerDark = Color(0xFF1B3B22) // UPDATE: Ye dark hi rahega taaki 'K' avatar dark green dikhe
+val PrimaryContainerDark = Color(0xFF1B3B22) 
 
 val BackgroundLight = Color(0xFFF8F9FA) 
 val BackgroundDark = Color(0xFF121212)
 
-// CARDS KE LIYE PURE WHITE AUR PURE DARK GRAY
 val SurfaceLight = Color.White 
 val SurfaceDark = Color(0xFF1E1E1E)
 
@@ -39,9 +38,6 @@ val TextSecondaryDark = Color(0xFFAAAAAA)
 
 val ErrorRed = Color(0xFFD32F2F)
 
-// ==========================================
-// THEME SCHEMES
-// ==========================================
 private val DarkColorScheme = darkColorScheme(
     primary = PrimaryGreenDark,
     primaryContainer = PrimaryContainerDark,
@@ -70,10 +66,14 @@ private val LightColorScheme = lightColorScheme(
 
 @Composable
 fun RupeeFlowTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    themeMode: Int = 0, // 0 = System, 1 = Light, 2 = Dark
+    darkTheme: Boolean = when (themeMode) {
+        1 -> false
+        2 -> true
+        else -> isSystemInDarkTheme()
+    },
     content: @Composable () -> Unit
 ) {
-    // Dynamic Color Engine completely removed. Only STRICT Light/Dark.
     val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
     
     val view = LocalView.current
