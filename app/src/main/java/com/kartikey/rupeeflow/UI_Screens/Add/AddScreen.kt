@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.sp
 import com.kartikey.rupeeflow.UI_Screens.Assets.BankAccountItem
 import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.CashItem
 import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.CreditCardItem
+import com.kartikey.rupeeflow.UI_Screens.bounceClick
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -53,7 +54,6 @@ fun AddScreen(
         }
     }
 
-    // 1. ADD MENU POPUP (WITH DIM BACKGROUND)
     val dimAlpha by animateFloatAsState(targetValue = if (showMenu) 0.4f else 0f, label = "dimBg")
     if (showMenu || dimAlpha > 0f) {
         Box(
@@ -77,7 +77,7 @@ fun AddScreen(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Card(
                         shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                         elevation = CardDefaults.cardElevation(8.dp),
                         modifier = Modifier.width(220.dp)
                     ) {
@@ -86,12 +86,12 @@ fun AddScreen(
                                 activeAddForm = "Expense"
                                 onToggleMenu()
                             }
-                            HorizontalDivider(color = Color(0xFFEEEEEE))
+                            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                             AddMenuItem("Add Investment", Icons.Outlined.TrendingUp) {
                                 activeAddForm = "Investment"
                                 onToggleMenu()
                             }
-                            HorizontalDivider(color = Color(0xFFEEEEEE))
+                            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                             AddMenuItem("Add Finance", Icons.Outlined.AccountBalance) {
                                 activeAddForm = "Finance"
                                 onToggleMenu()
@@ -103,14 +103,13 @@ fun AddScreen(
                             .offset(y = (-8).dp)
                             .size(16.dp)
                             .rotate(45f)
-                            .background(Color.White)
+                            .background(MaterialTheme.colorScheme.surface)
                     )
                 }
             }
         }
     }
 
-    // 2. THE HIGHLIGHTED FLOATING BUTTON (Always remains bright and on top)
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.BottomCenter
@@ -120,9 +119,9 @@ fun AddScreen(
                 .windowInsetsPadding(WindowInsets.navigationBars)
                 .padding(bottom = 16.dp)
                 .size(48.dp)
+                .bounceClick { onToggleMenu() }
                 .clip(RoundedCornerShape(14.dp))
-                .background(Color(0xFF2E7D32))
-                .clickable { onToggleMenu() },
+                .background(MaterialTheme.colorScheme.primary),
             contentAlignment = Alignment.Center
         ) {
             val rotation by animateFloatAsState(
@@ -130,18 +129,17 @@ fun AddScreen(
                 animationSpec = tween(300),
                 label = "iconRotate"
             )
-            Icon(Icons.Outlined.Add, contentDescription = "Add", tint = Color.White, modifier = Modifier.rotate(rotation))
+            Icon(Icons.Outlined.Add, contentDescription = "Add", tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.rotate(rotation))
         }
     }
 
-    // 3. MODAL BOTTOM SHEETS FOR FORMS
     if (activeAddForm != null) {
         val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true) 
         ModalBottomSheet(
             onDismissRequest = { activeAddForm = null },
             sheetState = sheetState,
-            containerColor = Color(0xFFF8F9FA),
-            dragHandle = { BottomSheetDefaults.DragHandle(color = Color.LightGray) }
+            containerColor = MaterialTheme.colorScheme.background,
+            dragHandle = { BottomSheetDefaults.DragHandle(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)) }
         ) {
             Column(
                 modifier = Modifier
@@ -154,7 +152,7 @@ fun AddScreen(
                     text = "Add $activeAddForm",
                     fontSize = 22.sp,
                     fontWeight = FontWeight.ExtraBold,
-                    color = Color.Black,
+                    color = MaterialTheme.colorScheme.onBackground,
                     modifier = Modifier.padding(bottom = 16.dp, top = 8.dp)
                 )
                 when (activeAddForm) {
@@ -172,16 +170,16 @@ fun AddMenuItem(title: String, icon: ImageVector, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .bounceClick(scaleDown = 0.95f) { onClick() }
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, contentDescription = title, tint = Color(0xFF2E7D32))
+            Icon(icon, contentDescription = title, tint = MaterialTheme.colorScheme.primary)
             Spacer(modifier = Modifier.width(12.dp))
-            Text(title, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color.Black)
+            Text(title, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface)
         }
-        Icon(Icons.Outlined.ChevronRight, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(20.dp))
+        Icon(Icons.Outlined.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
     }
 }
