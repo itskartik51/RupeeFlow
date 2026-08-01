@@ -25,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kartikey.rupeeflow.Cloud_Database.Constants
+import com.kartikey.rupeeflow.UI_Screens.bounceClick
 
 data class FDItem(
     val bankName: String,
@@ -60,17 +61,25 @@ fun FixedDepositsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Fixed Deposits", fontWeight = FontWeight.Bold) },
-                navigationIcon = { IconButton(onClick = onBackClick) { Icon(Icons.Default.ArrowBack, contentDescription = "Back") } },
-                actions = { IconButton(onClick = onRefreshClick) { Icon(Icons.Outlined.Refresh, contentDescription = "Refresh", modifier = Modifier.rotate(if (isLoading) angle else 0f)) } },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFFF8F9FA))
+                title = { Text("Fixed Deposits", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
+                navigationIcon = { 
+                    IconButton(onClick = onBackClick, modifier = Modifier.bounceClick()) { 
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.onSurface) 
+                    } 
+                },
+                actions = { 
+                    IconButton(onClick = onRefreshClick, modifier = Modifier.bounceClick()) { 
+                        Icon(Icons.Outlined.Refresh, contentDescription = "Refresh", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.rotate(if (isLoading) angle else 0f)) 
+                    } 
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
             )
         },
-        containerColor = Color(0xFFF8F9FA)
+        containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
         if (fdList.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize().padding(paddingValues), contentAlignment = Alignment.Center) {
-                Text("No Fixed Deposits Available", color = Color.Gray)
+                Text("No Fixed Deposits Available", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         } else {
             LazyColumn(
@@ -92,7 +101,7 @@ fun FDetailCard(fd: FDItem, onEditClick: (FDItem) -> Unit) {
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(2.dp),
         shape = RoundedCornerShape(16.dp)
     ) {
@@ -100,7 +109,7 @@ fun FDetailCard(fd: FDItem, onEditClick: (FDItem) -> Unit) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                 
                 Box(
-                    modifier = Modifier.size(44.dp).background(Color(0xFFF57C00).copy(alpha = 0.08f), RoundedCornerShape(10.dp)),
+                    modifier = Modifier.size(44.dp).background(Color(0xFFF57C00).copy(alpha = 0.1f), RoundedCornerShape(10.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     if (logoRes != null) {
@@ -115,18 +124,18 @@ fun FDetailCard(fd: FDItem, onEditClick: (FDItem) -> Unit) {
                 
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(text = fd.bankName.uppercase(), fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color.Black)
-                    Text(text = "A/C: ${fd.accountNo}", color = Color.Gray, fontSize = 12.sp, letterSpacing = 1.sp)
+                    Text(text = fd.bankName.uppercase(), fontWeight = FontWeight.Bold, fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface)
+                    Text(text = "A/C: ${fd.accountNo}", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, letterSpacing = 1.sp)
                 }
                 
                 val isMatured = fd.daysToMaturity <= 0
                 val pillColor = if (isMatured) Color(0xFF388E3C) else Color(0xFF1976D2)
-                Box(modifier = Modifier.background(pillColor.copy(alpha = 0.1f), RoundedCornerShape(20.dp)).padding(horizontal = 10.dp, vertical = 6.dp)) {
+                Box(modifier = Modifier.background(pillColor.copy(alpha = 0.15f), RoundedCornerShape(20.dp)).padding(horizontal = 10.dp, vertical = 6.dp)) {
                     Text(text = if (isMatured) "Matured" else "${fd.daysToMaturity} Days Left", color = pillColor, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                 }
                 Spacer(modifier = Modifier.width(8.dp))
-                IconButton(onClick = { onEditClick(fd) }) {
-                    Icon(Icons.Outlined.Edit, contentDescription = "Edit FD", tint = Color.Gray, modifier = Modifier.size(22.dp))
+                IconButton(onClick = { onEditClick(fd) }, modifier = Modifier.bounceClick()) {
+                    Icon(Icons.Outlined.Edit, contentDescription = "Edit FD", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(22.dp))
                 }
             }
             
@@ -134,33 +143,33 @@ fun FDetailCard(fd: FDItem, onEditClick: (FDItem) -> Unit) {
             
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
                 Column {
-                    Text(text = "Current Value", color = Color.Gray, fontSize = 12.sp)
+                    Text(text = "Current Value", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
                     Spacer(modifier = Modifier.height(2.dp))
-                    Text(text = formatRupeeAmount(fd.accruedValue), fontWeight = FontWeight.ExtraBold, fontSize = 26.sp, color = Color.Black)
+                    Text(text = formatRupeeAmount(fd.accruedValue), fontWeight = FontWeight.ExtraBold, fontSize = 26.sp, color = MaterialTheme.colorScheme.onSurface)
                 }
                 
                 Column(horizontalAlignment = Alignment.End) {
-                    Text(text = "Interest Rate", color = Color.Gray, fontSize = 12.sp)
+                    Text(text = "Interest Rate", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(text = "${fd.interestRate}% Yr", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color(0xFFF57C00))
                 }
             }
             
             Spacer(modifier = Modifier.height(16.dp))
-            HorizontalDivider(color = Color.LightGray.copy(alpha = 0.4f))
+            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
             Spacer(modifier = Modifier.height(16.dp))
             
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                MetricCol(label = "Invested", value = formatRupeeAmount(fd.investedAmt), color = Color.DarkGray)
+                MetricCol(label = "Invested", value = formatRupeeAmount(fd.investedAmt), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 MetricCol(label = "Maturity Amt", value = formatRupeeAmount(fd.maturityValue), color = Color(0xFF1976D2), align = Alignment.CenterHorizontally)
                 MetricCol(label = "Total Int. Earned", value = "+${formatRupeeAmount(fd.accruedInt)}", color = Color(0xFF388E3C), align = Alignment.End)
             }
             
             Spacer(modifier = Modifier.height(12.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                MetricCol(label = "Start Date", value = fd.createDate, color = Color.DarkGray)
-                MetricCol(label = "End Date", value = fd.maturityDate, color = Color.DarkGray, align = Alignment.CenterHorizontally)
-                MetricCol(label = "1-Day Earn", value = if(fd.daysToMaturity <= 0) "₹0.00" else "+${formatRupeeAmount(fd.oneDayInt)}", color = if(fd.daysToMaturity <= 0) Color.Gray else Color(0xFF388E3C), align = Alignment.End)
+                MetricCol(label = "Start Date", value = fd.createDate, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                MetricCol(label = "End Date", value = fd.maturityDate, color = MaterialTheme.colorScheme.onSurfaceVariant, align = Alignment.CenterHorizontally)
+                MetricCol(label = "1-Day Earn", value = if(fd.daysToMaturity <= 0) "₹0.00" else "+${formatRupeeAmount(fd.oneDayInt)}", color = if(fd.daysToMaturity <= 0) MaterialTheme.colorScheme.onSurfaceVariant else Color(0xFF388E3C), align = Alignment.End)
             }
         }
     }
@@ -169,7 +178,7 @@ fun FDetailCard(fd: FDItem, onEditClick: (FDItem) -> Unit) {
 @Composable
 fun MetricCol(label: String, value: String, color: Color, align: Alignment.Horizontal = Alignment.Start) {
     Column(horizontalAlignment = align) {
-        Text(text = label, color = Color.Gray, fontSize = 11.sp)
+        Text(text = label, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
         Text(text = value, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = color)
     }
 }
