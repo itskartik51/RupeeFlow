@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kartikey.rupeeflow.Cloud_Database.Constants
 import com.kartikey.rupeeflow.UI_Screens.QuickUpdateCCDialog
+import com.kartikey.rupeeflow.UI_Screens.bounceClick
 import java.util.Locale
 
 data class CreditCardItem(
@@ -68,17 +69,25 @@ fun CreditCardsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Credit Cards", fontWeight = FontWeight.Bold) },
-                navigationIcon = { IconButton(onClick = onBackClick) { Icon(Icons.Default.ArrowBack, contentDescription = "Back") } },
-                actions = { IconButton(onClick = onRefreshClick) { Icon(Icons.Outlined.Refresh, contentDescription = "Refresh", modifier = Modifier.rotate(if (isLoading) angle else 0f)) } },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFFF8F9FA))
+                title = { Text("Credit Cards", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
+                navigationIcon = { 
+                    IconButton(onClick = onBackClick, modifier = Modifier.bounceClick()) { 
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.onSurface) 
+                    } 
+                },
+                actions = { 
+                    IconButton(onClick = onRefreshClick, modifier = Modifier.bounceClick()) { 
+                        Icon(Icons.Outlined.Refresh, contentDescription = "Refresh", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.rotate(if (isLoading) angle else 0f)) 
+                    } 
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
             )
         },
-        containerColor = Color(0xFFF8F9FA)
+        containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
         if (ccList.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize().padding(paddingValues), contentAlignment = Alignment.Center) {
-                Text("No Credit Cards Added Yet", color = Color.Gray)
+                Text("No Credit Cards Added Yet", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         } else {
             LazyColumn(
@@ -101,7 +110,7 @@ fun CCDetailCard(cc: CreditCardItem, username: String, onEditClick: (CreditCardI
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(2.dp),
         shape = RoundedCornerShape(16.dp)
     ) {
@@ -109,7 +118,7 @@ fun CCDetailCard(cc: CreditCardItem, username: String, onEditClick: (CreditCardI
             
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
-                    modifier = Modifier.size(44.dp).background(Color(0xFF1976D2).copy(alpha = 0.05f), RoundedCornerShape(10.dp)),
+                    modifier = Modifier.size(44.dp).background(Color(0xFF1976D2).copy(alpha = 0.1f), RoundedCornerShape(10.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     if (logoRes != null) {
@@ -124,15 +133,15 @@ fun CCDetailCard(cc: CreditCardItem, username: String, onEditClick: (CreditCardI
                 
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(text = cc.issuer.uppercase(), fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color.Black)
-                    Text(text = "Card: ${cc.cardNo} | ${cc.type}", color = Color.Gray, fontSize = 12.sp, letterSpacing = 1.sp)
+                    Text(text = cc.issuer.uppercase(), fontWeight = FontWeight.Bold, fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface)
+                    Text(text = "Card: ${cc.cardNo} | ${cc.type}", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, letterSpacing = 1.sp)
                 }
                 
-                IconButton(onClick = { /* TODO: Notification Settings */ }) {
-                    Icon(Icons.Outlined.Notifications, contentDescription = "Reminders", tint = Color.Gray, modifier = Modifier.size(22.dp))
+                IconButton(onClick = { /* TODO: Notification Settings */ }, modifier = Modifier.bounceClick()) {
+                    Icon(Icons.Outlined.Notifications, contentDescription = "Reminders", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(22.dp))
                 }
-                IconButton(onClick = { onEditClick(cc) }) {
-                    Icon(Icons.Outlined.Edit, contentDescription = "Edit Card", tint = Color.Gray, modifier = Modifier.size(22.dp))
+                IconButton(onClick = { onEditClick(cc) }, modifier = Modifier.bounceClick()) {
+                    Icon(Icons.Outlined.Edit, contentDescription = "Edit Card", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(22.dp))
                 }
             }
             
@@ -140,15 +149,15 @@ fun CCDetailCard(cc: CreditCardItem, username: String, onEditClick: (CreditCardI
             
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                 Column {
-                    Text(text = formatRupeeAmount(cc.limit), fontWeight = FontWeight.ExtraBold, fontSize = 24.sp, color = Color.Black)
-                    Text(text = "Total Limit", color = Color.Gray, fontSize = 12.sp)
+                    Text(text = formatRupeeAmount(cc.limit), fontWeight = FontWeight.ExtraBold, fontSize = 24.sp, color = MaterialTheme.colorScheme.onSurface)
+                    Text(text = "Total Limit", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
                 }
                 
                 IconButton(
                     onClick = { showQuickUpdate = true },
-                    modifier = Modifier.size(36.dp).background(Color(0xFFE8F5E9), CircleShape)
+                    modifier = Modifier.size(36.dp).bounceClick().background(MaterialTheme.colorScheme.primaryContainer, CircleShape)
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = "Update Outstanding", tint = Color(0xFF2E7D32), modifier = Modifier.size(20.dp))
+                    Icon(Icons.Default.Add, contentDescription = "Update Outstanding", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
                 }
             }
             
@@ -159,7 +168,7 @@ fun CCDetailCard(cc: CreditCardItem, username: String, onEditClick: (CreditCardI
                 progress = { progressVal },
                 modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
                 color = Color(0xFF1976D2),
-                trackColor = Color(0xFFEEEEEE),
+                trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
             )
             
             Spacer(modifier = Modifier.height(6.dp))
@@ -167,7 +176,7 @@ fun CCDetailCard(cc: CreditCardItem, username: String, onEditClick: (CreditCardI
             Text(
                 text = String.format(Locale.US, "%.2f%%", cc.utilization),
                 fontSize = 11.sp,
-                color = Color.Gray,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.align(Alignment.CenterHorizontally)
             )
@@ -176,23 +185,23 @@ fun CCDetailCard(cc: CreditCardItem, username: String, onEditClick: (CreditCardI
             
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Column(horizontalAlignment = Alignment.Start) {
-                    Text(text = formatRupeeAmount(cc.outstanding), fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color.Black)
-                    Text(text = "Outstanding", color = Color.Gray, fontSize = 12.sp)
+                    Text(text = formatRupeeAmount(cc.outstanding), fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.onSurface)
+                    Text(text = "Outstanding", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
                 }
                 Column(horizontalAlignment = Alignment.End) {
                     Text(text = formatRupeeAmount(cc.available), fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color(0xFF1976D2))
-                    Text(text = "Available", color = Color.Gray, fontSize = 12.sp)
+                    Text(text = "Available", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
                 }
             }
             
             Spacer(modifier = Modifier.height(16.dp))
-            HorizontalDivider(color = Color.LightGray.copy(alpha = 0.4f))
+            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
             Spacer(modifier = Modifier.height(16.dp))
             
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                MetricItem(label = "Billing Day", value = "${cc.billingDay}", valueColor = Color.DarkGray, alignment = Alignment.Start)
-                MetricItem(label = "Due Day", value = "${cc.dueDay}", valueColor = Color.Black, alignment = Alignment.CenterHorizontally)
-                MetricItem(label = "Annual Fee", value = formatRupeeAmount(cc.annualFee), valueColor = Color.DarkGray, alignment = Alignment.End)
+                MetricItem(label = "Billing Day", value = "${cc.billingDay}", valueColor = MaterialTheme.colorScheme.onSurfaceVariant, alignment = Alignment.Start)
+                MetricItem(label = "Due Day", value = "${cc.dueDay}", valueColor = MaterialTheme.colorScheme.onSurface, alignment = Alignment.CenterHorizontally)
+                MetricItem(label = "Annual Fee", value = formatRupeeAmount(cc.annualFee), valueColor = MaterialTheme.colorScheme.onSurfaceVariant, alignment = Alignment.End)
             }
         }
     }
