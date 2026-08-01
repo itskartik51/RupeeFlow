@@ -1,6 +1,7 @@
 package com.kartikey.rupeeflow.UI_Screens.Profile
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -8,6 +9,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -32,6 +34,8 @@ fun ProfileScreen(
     password: String,
     dob: String, 
     paddingValues: PaddingValues, 
+    themeMode: Int,                     // Naya Parameter
+    onThemeChange: (Int) -> Unit,       // Naya Parameter
     onLogout: () -> Unit,
     onProfileRefresh: () -> Unit,
     startInDetails: Boolean = false, 
@@ -58,10 +62,12 @@ fun ProfileScreen(
                     name = name,
                     email = email,
                     paddingValues = paddingValues,
+                    themeMode = themeMode,
+                    onThemeChange = onThemeChange,
                     onNameClick = { currentProfileView = "Details" },
                     onOptionClick = { option ->
                         selectedOptionTitle = option
-                        if (option in listOf("Security Lock", "Currency", "Theme")) {
+                        if (option == "Security Lock" || option == "Currency") {
                             currentProfileView = "Preference"
                         } else if (option == "App Update") { 
                             currentProfileView = "Update"
@@ -102,10 +108,14 @@ private fun ProfileMainContent(
     name: String,
     email: String,
     paddingValues: PaddingValues,
+    themeMode: Int,
+    onThemeChange: (Int) -> Unit,
     onNameClick: () -> Unit,
     onOptionClick: (String) -> Unit,
     onLogout: () -> Unit
 ) {
+    var themeExpanded by remember { mutableStateOf(false) }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -151,7 +161,36 @@ private fun ProfileMainContent(
 
         ProfileOptionRow(iconVector = Icons.Default.Lock, title = "Security Lock", onClick = { onOptionClick("Security Lock") })
         ProfileOptionRow(iconVector = Icons.Default.CurrencyRupee, title = "Currency", onClick = { onOptionClick("Currency") }) 
-        ProfileOptionRow(iconVector = Icons.Default.Palette, title = "Theme", onClick = { onOptionClick("Theme") }) 
+        
+        // NAYA: Expandable Theme Block
+        Column {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .bounceClick(scaleDown = 0.97f) { themeExpanded = !themeExpanded } 
+                    .padding(vertical = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Default.Palette, contentDescription = "Theme", tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(24.dp))
+                Spacer(modifier = Modifier.width(16.dp))
+                Text("Theme", fontSize = 16.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
+                Spacer(modifier = Modifier.weight(1f))
+                Icon(
+                    imageVector = if (themeExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown, 
+                    contentDescription = null, 
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            
+            AnimatedVisibility(visible = themeExpanded) {
+                Column(modifier = Modifier.fillMaxWidth().padding(start = 40.dp, bottom = 16.dp)) {
+                    ThemeRadioOption("System Default", 0, themeMode, onThemeChange)
+                    ThemeRadioOption("Light", 1, themeMode, onThemeChange)
+                    ThemeRadioOption("Dark", 2, themeMode, onThemeChange)
+                }
+            }
+            HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+        }
         
         ProfileOptionRow(iconVector = Icons.Default.Download, title = "Data Download", onClick = { onOptionClick("Data Download") }) 
         ProfileOptionRow(iconVector = Icons.Default.SupportAgent, title = "Help & Support", onClick = { onOptionClick("Help & Support") }) 
@@ -164,12 +203,41 @@ private fun ProfileMainContent(
         
         Spacer(modifier = Modifier.height(32.dp))
 
-        ProfileOptionRow(
-            iconVector = Icons.Default.ExitToApp, 
-            title = "Logout", 
-            textColor = MaterialTheme.colorScheme.error, 
-            onClick = { onLogout() }
+        Button(
+            onClick = { onLogout() },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp)
+                .bounceClick(),
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Icon(Icons.Default.ExitToApp, contentDescription = "Logout", tint = MaterialTheme.colorScheme.error)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Logout", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.error)
+        }
+    }
+}
+
+@Composable
+fun ThemeRadioOption(title: String, modeValue: Int, currentMode: Int, onThemeChange: (Int) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .bounceClick(scaleDown = 0.98f) { onThemeChange(modeValue) }
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        RadioButton(
+            selected = (currentMode == modeValue),
+            onClick = { onThemeChange(modeValue) },
+            colors = RadioButtonDefaults.colors(
+                selectedColor = MaterialTheme.colorScheme.primary, // Tumhara Neon Green
+                unselectedColor = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(text = title, fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface)
     }
 }
 
@@ -193,5 +261,5 @@ private fun ProfileOptionRow(
         Spacer(modifier = Modifier.width(16.dp))
         Text(text = title, fontSize = 16.sp, fontWeight = FontWeight.Medium, color = finalColor)
     }
-    HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.surfaceVariant)
+    HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
 }
