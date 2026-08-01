@@ -16,10 +16,10 @@ import androidx.core.view.WindowCompat
 // STRICT CORE COLORS (NO MATERIAL YOU OVERRIDE)
 // ==========================================
 val PrimaryGreenLight = Color(0xFF2E7D32)
-val PrimaryGreenDark = Color(0xFF66BB6A) // डार्क मोड में शाइन करने वाला ग्रीन
+val PrimaryGreenDark = Color(0xFF1ED760) // UPDATE: Naya Neon/Vibrant Green shade for Dark Mode
 
 val PrimaryContainerLight = Color(0xFFE8F5E9)
-val PrimaryContainerDark = Color(0xFF1B3B22)
+val PrimaryContainerDark = Color(0xFF1B3B22) // UPDATE: Ye dark hi rahega taaki 'K' avatar dark green dikhe
 
 val BackgroundLight = Color(0xFFF8F9FA) 
 val BackgroundDark = Color(0xFF121212)
