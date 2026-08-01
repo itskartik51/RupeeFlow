@@ -21,6 +21,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.kartikey.rupeeflow.UI_Screens.bounceClick
 import java.text.NumberFormat
 import java.util.Locale
 
@@ -30,7 +31,7 @@ fun InvestmentScreen(
     onBackClick: () -> Unit, 
     username: String, 
     investmentList: List<InvestmentItem>,
-    isLoading: Boolean = false, // UPDATE: Loading state aagayi
+    isLoading: Boolean = false, 
     onRefreshClick: () -> Unit = {}
 ) { 
     val totalInvested = investmentList.sumOf { it.quantity * it.avgBuyPrice }
@@ -43,14 +44,16 @@ fun InvestmentScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("My Investments", fontWeight = FontWeight.Bold) },
+                title = { Text("My Investments", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
                 navigationIcon = {
-                    IconButton(onClick = onBackClick) { Icon(Icons.Default.ArrowBack, contentDescription = "Back") }
+                    IconButton(onClick = onBackClick, modifier = Modifier.bounceClick()) { 
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.onSurface) 
+                    }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFFF8F9FA))
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
             )
         },
-        containerColor = Color(0xFFF8F9FA)
+        containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
         LazyColumn(
             modifier = Modifier
@@ -67,7 +70,7 @@ fun InvestmentScreen(
                     totalReturn = totalReturn,
                     totalReturnPercent = totalReturnPercent,
                     totalInvested = totalInvested,
-                    isLoading = isLoading, // UPDATE: Passed to card
+                    isLoading = isLoading, 
                     onRefreshClick = onRefreshClick
                 )
                 Spacer(modifier = Modifier.height(24.dp))
@@ -78,7 +81,7 @@ fun InvestmentScreen(
 
             items(investmentList) { item ->
                 InvestmentListItem(item)
-                HorizontalDivider(color = Color.LightGray.copy(alpha = 0.3f), thickness = 1.dp, modifier = Modifier.padding(vertical = 8.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), thickness = 1.dp, modifier = Modifier.padding(vertical = 8.dp))
             }
         }
     }
@@ -91,7 +94,6 @@ fun InvestmentSummaryCard(
     isLoading: Boolean, 
     onRefreshClick: () -> Unit = {}
 ) {
-    // UPDATE: Smooth continuous rotation animation jab isLoading true ho
     val infiniteTransition = rememberInfiniteTransition(label = "refreshAnim")
     val angle by infiniteTransition.animateFloat(
         initialValue = 0f,
@@ -105,7 +107,7 @@ fun InvestmentSummaryCard(
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(2.dp),
         shape = RoundedCornerShape(16.dp)
     ) {
@@ -115,32 +117,31 @@ fun InvestmentSummaryCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("INVESTMENT ($itemCount)", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                Text("INVESTMENT ($itemCount)", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
                 Row {
-                    IconButton(onClick = { }, modifier = Modifier.size(32.dp)) {
-                        Icon(Icons.Outlined.Visibility, contentDescription = "Hide", tint = Color.DarkGray, modifier = Modifier.size(20.dp))
+                    IconButton(onClick = { }, modifier = Modifier.size(32.dp).bounceClick()) {
+                        Icon(Icons.Outlined.Visibility, contentDescription = "Hide", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
                     }
-                    IconButton(onClick = onRefreshClick, modifier = Modifier.size(32.dp)) {
+                    IconButton(onClick = onRefreshClick, modifier = Modifier.size(32.dp).bounceClick()) {
                         Icon(
                             Icons.Outlined.Refresh, 
                             contentDescription = "Refresh", 
-                            tint = Color.DarkGray, 
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant, 
                             modifier = Modifier
                                 .size(20.dp)
-                                // UPDATE: Yahan Modifier.rotate use hua hai
                                 .rotate(if (isLoading) angle else 0f) 
                         )
                     }
-                    IconButton(onClick = { }, modifier = Modifier.size(32.dp)) {
-                        Icon(Icons.Default.MoreVert, contentDescription = "More", tint = Color.DarkGray, modifier = Modifier.size(20.dp))
+                    IconButton(onClick = { }, modifier = Modifier.size(32.dp).bounceClick()) {
+                        Icon(Icons.Default.MoreVert, contentDescription = "More", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
                     }
                 }
             }
 
-            Text(text = formatRupee(totalCurrent), fontWeight = FontWeight.ExtraBold, fontSize = 32.sp, color = Color.Black)
+            Text(text = formatRupee(totalCurrent), fontWeight = FontWeight.ExtraBold, fontSize = 32.sp, color = MaterialTheme.colorScheme.onSurface)
             
             Spacer(modifier = Modifier.height(20.dp))
-            HorizontalDivider(color = Color.LightGray.copy(alpha = 0.4f))
+            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
             Spacer(modifier = Modifier.height(16.dp))
 
             SummaryRow("1D returns", total1DChange, total1DPercent)
@@ -150,8 +151,8 @@ fun InvestmentSummaryCard(
             Spacer(modifier = Modifier.height(12.dp))
             
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Invested", color = Color.DarkGray, fontSize = 14.sp)
-                Text(formatRupee(totalInvested), color = Color.Black, fontWeight = FontWeight.Medium, fontSize = 14.sp)
+                Text("Invested", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
+                Text(formatRupee(totalInvested), color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium, fontSize = 14.sp)
             }
         }
     }
@@ -160,11 +161,11 @@ fun InvestmentSummaryCard(
 @Composable
 fun SummaryRow(label: String, amount: Double, percent: Double) {
     val isPositive = amount >= 0
-    val color = if (isPositive) Color(0xFF00A36C) else Color(0xFFD32F2F)
+    val color = if (isPositive) Color(0xFF00A36C) else MaterialTheme.colorScheme.error
     val sign = if (isPositive) "+" else ""
 
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(label, color = Color.DarkGray, fontSize = 14.sp)
+        Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
         Text(
             text = "$sign${formatRupee(amount)} ($sign${String.format("%.2f", percent)}%)",
             color = color, fontWeight = FontWeight.Medium, fontSize = 14.sp
@@ -175,10 +176,10 @@ fun SummaryRow(label: String, amount: Double, percent: Double) {
 @Composable
 fun ListHeaderRow() {
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
-        Text("Data", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.Gray, modifier = Modifier.weight(0.8f))
-        Text("Market Price\n(1D %)", fontSize = 10.sp, color = Color.Gray, textAlign = TextAlign.End, maxLines = 2, modifier = Modifier.weight(1.3f))
-        Text("Current\n(Invested)", fontSize = 10.sp, color = Color.Gray, textAlign = TextAlign.End, maxLines = 2, modifier = Modifier.weight(1.2f))
-        Text("Returns\n(%)", fontSize = 10.sp, color = Color.Gray, textAlign = TextAlign.End, maxLines = 2, modifier = Modifier.weight(1f))
+        Text("Data", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(0.8f))
+        Text("Market Price\n(1D %)", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.End, maxLines = 2, modifier = Modifier.weight(1.3f))
+        Text("Current\n(Invested)", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.End, maxLines = 2, modifier = Modifier.weight(1.2f))
+        Text("Returns\n(%)", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.End, maxLines = 2, modifier = Modifier.weight(1f))
     }
 }
 
@@ -190,30 +191,30 @@ fun InvestmentListItem(item: InvestmentItem) {
     val totalRetPct = if (investedVal > 0) (totalRet / investedVal) * 100 else 0.0
     val oneDPct = if (item.currentPrice - item.oneDayChangePrice > 0) (item.oneDayChangePrice / (item.currentPrice - item.oneDayChangePrice)) * 100 else 0.0
 
-    val oneDayColor = if (item.oneDayChangePrice >= 0) Color(0xFF00A36C) else Color(0xFFD32F2F)
+    val oneDayColor = if (item.oneDayChangePrice >= 0) Color(0xFF00A36C) else MaterialTheme.colorScheme.error
     val oneDaySign = if (item.oneDayChangePrice >= 0) "+" else ""
     
-    val totalRetColor = if (totalRet >= 0) Color(0xFF00A36C) else Color(0xFFD32F2F)
+    val totalRetColor = if (totalRet >= 0) Color(0xFF00A36C) else MaterialTheme.colorScheme.error
     val totalRetSign = if (totalRet >= 0) "+" else ""
 
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Column(modifier = Modifier.weight(0.8f)) {
-            Text(item.assetName, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color.Black, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text("${item.quantity.toInt()} shares", fontSize = 11.sp, color = Color.Gray)
+            Text(item.assetName, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text("${item.quantity.toInt()} shares", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         
         Column(modifier = Modifier.weight(1.3f), horizontalAlignment = Alignment.End) {
-            Text(formatRupee(item.currentPrice), fontSize = 13.sp, color = Color.Black, fontWeight = FontWeight.Medium)
+            Text(formatRupee(item.currentPrice), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)
             Text("$oneDaySign${item.oneDayChangePrice} ($oneDaySign${String.format("%.2f", oneDPct)}%)", fontSize = 11.sp, color = oneDayColor)
         }
         
         Column(modifier = Modifier.weight(1.2f), horizontalAlignment = Alignment.End) {
-            Text(formatRupee(currentVal), fontSize = 13.sp, color = Color.Black, fontWeight = FontWeight.Medium)
-            Text("(${formatRupee(investedVal)})", fontSize = 11.sp, color = Color.Gray)
+            Text(formatRupee(currentVal), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)
+            Text("(${formatRupee(investedVal)})", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         
         Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.End) {
-            Text("$totalRetSign${formatRupee(totalRet)}", fontSize = 13.sp, color = Color.Black, fontWeight = FontWeight.Medium)
+            Text("$totalRetSign${formatRupee(totalRet)}", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)
             Text("($totalRetSign${String.format("%.2f", totalRetPct)}%)", fontSize = 11.sp, color = totalRetColor)
         }
     }
