@@ -115,7 +115,7 @@ private fun ProfileMainContent(
     onLogout: () -> Unit
 ) {
     var themeExpanded by remember { mutableStateOf(false) }
-    var currencyExpanded by remember { mutableStateOf(false) } // NAYA: Currency ke liye state
+    var currencyExpanded by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -162,7 +162,7 @@ private fun ProfileMainContent(
 
         ProfileOptionRow(iconVector = Icons.Default.Lock, title = "Security Lock", onClick = { onOptionClick("Security Lock") })
         
-        // NAYA: Expandable Currency Block
+        // Expandable Currency Block
         Column {
             Row(
                 modifier = Modifier
@@ -194,11 +194,12 @@ private fun ProfileMainContent(
                         Icon(
                             imageVector = Icons.Default.CheckCircle, 
                             contentDescription = "Selected", 
-                            tint = MaterialTheme.colorScheme.primary, // Green Tick
+                            tint = MaterialTheme.colorScheme.primary, 
                             modifier = Modifier.size(22.dp)
                         )
                         Spacer(modifier = Modifier.width(12.dp))
-                        Text(text = "INR ₹", fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)
+                        // UPDATE: "INR ₹" ki jagah "₹  INR" kar diya
+                        Text(text = "₹  INR", fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)
                     }
                 }
             }
