@@ -10,7 +10,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import com.kartikey.rupeeflow.UI_Screens.MainScreen
 import com.kartikey.rupeeflow.UI_Screens.LoginScreen
-import com.kartikey.rupeeflow.UI_Screens.RupeeFlowTheme // <-- NAYA IMPORT
+import com.kartikey.rupeeflow.UI_Screens.RupeeFlowTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -19,10 +19,12 @@ class MainActivity : ComponentActivity() {
         val sharedPreferences = getSharedPreferences("RupeeFlowPrefs", Context.MODE_PRIVATE)
         val savedLoginState = sharedPreferences.getBoolean("isLoggedIn", false)
         val savedUsername = sharedPreferences.getString("username", "") ?: ""
+        val savedThemeMode = sharedPreferences.getInt("theme_mode", 0) // Naya Theme Cache
 
         setContent {
-            // YAHAN FIX KIYA HAI: Ab hamara custom Theme Engine call hoga
-            RupeeFlowTheme { 
+            var themeMode by remember { mutableIntStateOf(savedThemeMode) }
+
+            RupeeFlowTheme(themeMode = themeMode) { 
                 Surface(modifier = Modifier.fillMaxSize()) {
                     var isLoggedIn by remember { mutableStateOf(savedLoginState) }
                     var currentUser by remember { mutableStateOf(savedUsername) }
@@ -30,6 +32,11 @@ class MainActivity : ComponentActivity() {
                     if (isLoggedIn && currentUser.isNotEmpty()) {
                         MainScreen(
                             username = currentUser,
+                            themeMode = themeMode,
+                            onThemeChange = { newMode ->
+                                sharedPreferences.edit().putInt("theme_mode", newMode).apply()
+                                themeMode = newMode
+                            },
                             onLogout = {
                                 sharedPreferences.edit().clear().apply()
                                 isLoggedIn = false
