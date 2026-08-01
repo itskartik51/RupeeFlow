@@ -1,9 +1,7 @@
 package com.kartikey.rupeeflow.UI_Screens.Add
 
 import android.widget.Toast
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -12,9 +10,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -22,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kartikey.rupeeflow.Cloud_Database.Constants
 import com.kartikey.rupeeflow.UI_Screens.NetworkClient
+import com.kartikey.rupeeflow.UI_Screens.bounceClick
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -51,9 +48,6 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
 
     val context = LocalContext.current
 
-    var isPressed by remember { mutableStateOf(false) }
-    val buttonScale by animateFloatAsState(targetValue = if (isPressed) 0.95f else 1f, label = "ButtonScale")
-
     LaunchedEffect(assetName) {
         if (assetName.isBlank() || selectedSymbol.isNotEmpty()) {
             searchResults = emptyList()
@@ -66,7 +60,6 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
         
         withContext(Dispatchers.IO) {
             try {
-                // Yahoo search independent hai, ise default client chalane denge
                 val client = OkHttpClient()
                 val request = Request.Builder()
                     .url("https://query2.finance.yahoo.com/v1/finance/search?q=${assetName.replace(" ", "%20")}&quotesCount=30&newsCount=0")
@@ -144,7 +137,7 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
 
     Card(
         modifier = Modifier.fillMaxWidth(), 
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(0.dp),
         shape = RoundedCornerShape(16.dp)
     ) {
@@ -161,15 +154,17 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                     label = { Text("Asset Type") },
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = typeExpanded) },
                     modifier = Modifier.fillMaxWidth().menuAnchor(),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary, unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), focusedTextColor = MaterialTheme.colorScheme.onSurface, unfocusedTextColor = MaterialTheme.colorScheme.onSurface)
                 )
                 ExposedDropdownMenu(
                     expanded = typeExpanded,
-                    onDismissRequest = { typeExpanded = false }
+                    onDismissRequest = { typeExpanded = false },
+                    modifier = Modifier.background(MaterialTheme.colorScheme.surface)
                 ) {
                     listOf("Stock", "Mutual Fund", "ETF", "Bond").forEach { selectionOption ->
                         DropdownMenuItem(
-                            text = { Text(selectionOption) },
+                            text = { Text(selectionOption, color = MaterialTheme.colorScheme.onSurface) },
                             onClick = {
                                 assetType = selectionOption
                                 assetName = "" 
@@ -202,9 +197,10 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                     modifier = Modifier.fillMaxWidth().menuAnchor(),
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary, unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), focusedTextColor = MaterialTheme.colorScheme.onSurface, unfocusedTextColor = MaterialTheme.colorScheme.onSurface),
                     trailingIcon = { 
                         if (isSearching) {
-                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = Color(0xFF2E7D32))
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.primary)
                         } else {
                             ExposedDropdownMenuDefaults.TrailingIcon(expanded = searchExpanded) 
                         }
@@ -214,18 +210,19 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                 if (assetName.isNotEmpty() && searchResults.isNotEmpty() && selectedSymbol.isEmpty()) {
                     ExposedDropdownMenu(
                         expanded = searchExpanded,
-                        onDismissRequest = { searchExpanded = false }
+                        onDismissRequest = { searchExpanded = false },
+                        modifier = Modifier.background(MaterialTheme.colorScheme.surface)
                     ) {
                         searchResults.forEach { row ->
                             DropdownMenuItem(
                                 text = { 
                                     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
-                                        Text(row.name, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color.Black)
+                                        Text(row.name, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurface)
                                         Spacer(modifier = Modifier.height(2.dp))
                                         Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                                            Text(row.displaySymbol, fontSize = 12.sp, color = Color.Gray, fontWeight = FontWeight.Medium)
+                                            Text(row.displaySymbol, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Medium)
                                             if (row.isIndian) {
-                                                Text("🇮🇳 India", fontSize = 11.sp, color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold)
+                                                Text("🇮🇳 India", fontSize = 11.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                                             }
                                         }
                                     }
@@ -250,15 +247,17 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                     label = { Text("Quantity") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.weight(1f), singleLine = true,
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary, unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), focusedTextColor = MaterialTheme.colorScheme.onSurface, unfocusedTextColor = MaterialTheme.colorScheme.onSurface)
                 )
                 OutlinedTextField(
                     value = buyPrice, onValueChange = { buyPrice = it },
                     label = { Text("Buy Price") },
-                    prefix = { Text("₹ ", fontWeight = FontWeight.Bold, color = Color.Black) },
+                    prefix = { Text("₹ ", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.weight(1f), singleLine = true,
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary, unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), focusedTextColor = MaterialTheme.colorScheme.onSurface, unfocusedTextColor = MaterialTheme.colorScheme.onSurface)
                 )
             }
 
@@ -268,7 +267,8 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                 value = date, onValueChange = { date = it },
                 label = { Text("Date (Optional)") },
                 modifier = Modifier.fillMaxWidth(), singleLine = true,
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary, unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), focusedTextColor = MaterialTheme.colorScheme.onSurface, unfocusedTextColor = MaterialTheme.colorScheme.onSurface)
             )
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -280,7 +280,6 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                     
                     if (selectedSymbol.isNotBlank() && qty > 0 && price > 0) {
                         
-                        // OPTIMISTIC UI: Instant Callback & Dismiss
                         onInvestmentAdded()
                         onDismiss() 
                         
@@ -302,7 +301,6 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                                 val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(body).build()
                                 client.newCall(request).execute()
                             } catch (e: Exception) {
-                                // Background fail fallback
                             }
                         }
                     } else {
@@ -312,20 +310,11 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp)
-                    .scale(buttonScale)
-                    .pointerInput(Unit) {
-                        detectTapGestures(
-                            onPress = {
-                                isPressed = true
-                                tryAwaitRelease()
-                                isPressed = false
-                            }
-                        )
-                    },
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF388E3C)),
+                    .bounceClick(),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                 shape = RoundedCornerShape(12.dp)
             ) {
-                Text("Save Investment", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White)
+                Text("Save Investment", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onPrimary)
             }
             
             Spacer(modifier = Modifier.height(24.dp))
