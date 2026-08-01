@@ -1,9 +1,7 @@
 package com.kartikey.rupeeflow.UI_Screens.Assets
 
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState 
 import androidx.compose.foundation.verticalScroll 
@@ -18,10 +16,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -35,6 +31,7 @@ import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.CashItem
 import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.CreditCardItem
 import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.FDItem
 import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.formatRupeeAmount
+import com.kartikey.rupeeflow.UI_Screens.bounceClick
 
 data class InvestmentItem(
     val assetName: String,
@@ -81,14 +78,13 @@ fun AssetsScreen(
     val totalCC = ccList.sumOf { it.outstanding }
     val totalInv = investmentList.sumOf { it.quantity * it.currentPrice }
     
-    // Networth Core Logic
     val networthAmount = totalBank + totalCash + totalFD + totalInv - totalCC
 
     if (currentView == "Main") {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xFFF8F9FA))
+                .background(MaterialTheme.colorScheme.background)
                 .padding(paddingValues)
                 .verticalScroll(rememberScrollState()) 
                 .padding(16.dp)
@@ -96,10 +92,9 @@ fun AssetsScreen(
             NetworthCard(networthAmount = networthAmount, isLoading = isLoading, onClick = { })
             Spacer(modifier = Modifier.height(24.dp))
             
-            Text(text = "My Investments", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color.Black, modifier = Modifier.padding(horizontal = 4.dp))
+            Text(text = "My Investments", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.onBackground, modifier = Modifier.padding(horizontal = 4.dp))
             Spacer(modifier = Modifier.height(12.dp))
             
-            // Smart Filters for Investment Assets (With Dynamic Title Count)
             val sharesList = investmentList.filter { it.assetType.equals("Stock", true) || it.assetType.equals("Share", true) }
             val hasShares = sharesList.isNotEmpty()
             val totalShares = if (hasShares) sharesList.sumOf { it.quantity * it.currentPrice } else 0.0
@@ -143,12 +138,13 @@ fun AssetsScreen(
             Spacer(modifier = Modifier.height(24.dp))
             
             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text(text = "My Finance", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color.Black)
-                TextButton(onClick = { onViewChange("FinanceDetails") }) { Text("More", color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold) }
+                Text(text = "My Finance", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.onBackground)
+                TextButton(onClick = { onViewChange("FinanceDetails") }, modifier = Modifier.bounceClick()) { 
+                    Text("More", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold) 
+                }
             }
             Spacer(modifier = Modifier.height(8.dp))
             
-            // Smart Filters for Finance Assets
             val hasCash = cashData.amount > 0.0
             val hasBank = bankList.isNotEmpty()
             val hasCC = ccList.isNotEmpty()
@@ -157,31 +153,19 @@ fun AssetsScreen(
             Column(modifier = Modifier.fillMaxWidth()) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Box(modifier = Modifier.weight(1f)) { 
-                        FinanceGridCard(
-                            "Cash", totalCash, hasCash, "+ Add Cash", null, 
-                            Icons.Outlined.Money, Color(0xFF388E3C)
-                        ) { onViewChange("DirectCash") } 
+                        FinanceGridCard("Cash", totalCash, hasCash, "+ Add Cash", null, Icons.Outlined.Money, Color(0xFF388E3C)) { onViewChange("DirectCash") } 
                     }
                     Box(modifier = Modifier.weight(1f)) { 
-                        FinanceGridCard(
-                            "Bank Balance", totalBank, hasBank, "+ Add Bank", if (hasBank) "${bankList.size}" else null, 
-                            Icons.Outlined.AccountBalance, Color(0xFF1976D2)
-                        ) { onViewChange("DirectBankAccounts") } 
+                        FinanceGridCard("Bank Balance", totalBank, hasBank, "+ Add Bank", if (hasBank) "${bankList.size}" else null, Icons.Outlined.AccountBalance, Color(0xFF1976D2)) { onViewChange("DirectBankAccounts") } 
                     }
                 }
                 Spacer(modifier = Modifier.height(12.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Box(modifier = Modifier.weight(1f)) { 
-                        FinanceGridCard(
-                            "Credit Card", totalCC, hasCC, "+ Add Card", if (hasCC) "${ccList.size}" else null, 
-                            Icons.Outlined.CreditCard, Color(0xFFD32F2F)
-                        ) { onViewChange("DirectCreditCards") } 
+                        FinanceGridCard("Credit Card", totalCC, hasCC, "+ Add Card", if (hasCC) "${ccList.size}" else null, Icons.Outlined.CreditCard, Color(0xFFD32F2F)) { onViewChange("DirectCreditCards") } 
                     }
                     Box(modifier = Modifier.weight(1f)) { 
-                        FinanceGridCard(
-                            "FD : Fixed Deposit", totalFD, hasFD, "+ Add FD", if (hasFD) "${fdList.size}" else null, 
-                            Icons.Outlined.Savings, Color(0xFFF57C00)
-                        ) { onViewChange("DirectFDs") } 
+                        FinanceGridCard("FD : Fixed Deposit", totalFD, hasFD, "+ Add FD", if (hasFD) "${fdList.size}" else null, Icons.Outlined.Savings, Color(0xFFF57C00)) { onViewChange("DirectFDs") } 
                     }
                 }
             }
@@ -215,43 +199,30 @@ fun AssetsScreen(
 
 @Composable
 fun InvestmentGridCard(title: String, amount: Double, hasData: Boolean, addText: String, onClick: () -> Unit) {
-    var isPressed by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(targetValue = if (isPressed) 0.95f else 1f, label = "ScaleAnim")
-    
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .scale(scale)
-            .pointerInput(Unit) {
-                detectTapGestures(
-                    onPress = { 
-                        isPressed = true
-                        tryAwaitRelease()
-                        isPressed = false
-                        onClick() 
-                    }
-                ) 
-            },
-        colors = CardDefaults.cardColors(containerColor = Color.White), 
+            .bounceClick { onClick() },
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), 
         shape = RoundedCornerShape(12.dp), 
         elevation = CardDefaults.cardElevation(2.dp), 
-        border = BorderStroke(1.dp, Color(0xFFEEEEEE))
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
     ) {
         Column(modifier = Modifier.padding(16.dp).fillMaxWidth(), horizontalAlignment = Alignment.Start) {
-            Text(text = title, color = Color.Gray, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(text = title, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Spacer(modifier = Modifier.height(8.dp))
             
             if (hasData) {
                 Text(
                     text = formatRupeeAmount(amount), 
-                    color = Color.Black, 
+                    color = MaterialTheme.colorScheme.onSurface, 
                     fontSize = 19.sp, 
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
             } else {
-                Text(text = addText, color = Color(0xFF2E7D32), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                Text(text = addText, color = MaterialTheme.colorScheme.primary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -268,33 +239,20 @@ fun FinanceGridCard(
     iconColor: Color, 
     onClick: () -> Unit
 ) {
-    var isPressed by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(targetValue = if (isPressed) 0.95f else 1f, label = "ScaleAnim")
-
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .scale(scale)
-            .pointerInput(Unit) {
-                detectTapGestures(
-                    onPress = { 
-                        isPressed = true
-                        tryAwaitRelease()
-                        isPressed = false
-                        onClick() 
-                    }
-                ) 
-            },
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+            .bounceClick { onClick() },
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = RoundedCornerShape(12.dp), 
         elevation = CardDefaults.cardElevation(2.dp), 
-        border = BorderStroke(1.dp, Color(0xFFEEEEEE))
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
     ) {
         Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.Start) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(icon, contentDescription = title, tint = iconColor, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(6.dp))
-                Text(text = title, color = Color.Gray, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(text = title, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Spacer(modifier = Modifier.height(8.dp))
             
@@ -302,23 +260,22 @@ fun FinanceGridCard(
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                     Text(
                         text = formatRupeeAmount(amount), 
-                        color = Color.Black, 
+                        color = MaterialTheme.colorScheme.onSurface, 
                         fontSize = 19.sp, 
                         fontWeight = FontWeight.Bold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        // Weight false ensures that it takes up only available space without pushing out the Link badge
                         modifier = Modifier.weight(1f, fill = false) 
                     )
                     if (linkCount != null) {
                         Spacer(modifier = Modifier.width(6.dp))
                         Row(
-                            modifier = Modifier.background(Color(0xFFE3F2FD), RoundedCornerShape(4.dp)).padding(horizontal = 4.dp, vertical = 2.dp),
+                            modifier = Modifier.background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(4.dp)).padding(horizontal = 4.dp, vertical = 2.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(Icons.Outlined.Link, contentDescription = "Link", tint = Color(0xFF1976D2), modifier = Modifier.size(10.dp))
+                            Icon(Icons.Outlined.Link, contentDescription = "Link", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(10.dp))
                             Spacer(modifier = Modifier.width(2.dp))
-                            Text(linkCount, color = Color(0xFF1976D2), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            Text(linkCount, color = MaterialTheme.colorScheme.primary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -329,14 +286,20 @@ fun FinanceGridCard(
     }
 }
 
+// Basic Networth card (Agar pehle yahan tha to ye bhi dark mode me rahega)
 @Composable
 fun NetworthCard(networthAmount: Double, isLoading: Boolean, onClick: () -> Unit) {
-    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(2.dp), shape = RoundedCornerShape(16.dp)) {
+    Card(
+        modifier = Modifier.fillMaxWidth().bounceClick { onClick() }, 
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), 
+        elevation = CardDefaults.cardElevation(2.dp), 
+        shape = RoundedCornerShape(16.dp)
+    ) {
         Column(modifier = Modifier.padding(20.dp)) {
-            Text("NET WORTH", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            Text("NET WORTH", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(8.dp))
-            if (isLoading) CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color(0xFF2E7D32))
-            else Text(formatRupeeAmount(networthAmount), fontSize = 32.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
+            if (isLoading) CircularProgressIndicator(modifier = Modifier.size(24.dp), color = MaterialTheme.colorScheme.primary)
+            else Text(formatRupeeAmount(networthAmount), fontSize = 32.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onSurface)
         }
     }
 }
