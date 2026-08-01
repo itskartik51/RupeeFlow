@@ -23,6 +23,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.kartikey.rupeeflow.Cloud_Database.Constants
 import com.kartikey.rupeeflow.UI_Screens.NetworkClient
+import com.kartikey.rupeeflow.UI_Screens.bounceClick
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -52,14 +53,16 @@ fun CashScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Physical Cash", fontWeight = FontWeight.Bold) },
+                title = { Text("Physical Cash", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
                 navigationIcon = {
-                    IconButton(onClick = onBackClick) { Icon(Icons.Default.ArrowBack, contentDescription = "Back") }
+                    IconButton(onClick = onBackClick, modifier = Modifier.bounceClick()) { 
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.onSurface) 
+                    }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFFF8F9FA))
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
             )
         },
-        containerColor = Color(0xFFF8F9FA)
+        containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
         Column(
             modifier = Modifier.fillMaxSize().padding(paddingValues).padding(16.dp),
@@ -67,39 +70,39 @@ fun CashScreen(
         ) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 elevation = CardDefaults.cardElevation(2.dp),
                 shape = RoundedCornerShape(16.dp)
             ) {
                 Column(modifier = Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Box(
-                        modifier = Modifier.size(60.dp).background(Color(0xFF388E3C).copy(alpha = 0.1f), RoundedCornerShape(16.dp)),
+                        modifier = Modifier.size(60.dp).background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(16.dp)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Outlined.Money, contentDescription = "Cash", tint = Color(0xFF388E3C), modifier = Modifier.size(32.dp))
+                        Icon(Icons.Outlined.Money, contentDescription = "Cash", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(32.dp))
                     }
                     
                     Spacer(modifier = Modifier.height(16.dp))
-                    Text(text = "Total Cash in Hand", color = Color.Gray, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                    Text(text = "Total Cash in Hand", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp, fontWeight = FontWeight.Medium)
                     
                     Spacer(modifier = Modifier.height(8.dp))
                     val format = NumberFormat.getCurrencyInstance(Locale("en", "IN")).apply { maximumFractionDigits = 0 }
-                    Text(text = format.format(cashData.amount), fontSize = 36.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
+                    Text(text = format.format(cashData.amount), fontSize = 36.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onSurface)
                     
                     Spacer(modifier = Modifier.height(12.dp))
                     val lastUpd = if (cashData.lastUpdated.isBlank()) "Never" else cashData.lastUpdated
-                    Text(text = "Last Verified: $lastUpd", color = Color.Gray, fontSize = 12.sp)
+                    Text(text = "Last Verified: $lastUpd", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
                     
                     Spacer(modifier = Modifier.height(24.dp))
                     Button(
                         onClick = { showUpdateDialog = true },
-                        modifier = Modifier.fillMaxWidth().height(50.dp),
+                        modifier = Modifier.fillMaxWidth().height(50.dp).bounceClick(),
                         shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE8F5E9))
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
                     ) {
-                        Icon(Icons.Outlined.Edit, contentDescription = "Edit", tint = Color(0xFF2E7D32), modifier = Modifier.size(18.dp))
+                        Icon(Icons.Outlined.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Update Cash Balance", color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold)
+                        Text("Update Cash Balance", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -131,12 +134,12 @@ fun UpdateCashDialog(currentAmount: Double, username: String, onDismiss: () -> U
         Card(
             modifier = Modifier.fillMaxWidth(0.9f).imePadding(), 
             shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             elevation = CardDefaults.cardElevation(8.dp)
         ) {
             Column(modifier = Modifier.padding(24.dp)) {
-                Text("Verify Cash Balance", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = Color.Black)
-                Text("Enter your exact current cash in hand", color = Color.Gray, fontSize = 13.sp)
+                Text("Verify Cash Balance", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = MaterialTheme.colorScheme.onSurface)
+                Text("Enter your exact current cash in hand", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
                 
                 Spacer(modifier = Modifier.height(20.dp))
                 
@@ -144,12 +147,18 @@ fun UpdateCashDialog(currentAmount: Double, username: String, onDismiss: () -> U
                     value = updateAmount,
                     onValueChange = { updateAmount = it },
                     label = { Text("Exact Amount") },
-                    prefix = { Text("₹ ", fontWeight = FontWeight.Bold, color = Color.Black) },
+                    prefix = { Text("₹ ", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF2E7D32), focusedLabelColor = Color(0xFF2E7D32))
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary, 
+                        focusedLabelColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                    )
                 )
                 
                 Spacer(modifier = Modifier.height(24.dp))
@@ -157,10 +166,11 @@ fun UpdateCashDialog(currentAmount: Double, username: String, onDismiss: () -> U
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedButton(
                         onClick = onDismiss,
-                        modifier = Modifier.weight(1f).height(50.dp),
-                        shape = RoundedCornerShape(12.dp)
+                        modifier = Modifier.weight(1f).height(50.dp).bounceClick(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface)
                     ) {
-                        Text("Cancel", color = Color.Black, fontWeight = FontWeight.Bold)
+                        Text("Cancel", fontWeight = FontWeight.Bold)
                     }
                     
                     Button(
@@ -168,7 +178,6 @@ fun UpdateCashDialog(currentAmount: Double, username: String, onDismiss: () -> U
                             val amt = updateAmount.toDoubleOrNull()
                             if (amt != null && amt >= 0.0) {
                                 
-                                // OPTIMISTIC UI: Instant Close
                                 onDismiss()
                                 Toast.makeText(context, "Verifying cash...", Toast.LENGTH_SHORT).show()
                                 
@@ -188,22 +197,22 @@ fun UpdateCashDialog(currentAmount: Double, username: String, onDismiss: () -> U
 
                                         withContext(Dispatchers.Main) {
                                             if (resData.contains("success")) {
-                                                onSuccess() // Silent Background refresh
+                                                onSuccess() 
                                             } else {
                                                 Toast.makeText(context, "Update Failed!", Toast.LENGTH_SHORT).show()
                                             }
                                         }
                                     } catch (e: Exception) {
-                                        // Ignore UI block on network error
+                                        
                                     }
                                 }
                             } else Toast.makeText(context, "Enter a valid amount", Toast.LENGTH_SHORT).show()
                         },
-                        modifier = Modifier.weight(1f).height(50.dp),
+                        modifier = Modifier.weight(1f).height(50.dp).bounceClick(),
                         shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF388E3C))
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                     ) {
-                        Text("Verify", fontWeight = FontWeight.Bold, color = Color.White)
+                        Text("Verify", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimary)
                     }
                 }
             }
