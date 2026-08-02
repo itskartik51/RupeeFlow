@@ -36,7 +36,7 @@ fun ProfileScreen(
     paddingValues: PaddingValues, 
     themeMode: Int,                     
     onThemeChange: (Int) -> Unit,
-    isUpdateAvailable: Boolean,         // NAYA PARAMETER
+    isUpdateAvailable: Boolean,
     onLogout: () -> Unit,
     onProfileRefresh: () -> Unit,
     startInDetails: Boolean = false, 
@@ -238,7 +238,6 @@ private fun ProfileMainContent(
         ProfileOptionRow(iconVector = Icons.Default.Download, title = "Data Download", onClick = { onOptionClick("Data Download") }) 
         ProfileOptionRow(iconVector = Icons.Default.SupportAgent, title = "Help & Support", onClick = { onOptionClick("Help & Support") }) 
         
-        // NAYA: Updates.kt se strictly handle ho raha hai
         AppUpdateRow(isUpdateAvailableBadge = isUpdateAvailable)
         
         Spacer(modifier = Modifier.height(24.dp))
@@ -275,4 +274,49 @@ private fun ProfileMainContent(
         
         Spacer(modifier = Modifier.height(40.dp))
     }
+}
+
+// FIX: Added the missing helper functions back to ProfileScreen.kt
+@Composable
+fun ThemeRadioOption(title: String, modeValue: Int, currentMode: Int, onThemeChange: (Int) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .bounceClick(scaleDown = 0.98f) { onThemeChange(modeValue) }
+            .padding(vertical = 2.dp), 
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        RadioButton(
+            selected = (currentMode == modeValue),
+            onClick = { onThemeChange(modeValue) },
+            colors = RadioButtonDefaults.colors(
+                selectedColor = MaterialTheme.colorScheme.primary, 
+                unselectedColor = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        )
+        Spacer(modifier = Modifier.width(4.dp))
+        Text(text = title, fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface)
+    }
+}
+
+@Composable
+fun ProfileOptionRow(
+    iconVector: ImageVector,
+    title: String, 
+    textColor: Color? = null, 
+    onClick: () -> Unit
+) {
+    val finalColor = textColor ?: MaterialTheme.colorScheme.onSurface
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .bounceClick(scaleDown = 0.97f) { onClick() } 
+            .padding(vertical = 16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(imageVector = iconVector, contentDescription = title, tint = finalColor, modifier = Modifier.size(24.dp))
+        Spacer(modifier = Modifier.width(16.dp))
+        Text(text = title, fontSize = 16.sp, fontWeight = FontWeight.Medium, color = finalColor)
+    }
+    HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
 }
