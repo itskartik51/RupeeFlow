@@ -271,8 +271,8 @@ object CacheManager {
             userMobile = tempMobile,
             userPassword = tempPass,
             userDob = tempDob,
-            thisMonthExpenses = if (tempMonth > 0) tempMonth else tempTotal,
-            thisYearExpenses = if (tempYear > 0) tempYear else tempTotal,
+            thisMonthExpenses = tempMonth, // BUG FIX: Removed fallback to tempTotal
+            thisYearExpenses = tempYear,   // BUG FIX: Removed fallback to tempTotal
             budgetLimit = fetchedBudgetLimit,
             transactionList = tempHistory.reversed(),
             investmentList = fetchedInvList,
