@@ -1,9 +1,17 @@
 package com.kartikey.rupeeflow.UI_Screens.Profile
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -18,11 +26,17 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.PathParser
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentActivity
 import com.kartikey.rupeeflow.UI_Screens.bounceClick
 
 @Composable
@@ -43,7 +57,6 @@ fun ProfileScreen(
     onResetDetailsState: () -> Unit = {}
 ) {
     var currentProfileView by remember { mutableStateOf("Main") }
-    var selectedOptionTitle by remember { mutableStateOf("") }
 
     LaunchedEffect(startInDetails) {
         if (startInDetails) {
@@ -67,14 +80,6 @@ fun ProfileScreen(
                     onThemeChange = onThemeChange,
                     isUpdateAvailable = isUpdateAvailable,
                     onNameClick = { currentProfileView = "Details" },
-                    onOptionClick = { option ->
-                        selectedOptionTitle = option
-                        if (option == "Security Lock") {
-                            currentProfileView = "Preference"
-                        } else if (option in listOf("Data Download", "Help & Support")) {
-                            currentProfileView = "Utility"
-                        }
-                    },
                     onLogout = onLogout
                 )
             }
@@ -90,12 +95,6 @@ fun ProfileScreen(
                     onProfileUpdated = { onProfileRefresh() }
                 )
             }
-            "Preference" -> {
-                PreferenceScreen(optionType = selectedOptionTitle, onBackClick = { currentProfileView = "Main" })
-            }
-            "Utility" -> {
-                ProfileUtility(optionType = selectedOptionTitle, onBackClick = { currentProfileView = "Main" })
-            }
         }
     }
 }
@@ -109,11 +108,52 @@ private fun ProfileMainContent(
     onThemeChange: (Int) -> Unit,
     isUpdateAvailable: Boolean,
     onNameClick: () -> Unit,
-    onOptionClick: (String) -> Unit,
     onLogout: () -> Unit
 ) {
-    var themeExpanded by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val sharedPreferences = remember { context.getSharedPreferences("RupeeFlowPrefs", Context.MODE_PRIVATE) }
+    
+    var securityExpanded by remember { mutableStateOf(false) }
     var currencyExpanded by remember { mutableStateOf(false) }
+    var themeExpanded by remember { mutableStateOf(false) }
+    var helpExpanded by remember { mutableStateOf(false) }
+
+    var isLockEnabled by remember { 
+        mutableStateOf(sharedPreferences.getBoolean("isSecurityLockEnabled", false)) 
+    }
+
+    fun authenticateAndToggleLock(targetState: Boolean) {
+        val activity = context as? FragmentActivity ?: return
+        val executor = ContextCompat.getMainExecutor(activity)
+        val biometricPrompt = BiometricPrompt(
+            activity,
+            executor,
+            object : BiometricPrompt.AuthenticationCallback() {
+                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                    super.onAuthenticationSucceeded(result)
+                    sharedPreferences.edit().putBoolean("isSecurityLockEnabled", targetState).apply()
+                    isLockEnabled = targetState
+                    Toast.makeText(context, if (targetState) "Security Lock Enabled" else "Security Lock Disabled", Toast.LENGTH_SHORT).show()
+                }
+
+                override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                    super.onAuthenticationError(errorCode, errString)
+                    Toast.makeText(context, "Auth Error: $errString", Toast.LENGTH_SHORT).show()
+                }
+            }
+        )
+
+        val promptInfo = BiometricPrompt.PromptInfo.Builder()
+            .setTitle("RupeeFlow Security")
+            .setSubtitle(if (targetState) "Confirm device lock to enable Security Lock" else "Confirm device lock to disable Security Lock")
+            .setAllowedAuthenticators(
+                BiometricManager.Authenticators.BIOMETRIC_STRONG or 
+                BiometricManager.Authenticators.DEVICE_CREDENTIAL
+            )
+            .build()
+
+        biometricPrompt.authenticate(promptInfo)
+    }
 
     Column(
         modifier = Modifier
@@ -158,8 +198,51 @@ private fun ProfileMainContent(
         
         Spacer(modifier = Modifier.height(32.dp))
 
-        ProfileOptionRow(iconVector = Icons.Default.Lock, title = "Security Lock", onClick = { onOptionClick("Security Lock") })
-        
+        // Expandable Security Lock Block
+        Column {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .bounceClick(scaleDown = 0.97f) { securityExpanded = !securityExpanded } 
+                    .padding(vertical = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Default.Lock, contentDescription = "Security Lock", tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(24.dp))
+                Spacer(modifier = Modifier.width(16.dp))
+                Text("Security Lock", fontSize = 16.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
+                Spacer(modifier = Modifier.weight(1f))
+                Icon(
+                    imageVector = if (securityExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown, 
+                    contentDescription = null, 
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            
+            AnimatedVisibility(visible = securityExpanded) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 40.dp, end = 8.dp, bottom = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = if (isLockEnabled) "App Lock is Active" else "App Lock is Off", 
+                        fontSize = 15.sp, 
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    CustomLockToggleSwitch(
+                        checked = isLockEnabled,
+                        onCheckedChange = { newState ->
+                            authenticateAndToggleLock(newState)
+                        }
+                    )
+                }
+            }
+            HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+        }
+
         // Expandable Currency Block
         Column {
             Row(
@@ -235,9 +318,73 @@ private fun ProfileMainContent(
             HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
         }
         
-        ProfileOptionRow(iconVector = Icons.Default.Download, title = "Data Download", onClick = { onOptionClick("Data Download") }) 
-        ProfileOptionRow(iconVector = Icons.Default.SupportAgent, title = "Help & Support", onClick = { onOptionClick("Help & Support") }) 
+        // Simple Clickable Data Download
+        ProfileOptionRow(
+            iconVector = Icons.Default.Download, 
+            title = "Data Download", 
+            onClick = { 
+                Toast.makeText(context, "Data Download feature coming soon!", Toast.LENGTH_SHORT).show() 
+            }
+        ) 
         
+        // Expandable Help & Support Block
+        Column {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .bounceClick(scaleDown = 0.97f) { helpExpanded = !helpExpanded } 
+                    .padding(vertical = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Default.SupportAgent, contentDescription = "Help & Support", tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(24.dp))
+                Spacer(modifier = Modifier.width(16.dp))
+                Text("Help & Support", fontSize = 16.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
+                Spacer(modifier = Modifier.weight(1f))
+                Icon(
+                    imageVector = if (helpExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown, 
+                    contentDescription = null, 
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            
+            AnimatedVisibility(visible = helpExpanded) {
+                Column(modifier = Modifier.fillMaxWidth().padding(start = 40.dp, bottom = 12.dp)) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .bounceClick(scaleDown = 0.98f) {
+                                try {
+                                    val intent = Intent(Intent.ACTION_SENDTO).apply {
+                                        data = Uri.parse("mailto:rupeeflow.rf@gmail.com")
+                                        putExtra(Intent.EXTRA_SUBJECT, "RupeeFlow Support Inquiry")
+                                    }
+                                    context.startActivity(Intent.createChooser(intent, "Send Email"))
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "No email client found", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                            .padding(vertical = 8.dp), 
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Email, 
+                            contentDescription = "Mail", 
+                            tint = MaterialTheme.colorScheme.primary, 
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = "rupeeflow.rf@gmail.com", 
+                            fontSize = 15.sp, 
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+            }
+            HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+        }
+
         AppUpdateRow(isUpdateAvailableBadge = isUpdateAvailable)
         
         Spacer(modifier = Modifier.height(24.dp))
@@ -276,7 +423,65 @@ private fun ProfileMainContent(
     }
 }
 
-// FIX: Added the missing helper functions back to ProfileScreen.kt
+// ==========================================
+// CUSTOM GRADIENT LOCK TOGGLE SWITCH (Uiverse.io Exact Replica)
+// ==========================================
+@Composable
+fun CustomLockToggleSwitch(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    val thumbOffset by animateDpAsState(
+        targetValue = if (checked) 52.dp else 4.dp,
+        animationSpec = tween(durationMillis = 300),
+        label = "ThumbOffset"
+    )
+
+    val trackBrush = if (checked) {
+        Brush.horizontalGradient(listOf(Color(0xFF10B981), Color(0xFF064E3B)))
+    } else {
+        Brush.horizontalGradient(listOf(Color(0xFFFB7185), Color(0xFF7F1D1D)))
+    }
+
+    Box(
+        modifier = Modifier
+            .width(96.dp)
+            .height(48.dp)
+            .clip(CircleShape)
+            .background(trackBrush)
+            .bounceClick(scaleDown = 0.95f) { onCheckedChange(!checked) }
+    ) {
+        val lockPathData = "M30,46V38a20,20,0,0,1,40,0v8a8,8,0,0,1,8,8V74a8,8,0,0,1-8,8H30a8,8,0,0,1-8-8V54A8,8,0,0,1,30,46Zm32-8v8H38V38a12,12,0,0,1,24,0Z"
+        val unlockPathData = "M50,18A19.9,19.9,0,0,0,30,38v8a8,8,0,0,0-8,8V74a8,8,0,0,0,8,8H70a8,8,0,0,0,8-8V54a8,8,0,0,0-8-8H38V38a12,12,0,0,1,23.6-3,4,4,0,1,0,7.8-2A20.1,20.1,0,0,0,50,18Z"
+
+        val iconPath = remember(checked) {
+            PathParser().parsePathString(
+                if (checked) unlockPathData else lockPathData
+            ).toPath()
+        }
+
+        Box(
+            modifier = Modifier
+                .offset(x = thumbOffset, y = 4.dp)
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(Color(0xFFF9FAFB)),
+            contentAlignment = Alignment.Center
+        ) {
+            Canvas(modifier = Modifier.size(24.dp)) {
+                val scaleX = size.width / 100f
+                val scaleY = size.height / 100f
+                scale(scaleX, scaleY, pivot = androidx.compose.ui.geometry.Offset.Zero) {
+                    drawPath(
+                        path = iconPath,
+                        color = Color(0xFF111827)
+                    )
+                }
+            }
+        }
+    }
+}
+
 @Composable
 fun ThemeRadioOption(title: String, modeValue: Int, currentMode: Int, onThemeChange: (Int) -> Unit) {
     Row(
