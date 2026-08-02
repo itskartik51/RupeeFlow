@@ -29,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -53,7 +54,6 @@ data class UpdateInfo(
     val apkUrl: String
 )
 
-// Background checker for App Start
 suspend fun checkIsUpdateAvailable(context: Context): Boolean = withContext(Dispatchers.IO) {
     try {
         val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
@@ -165,7 +165,6 @@ fun AppUpdateRow(isUpdateAvailableBadge: Boolean) {
             Spacer(modifier = Modifier.width(16.dp))
             Text("App Update", fontSize = 16.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
             
-            // GREEN DOT BADGE
             if (isUpdateAvailableBadge && !updateExpanded && checkState != "DOWNLOADING" && checkState != "READY") {
                 Spacer(modifier = Modifier.width(8.dp))
                 Box(
@@ -175,13 +174,7 @@ fun AppUpdateRow(isUpdateAvailableBadge: Boolean) {
                         .background(MaterialTheme.colorScheme.primary)
                 )
             }
-            
-            Spacer(modifier = Modifier.weight(1f))
-            Icon(
-                imageVector = if (updateExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown, 
-                contentDescription = null, 
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            // Chevron arrow is removed for a cleaner look
         }
         
         AnimatedVisibility(visible = updateExpanded) {
@@ -189,28 +182,34 @@ fun AppUpdateRow(isUpdateAvailableBadge: Boolean) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(start = 12.dp, bottom = 16.dp, end = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.Top 
             ) {
-                // LEFT SIDE FIXED (Logo & Version)
+                // LEFT SIDE FIXED
                 Column(
                     modifier = Modifier.weight(0.35f),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(50.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primaryContainer),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Default.SystemUpdate, contentDescription = "Update", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(26.dp))
+                    Box(modifier = Modifier.height(50.dp), contentAlignment = Alignment.Center) {
+                        Box(
+                            modifier = Modifier
+                                .size(50.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.primaryContainer),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.SystemUpdate, contentDescription = "Update", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(26.dp))
+                        }
                     }
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text("RupeeFlow", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
-                    Text("v$currentVersionName", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Box(modifier = Modifier.height(18.dp), contentAlignment = Alignment.Center) {
+                        Text("RupeeFlow", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+                    }
+                    Box(modifier = Modifier.height(16.dp), contentAlignment = Alignment.Center) {
+                        Text("v$currentVersionName", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
 
-                // RIGHT SIDE DYNAMIC (Live Status)
+                // RIGHT SIDE DYNAMIC (Strict Alignment with Left Side)
                 Box(
                     modifier = Modifier.weight(0.65f).padding(start = 16.dp),
                     contentAlignment = Alignment.Center
@@ -218,23 +217,36 @@ fun AppUpdateRow(isUpdateAvailableBadge: Boolean) {
                     Crossfade(targetState = checkState, label = "UpdateState") { state ->
                         when (state) {
                             "IDLE", "CHECKING" -> {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                                    Box(modifier = Modifier.height(50.dp), contentAlignment = Alignment.Center) {
+                                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                                    }
                                     Spacer(modifier = Modifier.height(8.dp))
-                                    Text("Checking...", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                                    Box(modifier = Modifier.height(18.dp), contentAlignment = Alignment.Center) {
+                                        Text("Checking...", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                                    }
+                                    Box(modifier = Modifier.height(16.dp)) 
                                 }
                             }
                             "UP_TO_DATE" -> {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Icon(Icons.Default.CheckCircle, contentDescription = "Updated", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(28.dp))
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text("Latest version!", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = MaterialTheme.colorScheme.onBackground)
-                                    Text("No updates.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
+                                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                                    Box(modifier = Modifier.height(50.dp), contentAlignment = Alignment.Center) {
+                                        Icon(Icons.Default.CheckCircle, contentDescription = "Updated", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(50.dp))
+                                    }
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Box(modifier = Modifier.height(18.dp), contentAlignment = Alignment.Center) {
+                                        Text("You're on the latest version!", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = MaterialTheme.colorScheme.onBackground)
+                                    }
+                                    Box(modifier = Modifier.height(16.dp), contentAlignment = Alignment.Center) {
+                                        Text("No new updates available.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
+                                    }
                                 }
                             }
                             "AVAILABLE" -> {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text("v${updateInfo?.versionName} Available", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface)
+                                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                                    Box(modifier = Modifier.height(50.dp), contentAlignment = Alignment.Center) {
+                                        Text("v${updateInfo?.versionName} Available", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurface)
+                                    }
                                     Spacer(modifier = Modifier.height(8.dp))
                                     Button(
                                         onClick = {
@@ -286,7 +298,7 @@ fun AppUpdateRow(isUpdateAvailableBadge: Boolean) {
                                                 }
                                             }
                                         },
-                                        modifier = Modifier.height(36.dp),
+                                        modifier = Modifier.height(34.dp),
                                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
                                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                                     ) {
@@ -296,21 +308,29 @@ fun AppUpdateRow(isUpdateAvailableBadge: Boolean) {
                             }
                             "DOWNLOADING" -> {
                                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-                                    Text("Downloading...", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = MaterialTheme.colorScheme.onBackground)
-                                    Spacer(modifier = Modifier.height(6.dp))
-                                    LinearProgressIndicator(
-                                        progress = { downloadProgress },
-                                        modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(50)),
-                                        color = MaterialTheme.colorScheme.primary,
-                                        trackColor = MaterialTheme.colorScheme.surfaceVariant
-                                    )
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text("${(downloadProgress * 100).toInt()}%", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    Box(modifier = Modifier.height(50.dp), contentAlignment = Alignment.Center) {
+                                        Text("Downloading...", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = MaterialTheme.colorScheme.onBackground)
+                                    }
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Box(modifier = Modifier.height(18.dp), contentAlignment = Alignment.Center) {
+                                        LinearProgressIndicator(
+                                            progress = { downloadProgress },
+                                            modifier = Modifier.fillMaxWidth().padding(end = 16.dp).height(6.dp),
+                                            color = MaterialTheme.colorScheme.primary,
+                                            trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                                            strokeCap = StrokeCap.Round 
+                                        )
+                                    }
+                                    Box(modifier = Modifier.height(16.dp), contentAlignment = Alignment.Center) {
+                                        Text("${(downloadProgress * 100).toInt()}%", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    }
                                 }
                             }
                             "READY" -> {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text("Ready to Install", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = MaterialTheme.colorScheme.onBackground)
+                                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                                    Box(modifier = Modifier.height(50.dp), contentAlignment = Alignment.Center) {
+                                        Text("Ready to Install", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = MaterialTheme.colorScheme.onBackground)
+                                    }
                                     Spacer(modifier = Modifier.height(8.dp))
                                     Button(
                                         onClick = {
@@ -324,7 +344,7 @@ fun AppUpdateRow(isUpdateAvailableBadge: Boolean) {
                                                 downloadedApkUri?.let { uri -> installApk(context, uri) }
                                             }
                                         },
-                                        modifier = Modifier.height(36.dp),
+                                        modifier = Modifier.height(34.dp),
                                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
                                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                                     ) {
