@@ -126,9 +126,8 @@ private fun ProfileMainContent(
         mutableStateOf(sharedPreferences.getBoolean("isSecurityLockEnabled", false)) 
     }
 
-    // BASE64 OBFUSCATED DATA (PROTECTED FROM GITHUB BOTS)
-    val encodedEmail = "cnVwZWVmbG93LnJmQGdtYWlsLmNvbQ==" // rupeeflow.rf@gmail.com
-    val encodedPhone = "OTE5ODI4ODk3MjY4" // Encoded 919828897268
+    val encodedEmail = "cnVwZWVmbG93LnJmQGdtYWlsLmNvbQ==" 
+    val encodedPhone = "OTE5ODI4ODk3MjY4" 
 
     val decodedEmail = remember(encodedEmail) {
         try { String(Base64.decode(encodedEmail, Base64.DEFAULT), Charsets.UTF_8) } catch (e: Exception) { "" }
@@ -216,7 +215,7 @@ private fun ProfileMainContent(
         
         Spacer(modifier = Modifier.height(32.dp))
 
-        // Expandable Security Lock Block
+        // Security Lock Block
         Column {
             Row(
                 modifier = Modifier
@@ -228,12 +227,6 @@ private fun ProfileMainContent(
                 Icon(Icons.Default.Lock, contentDescription = "Security Lock", tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(24.dp))
                 Spacer(modifier = Modifier.width(16.dp))
                 Text("Security Lock", fontSize = 16.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
-                Spacer(modifier = Modifier.weight(1f))
-                Icon(
-                    imageVector = if (securityExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown, 
-                    contentDescription = null, 
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
             }
             
             AnimatedVisibility(visible = securityExpanded) {
@@ -261,7 +254,7 @@ private fun ProfileMainContent(
             HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
         }
 
-        // Expandable Currency Block
+        // Currency Block
         Column {
             Row(
                 modifier = Modifier
@@ -273,12 +266,6 @@ private fun ProfileMainContent(
                 Icon(Icons.Default.CurrencyRupee, contentDescription = "Currency", tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(24.dp))
                 Spacer(modifier = Modifier.width(16.dp))
                 Text("Currency", fontSize = 16.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
-                Spacer(modifier = Modifier.weight(1f))
-                Icon(
-                    imageVector = if (currencyExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown, 
-                    contentDescription = null, 
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
             }
             
             AnimatedVisibility(visible = currencyExpanded) {
@@ -306,7 +293,7 @@ private fun ProfileMainContent(
             HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
         }
         
-        // Expandable Theme Block
+        // Theme Block
         Column {
             Row(
                 modifier = Modifier
@@ -318,12 +305,6 @@ private fun ProfileMainContent(
                 Icon(Icons.Default.Palette, contentDescription = "Theme", tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(24.dp))
                 Spacer(modifier = Modifier.width(16.dp))
                 Text("Theme", fontSize = 16.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
-                Spacer(modifier = Modifier.weight(1f))
-                Icon(
-                    imageVector = if (themeExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown, 
-                    contentDescription = null, 
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
             }
             
             AnimatedVisibility(visible = themeExpanded) {
@@ -336,7 +317,7 @@ private fun ProfileMainContent(
             HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
         }
         
-        // Simple Clickable Data Download
+        // Data Download
         ProfileOptionRow(
             iconVector = Icons.Default.Download, 
             title = "Data Download", 
@@ -345,7 +326,7 @@ private fun ProfileMainContent(
             }
         ) 
         
-        // Expandable Help & Support Block
+        // Help & Support Block
         Column {
             Row(
                 modifier = Modifier
@@ -357,12 +338,6 @@ private fun ProfileMainContent(
                 Icon(Icons.Default.SupportAgent, contentDescription = "Help & Support", tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(24.dp))
                 Spacer(modifier = Modifier.width(16.dp))
                 Text("Help & Support", fontSize = 16.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
-                Spacer(modifier = Modifier.weight(1f))
-                Icon(
-                    imageVector = if (helpExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown, 
-                    contentDescription = null, 
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
             }
             
             AnimatedVisibility(visible = helpExpanded) {
@@ -472,9 +447,6 @@ private fun ProfileMainContent(
     }
 }
 
-// ==========================================
-// WHATSAPP SVG ICON DRAWABLE
-// ==========================================
 @Composable
 fun WhatsAppIcon(modifier: Modifier = Modifier) {
     Canvas(modifier = modifier) {
@@ -486,22 +458,19 @@ fun WhatsAppIcon(modifier: Modifier = Modifier) {
         scale(scaleX, scaleY, pivot = androidx.compose.ui.geometry.Offset.Zero) {
             drawPath(
                 path = waPath,
-                color = Color(0xFF25D366) // WhatsApp Green
+                color = Color(0xFF25D366) 
             )
         }
     }
 }
 
-// ==========================================
-// CUSTOM GRADIENT LOCK TOGGLE SWITCH (Uiverse.io Exact Replica)
-// ==========================================
 @Composable
 fun CustomLockToggleSwitch(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit
 ) {
     val thumbOffset by animateDpAsState(
-        targetValue = if (checked) 52.dp else 4.dp,
+        targetValue = if (checked) 26.dp else 3.dp,
         animationSpec = tween(durationMillis = 300),
         label = "ThumbOffset"
     )
@@ -514,8 +483,8 @@ fun CustomLockToggleSwitch(
 
     Box(
         modifier = Modifier
-            .width(96.dp)
-            .height(48.dp)
+            .width(52.dp)
+            .height(28.dp)
             .clip(CircleShape)
             .background(trackBrush)
             .bounceClick(scaleDown = 0.95f) { onCheckedChange(!checked) }
@@ -531,13 +500,13 @@ fun CustomLockToggleSwitch(
 
         Box(
             modifier = Modifier
-                .offset(x = thumbOffset, y = 4.dp)
-                .size(40.dp)
+                .offset(x = thumbOffset, y = 2.5.dp)
+                .size(23.dp)
                 .clip(CircleShape)
                 .background(Color(0xFFF9FAFB)),
             contentAlignment = Alignment.Center
         ) {
-            Canvas(modifier = Modifier.size(24.dp)) {
+            Canvas(modifier = Modifier.size(12.dp)) {
                 val scaleX = size.width / 100f
                 val scaleY = size.height / 100f
                 scale(scaleX, scaleY, pivot = androidx.compose.ui.geometry.Offset.Zero) {
