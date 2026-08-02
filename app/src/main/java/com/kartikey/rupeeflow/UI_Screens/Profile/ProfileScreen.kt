@@ -342,17 +342,18 @@ private fun ProfileMainContent(
             
             AnimatedVisibility(visible = helpExpanded) {
                 Column(modifier = Modifier.fillMaxWidth().padding(start = 40.dp, bottom = 12.dp)) {
-                    // EMAIL OPTION
+                    // EMAIL OPTION FIX
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .bounceClick(scaleDown = 0.98f) {
                                 try {
                                     val mailBody = "Dear RupeeFlow,\nI am $displayName ($displayUsername), [$displayMobile]. I Need Help regarding..."
+                                    val encodedSubject = Uri.encode("RupeeFlow Support Inquiry")
+                                    val encodedBody = Uri.encode(mailBody)
+                                    
                                     val intent = Intent(Intent.ACTION_SENDTO).apply {
-                                        data = Uri.parse("mailto:$decodedEmail")
-                                        putExtra(Intent.EXTRA_SUBJECT, "RupeeFlow Support Inquiry")
-                                        putExtra(Intent.EXTRA_TEXT, mailBody)
+                                        data = Uri.parse("mailto:$decodedEmail?subject=$encodedSubject&body=$encodedBody")
                                     }
                                     context.startActivity(Intent.createChooser(intent, "Send Email"))
                                 } catch (e: Exception) {
@@ -377,13 +378,13 @@ private fun ProfileMainContent(
                         )
                     }
 
-                    // WHATSAPP OPTION
+                    // WHATSAPP OPTION FIX
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .bounceClick(scaleDown = 0.98f) {
                                 try {
-                                    val waMessage = "Hi RupeeFlow,$displayName ($displayUsername) is Here, I need help regarding.."
+                                    val waMessage = "Hi RupeeFlow, $displayName ($displayUsername) is Here, I need help regarding "
                                     val encodedText = Uri.encode(waMessage)
                                     val waUrl = "https://wa.me/$decodedPhone?text=$encodedText"
                                     val intent = Intent(Intent.ACTION_VIEW, Uri.parse(waUrl))
