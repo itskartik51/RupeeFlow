@@ -7,16 +7,19 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.graphics.Color
@@ -35,6 +38,7 @@ import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.CreditCardItem
 import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.FDItem
 import com.kartikey.rupeeflow.UI_Screens.Analytics.AnalyticsScreen
 import com.kartikey.rupeeflow.UI_Screens.Profile.ProfileScreen
+import com.kartikey.rupeeflow.UI_Screens.Profile.checkIsUpdateAvailable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -87,6 +91,13 @@ fun MainScreen(
     
     var refreshTrigger by remember { mutableIntStateOf(0) }
     var forceFetchNext by remember { mutableStateOf(false) } 
+    
+    var isUpdateAvailable by remember { mutableStateOf(false) } // NAYA: Global Update State
+
+    LaunchedEffect(Unit) {
+        // App khulte hi background mein check karega
+        isUpdateAvailable = checkIsUpdateAvailable(context)
+    }
 
     LaunchedEffect(selectedTab, showExpenseHistory, showContriScreen, isLoadingExpenses, transactionList.size, bankToEdit, ccToEdit, fdToEdit, showAddMenu) {
         if (showAddMenu) dNavState = "Add Menu Open"
@@ -220,7 +231,21 @@ fun MainScreen(
                         modifier = Modifier.bounceClick(),
                         selected = selectedTab == 4, 
                         onClick = { selectedTab = 4; showExpenseHistory = false; showContriScreen = false }, 
-                        icon = { Icon(Icons.Outlined.Person, contentDescription = "Profile") }, 
+                        icon = { 
+                            // NAYA: Profile Icon with Green Badge
+                            Box {
+                                Icon(Icons.Outlined.Person, contentDescription = "Profile")
+                                if (isUpdateAvailable) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(8.dp)
+                                            .align(Alignment.TopEnd)
+                                            .offset(x = 2.dp, y = (-2).dp)
+                                            .background(MaterialTheme.colorScheme.primary, CircleShape)
+                                    )
+                                }
+                            }
+                        }, 
                         label = { Text("Profile") }, 
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = MaterialTheme.colorScheme.primary, 
@@ -284,7 +309,8 @@ fun MainScreen(
                         4 -> ProfileScreen(
                             username = username, name = userFullName, email = userEmail, mobile = userMobile, 
                             password = userPassword, dob = userDob, paddingValues = paddingValues, 
-                            themeMode = themeMode, onThemeChange = onThemeChange, // Theme passed here
+                            themeMode = themeMode, onThemeChange = onThemeChange, 
+                            isUpdateAvailable = isUpdateAvailable, // NAYA: Passing to Profile
                             onLogout = onLogout, onProfileRefresh = { refreshTrigger++ },
                             startInDetails = openProfileDetails, onResetDetailsState = { openProfileDetails = false }
                         )
