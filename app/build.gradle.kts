@@ -11,8 +11,8 @@ android {
         applicationId = "com.kartikey.rupeeflow"
         minSdk = 24
         targetSdk = 34
-        versionCode = 5
-        versionName = "1.00.002"
+        versionCode = 6
+        versionName = "1.00.006"
     }
 
     signingConfigs {
@@ -70,6 +70,9 @@ dependencies {
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
     
+    // Biometric Security Lock Library (Fix for BiometricPrompt)
+    implementation("androidx.biometric:biometric:1.1.0")
+
     // UI & Design (Mint/Lavender Theme) 
     implementation("androidx.compose.ui:ui:1.7.0")
     implementation("androidx.compose.animation:animation:1.7.0") 
