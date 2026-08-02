@@ -187,19 +187,21 @@ private fun ProfileMainContent(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .bounceClick(scaleDown = 0.98f) { /* Clickable hai, aage kabhi aur currency aayi to yaha add hoga */ }
-                            .padding(vertical = 8.dp),
+                            .bounceClick(scaleDown = 0.98f) { /* Clickable, future me aur currencies add hongi tab kaam aayega */ }
+                            .padding(vertical = 2.dp), // UPDATE: Theme ki tarah 2.dp padding
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.CheckCircle, 
-                            contentDescription = "Selected", 
-                            tint = MaterialTheme.colorScheme.primary, 
-                            modifier = Modifier.size(22.dp)
+                        // UPDATE: CheckCircle Icon ki jagah exact Theme wala RadioButton use kiya
+                        RadioButton(
+                            selected = true,
+                            onClick = { }, // Empty kyuki by default INR selected hai
+                            colors = RadioButtonDefaults.colors(
+                                selectedColor = MaterialTheme.colorScheme.primary, 
+                                unselectedColor = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        // UPDATE: "INR ₹" ki jagah "₹  INR" kar diya
-                        Text(text = "₹  INR", fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)
+                        Spacer(modifier = Modifier.width(4.dp)) // UPDATE: Theme ki tarah 4.dp spacer
+                        Text(text = "₹  INR", fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface)
                     }
                 }
             }
