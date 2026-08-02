@@ -3,6 +3,7 @@ package com.kartikey.rupeeflow.UI_Screens.Profile
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.util.Base64
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.biometric.BiometricManager
@@ -13,7 +14,6 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -73,8 +73,10 @@ fun ProfileScreen(
         when (view) {
             "Main" -> {
                 ProfileMainContent(
+                    username = username,
                     name = name,
                     email = email,
+                    mobile = mobile,
                     paddingValues = paddingValues,
                     themeMode = themeMode,
                     onThemeChange = onThemeChange,
@@ -101,8 +103,10 @@ fun ProfileScreen(
 
 @Composable
 private fun ProfileMainContent(
+    username: String,
     name: String,
     email: String,
+    mobile: String,
     paddingValues: PaddingValues,
     themeMode: Int,
     onThemeChange: (Int) -> Unit,
@@ -120,6 +124,17 @@ private fun ProfileMainContent(
 
     var isLockEnabled by remember { 
         mutableStateOf(sharedPreferences.getBoolean("isSecurityLockEnabled", false)) 
+    }
+
+    // BASE64 OBFUSCATED DATA (PROTECTED FROM GITHUB BOTS)
+    val encodedEmail = "cnVwZWVmbG93LnJmQGdtYWlsLmNvbQ==" // rupeeflow.rf@gmail.com
+    val encodedPhone = "OTE5ODI4ODk3MjY4" // Encoded 919828897268
+
+    val decodedEmail = remember(encodedEmail) {
+        try { String(Base64.decode(encodedEmail, Base64.DEFAULT), Charsets.UTF_8) } catch (e: Exception) { "" }
+    }
+    val decodedPhone = remember(encodedPhone) {
+        try { String(Base64.decode(encodedPhone, Base64.DEFAULT), Charsets.UTF_8) } catch (e: Exception) { "" }
     }
 
     fun authenticateAndToggleLock(targetState: Boolean) {
@@ -167,6 +182,9 @@ private fun ProfileMainContent(
 
         val displayLetter = if (name.isNotBlank()) name.take(1).uppercase() else "?"
         val displayEmail = if (email.isNotBlank()) email else "Add Mail"
+        val displayName = name.ifBlank { "User" }
+        val displayUsername = username.ifBlank { "N/A" }
+        val displayMobile = mobile.ifBlank { "N/A" }
 
         Box(
             modifier = Modifier
@@ -182,7 +200,7 @@ private fun ProfileMainContent(
         Spacer(modifier = Modifier.height(16.dp))
         
         Text(
-            text = name.ifBlank { "User" }, 
+            text = displayName, 
             fontWeight = FontWeight.ExtraBold, 
             fontSize = 22.sp,
             color = MaterialTheme.colorScheme.onBackground,
@@ -349,14 +367,17 @@ private fun ProfileMainContent(
             
             AnimatedVisibility(visible = helpExpanded) {
                 Column(modifier = Modifier.fillMaxWidth().padding(start = 40.dp, bottom = 12.dp)) {
+                    // EMAIL OPTION
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .bounceClick(scaleDown = 0.98f) {
                                 try {
+                                    val mailBody = "Dear RupeeFlow,\nI am $displayName ($displayUsername), [$displayMobile]. I Need Help regarding..."
                                     val intent = Intent(Intent.ACTION_SENDTO).apply {
-                                        data = Uri.parse("mailto:rupeeflow.rf@gmail.com")
+                                        data = Uri.parse("mailto:$decodedEmail")
                                         putExtra(Intent.EXTRA_SUBJECT, "RupeeFlow Support Inquiry")
+                                        putExtra(Intent.EXTRA_TEXT, mailBody)
                                     }
                                     context.startActivity(Intent.createChooser(intent, "Send Email"))
                                 } catch (e: Exception) {
@@ -368,16 +389,44 @@ private fun ProfileMainContent(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Email, 
-                            contentDescription = "Mail", 
+                            contentDescription = "Email Support", 
                             tint = MaterialTheme.colorScheme.primary, 
                             modifier = Modifier.size(20.dp)
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(
-                            text = "rupeeflow.rf@gmail.com", 
+                            text = "Email Support", 
                             fontSize = 15.sp, 
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.SemiBold
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+
+                    // WHATSAPP OPTION
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .bounceClick(scaleDown = 0.98f) {
+                                try {
+                                    val waMessage = "Hi RupeeFlow,$displayName ($displayUsername) is Here, I need help regarding.."
+                                    val encodedText = Uri.encode(waMessage)
+                                    val waUrl = "https://wa.me/$decodedPhone?text=$encodedText"
+                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(waUrl))
+                                    context.startActivity(intent)
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "WhatsApp not installed", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                            .padding(vertical = 8.dp), 
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        WhatsAppIcon(modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = "WhatsApp Support", 
+                            fontSize = 15.sp, 
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontWeight = FontWeight.Medium
                         )
                     }
                 }
@@ -420,6 +469,26 @@ private fun ProfileMainContent(
         }
         
         Spacer(modifier = Modifier.height(40.dp))
+    }
+}
+
+// ==========================================
+// WHATSAPP SVG ICON DRAWABLE
+// ==========================================
+@Composable
+fun WhatsAppIcon(modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier) {
+        val waPathData = "M12.011 2c-5.506 0-9.98 4.474-9.98 9.98 0 1.758.459 3.469 1.332 4.978l-1.363 4.977 5.093-1.335c1.453.792 3.097 1.21 4.767 1.21 5.506 0 9.98-4.474 9.98-9.98 0-5.506-4.474-9.98-9.98-9.98zm5.83 14.28c-.244.688-1.226 1.261-1.996 1.428-.528.115-1.218.207-3.535-.754-2.964-1.228-4.871-4.24-5.019-4.437-.147-.197-1.202-1.603-1.202-3.057 0-1.454.76-2.171 1.032-2.464.272-.293.593-.367.791-.367.197 0 .395.003.568.012.183.009.43-.07.671.508.244.588.835 2.038.908 2.186.073.148.122.321.024.516-.098.196-.147.321-.295.494-.148.173-.311.387-.444.52-.148.148-.302.309-.13.604.172.295.767 1.268 1.648 2.052 1.134 1.01 2.091 1.323 2.387 1.471.296.148.468.123.641-.074.173-.197.74-.863.938-1.159.198-.296.395-.246.666-.148.272.098 1.728.815 2.024.962.296.148.494.222.568.345.074.123.074.714-.17 1.402z"
+        val waPath = PathParser().parsePathString(waPathData).toPath()
+
+        val scaleX = size.width / 24f
+        val scaleY = size.height / 24f
+        scale(scaleX, scaleY, pivot = androidx.compose.ui.geometry.Offset.Zero) {
+            drawPath(
+                path = waPath,
+                color = Color(0xFF25D366) // WhatsApp Green
+            )
+        }
     }
 }
 
