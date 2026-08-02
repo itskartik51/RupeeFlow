@@ -9,7 +9,6 @@ import androidx.compose.material.icons.outlined.DateRange
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import java.text.SimpleDateFormat
@@ -100,36 +99,34 @@ fun CustomDatePicker(
                     datePickerState.selectedDateMillis?.let { onDateSelected(it) }
                     showDialog = false
                 }) {
-                    Text("OK", color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold)
+                    Text("OK", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDialog = false }) {
-                    Text("Cancel", color = Color.Gray)
+                    Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             },
-            // PURE WHITE BACKGROUND FOR CONTAINER
-            colors = DatePickerDefaults.colors(containerColor = Color.White)
+            colors = DatePickerDefaults.colors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
             DatePicker(
                 state = datePickerState,
-                // OLD HARDCODED CLEAN COLORS (No Purple Tint)
                 colors = DatePickerDefaults.colors(
-                    containerColor = Color.White,
-                    titleContentColor = Color.Gray,
-                    headlineContentColor = Color.Black,
-                    weekdayContentColor = Color.Gray,
-                    subheadContentColor = Color.Black,
-                    yearContentColor = Color.Black,
-                    currentYearContentColor = Color(0xFF2E7D32),
-                    selectedYearContainerColor = Color(0xFF2E7D32),
-                    selectedYearContentColor = Color.White,
-                    dayContentColor = Color.Black,
-                    disabledDayContentColor = Color.LightGray,
-                    selectedDayContainerColor = Color(0xFF2E7D32),
-                    selectedDayContentColor = Color.White,
-                    todayDateBorderColor = Color(0xFF2E7D32),
-                    todayContentColor = Color(0xFF2E7D32)
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    titleContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    headlineContentColor = MaterialTheme.colorScheme.onSurface,
+                    weekdayContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    subheadContentColor = MaterialTheme.colorScheme.onSurface,
+                    yearContentColor = MaterialTheme.colorScheme.onSurface,
+                    currentYearContentColor = MaterialTheme.colorScheme.primary,
+                    selectedYearContainerColor = MaterialTheme.colorScheme.primary,
+                    selectedYearContentColor = MaterialTheme.colorScheme.onPrimary,
+                    dayContentColor = MaterialTheme.colorScheme.onSurface,
+                    disabledDayContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+                    selectedDayContainerColor = MaterialTheme.colorScheme.primary,
+                    selectedDayContentColor = MaterialTheme.colorScheme.onPrimary,
+                    todayDateBorderColor = MaterialTheme.colorScheme.primary,
+                    todayContentColor = MaterialTheme.colorScheme.primary
                 )
             )
         }
