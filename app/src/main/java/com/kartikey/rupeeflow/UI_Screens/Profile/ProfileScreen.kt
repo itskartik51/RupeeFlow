@@ -35,7 +35,8 @@ fun ProfileScreen(
     dob: String, 
     paddingValues: PaddingValues, 
     themeMode: Int,                     
-    onThemeChange: (Int) -> Unit,       
+    onThemeChange: (Int) -> Unit,
+    isUpdateAvailable: Boolean,         // NAYA PARAMETER
     onLogout: () -> Unit,
     onProfileRefresh: () -> Unit,
     startInDetails: Boolean = false, 
@@ -64,13 +65,12 @@ fun ProfileScreen(
                     paddingValues = paddingValues,
                     themeMode = themeMode,
                     onThemeChange = onThemeChange,
+                    isUpdateAvailable = isUpdateAvailable,
                     onNameClick = { currentProfileView = "Details" },
                     onOptionClick = { option ->
                         selectedOptionTitle = option
                         if (option == "Security Lock") {
                             currentProfileView = "Preference"
-                        } else if (option == "App Update") { 
-                            currentProfileView = "Update"
                         } else if (option in listOf("Data Download", "Help & Support")) {
                             currentProfileView = "Utility"
                         }
@@ -96,9 +96,6 @@ fun ProfileScreen(
             "Utility" -> {
                 ProfileUtility(optionType = selectedOptionTitle, onBackClick = { currentProfileView = "Main" })
             }
-            "Update" -> {
-                AppUpdateScreen(onBackClick = { currentProfileView = "Main" })
-            }
         }
     }
 }
@@ -110,6 +107,7 @@ private fun ProfileMainContent(
     paddingValues: PaddingValues,
     themeMode: Int,
     onThemeChange: (Int) -> Unit,
+    isUpdateAvailable: Boolean,
     onNameClick: () -> Unit,
     onOptionClick: (String) -> Unit,
     onLogout: () -> Unit
@@ -187,20 +185,19 @@ private fun ProfileMainContent(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .bounceClick(scaleDown = 0.98f) { /* Clickable, future me aur currencies add hongi tab kaam aayega */ }
-                            .padding(vertical = 2.dp), // UPDATE: Theme ki tarah 2.dp padding
+                            .bounceClick(scaleDown = 0.98f) { }
+                            .padding(vertical = 2.dp), 
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // UPDATE: CheckCircle Icon ki jagah exact Theme wala RadioButton use kiya
                         RadioButton(
                             selected = true,
-                            onClick = { }, // Empty kyuki by default INR selected hai
+                            onClick = { }, 
                             colors = RadioButtonDefaults.colors(
                                 selectedColor = MaterialTheme.colorScheme.primary, 
                                 unselectedColor = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         )
-                        Spacer(modifier = Modifier.width(4.dp)) // UPDATE: Theme ki tarah 4.dp spacer
+                        Spacer(modifier = Modifier.width(4.dp)) 
                         Text(text = "₹  INR", fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface)
                     }
                 }
@@ -241,11 +238,8 @@ private fun ProfileMainContent(
         ProfileOptionRow(iconVector = Icons.Default.Download, title = "Data Download", onClick = { onOptionClick("Data Download") }) 
         ProfileOptionRow(iconVector = Icons.Default.SupportAgent, title = "Help & Support", onClick = { onOptionClick("Help & Support") }) 
         
-        ProfileOptionRow(
-            iconVector = Icons.Default.Info, 
-            title = "App Update", 
-            onClick = { onOptionClick("App Update") }
-        )
+        // NAYA: Updates.kt se strictly handle ho raha hai
+        AppUpdateRow(isUpdateAvailableBadge = isUpdateAvailable)
         
         Spacer(modifier = Modifier.height(24.dp))
 
@@ -281,49 +275,4 @@ private fun ProfileMainContent(
         
         Spacer(modifier = Modifier.height(40.dp))
     }
-}
-
-@Composable
-fun ThemeRadioOption(title: String, modeValue: Int, currentMode: Int, onThemeChange: (Int) -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .bounceClick(scaleDown = 0.98f) { onThemeChange(modeValue) }
-            .padding(vertical = 2.dp), 
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        RadioButton(
-            selected = (currentMode == modeValue),
-            onClick = { onThemeChange(modeValue) },
-            colors = RadioButtonDefaults.colors(
-                selectedColor = MaterialTheme.colorScheme.primary, 
-                unselectedColor = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        )
-        Spacer(modifier = Modifier.width(4.dp))
-        Text(text = title, fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface)
-    }
-}
-
-@Composable
-private fun ProfileOptionRow(
-    iconVector: ImageVector,
-    title: String, 
-    textColor: Color? = null, 
-    onClick: () -> Unit
-) {
-    val finalColor = textColor ?: MaterialTheme.colorScheme.onSurface
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .bounceClick(scaleDown = 0.97f) { onClick() } 
-            .padding(vertical = 16.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(imageVector = iconVector, contentDescription = title, tint = finalColor, modifier = Modifier.size(24.dp))
-        
-        Spacer(modifier = Modifier.width(16.dp))
-        Text(text = title, fontSize = 16.sp, fontWeight = FontWeight.Medium, color = finalColor)
-    }
-    HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
 }
