@@ -15,12 +15,12 @@ import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -53,13 +53,37 @@ data class UpdateInfo(
     val apkUrl: String
 )
 
-@OptIn(ExperimentalMaterial3Api::class)
+// Background checker for App Start
+suspend fun checkIsUpdateAvailable(context: Context): Boolean = withContext(Dispatchers.IO) {
+    try {
+        val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
+        val currentVersionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) packageInfo.longVersionCode.toInt() else packageInfo.versionCode
+        
+        val request = Request.Builder()
+            .url("https://raw.githubusercontent.com/itskartik51/RupeeFlow/main/Updates/version.json")
+            .build()
+        val response = OkHttpClient().newCall(request).execute()
+        val jsonData = response.body?.string()
+
+        if (jsonData != null) {
+            val json = JSONObject(jsonData)
+            val serverCode = json.optInt("latest_version_code", 0)
+            return@withContext serverCode > currentVersionCode
+        }
+    } catch (e: Exception) {
+        return@withContext false
+    }
+    return@withContext false
+}
+
 @Composable
-fun AppUpdateScreen(onBackClick: () -> Unit) {
+fun AppUpdateRow(isUpdateAvailableBadge: Boolean) {
+    var updateExpanded by remember { mutableStateOf(false) }
+    
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
-    var checkState by remember { mutableStateOf("CHECKING") }
+    var checkState by remember { mutableStateOf("IDLE") }
     var updateInfo by remember { mutableStateOf<UpdateInfo?>(null) }
     var downloadProgress by remember { mutableFloatStateOf(0f) }
     var downloadedApkUri by remember { mutableStateOf<Uri?>(null) }
@@ -80,227 +104,240 @@ fun AppUpdateScreen(onBackClick: () -> Unit) {
 
     val notificationPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
         if (!isGranted) {
-            Toast.makeText(context, "Notifications disabled. You won't be alerted when download finishes.", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "Notifications disabled.", Toast.LENGTH_SHORT).show()
         }
     }
 
-    LaunchedEffect(Unit) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+    LaunchedEffect(updateExpanded) {
+        if (updateExpanded && (checkState == "IDLE" || checkState == "UP_TO_DATE")) {
+            checkState = "CHECKING"
+            
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
             }
-        }
 
-        withContext(Dispatchers.IO) {
-            try {
-                val request = Request.Builder()
-                    .url("https://raw.githubusercontent.com/itskartik51/RupeeFlow/main/Updates/version.json")
-                    .build()
-                val response = OkHttpClient().newCall(request).execute()
-                val jsonData = response.body?.string()
+            withContext(Dispatchers.IO) {
+                try {
+                    val request = Request.Builder()
+                        .url("https://raw.githubusercontent.com/itskartik51/RupeeFlow/main/Updates/version.json")
+                        .build()
+                    val response = OkHttpClient().newCall(request).execute()
+                    val jsonData = response.body?.string()
 
-                if (jsonData != null) {
-                    val json = JSONObject(jsonData)
-                    val serverCode = json.optInt("latest_version_code", 0)
-                    
-                    withContext(Dispatchers.Main) {
-                        if (serverCode > currentVersionCode) {
-                            updateInfo = UpdateInfo(
-                                versionCode = serverCode,
-                                versionName = json.optString("latest_version_name", ""),
-                                releaseNotes = json.optString("release_notes", "Bug fixes and improvements."),
-                                apkUrl = json.optString("apk_url", "")
-                            )
-                            checkState = "AVAILABLE"
-                        } else {
-                            checkState = "UP_TO_DATE"
+                    if (jsonData != null) {
+                        val json = JSONObject(jsonData)
+                        val serverCode = json.optInt("latest_version_code", 0)
+                        
+                        withContext(Dispatchers.Main) {
+                            if (serverCode > currentVersionCode) {
+                                updateInfo = UpdateInfo(
+                                    versionCode = serverCode,
+                                    versionName = json.optString("latest_version_name", ""),
+                                    releaseNotes = json.optString("release_notes", ""),
+                                    apkUrl = json.optString("apk_url", "")
+                                )
+                                checkState = "AVAILABLE"
+                            } else {
+                                checkState = "UP_TO_DATE"
+                            }
                         }
+                    } else {
+                        withContext(Dispatchers.Main) { checkState = "UP_TO_DATE" }
                     }
-                } else {
+                } catch (e: Exception) {
                     withContext(Dispatchers.Main) { checkState = "UP_TO_DATE" }
                 }
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) { checkState = "UP_TO_DATE" }
             }
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("App Update", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
-                navigationIcon = {
-                    // Applied Premium Bounce Here
-                    IconButton(onClick = onBackClick, modifier = Modifier.bounceClick()) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.onSurface)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
-            )
-        },
-        containerColor = MaterialTheme.colorScheme.background
-    ) { paddingValues ->
-        Column(
+    Column {
+        Row(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(24.dp)
-                .verticalScroll(rememberScrollState()),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .fillMaxWidth()
+                .bounceClick(scaleDown = 0.97f) { updateExpanded = !updateExpanded } 
+                .padding(vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Spacer(modifier = Modifier.height(20.dp))
+            Icon(Icons.Default.Info, contentDescription = "App Update", tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(24.dp))
+            Spacer(modifier = Modifier.width(16.dp))
+            Text("App Update", fontSize = 16.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
             
-            Box(
-                modifier = Modifier
-                    .size(100.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primaryContainer),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.Default.SystemUpdate, contentDescription = "Update", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(50.dp))
+            // GREEN DOT BADGE
+            if (isUpdateAvailableBadge && !updateExpanded && checkState != "DOWNLOADING" && checkState != "READY") {
+                Spacer(modifier = Modifier.width(8.dp))
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary)
+                )
             }
             
-            Spacer(modifier = Modifier.height(24.dp))
-            Text("RupeeFlow", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onBackground)
-            Text("Current Version: v$currentVersionName", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            
-            Spacer(modifier = Modifier.height(40.dp))
-
-            when (checkState) {
-                "CHECKING" -> {
-                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text("Checking for updates...", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
-                }
-                "UP_TO_DATE" -> {
-                    Icon(Icons.Default.CheckCircle, contentDescription = "Updated", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(48.dp))
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text("You're on the latest version!", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onBackground)
-                    Text("No new updates available.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
-                }
-                "AVAILABLE" -> {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                        shape = RoundedCornerShape(16.dp),
-                        elevation = CardDefaults.cardElevation(2.dp)
+            Spacer(modifier = Modifier.weight(1f))
+            Icon(
+                imageVector = if (updateExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown, 
+                contentDescription = null, 
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        
+        AnimatedVisibility(visible = updateExpanded) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 12.dp, bottom = 16.dp, end = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // LEFT SIDE FIXED (Logo & Version)
+                Column(
+                    modifier = Modifier.weight(0.35f),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(50.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primaryContainer),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Column(modifier = Modifier.padding(20.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.NewReleases, contentDescription = "New", tint = Color(0xFFE65100))
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Version ${updateInfo?.versionName} Available!", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface)
-                            }
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Text("What's New:", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(updateInfo?.releaseNotes ?: "", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
+                        Icon(Icons.Default.SystemUpdate, contentDescription = "Update", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(26.dp))
                     }
-                    
-                    Spacer(modifier = Modifier.height(32.dp))
-                    
-                    Button(
-                        onClick = {
-                            checkState = "DOWNLOADING"
-                            val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-                            val uri = Uri.parse(updateInfo?.apkUrl)
-                            val request = DownloadManager.Request(uri)
-                                .setTitle("RupeeFlow Update")
-                                .setDescription("Downloading latest version...")
-                                .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "RupeeFlow_Update_${updateInfo?.versionCode}.apk")
-                                .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-                            
-                            val downloadId = downloadManager.enqueue(request)
-                            
-                            coroutineScope.launch(Dispatchers.IO) {
-                                var isDownloading = true
-                                while (isDownloading) {
-                                    val query = DownloadManager.Query().setFilterById(downloadId)
-                                    val cursor = downloadManager.query(query)
-                                    if (cursor != null && cursor.moveToFirst()) {
-                                        val status = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS))
-                                        if (status == DownloadManager.STATUS_SUCCESSFUL) {
-                                            isDownloading = false
-                                            
-                                            val localUriStr = cursor.getString(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_LOCAL_URI))
-                                            val downloadedFile = File(Uri.parse(localUriStr).path!!)
-                                            val finalUri = FileProvider.getUriForFile(context, "${context.packageName}.provider", downloadedFile)
-                                            
-                                            withContext(Dispatchers.Main) {
-                                                downloadedApkUri = finalUri
-                                                checkState = "READY"
-                                                showUpdateReadyNotification(context, finalUri)
-                                            }
-                                        } else if (status == DownloadManager.STATUS_FAILED) {
-                                            isDownloading = false
-                                            withContext(Dispatchers.Main) {
-                                                checkState = "AVAILABLE"
-                                                Toast.makeText(context, "Download Failed", Toast.LENGTH_SHORT).show()
-                                            }
-                                        } else {
-                                            val bytesDownloaded = cursor.getLong(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR))
-                                            val bytesTotal = cursor.getLong(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES))
-                                            if (bytesTotal > 0) {
-                                                withContext(Dispatchers.Main) { downloadProgress = bytesDownloaded.toFloat() / bytesTotal.toFloat() }
-                                            }
-                                        }
-                                    }
-                                    cursor?.close()
-                                    if (isDownloading) delay(500)
-                                }
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth().height(52.dp).bounceClick(),
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Icon(Icons.Default.Download, contentDescription = "Download", tint = MaterialTheme.colorScheme.onPrimary)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Download Update", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onPrimary)
-                    }
-                }
-                "DOWNLOADING" -> {
-                    Text("Downloading in background...", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onBackground)
-                    Spacer(modifier = Modifier.height(16.dp))
-                    LinearProgressIndicator(
-                        progress = { downloadProgress },
-                        modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(50)),
-                        color = MaterialTheme.colorScheme.primary,
-                        trackColor = MaterialTheme.colorScheme.surfaceVariant
-                    )
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text("${(downloadProgress * 100).toInt()}%", color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(24.dp))
-                    Text("You can navigate away, the download will continue.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("RupeeFlow", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+                    Text("v$currentVersionName", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                "READY" -> {
-                    Icon(Icons.Default.Inventory, contentDescription = "Ready", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(48.dp))
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text("Update Ready to Install", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.onBackground)
-                    Spacer(modifier = Modifier.height(32.dp))
-                    
-                    Button(
-                        onClick = {
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !context.packageManager.canRequestPackageInstalls()) {
-                                val intent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
-                                    data = Uri.parse("package:${context.packageName}")
+
+                // RIGHT SIDE DYNAMIC (Live Status)
+                Box(
+                    modifier = Modifier.weight(0.65f).padding(start = 16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Crossfade(targetState = checkState, label = "UpdateState") { state ->
+                        when (state) {
+                            "IDLE", "CHECKING" -> {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text("Checking...", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
                                 }
-                                installLauncher.launch(intent)
-                                Toast.makeText(context, "Please allow RupeeFlow to install updates.", Toast.LENGTH_LONG).show()
-                            } else {
-                                downloadedApkUri?.let { uri -> installApk(context, uri) }
                             }
-                        },
-                        modifier = Modifier.fillMaxWidth().height(52.dp).bounceClick(),
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text("Install Now", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onPrimary)
+                            "UP_TO_DATE" -> {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Icon(Icons.Default.CheckCircle, contentDescription = "Updated", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(28.dp))
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text("Latest version!", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = MaterialTheme.colorScheme.onBackground)
+                                    Text("No updates.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
+                                }
+                            }
+                            "AVAILABLE" -> {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text("v${updateInfo?.versionName} Available", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface)
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Button(
+                                        onClick = {
+                                            checkState = "DOWNLOADING"
+                                            val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+                                            val uri = Uri.parse(updateInfo?.apkUrl)
+                                            val request = DownloadManager.Request(uri)
+                                                .setTitle("RupeeFlow Update")
+                                                .setDescription("Downloading latest version...")
+                                                .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "RupeeFlow_Update_${updateInfo?.versionCode}.apk")
+                                                .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                                            
+                                            val downloadId = downloadManager.enqueue(request)
+                                            
+                                            coroutineScope.launch(Dispatchers.IO) {
+                                                var isDownloading = true
+                                                while (isDownloading) {
+                                                    val query = DownloadManager.Query().setFilterById(downloadId)
+                                                    val cursor = downloadManager.query(query)
+                                                    if (cursor != null && cursor.moveToFirst()) {
+                                                        val status = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS))
+                                                        if (status == DownloadManager.STATUS_SUCCESSFUL) {
+                                                            isDownloading = false
+                                                            val localUriStr = cursor.getString(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_LOCAL_URI))
+                                                            val downloadedFile = File(Uri.parse(localUriStr).path!!)
+                                                            val finalUri = FileProvider.getUriForFile(context, "${context.packageName}.provider", downloadedFile)
+                                                            
+                                                            withContext(Dispatchers.Main) {
+                                                                downloadedApkUri = finalUri
+                                                                checkState = "READY"
+                                                                showUpdateReadyNotification(context, finalUri)
+                                                            }
+                                                        } else if (status == DownloadManager.STATUS_FAILED) {
+                                                            isDownloading = false
+                                                            withContext(Dispatchers.Main) {
+                                                                checkState = "AVAILABLE"
+                                                                Toast.makeText(context, "Download Failed", Toast.LENGTH_SHORT).show()
+                                                            }
+                                                        } else {
+                                                            val bytesDownloaded = cursor.getLong(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR))
+                                                            val bytesTotal = cursor.getLong(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES))
+                                                            if (bytesTotal > 0) {
+                                                                withContext(Dispatchers.Main) { downloadProgress = bytesDownloaded.toFloat() / bytesTotal.toFloat() }
+                                                            }
+                                                        }
+                                                    }
+                                                    cursor?.close()
+                                                    if (isDownloading) delay(500)
+                                                }
+                                            }
+                                        },
+                                        modifier = Modifier.height(36.dp),
+                                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
+                                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                                    ) {
+                                        Text("Download", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimary)
+                                    }
+                                }
+                            }
+                            "DOWNLOADING" -> {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                                    Text("Downloading...", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = MaterialTheme.colorScheme.onBackground)
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    LinearProgressIndicator(
+                                        progress = { downloadProgress },
+                                        modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(50)),
+                                        color = MaterialTheme.colorScheme.primary,
+                                        trackColor = MaterialTheme.colorScheme.surfaceVariant
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text("${(downloadProgress * 100).toInt()}%", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                            "READY" -> {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text("Ready to Install", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = MaterialTheme.colorScheme.onBackground)
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Button(
+                                        onClick = {
+                                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !context.packageManager.canRequestPackageInstalls()) {
+                                                val intent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+                                                    data = Uri.parse("package:${context.packageName}")
+                                                }
+                                                installLauncher.launch(intent)
+                                                Toast.makeText(context, "Allow installs to update", Toast.LENGTH_LONG).show()
+                                            } else {
+                                                downloadedApkUri?.let { uri -> installApk(context, uri) }
+                                            }
+                                        },
+                                        modifier = Modifier.height(36.dp),
+                                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
+                                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                                    ) {
+                                        Text("Install", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimary)
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
         }
+        HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
     }
 }
 
@@ -326,9 +363,7 @@ fun showUpdateReadyNotification(context: Context, apkUri: Uri) {
             channelId,
             "App Updates",
             NotificationManager.IMPORTANCE_HIGH
-        ).apply {
-            description = "Notifications for RupeeFlow version updates"
-        }
+        )
         notificationManager.createNotificationChannel(channel)
     }
 
@@ -348,7 +383,7 @@ fun showUpdateReadyNotification(context: Context, apkUri: Uri) {
     val notification = NotificationCompat.Builder(context, channelId)
         .setSmallIcon(android.R.drawable.stat_sys_download_done) 
         .setContentTitle("\uD83D\uDE80 RupeeFlow Update Ready")
-        .setContentText("Download complete. Tap here to install the latest version.")
+        .setContentText("Download complete. Tap here to install.")
         .setPriority(NotificationCompat.PRIORITY_HIGH) 
         .setAutoCancel(true) 
         .setContentIntent(pendingIntent) 
