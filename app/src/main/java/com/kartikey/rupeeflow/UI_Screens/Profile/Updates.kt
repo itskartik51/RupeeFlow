@@ -120,6 +120,9 @@ fun AppUpdateRow(isUpdateAvailableBadge: Boolean) {
 
             withContext(Dispatchers.IO) {
                 try {
+                    // UX Delay: Added to prevent UI animation flickering
+                    delay(600) 
+                    
                     val request = Request.Builder()
                         .url("https://raw.githubusercontent.com/itskartik51/RupeeFlow/main/Updates/version.json")
                         .build()
@@ -174,7 +177,6 @@ fun AppUpdateRow(isUpdateAvailableBadge: Boolean) {
                         .background(MaterialTheme.colorScheme.primary)
                 )
             }
-            // Chevron arrow is removed for a cleaner look
         }
         
         AnimatedVisibility(visible = updateExpanded) {
@@ -209,7 +211,7 @@ fun AppUpdateRow(isUpdateAvailableBadge: Boolean) {
                     }
                 }
 
-                // RIGHT SIDE DYNAMIC (Strict Alignment with Left Side)
+                // RIGHT SIDE DYNAMIC
                 Box(
                     modifier = Modifier.weight(0.65f).padding(start = 16.dp),
                     contentAlignment = Alignment.Center
