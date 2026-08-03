@@ -1,7 +1,8 @@
 package com.kartikey.rupeeflow.UI_Screens
 
 import android.content.Context
-import com.kartikey.rupeeflow.Cloud_Database.Constants
+import com.google.firebase.Timestamp
+import com.google.firebase.firestore.FirebaseFirestore
 import com.kartikey.rupeeflow.UI_Screens.Add.TransactionModel
 import com.kartikey.rupeeflow.UI_Screens.Assets.InvestmentItem
 import com.kartikey.rupeeflow.UI_Screens.Assets.BankAccountItem
@@ -10,27 +11,14 @@ import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.CreditCardItem
 import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.FDItem
 import com.kartikey.rupeeflow.UI_Screens.Home.ContriRoomModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONArray
 import org.json.JSONObject
+import java.text.SimpleDateFormat
 import java.util.Calendar
+import java.util.Date
 import java.util.Locale
-import java.util.concurrent.TimeUnit
-
-// Naya Singleton Network Engine (Connection Pooling & Keep-Alive ke liye)
-object NetworkClient {
-    val instance: OkHttpClient by lazy {
-        OkHttpClient.Builder()
-            .connectTimeout(15, TimeUnit.SECONDS)
-            .readTimeout(15, TimeUnit.SECONDS)
-            .writeTimeout(15, TimeUnit.SECONDS)
-            .retryOnConnectionFailure(true) // Network drop hone par auto-retry
-            .build()
-    }
-}
 
 data class AppData(
     val userFullName: String,
@@ -66,30 +54,229 @@ object CacheManager {
     suspend fun fetchAndCacheData(context: Context, username: String, forceRefresh: Boolean = false): AppData? {
         return withContext(Dispatchers.IO) {
             try {
-                val json = JSONObject().apply { 
-                    put("action", "get_all_data")
-                    put("username", username) 
-                    put("force_refresh", forceRefresh) 
-                }
-                
-                // Ab naya client nahi banega, purana fast connection reuse hoga
-                val client = NetworkClient.instance 
-                val body = json.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
-                val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(body).build()
-                val response = client.newCall(request).execute()
-                val responseData = response.body?.string() ?: ""
+                val db = FirebaseFirestore.getInstance()
 
-                if (response.isSuccessful && responseData.trim().startsWith("{")) {
-                    val jsonResponse = JSONObject(responseData)
-                    if (jsonResponse.optString("status") == "success") {
-                        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                        prefs.edit().putString("data_$username", responseData).apply()
-                        return@withContext parseJsonToAppData(responseData)
+                // 1. Fetch User Profile Document by Username
+                val userQuery = db.collection("Users")
+                    .whereEqualTo("username", username)
+                    .get()
+                    .await()
+
+                if (userQuery.isEmpty) return@withContext null
+
+                val userDoc = userQuery.documents[0]
+                val userRef = userDoc.reference
+
+                // Profile Fields
+                val profileObj = JSONObject().apply {
+                    put("name", userDoc.getString("name") ?: "")
+                    put("email", userDoc.getString("email") ?: "")
+                    put("mobile", userDoc.getString("mobile_no_") ?: userDoc.getString("mobile") ?: "")
+                    put("password", userDoc.getString("password") ?: "")
+                    
+                    val rawDob = userDoc.get("dob")
+                    val formattedDob = when (rawDob) {
+                        is Timestamp -> SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(rawDob.toDate())
+                        is String -> rawDob
+                        else -> ""
+                    }
+                    put("dob", formattedDob)
+                }
+
+                val budgetLimit = userDoc.getDouble("budget_limit") ?: 0.0
+
+                // 2. Fetch Expenses Sub-collection
+                val expensesDocs = userRef.collection("Expenses").get().await()
+                val expensesArray = JSONArray()
+
+                for (doc in expensesDocs) {
+                    val expObj = JSONObject()
+                    val rawDate = doc.get("date")
+                    val dateStr = when (rawDate) {
+                        is Timestamp -> SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(rawDate.toDate())
+                        is String -> rawDate
+                        else -> doc.id
+                    }
+
+                    expObj.put("date", dateStr)
+                    expObj.put("amount", doc.getDouble("amount") ?: 0.0)
+                    expObj.put("category", doc.getString("category") ?: "")
+                    expObj.put("detail1", doc.getString("detail_1") ?: doc.getString("detail1") ?: "")
+                    expObj.put("detail2", doc.getString("detail_2") ?: doc.getString("detail2") ?: "")
+                    
+                    val paymentDetail = doc.getString("payment_detail") ?: ""
+                    val splitPayment = paymentDetail.split("|").map { it.trim() }
+                    
+                    expObj.put("mode", if (splitPayment.isNotEmpty()) splitPayment[0] else "")
+                    expObj.put("source_type", if (splitPayment.size > 1) splitPayment[1] else "")
+                    expObj.put("source_id", if (splitPayment.size > 2) splitPayment[2] else "")
+
+                    expensesArray.put(expObj)
+                }
+
+                // 3. Fetch Finances Sub-collection
+                val financesDocs = userRef.collection("Finances").get().await()
+                var cashObj = JSONObject().apply {
+                    put("amount", 0.0)
+                    put("last_updated", "")
+                }
+                val banksArray = JSONArray()
+                val fdArray = JSONArray()
+                val ccArray = JSONArray()
+
+                for (doc in financesDocs) {
+                    when (doc.id) {
+                        "Cash" -> {
+                            cashObj.put("amount", doc.getDouble("total_cash") ?: doc.getDouble("amount") ?: 0.0)
+                            cashObj.put("last_updated", doc.getString("last_updated") ?: "")
+                        }
+                        "Banking_Data" -> {
+                            val dataMap = doc.data
+                            dataMap.forEach { (accNo, rawBank) ->
+                                if (rawBank is Map<*, *>) {
+                                    val bName = rawBank["bank_name"]?.toString() ?: ""
+                                    val curBal = (rawBank["current_bal"] as? Number)?.toDouble() ?: 0.0
+                                    val rate = (rawBank["interest_rate"] as? Number)?.toDouble() ?: 0.0
+                                    
+                                    val qtrPct = rate / 4.0
+                                    val expQtr = curBal * (qtrPct / 100.0)
+                                    val expYr = curBal * (rate / 100.0)
+                                    val oneDay = (curBal * (rate / 100.0)) / 365.0
+                                    val accruedQtr = (rawBank["accrued_qtr_int"] as? Number)?.toDouble() ?: (expQtr / 2.0)
+                                    val accruedYr = (rawBank["accrued_yr_int"] as? Number)?.toDouble() ?: (expYr / 2.0)
+
+                                    val bObj = JSONObject().apply {
+                                        put("bank_name", bName)
+                                        put("account_no", accNo)
+                                        put("current_bal", curBal)
+                                        put("interest_rate", rate)
+                                        put("qtr_interest_pct", qtrPct)
+                                        put("exp_qtr_int", expQtr)
+                                        put("accrued_qtr_int", accruedQtr)
+                                        put("exp_yr_int", expYr)
+                                        put("accrued_yr_int", accruedYr)
+                                        put("one_day_int", oneDay)
+                                    }
+                                    banksArray.put(bObj)
+                                }
+                            }
+                        }
+                        "Fixed_Deposits" -> {
+                            val dataMap = doc.data
+                            dataMap.forEach { (accNo, rawFd) ->
+                                if (rawFd is Map<*, *>) {
+                                    val invAmt = (rawFd["invested_amt"] as? Number)?.toDouble() ?: 0.0
+                                    val rate = (rawFd["interest_rate"] as? Number)?.toDouble() ?: 0.0
+                                    val matVal = (rawFd["maturity_value"] as? Number)?.toDouble() ?: invAmt
+                                    val accVal = (rawFd["accrued_value"] as? Number)?.toDouble() ?: invAmt
+                                    val accInt = (rawFd["accrued_int"] as? Number)?.toDouble() ?: (accVal - invAmt)
+                                    val oneDay = (invAmt * (rate / 100.0)) / 365.0
+
+                                    val fdObj = JSONObject().apply {
+                                        put("bank_name", rawFd["bank_name"]?.toString() ?: "")
+                                        put("account_no", accNo)
+                                        put("create_date", rawFd["create_date"]?.toString() ?: "")
+                                        put("maturity_date", rawFd["maturity_date"]?.toString() ?: "")
+                                        put("days_to_maturity", (rawFd["days_to_maturity"] as? Number)?.toInt() ?: 0)
+                                        put("invested_amt", invAmt)
+                                        put("interest_rate", rate)
+                                        put("maturity_value", matVal)
+                                        put("accrued_value", accVal)
+                                        put("accrued_int", accInt)
+                                        put("one_day_int", oneDay)
+                                    }
+                                    fdArray.put(fdObj)
+                                }
+                            }
+                        }
+                        "Credit_Cards" -> {
+                            val dataMap = doc.data
+                            dataMap.forEach { (cardNo, rawCc) ->
+                                if (rawCc is Map<*, *>) {
+                                    val limit = (rawCc["limit"] as? Number)?.toDouble() ?: 0.0
+                                    val out = (rawCc["outstanding"] as? Number)?.toDouble() ?: 0.0
+                                    val avail = (rawCc["available"] as? Number)?.toDouble() ?: (limit - out)
+                                    val util = if (limit > 0) (out / limit) * 100.0 else 0.0
+
+                                    val ccObj = JSONObject().apply {
+                                        put("issuer", rawCc["issuer"]?.toString() ?: "")
+                                        put("card_no", cardNo)
+                                        put("type", rawCc["type"]?.toString() ?: "Visa")
+                                        put("limit", limit)
+                                        put("outstanding", out)
+                                        put("available", avail)
+                                        put("utilization", util)
+                                        put("cibil_status", rawCc["cibil_status"]?.toString() ?: "Good")
+                                        put("billing_day", (rawCc["billing_day"] as? Number)?.toInt() ?: 0)
+                                        put("due_day", (rawCc["due_day"] as? Number)?.toInt() ?: 0)
+                                        put("reminder_day", (rawCc["reminder_day"] as? Number)?.toInt() ?: 0)
+                                        put("annual_fee", (rawCc["annual_fee"] as? Number)?.toDouble() ?: 0.0)
+                                        put("joining_fee", (rawCc["joining_fee"] as? Number)?.toDouble() ?: 0.0)
+                                        put("last_used", rawCc["last_used"]?.toString() ?: "")
+                                    }
+                                    ccArray.put(ccObj)
+                                }
+                            }
+                        }
                     }
                 }
-                null
+
+                // 4. Fetch Investments Sub-collection
+                val invDocs = userRef.collection("Investments").get().await()
+                val invArray = JSONArray()
+                for (doc in invDocs) {
+                    val invObj = JSONObject().apply {
+                        put("asset_name", doc.getString("asset_name") ?: doc.id)
+                        put("asset_type", doc.getString("asset_type") ?: "Stock")
+                        put("quantity", doc.getDouble("quantity") ?: 0.0)
+                        put("buy_price", doc.getDouble("buy_price") ?: 0.0)
+                        put("current_price", doc.getDouble("current_price") ?: doc.getDouble("buy_price") ?: 0.0)
+                        put("one_day_change", doc.getDouble("one_day_change") ?: 0.0)
+                    }
+                    invArray.put(invObj)
+                }
+
+                // 5. Fetch Contri Rooms
+                val contriArray = JSONArray()
+                val contriDocs = db.collection("Contri")
+                    .whereArrayContains("members", username)
+                    .get()
+                    .await()
+
+                for (doc in contriDocs) {
+                    val cObj = JSONObject().apply {
+                        put("room_name", doc.getString("room_name") ?: "")
+                        put("room_code", doc.id)
+                        put("passkey", doc.getString("passkey") ?: "123456")
+                        put("expenses", JSONArray())
+                    }
+                    contriArray.put(cObj)
+                }
+
+                // Construct Master Payload
+                val masterJson = JSONObject().apply {
+                    put("status", "success")
+                    put("profile", profileObj)
+                    put("budget_limit", budgetLimit)
+                    put("expenses", expensesArray)
+                    put("cash", cashObj)
+                    put("banks", banksArray)
+                    put("fds", fdArray)
+                    put("credit_cards", ccArray)
+                    put("investments", invArray)
+                    put("contri_rooms", contriArray)
+                }
+
+                val responseData = masterJson.toString()
+
+                // Local Cache Update
+                val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                prefs.edit().putString("data_$username", responseData).apply()
+
+                return@withContext parseJsonToAppData(responseData)
+
             } catch (e: Exception) {
-                null 
+                null
             }
         }
     }
@@ -157,7 +344,7 @@ object CacheManager {
                 fetchedInvList.add(
                     InvestmentItem(
                         assetName = item.optString("asset_name", ""),
-                        assetType = item.optString("asset_type", "Stock"), // <-- YAHAN FIX KIYA HAI
+                        assetType = item.optString("asset_type", "Stock"),
                         quantity = item.optDouble("quantity", 0.0), 
                         avgBuyPrice = item.optDouble("buy_price", 0.0), 
                         currentPrice = item.optDouble("current_price", item.optDouble("buy_price", 0.0)), 
@@ -271,8 +458,8 @@ object CacheManager {
             userMobile = tempMobile,
             userPassword = tempPass,
             userDob = tempDob,
-            thisMonthExpenses = tempMonth, // BUG FIX: Removed fallback to tempTotal
-            thisYearExpenses = tempYear,   // BUG FIX: Removed fallback to tempTotal
+            thisMonthExpenses = tempMonth,
+            thisYearExpenses = tempYear,
             budgetLimit = fetchedBudgetLimit,
             transactionList = tempHistory.reversed(),
             investmentList = fetchedInvList,
