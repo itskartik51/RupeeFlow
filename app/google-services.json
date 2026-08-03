@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "863578276398",
+    "project_id": "rupeeflow-backend",
+    "storage_bucket": "rupeeflow-backend.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:863578276398:android:4ed0716c71c3e6d34dd5bf",
+        "android_client_info": {
+          "package_name": "com.kartikey.rupeeflow"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCXlVhkdQbkF5lV8nIq-s5Ue5ZnX7AWAJc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
