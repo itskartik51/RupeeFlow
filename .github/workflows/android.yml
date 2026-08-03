@@ -20,13 +20,11 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
-    # 1. Bina 'gradlew' file ke, sidha GitHub ka Gradle (v8.7) install karega
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v3
       with:
         gradle-version: '8.7'
 
-    # 2. JSON file create karega
     - name: Create Google Services JSON
       env:
         GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
@@ -36,6 +34,5 @@ jobs:
         ${{ secrets.GOOGLE_SERVICES_JSON }}
         EOF
 
-    # 3. Direct 'gradle' command se build karega (No ./gradlew required)
-    - name: Build Debug APK
-      run: gradle assembleDebug
+    - name: Build Release APK
+      run: gradle assembleRelease
