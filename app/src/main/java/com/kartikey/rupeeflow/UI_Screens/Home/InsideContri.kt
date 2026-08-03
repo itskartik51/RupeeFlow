@@ -119,7 +119,6 @@ fun InsideContriScreen(
                     val contriDoc = contriQuery.documents[0]
                     val admin = contriDoc.getString("admin") ?: ""
                     
-                    // 100% BULLETPROOF SAFE CASTING FOR FIREBASE ARRAYS
                     val memberUsernames = (contriDoc.get("member_usernames") as? List<*>)?.map { it.toString() } ?: emptyList()
                     val membersArray = (contriDoc.get("members") as? List<*>)?.map { it.toString() } ?: emptyList()
                     
@@ -138,33 +137,26 @@ fun InsideContriScreen(
                         totalGroupExpense = if (totalExpRaw is Number) totalExpRaw.toDouble() else 0.0
                     }
 
-                    // 1. Fetch Active Transactions
-                    val transDocs = contriDoc.reference.collection("Transactions").get().await()
+                    // 1. Fetch Transactions from EACH user's personal collection
                     val membersMap = mutableMapOf<String, MemberLedger>()
                     
                     for (m in activeMembersList) { 
-                        membersMap[m] = MemberLedger(m, 0.0, mutableListOf()) 
-                    }
-                    
-                    for (doc in transDocs) {
-                        val item = doc.getString("item_name") ?: "Unknown"
+                        // Fetch the specific user's collection
+                        val userExpDocs = contriDoc.reference.collection(m).get().await()
+                        var userSpent = 0.0
+                        val expList = mutableListOf<ContriExpense>()
                         
-                        val rawAmt = doc.get("amount")
-                        val amt = if (rawAmt is Number) rawAmt.toDouble() else 0.0
-                        
-                        val date = doc.getString("date") ?: ""
-                        val paidBy = doc.getString("paid_by") ?: ""
-                        
-                        val matchedKey = membersMap.keys.find { it.equals(paidBy, ignoreCase = true) } ?: paidBy
-                        
-                        if (membersMap.containsKey(matchedKey)) {
-                            val current = membersMap[matchedKey]!!
-                            val updatedList = current.expenses.toMutableList()
-                            updatedList.add(ContriExpense(item, amt, date))
-                            membersMap[matchedKey] = current.copy(totalSpent = current.totalSpent + amt, expenses = updatedList)
-                        } else {
-                            membersMap[matchedKey] = MemberLedger(matchedKey, amt, mutableListOf(ContriExpense(item, amt, date)))
+                        for (doc in userExpDocs) {
+                            val item = doc.getString("item_name") ?: "Unknown"
+                            val rawAmt = doc.get("amount")
+                            val amt = if (rawAmt is Number) rawAmt.toDouble() else 0.0
+                            val date = doc.getString("date") ?: ""
+                            
+                            userSpent += amt
+                            expList.add(ContriExpense(item, amt, date))
                         }
+                        
+                        membersMap[m] = MemberLedger(m, userSpent, expList)
                     }
 
                     // 2. Fetch Past Cycles
@@ -376,12 +368,12 @@ fun InsideContriScreen(
                 Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                 }
-            } else if (ledgers.isEmpty()) {
+            } else if (ledgers.isEmpty() || ledgers.all { it.expenses.isEmpty() }) {
                 Box(modifier = Modifier.fillMaxWidth().height(200.dp).padding(top = 40.dp), contentAlignment = Alignment.TopCenter) {
                     Text("No expenses yet. Tap + to add!", color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f), fontWeight = FontWeight.Medium)
                 }
             } else {
-                DynamicLedgerView(ledgers)
+                DynamicLedgerView(ledgers.filter { it.expenses.isNotEmpty() || it.totalSpent > 0 })
             }
 
             // PAST CYCLES
@@ -707,10 +699,14 @@ fun InsideContriScreen(
                                     
                                     if (!q.isEmpty) {
                                         val ref = q.documents[0].reference
-                                        val transDocs = ref.collection("Transactions").get().await()
+                                        val activeUsers = (ref.get("member_usernames") as? List<*>)?.map { it.toString() } ?: emptyList()
                                         
-                                        for (doc in transDocs.documents) {
-                                            doc.reference.delete().await()
+                                        // CLEAR EXPENSES FROM EACH USER'S COLLECTION
+                                        for (m in activeUsers) {
+                                            val userExpDocs = ref.collection(m).get().await()
+                                            for (doc in userExpDocs) {
+                                                doc.reference.delete().await()
+                                            }
                                         }
                                         
                                         ref.update("total_group_expense", 0.0).await()
@@ -785,28 +781,28 @@ fun InsideContriScreen(
                     CoroutineScope(Dispatchers.IO).launch {
                         try {
                             val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+                            val dateForDocId = SimpleDateFormat("dd-MM-yyyy", Locale.getDefault()).format(Date(dateMillis))
                             val db = FirebaseFirestore.getInstance()
 
                             val q = db.collection("Contri").whereEqualTo("contri_code", room.roomCode).get().await()
                             if (!q.isEmpty) {
                                 val ref = q.documents[0].reference
-                                val transCol = ref.collection("Transactions")
                                 
-                                // FIX: Generate Custom Document ID -> 001_ExpenseTitle
-                                val existingDocs = transCol.get().await()
+                                // FIX: Save expense in the specific USER's sub-collection
+                                val userCol = ref.collection(username)
+                                val existingDocs = userCol.get().await()
                                 val nextIndex = existingDocs.size() + 1
                                 val formattedIndex = String.format(Locale.US, "%03d", nextIndex)
-                                val safeTitle = title.replace(Regex("[^A-Za-z0-9]"), "")
-                                val customDocId = "${formattedIndex}_${safeTitle}"
+                                val customDocId = "${formattedIndex}_${dateForDocId}"
 
                                 val transData = hashMapOf(
                                     "item_name" to title,
                                     "amount" to amount,
                                     "date" to sdf.format(Date(dateMillis)),
-                                    "paid_by" to username,
                                     "timestamp" to FieldValue.serverTimestamp()
                                 )
-                                transCol.document(customDocId).set(transData).await()
+                                
+                                userCol.document(customDocId).set(transData).await()
                                 ref.update("total_group_expense", FieldValue.increment(amount)).await()
                                 
                                 withContext(Dispatchers.Main) { refreshTrigger++ }
