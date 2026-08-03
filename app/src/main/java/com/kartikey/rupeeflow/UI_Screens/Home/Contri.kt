@@ -348,6 +348,16 @@ fun AutoJoinContriDialog(
                             "members", FieldValue.arrayUnion(exactMemberString)
                         ).await()
                         
+                        // FIX FOR POINT 3: Update room_X inside User Document
+                        if (!userQuery.isEmpty) {
+                            val userDocRef = userQuery.documents[0].reference
+                            val userData = userQuery.documents[0].data ?: emptyMap<String, Any>()
+                            val existingRooms = userData.keys.filter { it.startsWith("room_") }
+                            val nextRoomIndex = existingRooms.size + 1
+                            val roomVal = "$roomName / $roomCode / $pin"
+                            userDocRef.update("room_$nextRoomIndex", roomVal).await()
+                        }
+                        
                         withContext(Dispatchers.Main) { 
                             Toast.makeText(context, "Joined $roomName!", Toast.LENGTH_SHORT).show()
                             onSuccess() 
@@ -571,6 +581,16 @@ fun CreateContriDialog(username: String, onDismiss: () -> Unit, onSuccess: () ->
                                     
                                     db.collection("Contri").document(docId).set(contriData).await()
                                     
+                                    // FIX FOR POINT 3: Save room_X inside User Document
+                                    if (!userQuery.isEmpty) {
+                                        val userDocRef = userQuery.documents[0].reference
+                                        val userData = userQuery.documents[0].data ?: emptyMap<String, Any>()
+                                        val existingRooms = userData.keys.filter { it.startsWith("room_") }
+                                        val nextRoomIndex = existingRooms.size + 1
+                                        val roomVal = "$contriName / $randomCode / $pin"
+                                        userDocRef.update("room_$nextRoomIndex", roomVal).await()
+                                    }
+                                    
                                     withContext(Dispatchers.Main) {
                                         isSubmitting = false
                                         Toast.makeText(context, "Room Created!", Toast.LENGTH_SHORT).show()
@@ -768,11 +788,22 @@ fun JoinContriDialog(
                                                 val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
                                                 val fullName = if (!userQuery.isEmpty) userQuery.documents[0].getString("name") ?: username else username
                                                 val exactMemberString = "$fullName/$todayStr"
+                                                val roomName = doc.getString("contri_name") ?: "Contri Room"
                                                 
                                                 doc.reference.update(
                                                     "member_usernames", FieldValue.arrayUnion(username),
                                                     "members", FieldValue.arrayUnion(exactMemberString)
                                                 ).await()
+                                                
+                                                // FIX FOR POINT 3: Save room_X inside User Document
+                                                if (!userQuery.isEmpty) {
+                                                    val userDocRef = userQuery.documents[0].reference
+                                                    val userData = userQuery.documents[0].data ?: emptyMap<String, Any>()
+                                                    val existingRooms = userData.keys.filter { it.startsWith("room_") }
+                                                    val nextRoomIndex = existingRooms.size + 1
+                                                    val roomVal = "$roomName / $formattedCode / $pin"
+                                                    userDocRef.update("room_$nextRoomIndex", roomVal).await()
+                                                }
                                                 
                                                 withContext(Dispatchers.Main) {
                                                     isSubmitting = false
