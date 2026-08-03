@@ -20,11 +20,13 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.google.firebase.firestore.FirebaseFirestore
 import com.kartikey.rupeeflow.UI_Screens.bounceClick
-import com.kartikey.rupeeflow.UI_Screens.updateUserProfile
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -82,29 +84,67 @@ fun ProfileDetailsScreen(
                                 Toast.makeText(context, "Saving changes...", Toast.LENGTH_SHORT).show()
                                 
                                 CoroutineScope(Dispatchers.IO).launch {
-                                    updateUserProfile(
-                                        oldUsername = username,
-                                        newName = currentName,
-                                        newUsername = currentUsername,
-                                        newMobile = currentMobile,
-                                        newEmail = currentEmail,
-                                        newPassword = currentPassword,
-                                        newDob = currentDob,
-                                        onSuccess = {
-                                            usernameError = false
-                                            onProfileUpdated() 
-                                            Toast.makeText(context, "Profile Details Updated!", Toast.LENGTH_SHORT).show()
-                                        },
-                                        onError = { errorType ->
-                                            if (errorType == "username_taken") {
-                                                isEditing = true
-                                                usernameError = true 
-                                            } else {
-                                                isEditing = true
-                                                Toast.makeText(context, "Update Failed!", Toast.LENGTH_SHORT).show()
+                                    try {
+                                        val db = FirebaseFirestore.getInstance()
+                                        
+                                        // 1. If username changed, verify it's not already taken
+                                        if (currentUsername.trim() != username) {
+                                            val duplicateCheck = db.collection("Users")
+                                                .whereEqualTo("username", currentUsername.trim())
+                                                .get()
+                                                .await()
+                                                
+                                            if (!duplicateCheck.isEmpty) {
+                                                withContext(Dispatchers.Main) {
+                                                    isEditing = true
+                                                    usernameError = true
+                                                    Toast.makeText(context, "Username already taken!", Toast.LENGTH_SHORT).show()
+                                                }
+                                                return@launch
                                             }
                                         }
-                                    )
+
+                                        // 2. Fetch User Document
+                                        val userQuery = db.collection("Users")
+                                            .whereEqualTo("username", username)
+                                            .get()
+                                            .await()
+                                            
+                                        if (!userQuery.isEmpty) {
+                                            val userRef = userQuery.documents[0].reference
+                                            
+                                            val formattedMobile = if (currentMobile.startsWith("+91")) currentMobile else "+91$currentMobile"
+                                            
+                                            // 3. Update Firestore Data
+                                            val updates = hashMapOf<String, Any>(
+                                                "name" to currentName.trim(),
+                                                "username" to currentUsername.trim(),
+                                                "mobile_no_" to formattedMobile,
+                                                "email" to currentEmail.trim(),
+                                                "password" to currentPassword.trim(),
+                                                "dob" to currentDob.trim()
+                                            )
+                                            
+                                            userRef.update(updates).await()
+                                            
+                                            withContext(Dispatchers.Main) {
+                                                usernameError = false
+                                                onProfileUpdated() 
+                                                Toast.makeText(context, "Profile Details Updated!", Toast.LENGTH_SHORT).show()
+                                            }
+                                        } else {
+                                            withContext(Dispatchers.Main) {
+                                                isEditing = true
+                                                Toast.makeText(context, "User not found!", Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
+                                        
+                                    } catch (e: Exception) {
+                                        withContext(Dispatchers.Main) {
+                                            isEditing = true
+                                            Toast.makeText(context, "Update Failed!", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
                                 }
                             } else {
                                 isEditing = true 
