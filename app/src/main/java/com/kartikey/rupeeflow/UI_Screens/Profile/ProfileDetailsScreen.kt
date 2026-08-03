@@ -21,6 +21,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.Timestamp
 import com.kartikey.rupeeflow.UI_Screens.bounceClick
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -113,17 +114,27 @@ fun ProfileDetailsScreen(
                                         if (!userQuery.isEmpty) {
                                             val userRef = userQuery.documents[0].reference
                                             
-                                            val formattedMobile = if (currentMobile.startsWith("+91")) currentMobile else "+91$currentMobile"
+                                            val cleanMobile = currentMobile.trim().removePrefix("+91")
+                                            
+                                            // Convert Date String to Timestamp
+                                            val dobDate = try {
+                                                if (currentDob.isNotBlank()) sdf.parse(currentDob.trim()) else null
+                                            } catch (e: Exception) { null }
                                             
                                             // 3. Update Firestore Data
                                             val updates = hashMapOf<String, Any>(
                                                 "name" to currentName.trim(),
                                                 "username" to currentUsername.trim(),
-                                                "mobile_no_" to formattedMobile,
+                                                "mobile_no_" to cleanMobile,
                                                 "email" to currentEmail.trim(),
-                                                "password" to currentPassword.trim(),
-                                                "dob" to currentDob.trim()
+                                                "password" to currentPassword.trim()
                                             )
+                                            
+                                            if (dobDate != null) {
+                                                updates["dob"] = Timestamp(dobDate)
+                                            } else {
+                                                updates["dob"] = currentDob.trim()
+                                            }
                                             
                                             userRef.update(updates).await()
                                             
