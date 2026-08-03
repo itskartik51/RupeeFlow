@@ -32,15 +32,18 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.kartikey.rupeeflow.Cloud_Database.Constants
+import com.google.firebase.FieldValue
+import com.google.firebase.firestore.FieldValue as FirestoreFieldValue
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
 import com.kartikey.rupeeflow.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
-import org.json.JSONObject
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @Composable
 fun LoginScreen(onLoginSuccess: (String) -> Unit) {
@@ -260,8 +263,7 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.clickable { 
-                    }
+                    modifier = Modifier.clickable { }
                 )
             }
         }
@@ -305,40 +307,139 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
                     coroutineScope.launch(Dispatchers.IO) {
                         try {
                             statusMessage = "Processing..."
-                            val json = JSONObject().apply {
-                                put("action", if (isLoginMode) "login" else "signup")
-                                put("name", name)
-                                put("mobile", if (!isLoginMode) "+91$mobile" else mobile)
-                                put("username", username)
-                                put("password", password)
-                                if (!isLoginMode) {
-                                    put("email", email) 
-                                }
-                            }
+                            val db = FirebaseFirestore.getInstance()
 
-                            val client = NetworkClient.instance
-                            val body = json.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
-                            val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(body).build()
-                            val response = client.newCall(request).execute()
-                            val responseData = response.body?.string() ?: ""
-                            
-                            withContext(Dispatchers.Main) {
-                                try {
-                                    val jsonResponse = JSONObject(responseData)
-                                    val status = jsonResponse.optString("status")
-                                    val message = jsonResponse.optString("message")
+                            if (isLoginMode) {
+                                // ==========================================
+                                // FIRESTORE LOGIN LOGIC
+                                // ==========================================
+                                val inputUserOrMobile = mobile.trim()
+                                val inputPass = password.trim()
 
-                                    if (status == "success") {
-                                        val loggedInUser = jsonResponse.optString("username")
-                                        onLoginSuccess(loggedInUser)
-                                    } else {
-                                        statusMessage = message
+                                // 1. Try search by Username
+                                var query = db.collection("Users")
+                                    .whereEqualTo("username", inputUserOrMobile)
+                                    .get()
+                                    .await()
+
+                                // 2. If empty, search by Mobile
+                                if (query.isEmpty) {
+                                    val formattedMobile = if (inputUserOrMobile.startsWith("+91")) inputUserOrMobile else "+91$inputUserOrMobile"
+                                    query = db.collection("Users")
+                                        .whereEqualTo("mobile_no_", formattedMobile)
+                                        .get()
+                                        .await()
+
+                                    if (query.isEmpty) {
+                                        query = db.collection("Users")
+                                            .whereEqualTo("mobile", formattedMobile)
+                                            .get()
+                                            .await()
                                     }
-                                } catch (e: Exception) {
-                                    statusMessage = "Error parsing data!"
+                                }
+
+                                if (!query.isEmpty) {
+                                    val userDoc = query.documents[0]
+                                    val savedPassword = userDoc.getString("password") ?: ""
+
+                                    if (savedPassword == inputPass) {
+                                        val matchedUsername = userDoc.getString("username") ?: inputUserOrMobile
+                                        withContext(Dispatchers.Main) {
+                                            onLoginSuccess(matchedUsername)
+                                        }
+                                    } else {
+                                        withContext(Dispatchers.Main) {
+                                            statusMessage = "Incorrect password!"
+                                        }
+                                    }
+                                } else {
+                                    withContext(Dispatchers.Main) {
+                                        statusMessage = "User not found!"
+                                    }
+                                }
+
+                            } else {
+                                // ==========================================
+                                // FIRESTORE SIGNUP LOGIC
+                                // ==========================================
+                                val formattedMobile = "+91${mobile.trim()}"
+                                val newUsername = username.trim()
+
+                                // 1. Check if Username already taken
+                                val userCheck = db.collection("Users")
+                                    .whereEqualTo("username", newUsername)
+                                    .get()
+                                    .await()
+
+                                if (!userCheck.isEmpty) {
+                                    withContext(Dispatchers.Main) {
+                                        statusMessage = "Username already taken!"
+                                    }
+                                    return@launch
+                                }
+
+                                // 2. Check if Mobile already registered
+                                val mobileCheck = db.collection("Users")
+                                    .whereEqualTo("mobile_no_", formattedMobile)
+                                    .get()
+                                    .await()
+
+                                if (!mobileCheck.isEmpty) {
+                                    withContext(Dispatchers.Main) {
+                                        statusMessage = "Mobile number already registered!"
+                                    }
+                                    return@launch
+                                }
+
+                                // 3. Auto-increment User ID from System/Metadata
+                                val metaRef = db.collection("System").document("Metadata")
+                                val metaDoc = metaRef.get().await()
+                                var lastCounter = 8L
+
+                                if (metaDoc.exists()) {
+                                    lastCounter = metaDoc.getLong("last_user_id") 
+                                        ?: metaDoc.getLong("counter") 
+                                        ?: 8L
+                                }
+
+                                val nextCounter = lastCounter + 1
+                                val newUserId = String.format(Locale.US, "%04d", nextCounter) // e.g. "0009"
+
+                                // Update counter in Metadata
+                                metaRef.set(mapOf("last_user_id" to nextCounter), SetOptions.merge())
+
+                                // 4. Create User Profile Doc
+                                val userData = hashMapOf(
+                                    "name" to name.trim(),
+                                    "username" to newUsername,
+                                    "mobile_no_" to formattedMobile,
+                                    "email" to email.trim(),
+                                    "password" to password.trim(),
+                                    "dob" to "",
+                                    "budget_limit" to 0.0,
+                                    "created_at" to FirestoreFieldValue.serverTimestamp()
+                                )
+
+                                val newUserRef = db.collection("Users").document(newUserId)
+                                newUserRef.set(userData).await()
+
+                                // 5. Seed default Cash Document
+                                val cashData = hashMapOf(
+                                    "total_cash" to 0.0,
+                                    "last_updated" to SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
+                                )
+                                newUserRef.collection("Finances").document("Cash").set(cashData).await()
+
+                                withContext(Dispatchers.Main) {
+                                    onLoginSuccess(newUsername)
                                 }
                             }
-                        } catch (e: Exception) { withContext(Dispatchers.Main) { statusMessage = "Network Error!" } }
+
+                        } catch (e: Exception) {
+                            withContext(Dispatchers.Main) { 
+                                statusMessage = "Network/Firestore Error: ${e.localizedMessage ?: "Try again"}" 
+                            } 
+                        }
                     }
                 }
                 .clip(RoundedCornerShape(12.dp))
