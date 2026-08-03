@@ -3,23 +3,23 @@ package com.kartikey.rupeeflow.UI_Screens
 import android.widget.Toast
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.Image
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -32,20 +32,19 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
 import com.kartikey.rupeeflow.Cloud_Database.Constants
 import com.kartikey.rupeeflow.UI_Screens.Add.TransactionModel
 import com.kartikey.rupeeflow.UI_Screens.Assets.BankAccountItem
 import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.CreditCardItem
 import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.FDItem
-import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.CashItem
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
-import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -72,57 +71,54 @@ fun EditBankDialog(bank: BankAccountItem, username: String, onDismiss: () -> Uni
     if (showDeleteConfirm) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("Delete Bank Account", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
-            text = { Text("Are you sure you want to permanently remove this bank account? This action cannot be undone.", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+            title = { Text("Delete Bank Account", fontWeight = FontWeight.Bold, color = Color.Black) },
+            text = { Text("Are you sure you want to permanently remove this bank account? This action cannot be undone.", color = Color.DarkGray) },
             confirmButton = {
                 Button(
                     onClick = {
-                        // OPTIMISTIC UI: Instant Dismiss
                         showDeleteConfirm = false
                         onDismiss()
                         Toast.makeText(context, "Deleting bank...", Toast.LENGTH_SHORT).show()
                         
                         CoroutineScope(Dispatchers.IO).launch {
                             try {
-                                val jsonBody = JSONObject().apply { 
-                                    put("action", "delete_data")
-                                    put("username", username)
-                                    put("data_type", "bank")
-                                    put("identifier", bank.accountNo) 
+                                val db = FirebaseFirestore.getInstance()
+                                val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
+                                if (!userQuery.isEmpty) {
+                                    val userRef = userQuery.documents[0].reference
+                                    val updates = hashMapOf<String, Any>(
+                                        bank.accountNo to FieldValue.delete()
+                                    )
+                                    userRef.collection("Finances").document("Banking_Data").update(updates).await()
+                                    withContext(Dispatchers.Main) { onUpdateSuccess() }
+                                } else {
+                                    withContext(Dispatchers.Main) { Toast.makeText(context, "Failed to delete account!", Toast.LENGTH_SHORT).show() }
                                 }
-                                val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(jsonBody.toString().toRequestBody("application/json".toMediaType())).build()
-                                val response = NetworkClient.instance.newCall(request).execute()
-                                val resData = response.body?.string() ?: ""
-                                withContext(Dispatchers.Main) {
-                                    if (resData.contains("success")) { 
-                                        onUpdateSuccess() // Background refresh
-                                    } else { 
-                                        Toast.makeText(context, "Failed to delete account!", Toast.LENGTH_SHORT).show() 
-                                    }
-                                }
-                            } catch (e: Exception) {}
+                            } catch (e: Exception) {
+                                withContext(Dispatchers.Main) { Toast.makeText(context, "Failed to delete account!", Toast.LENGTH_SHORT).show() }
+                            }
                         }
                     }, 
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F))
                 ) { 
-                    Text("Delete", color = MaterialTheme.colorScheme.onError, fontWeight = FontWeight.Bold) 
+                    Text("Delete", color = Color.White, fontWeight = FontWeight.Bold) 
                 }
             }, 
             dismissButton = { 
                 TextButton(onClick = { showDeleteConfirm = false }) { 
-                    Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold) 
+                    Text("Cancel", color = Color.Gray, fontWeight = FontWeight.Bold) 
                 } 
             }
         )
     }
 
     Dialog(onDismissRequest = { onDismiss() }, properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = false)) {
-        Card(modifier = Modifier.fillMaxWidth().padding(8.dp), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), elevation = CardDefaults.cardElevation(8.dp)) {
+        Card(modifier = Modifier.fillMaxWidth().padding(8.dp), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(8.dp)) {
             Column(modifier = Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text(text = "Edit Bank Details", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onSurface)
+                    Text(text = "Edit Bank Details", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
                     IconButton(onClick = { showDeleteConfirm = true }) { 
-                        Icon(Icons.Outlined.Delete, contentDescription = "Delete Bank", tint = MaterialTheme.colorScheme.error) 
+                        Icon(Icons.Outlined.Delete, contentDescription = "Delete Bank", tint = Color(0xFFD32F2F)) 
                     }
                 }
                 Spacer(modifier = Modifier.height(16.dp))
@@ -134,12 +130,12 @@ fun EditBankDialog(bank: BankAccountItem, username: String, onDismiss: () -> Uni
                         modifier = Modifier.fillMaxWidth().menuAnchor(), 
                         singleLine = true, 
                         shape = RoundedCornerShape(12.dp), 
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary, focusedLabelColor = MaterialTheme.colorScheme.primary)
+                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF2E7D32), focusedLabelColor = Color(0xFF2E7D32))
                     )
                     if (showDropdown) { 
-                        ExposedDropdownMenu(expanded = showDropdown, onDismissRequest = { expanded = false }, modifier = Modifier.background(MaterialTheme.colorScheme.surface)) { 
+                        ExposedDropdownMenu(expanded = showDropdown, onDismissRequest = { expanded = false }, modifier = Modifier.background(Color.White)) { 
                             filteredBanks.forEach { selectionOption -> 
-                                DropdownMenuItem(text = { Text(selectionOption, color = MaterialTheme.colorScheme.onSurface) }, onClick = { bankName = selectionOption; expanded = false }) 
+                                DropdownMenuItem(text = { Text(selectionOption, color = Color.Black) }, onClick = { bankName = selectionOption; expanded = false }) 
                             } 
                         } 
                     }
@@ -150,12 +146,12 @@ fun EditBankDialog(bank: BankAccountItem, username: String, onDismiss: () -> Uni
                         value = bankBalance, 
                         onValueChange = { bankBalance = it }, 
                         label = { Text("Balance") }, 
-                        prefix = { Text("₹ ", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) }, 
+                        prefix = { Text("₹ ", fontWeight = FontWeight.Bold, color = Color.Black) }, 
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), 
                         modifier = Modifier.weight(1f), 
                         singleLine = true, 
                         shape = RoundedCornerShape(12.dp), 
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary, focusedLabelColor = MaterialTheme.colorScheme.primary)
+                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF2E7D32), focusedLabelColor = Color(0xFF2E7D32))
                     )
                     OutlinedTextField(
                         value = interestRate, 
@@ -166,7 +162,7 @@ fun EditBankDialog(bank: BankAccountItem, username: String, onDismiss: () -> Uni
                         modifier = Modifier.weight(1f), 
                         singleLine = true, 
                         shape = RoundedCornerShape(12.dp), 
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary, focusedLabelColor = MaterialTheme.colorScheme.primary)
+                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF2E7D32), focusedLabelColor = Color(0xFF2E7D32))
                     )
                 }
                 Spacer(modifier = Modifier.height(28.dp))
@@ -175,8 +171,8 @@ fun EditBankDialog(bank: BankAccountItem, username: String, onDismiss: () -> Uni
                         onClick = { onDismiss() }, 
                         modifier = Modifier.weight(1f).height(50.dp).scale(cancelButtonScale).pointerInput(Unit) { detectTapGestures(onPress = { isCancelPressed = true; tryAwaitRelease(); isCancelPressed = false }) }, 
                         shape = RoundedCornerShape(12.dp), 
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)), 
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface)
+                        border = BorderStroke(1.dp, Color.LightGray), 
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Black)
                     ) { 
                         Text("Cancel", fontWeight = FontWeight.Bold) 
                     }
@@ -191,32 +187,28 @@ fun EditBankDialog(bank: BankAccountItem, username: String, onDismiss: () -> Uni
                                     return@Button 
                                 }
                                 
-                                // OPTIMISTIC UI: Instant Dismiss
                                 onDismiss()
                                 Toast.makeText(context, "Updating bank...", Toast.LENGTH_SHORT).show()
                                 
                                 CoroutineScope(Dispatchers.IO).launch {
                                     try {
-                                        val jsonBody = JSONObject().apply { 
-                                            put("action", "edit_bank")
-                                            put("username", username)
-                                            put("original_account_no", bank.accountNo)
-                                            put("new_bank_name", bankName)
-                                            put("new_account_no", bank.accountNo)
-                                            put("new_current_bal", newBal)
-                                            put("new_interest_rate", newRate) 
+                                        val db = FirebaseFirestore.getInstance()
+                                        val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
+                                        if (!userQuery.isEmpty) {
+                                            val userRef = userQuery.documents[0].reference
+                                            val updateMap = hashMapOf<String, Any>(
+                                                "${bank.accountNo}.bank_name" to bankName,
+                                                "${bank.accountNo}.current_bal" to newBal,
+                                                "${bank.accountNo}.interest_rate" to newRate
+                                            )
+                                            userRef.collection("Finances").document("Banking_Data").update(updateMap).await()
+                                            withContext(Dispatchers.Main) { onUpdateSuccess() }
+                                        } else {
+                                            withContext(Dispatchers.Main) { Toast.makeText(context, "Update Failed!", Toast.LENGTH_SHORT).show() }
                                         }
-                                        val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(jsonBody.toString().toRequestBody("application/json".toMediaType())).build()
-                                        val response = NetworkClient.instance.newCall(request).execute()
-                                        val resData = response.body?.string() ?: ""
-                                        withContext(Dispatchers.Main) {
-                                            if (resData.contains("success")) { 
-                                                onUpdateSuccess() 
-                                            } else { 
-                                                Toast.makeText(context, "Update Failed!", Toast.LENGTH_SHORT).show() 
-                                            }
-                                        }
-                                    } catch (e: Exception) {}
+                                    } catch (e: Exception) {
+                                        withContext(Dispatchers.Main) { Toast.makeText(context, "Update Failed!", Toast.LENGTH_SHORT).show() }
+                                    }
                                 }
                             } else { 
                                 Toast.makeText(context, "Please enter valid details", Toast.LENGTH_SHORT).show() 
@@ -224,9 +216,9 @@ fun EditBankDialog(bank: BankAccountItem, username: String, onDismiss: () -> Uni
                         }, 
                         modifier = Modifier.weight(1f).height(50.dp).scale(updateButtonScale).pointerInput(Unit) { detectTapGestures(onPress = { isUpdatePressed = true; tryAwaitRelease(); isUpdatePressed = false }) }, 
                         shape = RoundedCornerShape(12.dp), 
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF388E3C))
                     ) { 
-                        Text("Update", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimary) 
+                        Text("Update", fontWeight = FontWeight.Bold, color = Color.White) 
                     }
                 }
             }
@@ -247,12 +239,12 @@ fun QuickUpdateCCDialog(cc: CreditCardItem, username: String, onDismiss: () -> U
         Card(
             modifier = Modifier.fillMaxWidth(0.9f).imePadding(), 
             shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
             elevation = CardDefaults.cardElevation(8.dp)
         ) {
             Column(modifier = Modifier.padding(24.dp)) {
-                Text("Update Outstanding", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = MaterialTheme.colorScheme.onSurface)
-                Text("Add spend (+) or pay bill (-) on ${cc.issuer}", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+                Text("Update Outstanding", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = Color.Black)
+                Text("Add spend (+) or pay bill (-) on ${cc.issuer}", color = Color.Gray, fontSize = 13.sp)
                 
                 Spacer(modifier = Modifier.height(20.dp))
                 
@@ -260,12 +252,12 @@ fun QuickUpdateCCDialog(cc: CreditCardItem, username: String, onDismiss: () -> U
                     value = updateAmount,
                     onValueChange = { updateAmount = it },
                     label = { Text("Amount (+ or -)") },
-                    prefix = { Text("₹ ", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
+                    prefix = { Text("₹ ", fontWeight = FontWeight.Bold, color = Color.Black) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary, focusedLabelColor = MaterialTheme.colorScheme.primary)
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF2E7D32), focusedLabelColor = Color(0xFF2E7D32))
                 )
                 
                 Spacer(modifier = Modifier.height(24.dp))
@@ -274,11 +266,9 @@ fun QuickUpdateCCDialog(cc: CreditCardItem, username: String, onDismiss: () -> U
                     OutlinedButton(
                         onClick = { onDismiss() },
                         modifier = Modifier.weight(1f).height(50.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface)
+                        shape = RoundedCornerShape(12.dp)
                     ) {
-                        Text("Cancel", fontWeight = FontWeight.Bold)
+                        Text("Cancel", color = Color.Black, fontWeight = FontWeight.Bold)
                     }
                     
                     Button(
@@ -287,35 +277,40 @@ fun QuickUpdateCCDialog(cc: CreditCardItem, username: String, onDismiss: () -> U
                             if (amountEntered != null && amountEntered != 0.0) {
                                 val newCalculatedOutstanding = cc.outstanding + amountEntered 
                                 
-                                // OPTIMISTIC UI
                                 onDismiss()
                                 Toast.makeText(context, "Updating card...", Toast.LENGTH_SHORT).show()
                                 
                                 CoroutineScope(Dispatchers.IO).launch {
                                     try {
-                                        val jsonBody = JSONObject().apply {
-                                            put("action", "edit_cc")
-                                            put("username", username)
-                                            put("original_card_no", cc.cardNo)
-                                            put("new_outstanding", newCalculatedOutstanding)
-                                        }
-                                        val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(jsonBody.toString().toRequestBody("application/json".toMediaType())).build()
-                                        val response = NetworkClient.instance.newCall(request).execute()
-                                        val resData = response.body?.string() ?: ""
+                                        val db = FirebaseFirestore.getInstance()
+                                        val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
+                                        if (!userQuery.isEmpty) {
+                                            val userRef = userQuery.documents[0].reference
+                                            val limit = cc.limit
+                                            val avail = limit - newCalculatedOutstanding
+                                            val util = if (limit > 0) (newCalculatedOutstanding / limit) * 100.0 else 0.0
 
-                                        withContext(Dispatchers.Main) {
-                                            if (resData.contains("success")) { onSuccess() } 
-                                            else { Toast.makeText(context, "Update Failed!", Toast.LENGTH_SHORT).show() }
+                                            val updateMap = hashMapOf<String, Any>(
+                                                "${cc.cardNo}.outstanding" to newCalculatedOutstanding,
+                                                "${cc.cardNo}.available" to avail,
+                                                "${cc.cardNo}.utilization" to util
+                                            )
+                                            userRef.collection("Finances").document("Credit_Cards").update(updateMap).await()
+                                            withContext(Dispatchers.Main) { onSuccess() }
+                                        } else {
+                                            withContext(Dispatchers.Main) { Toast.makeText(context, "Update Failed!", Toast.LENGTH_SHORT).show() }
                                         }
-                                    } catch (e: Exception) {}
+                                    } catch (e: Exception) {
+                                        withContext(Dispatchers.Main) { Toast.makeText(context, "Update Failed!", Toast.LENGTH_SHORT).show() }
+                                    }
                                 }
                             } else { Toast.makeText(context, "Enter a valid amount", Toast.LENGTH_SHORT).show() }
                         },
                         modifier = Modifier.weight(1f).height(50.dp),
                         shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF388E3C))
                     ) {
-                        Text("Update", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimary)
+                        Text("Update", fontWeight = FontWeight.Bold, color = Color.White)
                     }
                 }
             }
@@ -337,8 +332,8 @@ fun EditCreditCardDialog(cc: CreditCardItem, username: String, onDismiss: () -> 
     if (showDeleteConfirm) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("Remove Card", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
-            text = { Text("Are you sure you want to permanently delete this Credit Card record?", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+            title = { Text("Remove Card", fontWeight = FontWeight.Bold) },
+            text = { Text("Are you sure you want to permanently delete this Credit Card record?", color = Color.DarkGray) },
             confirmButton = {
                 Button(
                     onClick = {
@@ -348,45 +343,49 @@ fun EditCreditCardDialog(cc: CreditCardItem, username: String, onDismiss: () -> 
                         
                         CoroutineScope(Dispatchers.IO).launch {
                             try {
-                                val jsonBody = JSONObject().apply { put("action", "delete_data"); put("username", username); put("data_type", "cc"); put("identifier", cc.cardNo) }
-                                val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(jsonBody.toString().toRequestBody("application/json".toMediaType())).build()
-                                val response = NetworkClient.instance.newCall(request).execute()
-                                val resData = response.body?.string() ?: ""
-                                withContext(Dispatchers.Main) {
-                                    if (resData.contains("success")) { onUpdateSuccess() } 
-                                    else { Toast.makeText(context, "Failed to delete card!", Toast.LENGTH_SHORT).show() }
+                                val db = FirebaseFirestore.getInstance()
+                                val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
+                                if (!userQuery.isEmpty) {
+                                    val userRef = userQuery.documents[0].reference
+                                    val updates = hashMapOf<String, Any>(cc.cardNo to FieldValue.delete())
+                                    userRef.collection("Finances").document("Credit_Cards").update(updates).await()
+                                    withContext(Dispatchers.Main) { onUpdateSuccess() }
+                                } else {
+                                    withContext(Dispatchers.Main) { Toast.makeText(context, "Failed to delete card!", Toast.LENGTH_SHORT).show() }
                                 }
-                            } catch (e: Exception) {}
+                            } catch (e: Exception) {
+                                withContext(Dispatchers.Main) { Toast.makeText(context, "Failed to delete card!", Toast.LENGTH_SHORT).show() }
+                            }
                         }
-                    }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                ) { Text("Delete", color = MaterialTheme.colorScheme.onError) }
-            }, dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant) } }
+                    }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F))
+                ) { Text("Delete", color = Color.White) }
+            }, dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel", color = Color.Gray) } }
         )
     }
 
     Dialog(onDismissRequest = { onDismiss() }, properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = false)) {
-        Card(modifier = Modifier.fillMaxWidth().padding(8.dp), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), elevation = CardDefaults.cardElevation(8.dp)) {
+        Card(modifier = Modifier.fillMaxWidth().padding(8.dp), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(8.dp)) {
             Column(modifier = Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text("Edit Credit Card", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onSurface)
-                    IconButton(onClick = { showDeleteConfirm = true }) { Icon(Icons.Outlined.Delete, contentDescription = "Delete CC", tint = MaterialTheme.colorScheme.error) }
+                    Text("Edit Credit Card", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
+                    IconButton(onClick = { showDeleteConfirm = true }) { Icon(Icons.Outlined.Delete, contentDescription = "Delete CC", tint = Color(0xFFD32F2F)) }
                 }
                 Spacer(modifier = Modifier.height(16.dp))
                 
-                OutlinedTextField(value = limit, onValueChange = { limit = it }, label = { Text("Total Limit") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary, focusedLabelColor = MaterialTheme.colorScheme.primary))
+                OutlinedTextField(value = limit, onValueChange = { limit = it }, label = { Text("Total Limit") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))
                 Spacer(modifier = Modifier.height(12.dp))
                 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedTextField(value = billingDay, onValueChange = { billingDay = it }, label = { Text("Bill Day (1-31)") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary, focusedLabelColor = MaterialTheme.colorScheme.primary))
-                    OutlinedTextField(value = dueDay, onValueChange = { dueDay = it }, label = { Text("Due Day (1-31)") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary, focusedLabelColor = MaterialTheme.colorScheme.primary))
+                    OutlinedTextField(value = billingDay, onValueChange = { billingDay = it }, label = { Text("Bill Day (1-31)") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp))
+                    OutlinedTextField(value = dueDay, onValueChange = { dueDay = it }, label = { Text("Due Day (1-31)") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp))
                 }
                 Spacer(modifier = Modifier.height(12.dp))
                 
-                OutlinedTextField(value = annualFee, onValueChange = { annualFee = it }, label = { Text("Annual Fee") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary, focusedLabelColor = MaterialTheme.colorScheme.primary))
+                OutlinedTextField(value = annualFee, onValueChange = { annualFee = it }, label = { Text("Annual Fee") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))
                 
                 Spacer(modifier = Modifier.height(28.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedButton(onClick = { onDismiss() }, modifier = Modifier.weight(1f).height(50.dp), shape = RoundedCornerShape(12.dp), border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)), colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface)) { Text("Cancel", fontWeight = FontWeight.Bold) }
+                    OutlinedButton(onClick = { onDismiss() }, modifier = Modifier.weight(1f).height(50.dp), shape = RoundedCornerShape(12.dp)) { Text("Cancel", color = Color.Black, fontWeight = FontWeight.Bold) }
                     Button(
                         onClick = {
                             val newLimit = limit.toDoubleOrNull()
@@ -396,22 +395,33 @@ fun EditCreditCardDialog(cc: CreditCardItem, username: String, onDismiss: () -> 
                                 
                                 CoroutineScope(Dispatchers.IO).launch {
                                     try {
-                                        val jsonBody = JSONObject().apply { 
-                                            put("action", "edit_cc"); put("username", username); put("original_card_no", cc.cardNo)
-                                            put("new_limit", newLimit); put("new_billing_day", billingDay.toIntOrNull()?:0); put("new_due_day", dueDay.toIntOrNull()?:0); put("new_annual_fee", annualFee.toDoubleOrNull()?:0.0) 
+                                        val db = FirebaseFirestore.getInstance()
+                                        val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
+                                        if (!userQuery.isEmpty) {
+                                            val userRef = userQuery.documents[0].reference
+                                            val avail = newLimit - cc.outstanding
+                                            val util = if (newLimit > 0) (cc.outstanding / newLimit) * 100.0 else 0.0
+
+                                            val updateMap = hashMapOf<String, Any>(
+                                                "${cc.cardNo}.limit" to newLimit,
+                                                "${cc.cardNo}.available" to avail,
+                                                "${cc.cardNo}.utilization" to util,
+                                                "${cc.cardNo}.billing_day" to (billingDay.toIntOrNull() ?: 0),
+                                                "${cc.cardNo}.due_day" to (dueDay.toIntOrNull() ?: 0),
+                                                "${cc.cardNo}.annual_fee" to (annualFee.toDoubleOrNull() ?: 0.0)
+                                            )
+                                            userRef.collection("Finances").document("Credit_Cards").update(updateMap).await()
+                                            withContext(Dispatchers.Main) { onUpdateSuccess() }
+                                        } else {
+                                            withContext(Dispatchers.Main) { Toast.makeText(context, "Update Failed!", Toast.LENGTH_SHORT).show() }
                                         }
-                                        val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(jsonBody.toString().toRequestBody("application/json".toMediaType())).build()
-                                        val response = NetworkClient.instance.newCall(request).execute()
-                                        val resData = response.body?.string() ?: ""
-                                        withContext(Dispatchers.Main) {
-                                            if (resData.contains("success")) { onUpdateSuccess() } 
-                                            else { Toast.makeText(context, "Update Failed!", Toast.LENGTH_SHORT).show() }
-                                        }
-                                    } catch (e: Exception) {}
+                                    } catch (e: Exception) {
+                                        withContext(Dispatchers.Main) { Toast.makeText(context, "Update Failed!", Toast.LENGTH_SHORT).show() }
+                                    }
                                 }
                             } else { Toast.makeText(context, "Check inputs!", Toast.LENGTH_SHORT).show() }
-                        }, modifier = Modifier.weight(1f).height(50.dp), shape = RoundedCornerShape(12.dp), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-                    ) { Text("Save", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold) }
+                        }, modifier = Modifier.weight(1f).height(50.dp), shape = RoundedCornerShape(12.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF388E3C))
+                    ) { Text("Save", color = Color.White, fontWeight = FontWeight.Bold) }
                 }
             }
         }
@@ -427,8 +437,8 @@ fun EditFDDialog(fd: FDItem, username: String, onDismiss: () -> Unit, onUpdateSu
     if (showDeleteConfirm) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("Break / Delete FD", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
-            text = { Text("Are you sure you want to delete this Fixed Deposit record?", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+            title = { Text("Break / Delete FD", fontWeight = FontWeight.Bold) },
+            text = { Text("Are you sure you want to delete this Fixed Deposit record?", color = Color.DarkGray) },
             confirmButton = {
                 Button(
                     onClick = {
@@ -438,33 +448,37 @@ fun EditFDDialog(fd: FDItem, username: String, onDismiss: () -> Unit, onUpdateSu
                         
                         CoroutineScope(Dispatchers.IO).launch {
                             try {
-                                val jsonBody = JSONObject().apply { put("action", "delete_data"); put("username", username); put("data_type", "fd"); put("identifier", fd.accountNo) }
-                                val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(jsonBody.toString().toRequestBody("application/json".toMediaType())).build()
-                                val response = NetworkClient.instance.newCall(request).execute()
-                                val resData = response.body?.string() ?: ""
-                                withContext(Dispatchers.Main) {
-                                    if (resData.contains("success")) { onUpdateSuccess() } 
-                                    else { Toast.makeText(context, "Failed to delete FD!", Toast.LENGTH_SHORT).show() }
+                                val db = FirebaseFirestore.getInstance()
+                                val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
+                                if (!userQuery.isEmpty) {
+                                    val userRef = userQuery.documents[0].reference
+                                    val updates = hashMapOf<String, Any>(fd.accountNo to FieldValue.delete())
+                                    userRef.collection("Finances").document("Fixed_Deposits").update(updates).await()
+                                    withContext(Dispatchers.Main) { onUpdateSuccess() }
+                                } else {
+                                    withContext(Dispatchers.Main) { Toast.makeText(context, "Failed to delete FD!", Toast.LENGTH_SHORT).show() }
                                 }
-                            } catch (e: Exception) {}
+                            } catch (e: Exception) {
+                                withContext(Dispatchers.Main) { Toast.makeText(context, "Failed to delete FD!", Toast.LENGTH_SHORT).show() }
+                            }
                         }
-                    }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                ) { Text("Delete", color = MaterialTheme.colorScheme.onError) }
-            }, dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant) } }
+                    }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F))
+                ) { Text("Delete", color = Color.White) }
+            }, dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel", color = Color.Gray) } }
         )
     }
 
     Dialog(onDismissRequest = { onDismiss() }, properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = false)) {
-        Card(modifier = Modifier.fillMaxWidth().padding(8.dp), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), elevation = CardDefaults.cardElevation(8.dp)) {
+        Card(modifier = Modifier.fillMaxWidth().padding(8.dp), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(8.dp)) {
             Column(modifier = Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text("FD Settings", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onSurface)
-                    IconButton(onClick = { showDeleteConfirm = true }) { Icon(Icons.Outlined.Delete, contentDescription = "Delete FD", tint = MaterialTheme.colorScheme.error) }
+                    Text("FD Settings", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
+                    IconButton(onClick = { showDeleteConfirm = true }) { Icon(Icons.Outlined.Delete, contentDescription = "Delete FD", tint = Color(0xFFD32F2F)) }
                 }
                 Spacer(modifier = Modifier.height(16.dp))
-                Text("Fixed Deposit records cannot be freely edited to maintain interest accuracy. If you need to make changes, please Delete this record and recreate a new FD.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
+                Text("Fixed Deposit records cannot be freely edited to maintain interest accuracy. If you need to make changes, please Delete this record and recreate a new FD.", color = Color.Gray, fontSize = 14.sp)
                 Spacer(modifier = Modifier.height(28.dp))
-                OutlinedButton(onClick = { onDismiss() }, modifier = Modifier.fillMaxWidth().height(50.dp), shape = RoundedCornerShape(12.dp), border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)), colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface)) { Text("Close", fontWeight = FontWeight.Bold) }
+                OutlinedButton(onClick = { onDismiss() }, modifier = Modifier.fillMaxWidth().height(50.dp), shape = RoundedCornerShape(12.dp)) { Text("Close", color = Color.Black, fontWeight = FontWeight.Bold) }
             }
         }
     }
@@ -476,27 +490,26 @@ suspend fun updateUserProfile(
 ) {
     withContext(Dispatchers.IO) {
         try {
-            val jsonBody = JSONObject().apply {
-                put("action", "edit_profile"); put("username", oldUsername)
-                if (newName.isNotBlank()) put("new_name", newName)
-                if (newUsername.isNotBlank()) put("new_username", newUsername)
-                if (newMobile.isNotBlank()) put("new_mobile", newMobile)
-                if (newEmail.isNotBlank()) put("new_email", newEmail)
-                if (newPassword.isNotBlank()) put("new_password", newPassword)
-                if (newDob.isNotBlank()) put("new_dob", newDob)
-            }
-            val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(jsonBody.toString().toRequestBody("application/json".toMediaType())).build()
-            val response = NetworkClient.instance.newCall(request).execute()
-            val resData = response.body?.string() ?: ""
+            val db = FirebaseFirestore.getInstance()
+            val userQuery = db.collection("Users").whereEqualTo("username", oldUsername).get().await()
+            if (!userQuery.isEmpty) {
+                val userRef = userQuery.documents[0].reference
+                val updates = mutableMapOf<String, Any>()
+                if (newName.isNotBlank()) updates["name"] = newName
+                if (newUsername.isNotBlank()) updates["username"] = newUsername
+                if (newMobile.isNotBlank()) updates["mobile_no_"] = if (newMobile.startsWith("+91")) newMobile else "+91$newMobile"
+                if (newEmail.isNotBlank()) updates["email"] = newEmail
+                if (newPassword.isNotBlank()) updates["password"] = newPassword
+                if (newDob.isNotBlank()) updates["dob"] = newDob
 
-            withContext(Dispatchers.Main) {
-                if (resData.contains("success")) { onSuccess() } else {
-                    var errorType = "unknown"
-                    try { errorType = JSONObject(resData).optString("error_type", "unknown") } catch (e: Exception) { }
-                    onError(errorType)
-                }
+                userRef.update(updates).await()
+                withContext(Dispatchers.Main) { onSuccess() }
+            } else {
+                withContext(Dispatchers.Main) { onError("user_not_found") }
             }
-        } catch (e: Exception) { withContext(Dispatchers.Main) { onError("network_error") } }
+        } catch (e: Exception) { 
+            withContext(Dispatchers.Main) { onError("network_error") } 
+        }
     }
 }
 
@@ -511,9 +524,9 @@ fun DeleteExpenseDialog(
 
     AlertDialog(
         onDismissRequest = { onDismiss() },
-        containerColor = MaterialTheme.colorScheme.surface,
-        title = { Text("Delete Expense?", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
-        text = { Text("Are you sure you want to delete this ₹${expense.amount} expense? The deducted balance will be securely refunded to your account.", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+        containerColor = Color.White,
+        title = { Text("Delete Expense?", fontWeight = FontWeight.Bold, color = Color.Black) },
+        text = { Text("Are you sure you want to delete this ₹${expense.amount} expense? The deducted balance will be securely refunded to your account.", color = Color.DarkGray) },
         confirmButton = {
             Button(
                 onClick = {
@@ -522,31 +535,76 @@ fun DeleteExpenseDialog(
                     
                     CoroutineScope(Dispatchers.IO).launch {
                         try {
-                            val jsonBody = JSONObject().apply { 
-                                put("action", "delete_data")
-                                put("username", username)
-                                put("data_type", "expense")
-                                put("identifier", expense.date) 
+                            val db = FirebaseFirestore.getInstance()
+                            val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
+                            if (!userQuery.isEmpty) {
+                                val userRef = userQuery.documents[0].reference
+                                val expQuery = userRef.collection("Expenses")
+                                    .whereEqualTo("date", expense.date)
+                                    .get()
+                                    .await()
+
+                                for (doc in expQuery.documents) {
+                                    doc.reference.delete().await()
+                                }
+
+                                // REFUND LOGIC
+                                val refundAmt = expense.amount
+                                when (expense.sourceType) {
+                                    "Cash" -> {
+                                        val cashDoc = userRef.collection("Finances").document("Cash").get().await()
+                                        val cur = cashDoc.getDouble("total_cash") ?: 0.0
+                                        userRef.collection("Finances").document("Cash").update("total_cash", cur + refundAmt).await()
+                                    }
+                                    "Bank" -> {
+                                        if (expense.sourceId.isNotEmpty()) {
+                                            val bankDoc = userRef.collection("Finances").document("Banking_Data").get().await()
+                                            val bankData = bankDoc.get(expense.sourceId) as? Map<*, *>
+                                            if (bankData != null) {
+                                                val curBal = (bankData["current_bal"] as? Number)?.toDouble() ?: 0.0
+                                                userRef.collection("Finances").document("Banking_Data").update("${expense.sourceId}.current_bal", curBal + refundAmt).await()
+                                            }
+                                        }
+                                    }
+                                    "Credit Card" -> {
+                                        if (expense.sourceId.isNotEmpty()) {
+                                            val ccDoc = userRef.collection("Finances").document("Credit_Cards").get().await()
+                                            val ccData = ccDoc.get(expense.sourceId) as? Map<*, *>
+                                            if (ccData != null) {
+                                                val curOut = (ccData["outstanding"] as? Number)?.toDouble() ?: 0.0
+                                                val limit = (ccData["limit"] as? Number)?.toDouble() ?: 0.0
+                                                val newOut = (curOut - refundAmt).coerceAtLeast(0.0)
+                                                val avail = limit - newOut
+                                                val util = if (limit > 0) (newOut / limit) * 100.0 else 0.0
+
+                                                userRef.collection("Finances").document("Credit_Cards").update(
+                                                    mapOf(
+                                                        "${expense.sourceId}.outstanding" to newOut,
+                                                        "${expense.sourceId}.available" to avail,
+                                                        "${expense.sourceId}.utilization" to util
+                                                    )
+                                                ).await()
+                                            }
+                                        }
+                                    }
+                                }
+                                withContext(Dispatchers.Main) { onSuccess() }
+                            } else {
+                                withContext(Dispatchers.Main) { Toast.makeText(context, "Failed to delete!", Toast.LENGTH_SHORT).show() }
                             }
-                            val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(jsonBody.toString().toRequestBody("application/json".toMediaType())).build()
-                            val response = NetworkClient.instance.newCall(request).execute()
-                            val resData = response.body?.string() ?: ""
-                            withContext(Dispatchers.Main) {
-                                if (resData.contains("success")) { 
-                                    onSuccess() 
-                                } else { Toast.makeText(context, "Failed to delete!", Toast.LENGTH_SHORT).show() }
-                            }
-                        } catch (e: Exception) {}
+                        } catch (e: Exception) {
+                            withContext(Dispatchers.Main) { Toast.makeText(context, "Failed to delete!", Toast.LENGTH_SHORT).show() }
+                        }
                     }
                 }, 
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F))
             ) { 
-                Text("Delete", color = MaterialTheme.colorScheme.onError, fontWeight = FontWeight.Bold) 
+                Text("Delete", color = Color.White, fontWeight = FontWeight.Bold) 
             }
         }, 
         dismissButton = { 
             TextButton(onClick = { onDismiss() }) { 
-                Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold) 
+                Text("Cancel", color = Color.Gray, fontWeight = FontWeight.Bold) 
             } 
         }
     )
@@ -559,18 +617,12 @@ fun EditExpenseDialog(
     username: String,
     bankList: List<BankAccountItem>,
     ccList: List<CreditCardItem>,
-    cashData: CashItem? = null,
     onDismiss: () -> Unit,
     onSuccess: () -> Unit
 ) {
-    val categories = listOf("Food", "Transport", "Shopping", "Bills", "Fuel", "Personal Care", "Health", "Education", "Entertainment", "Custom")
+    val categories = listOf("Food", "Transport", "Shopping", "Bills", "Custom")
     val paymentModes = listOf("Cash", "UPI", "NEFT", "Credit Card", "Debit Card", "Net Banking")
     
-    val hasBank = bankList.isNotEmpty()
-    val hasCC = ccList.isNotEmpty()
-    val hasCash = cashData != null && cashData.amount > 0.0
-    val hasNoFinance = !hasBank && !hasCC && !hasCash
-
     var categoryText by remember { mutableStateOf(if (categories.contains(expense.category)) expense.category else "Custom") }
     var customCategoryText by remember { mutableStateOf(if (!categories.contains(expense.category)) expense.category else "") }
     var isCustomCategory by remember { mutableStateOf(!categories.contains(expense.category)) }
@@ -621,10 +673,10 @@ fun EditExpenseDialog(
     val context = LocalContext.current
 
     Dialog(onDismissRequest = { onDismiss() }, properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = false)) {
-        Card(modifier = Modifier.fillMaxWidth().padding(8.dp), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), elevation = CardDefaults.cardElevation(8.dp)) {
+        Card(modifier = Modifier.fillMaxWidth().padding(8.dp), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(8.dp)) {
             Column(modifier = Modifier.padding(20.dp)) {
-                Text("Edit Expense", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onSurface)
-                Text("Changes will automatically refund & adjust balances.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Edit Expense", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
+                Text("Changes will automatically refund & adjust balances.", fontSize = 12.sp, color = Color.Gray)
                 Spacer(modifier = Modifier.height(16.dp))
                 
                 ExposedDropdownMenuBox(expanded = catExpanded, onExpandedChange = { catExpanded = !catExpanded }, modifier = Modifier.fillMaxWidth()) {
@@ -635,18 +687,12 @@ fun EditExpenseDialog(
                         label = { Text("Category") }, 
                         modifier = Modifier.fillMaxWidth().menuAnchor(), 
                         shape = RoundedCornerShape(12.dp), 
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = MaterialTheme.colorScheme.primary, 
-                            unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface
-                        )
+                        singleLine = true
                     )
-                    ExposedDropdownMenu(expanded = catExpanded, onDismissRequest = { catExpanded = false }, modifier = Modifier.background(MaterialTheme.colorScheme.surface)) {
+                    ExposedDropdownMenu(expanded = catExpanded, onDismissRequest = { catExpanded = false }, modifier = Modifier.background(Color.White)) {
                         categories.forEach { name -> 
                             DropdownMenuItem(
-                                text = { Text(name, color = MaterialTheme.colorScheme.onSurface) }, 
+                                text = { Text(name) }, 
                                 onClick = { 
                                     categoryText = name
                                     isCustomCategory = (name == "Custom")
@@ -660,66 +706,32 @@ fun EditExpenseDialog(
                 Spacer(modifier = Modifier.height(12.dp))
                 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedTextField(
-                        value = remark1, onValueChange = { remark1 = it }, label = { Text("Remark 1") }, modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp), singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary, unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), focusedTextColor = MaterialTheme.colorScheme.onSurface, unfocusedTextColor = MaterialTheme.colorScheme.onSurface)
-                    )
-                    OutlinedTextField(
-                        value = remark2, onValueChange = { remark2 = it }, label = { Text("Remark 2") }, modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp), singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary, unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), focusedTextColor = MaterialTheme.colorScheme.onSurface, unfocusedTextColor = MaterialTheme.colorScheme.onSurface)
-                    )
+                    OutlinedTextField(value = remark1, onValueChange = { remark1 = it }, label = { Text("Remark 1") }, modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp), singleLine = true)
+                    OutlinedTextField(value = remark2, onValueChange = { remark2 = it }, label = { Text("Remark 2") }, modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp), singleLine = true)
                 }
                 Spacer(modifier = Modifier.height(12.dp))
 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    ExposedDropdownMenuBox(
-                        expanded = modeExpanded, 
-                        onExpandedChange = { 
-                            if (hasNoFinance) {
-                                Toast.makeText(context, "Add Finance Detail", Toast.LENGTH_SHORT).show()
-                                modeExpanded = false
-                            } else {
-                                modeExpanded = !modeExpanded 
-                            }
-                        }, 
-                        modifier = Modifier.weight(0.35f)
-                    ) {
+                    ExposedDropdownMenuBox(expanded = modeExpanded, onExpandedChange = { modeExpanded = !modeExpanded }, modifier = Modifier.weight(0.35f)) {
                         Box(
-                            modifier = Modifier.fillMaxWidth().height(56.dp).border(1.dp, if (modeExpanded) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(12.dp)).menuAnchor().background(if (hasNoFinance) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f) else Color.Transparent, RoundedCornerShape(12.dp)),
+                            modifier = Modifier.fillMaxWidth().height(56.dp).border(1.dp, if (modeExpanded) Color(0xFF2E7D32) else Color.Gray, RoundedCornerShape(12.dp)).menuAnchor().background(Color.Transparent, RoundedCornerShape(12.dp)),
                             contentAlignment = Alignment.CenterStart
                         ) {
                             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text(text = if (modeText.isEmpty()) "Mode" else modeText, color = if (modeText.isEmpty() || hasNoFinance) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface, fontSize = 14.sp, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                                Icon(Icons.Outlined.ArrowDropDown, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp).rotate(if (modeExpanded) 180f else 0f))
+                                Text(text = if (modeText.isEmpty()) "Mode" else modeText, color = if (modeText.isEmpty()) Color.Gray else Color.Black, fontSize = 14.sp, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                                Icon(Icons.Outlined.ArrowDropDown, null, tint = Color.Gray, modifier = Modifier.size(20.dp).rotate(if (modeExpanded) 180f else 0f))
                             }
                         }
-                        ExposedDropdownMenu(expanded = modeExpanded, onDismissRequest = { modeExpanded = false }, modifier = Modifier.background(MaterialTheme.colorScheme.surface).widthIn(min = 140.dp)) {
+                        ExposedDropdownMenu(expanded = modeExpanded, onDismissRequest = { modeExpanded = false }, modifier = Modifier.background(Color.White).widthIn(min = 140.dp)) {
                             paymentModes.forEach { name ->
-                                val isAvailable = when (name) {
-                                    "Cash" -> hasCash
-                                    "Credit Card" -> hasCC
-                                    else -> hasBank
-                                }
-                                val itemColor = if (isAvailable) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                                
                                 DropdownMenuItem(
-                                    text = { Text(name, fontSize = 14.sp, color = itemColor, maxLines = 1, softWrap = false) },
+                                    text = { Text(name, fontSize = 14.sp, maxLines = 1, softWrap = false) },
                                     onClick = {
-                                        if (isAvailable) {
-                                            modeText = name; modeExpanded = false
-                                            selectedSourceId = ""; selectedSourceName = ""; selectedSourceLogo = null 
-                                            if (name == "Cash") { selectedSourceType = "Cash"; selectedSourceId = "Cash"; selectedSourceName = "Cash in Hand" } 
-                                            else if (name == "Credit Card") { selectedSourceType = "Credit Card" } 
-                                            else { selectedSourceType = "Bank" }
-                                        } else {
-                                            val msg = when(name) {
-                                                "Cash" -> "Please add Cash Balance first"
-                                                "Credit Card" -> "Please add a Credit Card first"
-                                                else -> "Please add a Bank Account to use $name"
-                                            }
-                                            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-                                            modeExpanded = false
-                                        }
+                                        modeText = name; modeExpanded = false
+                                        selectedSourceId = ""; selectedSourceName = ""; selectedSourceLogo = null 
+                                        if (name == "Cash") { selectedSourceType = "Cash"; selectedSourceId = "Cash"; selectedSourceName = "Cash in Hand" } 
+                                        else if (name == "Credit Card") { selectedSourceType = "Credit Card" } 
+                                        else { selectedSourceType = "Bank" }
                                     }
                                 )
                             }
@@ -730,34 +742,34 @@ fun EditExpenseDialog(
 
                     ExposedDropdownMenuBox(expanded = paidByExpanded && isPaidByActive, onExpandedChange = { if(isPaidByActive) paidByExpanded = !paidByExpanded }, modifier = Modifier.weight(0.65f)) {
                         Box(
-                            modifier = Modifier.fillMaxWidth().height(56.dp).border(1.dp, if(paidByExpanded) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(12.dp)).menuAnchor().background(if (!isPaidByActive && selectedSourceType != "Cash") MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f) else Color.Transparent, RoundedCornerShape(12.dp)),
+                            modifier = Modifier.fillMaxWidth().height(56.dp).border(1.dp, if(paidByExpanded) Color(0xFF2E7D32) else Color.Gray, RoundedCornerShape(12.dp)).menuAnchor().background(if (!isPaidByActive && selectedSourceType != "Cash") Color(0xFFF5F5F5) else Color.Transparent, RoundedCornerShape(12.dp)),
                             contentAlignment = Alignment.CenterStart
                         ) {
                             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                if (selectedSourceType.isEmpty()) { Text("Select Mode", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp, modifier = Modifier.weight(1f)) } 
-                                else if (selectedSourceId.isEmpty()) { Text(if(selectedSourceType == "Bank") "Choose Bank" else "Choose Card", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp, modifier = Modifier.weight(1f)) } 
+                                if (selectedSourceType.isEmpty()) { Text("Select Mode", color = Color.Gray, fontSize = 14.sp, modifier = Modifier.weight(1f)) } 
+                                else if (selectedSourceId.isEmpty()) { Text(if(selectedSourceType == "Bank") "Choose Bank" else "Choose Card", color = Color.Gray, fontSize = 14.sp, modifier = Modifier.weight(1f)) } 
                                 else {
                                     if (selectedSourceLogo != null && selectedSourceType != "Cash") {
                                         Image(painter = painterResource(id = selectedSourceLogo!!), contentDescription = null, modifier = Modifier.size(20.dp).clip(RoundedCornerShape(4.dp)), contentScale = ContentScale.Fit)
                                         Spacer(modifier = Modifier.width(8.dp))
                                     }
-                                    Text(text = selectedSourceName, color = if(selectedSourceType == "Cash") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                                    Text(text = selectedSourceName, color = if(selectedSourceType == "Cash") Color(0xFF2E7D32) else Color.Black, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                                 }
-                                if (isPaidByActive) { Icon(Icons.Outlined.ArrowDropDown, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp).rotate(if (paidByExpanded) 180f else 0f)) }
+                                if (isPaidByActive) { Icon(Icons.Outlined.ArrowDropDown, null, tint = Color.Gray, modifier = Modifier.size(20.dp).rotate(if (paidByExpanded) 180f else 0f)) }
                             }
                         }
 
-                        ExposedDropdownMenu(expanded = paidByExpanded && isPaidByActive, onDismissRequest = { paidByExpanded = false }, modifier = Modifier.background(MaterialTheme.colorScheme.surface)) {
+                        ExposedDropdownMenu(expanded = paidByExpanded && isPaidByActive, onDismissRequest = { paidByExpanded = false }, modifier = Modifier.background(Color.White)) {
                             if (selectedSourceType == "Bank") {
-                                if (bankList.isEmpty()) DropdownMenuItem(text = { Text("No Banks", color = MaterialTheme.colorScheme.onSurfaceVariant) }, onClick = {}) 
+                                if (bankList.isEmpty()) DropdownMenuItem(text = { Text("No Banks", color = Color.Gray) }, onClick = {}) 
                                 bankList.forEach { bank ->
                                     DropdownMenuItem(
                                         text = { 
                                             Row(verticalAlignment = Alignment.CenterVertically) {
                                                 val logo = Constants.BankLogoMap[bank.bankName]
-                                                if (logo != null) Image(painterResource(logo), null, modifier = Modifier.size(24.dp).clip(RoundedCornerShape(4.dp))) else Icon(Icons.Outlined.AccountBalance, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp))
+                                                if (logo != null) Image(painterResource(logo), null, modifier = Modifier.size(24.dp).clip(RoundedCornerShape(4.dp))) else Icon(Icons.Outlined.AccountBalance, null, tint = Color.DarkGray, modifier = Modifier.size(24.dp))
                                                 Spacer(modifier = Modifier.width(12.dp))
-                                                Text("• ${if (bank.accountNo.length >= 4) bank.accountNo.takeLast(4) else bank.accountNo}", color = MaterialTheme.colorScheme.onSurface, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold)
+                                                Text("• ${if (bank.accountNo.length >= 4) bank.accountNo.takeLast(4) else bank.accountNo}", maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold)
                                             }
                                         },
                                         onClick = { 
@@ -769,15 +781,15 @@ fun EditExpenseDialog(
                                     )
                                 }
                             } else if (selectedSourceType == "Credit Card") {
-                                if (ccList.isEmpty()) DropdownMenuItem(text = { Text("No Cards", color = MaterialTheme.colorScheme.onSurfaceVariant) }, onClick = {}) 
+                                if (ccList.isEmpty()) DropdownMenuItem(text = { Text("No Cards", color = Color.Gray) }, onClick = {}) 
                                 ccList.forEach { cc ->
                                     DropdownMenuItem(
                                         text = { 
                                             Row(verticalAlignment = Alignment.CenterVertically) {
                                                 val logo = Constants.BankLogoMap[cc.issuer]
-                                                if (logo != null) Image(painterResource(logo), null, modifier = Modifier.size(24.dp).clip(RoundedCornerShape(4.dp))) else Icon(Icons.Outlined.CreditCard, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp))
+                                                if (logo != null) Image(painterResource(logo), null, modifier = Modifier.size(24.dp).clip(RoundedCornerShape(4.dp))) else Icon(Icons.Outlined.CreditCard, null, tint = Color.DarkGray, modifier = Modifier.size(24.dp))
                                                 Spacer(modifier = Modifier.width(12.dp))
-                                                Text("• ${if (cc.cardNo.length >= 4) cc.cardNo.takeLast(4) else cc.cardNo}", color = MaterialTheme.colorScheme.onSurface, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold)
+                                                Text("• ${if (cc.cardNo.length >= 4) cc.cardNo.takeLast(4) else cc.cardNo}", maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold)
                                             }
                                         },
                                         onClick = { 
@@ -796,69 +808,104 @@ fun EditExpenseDialog(
 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     CustomDatePicker(label = "Date", selectedDateMillis = expenseDateMillis, onDateSelected = { expenseDateMillis = it }, restrictToCurrentMonth = false, modifier = Modifier.weight(1f))
-                    OutlinedTextField(
-                        value = amount, onValueChange = { amount = it }, label = { Text("Amount") }, prefix = { Text("₹ ", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp), singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary, unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), focusedTextColor = MaterialTheme.colorScheme.onSurface, unfocusedTextColor = MaterialTheme.colorScheme.onSurface)
-                    )
+                    OutlinedTextField(value = amount, onValueChange = { amount = it }, label = { Text("Amount") }, prefix = { Text("₹ ", fontWeight = FontWeight.Bold, color = Color.Black) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp), singleLine = true)
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
                 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedButton(
-                        onClick = { onDismiss() }, modifier = Modifier.weight(1f).height(50.dp), shape = RoundedCornerShape(12.dp), border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)), colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface)
-                    ) { Text("Cancel", fontWeight = FontWeight.Bold) }
-                    
+                    OutlinedButton(onClick = { onDismiss() }, modifier = Modifier.weight(1f).height(50.dp), shape = RoundedCornerShape(12.dp)) { Text("Cancel", color = Color.Black, fontWeight = FontWeight.Bold) }
                     Button(
                         onClick = {
                             val finalCategory = if(isCustomCategory) customCategoryText.trim() else categoryText.trim()
                             val finalExpenseDateStr = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(expenseDateMillis))
                             
-                            val canSave = if (hasNoFinance) {
-                                amount.isNotBlank() && finalCategory.isNotBlank()
-                            } else {
-                                amount.isNotBlank() && finalCategory.isNotBlank() && modeText.isNotBlank() &&
-                                (selectedSourceType.isEmpty() || selectedSourceId.isNotEmpty())
-                            }
-                            
-                            if (canSave) {
-                                if (!hasNoFinance && selectedSourceType.isNotEmpty() && selectedSourceId.isEmpty()) {
+                            if (amount.isNotBlank() && finalCategory.isNotBlank() && modeText.isNotBlank()) {
+                                if (selectedSourceType.isNotEmpty() && selectedSourceId.isEmpty()) {
                                     Toast.makeText(context, "Select exact account/card!", Toast.LENGTH_SHORT).show(); return@Button
                                 }
-                                
-                                val actualMode = if (hasNoFinance) "Unspecified" else modeText
-                                val actualSourceType = if (hasNoFinance) "None" else selectedSourceType
-                                val actualSourceId = if (hasNoFinance) "None" else selectedSourceId
                                 
                                 onDismiss()
                                 Toast.makeText(context, "Updating expense...", Toast.LENGTH_SHORT).show()
                                 
                                 CoroutineScope(Dispatchers.IO).launch {
                                     try {
-                                        val jsonBody = JSONObject().apply { 
-                                            put("action", "edit_expense")
-                                            put("username", username)
-                                            put("original_date", expense.date)
-                                            put("date", finalExpenseDateStr) 
-                                            put("amount", amount)
-                                            put("category", finalCategory)
-                                            put("detail1", remark1)
-                                            put("detail2", remark2)
-                                            put("mode", actualMode)
-                                            put("source_type", actualSourceType)
-                                            put("source_identifier", actualSourceId)
-                                        }
-                                        val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(jsonBody.toString().toRequestBody("application/json".toMediaType())).build()
-                                        val response = NetworkClient.instance.newCall(request).execute()
-                                        val resData = response.body?.string() ?: ""
-                                        withContext(Dispatchers.Main) {
-                                            if (resData.contains("success")) { 
-                                                onSuccess() 
-                                            } else { 
-                                                Toast.makeText(context, "Update Failed!", Toast.LENGTH_SHORT).show() 
+                                        val db = FirebaseFirestore.getInstance()
+                                        val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
+                                        if (!userQuery.isEmpty) {
+                                            val userRef = userQuery.documents[0].reference
+                                            val expQuery = userRef.collection("Expenses")
+                                                .whereEqualTo("date", expense.date)
+                                                .get()
+                                                .await()
+
+                                            val newAmt = amount.toDoubleOrNull() ?: expense.amount
+                                            val paymentDetailStr = "$modeText | $selectedSourceType | $selectedSourceId"
+
+                                            val expData = hashMapOf<String, Any>(
+                                                "date" to finalExpenseDateStr,
+                                                "amount" to newAmt,
+                                                "category" to finalCategory,
+                                                "detail_1" to remark1,
+                                                "detail_2" to remark2,
+                                                "payment_detail" to paymentDetailStr
+                                            )
+
+                                            if (!expQuery.isEmpty) {
+                                                expQuery.documents[0].reference.set(expData, SetOptions.merge()).await()
+                                            } else {
+                                                userRef.collection("Expenses").add(expData).await()
                                             }
+
+                                            // BALANCE ADJUSTMENT
+                                            val diff = newAmt - expense.amount
+                                            if (diff != 0.0) {
+                                                when (selectedSourceType) {
+                                                    "Cash" -> {
+                                                        val cashDoc = userRef.collection("Finances").document("Cash").get().await()
+                                                        val cur = cashDoc.getDouble("total_cash") ?: 0.0
+                                                        userRef.collection("Finances").document("Cash").update("total_cash", cur - diff).await()
+                                                    }
+                                                    "Bank" -> {
+                                                        if (selectedSourceId.isNotEmpty()) {
+                                                            val bankDoc = userRef.collection("Finances").document("Banking_Data").get().await()
+                                                            val bankData = bankDoc.get(selectedSourceId) as? Map<*, *>
+                                                            if (bankData != null) {
+                                                                val curBal = (bankData["current_bal"] as? Number)?.toDouble() ?: 0.0
+                                                                userRef.collection("Finances").document("Banking_Data").update("${selectedSourceId}.current_bal", curBal - diff).await()
+                                                            }
+                                                        }
+                                                    }
+                                                    "Credit Card" -> {
+                                                        if (selectedSourceId.isNotEmpty()) {
+                                                            val ccDoc = userRef.collection("Finances").document("Credit_Cards").get().await()
+                                                            val ccData = ccDoc.get(selectedSourceId) as? Map<*, *>
+                                                            if (ccData != null) {
+                                                                val curOut = (ccData["outstanding"] as? Number)?.toDouble() ?: 0.0
+                                                                val limit = (ccData["limit"] as? Number)?.toDouble() ?: 0.0
+                                                                val newOut = (curOut + diff).coerceAtLeast(0.0)
+                                                                val avail = limit - newOut
+                                                                val util = if (limit > 0) (newOut / limit) * 100.0 else 0.0
+
+                                                                userRef.collection("Finances").document("Credit_Cards").update(
+                                                                    mapOf(
+                                                                        "${selectedSourceId}.outstanding" to newOut,
+                                                                        "${selectedSourceId}.available" to avail,
+                                                                        "${selectedSourceId}.utilization" to util
+                                                                    )
+                                                                ).await()
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            withContext(Dispatchers.Main) { onSuccess() }
+                                        } else {
+                                            withContext(Dispatchers.Main) { Toast.makeText(context, "Update Failed!", Toast.LENGTH_SHORT).show() }
                                         }
-                                    } catch (e: Exception) {}
+                                    } catch (e: Exception) {
+                                        withContext(Dispatchers.Main) { Toast.makeText(context, "Update Failed!", Toast.LENGTH_SHORT).show() }
+                                    }
                                 }
                             } else { 
                                 Toast.makeText(context, "Fill required fields!", Toast.LENGTH_SHORT).show() 
@@ -866,9 +913,9 @@ fun EditExpenseDialog(
                         }, 
                         modifier = Modifier.weight(1f).height(50.dp), 
                         shape = RoundedCornerShape(12.dp), 
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF388E3C))
                     ) { 
-                        Text("Save", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold) 
+                        Text("Save", color = Color.White, fontWeight = FontWeight.Bold) 
                     }
                 }
             }
