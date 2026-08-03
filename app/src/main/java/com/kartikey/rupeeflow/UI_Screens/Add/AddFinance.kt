@@ -21,17 +21,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
 import com.kartikey.rupeeflow.Cloud_Database.Constants
 import com.kartikey.rupeeflow.UI_Screens.CustomDatePicker
-import com.kartikey.rupeeflow.UI_Screens.NetworkClient
 import com.kartikey.rupeeflow.UI_Screens.bounceClick
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
-import org.json.JSONObject
+import kotlinx.coroutines.tasks.await
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -115,17 +113,19 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
 
             CoroutineScope(Dispatchers.IO).launch {
                 try {
-                    val client = NetworkClient.instance
-                    val jsonBody = JSONObject().apply {
-                        put("action", "add_bank")
-                        put("username", username)
-                        put("bank_name", bankName) 
-                        put("account_no", formattedAcc)
-                        put("current_bal", bal)
-                        put("interest_rate", rate)
+                    val db = FirebaseFirestore.getInstance()
+                    val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
+                    if (!userQuery.isEmpty) {
+                        val userRef = userQuery.documents[0].reference
+                        val bankMap = hashMapOf<String, Any>(
+                            "bank_name" to bankName,
+                            "account_no" to formattedAcc,
+                            "current_bal" to bal,
+                            "interest_rate" to rate
+                        )
+                        userRef.collection("Finances").document("Banking_Data")
+                            .set(mapOf(formattedAcc to bankMap), SetOptions.merge()).await()
                     }
-                    val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(jsonBody.toString().toRequestBody("application/json".toMediaType())).build()
-                    client.newCall(request).execute()
                 } catch (e: Exception) {}
             }
         }
@@ -145,19 +145,21 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
 
             CoroutineScope(Dispatchers.IO).launch {
                 try {
-                    val client = NetworkClient.instance
-                    val jsonBody = JSONObject().apply {
-                        put("action", "add_fd")
-                        put("username", username)
-                        put("bank_name", bankName) 
-                        put("account_no", fdAccountNo)
-                        put("invested_amount", invAmt)
-                        put("interest_rate", rate)
-                        put("create_date", formatForSheet(createDateMillis))
-                        put("maturity_date", formatForSheet(maturityDateMillis))
+                    val db = FirebaseFirestore.getInstance()
+                    val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
+                    if (!userQuery.isEmpty) {
+                        val userRef = userQuery.documents[0].reference
+                        val fdMap = hashMapOf<String, Any>(
+                            "bank_name" to bankName,
+                            "account_no" to fdAccountNo,
+                            "invested_amt" to invAmt,
+                            "interest_rate" to rate,
+                            "create_date" to formatForSheet(createDateMillis),
+                            "maturity_date" to formatForSheet(maturityDateMillis)
+                        )
+                        userRef.collection("Finances").document("Fixed_Deposits")
+                            .set(mapOf(fdAccountNo to fdMap), SetOptions.merge()).await()
                     }
-                    val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(jsonBody.toString().toRequestBody("application/json".toMediaType())).build()
-                    client.newCall(request).execute()
                 } catch (e: Exception) {}
             }
         }
@@ -173,21 +175,21 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
 
             CoroutineScope(Dispatchers.IO).launch {
                 try {
-                    val client = NetworkClient.instance
-                    val mediaType = "application/json".toMediaType()
-                    
-                    val fetchJson = JSONObject().apply { put("action", "get_all_data"); put("username", username) }
-                    val fetchReq = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(fetchJson.toString().toRequestBody(mediaType)).build()
-                    val res = client.newCall(fetchReq).execute()
-                    val resData = res.body?.string() ?: "{}"
-                    
-                    var existingCash = 0.0
-                    try { existingCash = JSONObject(resData).optJSONObject("cash")?.optDouble("amount", 0.0) ?: 0.0 } catch (e: Exception) { }
-                    
-                    val finalAmount = existingCash + cAmt
-                    val updateJson = JSONObject().apply { put("action", "update_cash"); put("username", username); put("amount", finalAmount) }
-                    val updateReq = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(updateJson.toString().toRequestBody(mediaType)).build()
-                    client.newCall(updateReq).execute()
+                    val db = FirebaseFirestore.getInstance()
+                    val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
+                    if (!userQuery.isEmpty) {
+                        val userRef = userQuery.documents[0].reference
+                        val cashDocRef = userRef.collection("Finances").document("Cash")
+                        val cashDoc = cashDocRef.get().await()
+                        val existingCash = cashDoc.getDouble("total_cash") ?: 0.0
+                        val finalAmount = existingCash + cAmt
+                        
+                        val cashDataMap = hashMapOf<String, Any>(
+                            "total_cash" to finalAmount,
+                            "last_updated" to SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
+                        )
+                        cashDocRef.set(cashDataMap, SetOptions.merge()).await()
+                    }
                 } catch (e: Exception) {}
             }
         }
@@ -207,29 +209,34 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
             Toast.makeText(context, "Select a valid Issuer from dropdown!", Toast.LENGTH_SHORT).show()
         } else {
             val finalType = "$ccNetwork/$ccSecurity"
+            val formattedCardNo = "XXXXX$ccCardNo"
             onFinanceAdded()
             onDismiss()
             
             CoroutineScope(Dispatchers.IO).launch {
                 try {
-                    val client = NetworkClient.instance
-                    val jsonBody = JSONObject().apply {
-                        put("action", "add_cc")
-                        put("username", username)
-                        put("issuer", ccIssuer)
-                        put("card_no", "XXXXX$ccCardNo")
-                        put("type", finalType)
-                        put("limit", limitAmt)
-                        put("outstanding", 0.0) 
-                        put("billing_day", billDay)
-                        put("due_day", dueD)
-                        put("reminder_day", remindD)
-                        put("annual_fee", annFee) 
-                        put("joining_fee", joinFee)
-                        put("last_used", "")
+                    val db = FirebaseFirestore.getInstance()
+                    val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
+                    if (!userQuery.isEmpty) {
+                        val userRef = userQuery.documents[0].reference
+                        val ccMap = hashMapOf<String, Any>(
+                            "issuer" to ccIssuer,
+                            "card_no" to formattedCardNo,
+                            "type" to finalType,
+                            "limit" to limitAmt,
+                            "outstanding" to 0.0,
+                            "available" to limitAmt,
+                            "utilization" to 0.0,
+                            "billing_day" to billDay,
+                            "due_day" to dueD,
+                            "reminder_day" to remindD,
+                            "annual_fee" to annFee,
+                            "joining_fee" to joinFee,
+                            "last_used" to ""
+                        )
+                        userRef.collection("Finances").document("Credit_Cards")
+                            .set(mapOf(formattedCardNo to ccMap), SetOptions.merge()).await()
                     }
-                    val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(jsonBody.toString().toRequestBody("application/json".toMediaType())).build()
-                    client.newCall(request).execute()
                 } catch (e: Exception) {}
             }
         }
