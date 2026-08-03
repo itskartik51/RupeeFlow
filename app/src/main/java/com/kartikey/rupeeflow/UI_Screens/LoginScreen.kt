@@ -312,7 +312,7 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
                                 // ==========================================
                                 // FIRESTORE LOGIN LOGIC
                                 // ==========================================
-                                val inputUserOrMobile = mobile.trim()
+                                val inputUserOrMobile = mobile.trim().removePrefix("+91")
                                 val inputPass = password.trim()
 
                                 // 1. Try search by Username
@@ -323,18 +323,10 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
 
                                 // 2. If empty, search by Mobile
                                 if (query.isEmpty) {
-                                    val formattedMobile = if (inputUserOrMobile.startsWith("+91")) inputUserOrMobile else "+91$inputUserOrMobile"
                                     query = db.collection("Users")
-                                        .whereEqualTo("mobile_no_", formattedMobile)
+                                        .whereEqualTo("mobile_no_", inputUserOrMobile)
                                         .get()
                                         .await()
-
-                                    if (query.isEmpty) {
-                                        query = db.collection("Users")
-                                            .whereEqualTo("mobile", formattedMobile)
-                                            .get()
-                                            .await()
-                                    }
                                 }
 
                                 if (!query.isEmpty) {
@@ -361,7 +353,7 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
                                 // ==========================================
                                 // FIRESTORE SIGNUP LOGIC
                                 // ==========================================
-                                val formattedMobile = "+91${mobile.trim()}"
+                                val cleanMobile = mobile.trim()
                                 val newUsername = username.trim()
 
                                 // 1. Check if Username already taken
@@ -379,7 +371,7 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
 
                                 // 2. Check if Mobile already registered
                                 val mobileCheck = db.collection("Users")
-                                    .whereEqualTo("mobile_no_", formattedMobile)
+                                    .whereEqualTo("mobile_no_", cleanMobile)
                                     .get()
                                     .await()
 
@@ -411,10 +403,10 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
                                 val userData = hashMapOf(
                                     "name" to name.trim(),
                                     "username" to newUsername,
-                                    "mobile_no_" to formattedMobile,
+                                    "mobile_no_" to cleanMobile,
                                     "email" to email.trim(),
                                     "password" to password.trim(),
-                                    "dob" to "",
+                                    "dob" to null, // Initialized as null Timestamp equivalent
                                     "budget_limit" to 0.0,
                                     "created_at" to FieldValue.serverTimestamp()
                                 )
