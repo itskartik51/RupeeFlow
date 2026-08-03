@@ -16,18 +16,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.kartikey.rupeeflow.Cloud_Database.Constants
-import com.kartikey.rupeeflow.UI_Screens.NetworkClient
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
 import com.kartikey.rupeeflow.UI_Screens.bounceClick
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
-import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -285,21 +284,21 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                         
                         CoroutineScope(Dispatchers.IO).launch {
                             try {
-                                val jsonBody = JSONObject().apply {
-                                    put("action", "add_investment")
-                                    put("username", username)
-                                    put("inv_date", date)
-                                    put("asset_name", selectedSymbol) 
-                                    put("asset_type", assetType)
-                                    put("quantity", qty)
-                                    put("buy_price", price)
-                                    put("broker", "")
-                                    put("notes", "")
+                                val db = FirebaseFirestore.getInstance()
+                                val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
+                                if (!userQuery.isEmpty) {
+                                    val userRef = userQuery.documents[0].reference
+                                    val invData = hashMapOf<String, Any>(
+                                        "asset_name" to selectedSymbol,
+                                        "asset_type" to assetType,
+                                        "quantity" to qty,
+                                        "buy_price" to price,
+                                        "current_price" to price,
+                                        "one_day_change" to 0.0,
+                                        "inv_date" to date
+                                    )
+                                    userRef.collection("Investments").document(selectedSymbol).set(invData, SetOptions.merge()).await()
                                 }
-                                val client = NetworkClient.instance
-                                val body = jsonBody.toString().toRequestBody("application/json".toMediaType())
-                                val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(body).build()
-                                client.newCall(request).execute()
                             } catch (e: Exception) {
                             }
                         }
