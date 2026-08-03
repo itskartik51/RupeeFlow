@@ -21,18 +21,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
 import com.kartikey.rupeeflow.Cloud_Database.Constants
-import com.kartikey.rupeeflow.UI_Screens.NetworkClient
 import com.kartikey.rupeeflow.UI_Screens.bounceClick
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
-import org.json.JSONObject
 import java.text.NumberFormat
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 
 data class CashItem(
@@ -183,27 +183,31 @@ fun UpdateCashDialog(currentAmount: Double, username: String, onDismiss: () -> U
                                 
                                 CoroutineScope(Dispatchers.IO).launch {
                                     try {
-                                        val jsonBody = JSONObject().apply {
-                                            put("action", "update_cash")
-                                            put("username", username)
-                                            put("amount", amt)
-                                        }
-                                        val request = Request.Builder()
-                                            .url(Constants.GOOGLE_SHEET_API_URL)
-                                            .post(jsonBody.toString().toRequestBody("application/json".toMediaType()))
-                                            .build()
-                                        val response = NetworkClient.instance.newCall(request).execute()
-                                        val resData = response.body?.string() ?: ""
+                                        val db = FirebaseFirestore.getInstance()
+                                        val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
+                                        
+                                        if (!userQuery.isEmpty) {
+                                            val userRef = userQuery.documents[0].reference
+                                            val cashData = hashMapOf(
+                                                "total_cash" to amt,
+                                                "last_updated" to SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
+                                            )
+                                            userRef.collection("Finances").document("Cash")
+                                                .set(cashData, SetOptions.merge())
+                                                .await()
 
-                                        withContext(Dispatchers.Main) {
-                                            if (resData.contains("success")) {
+                                            withContext(Dispatchers.Main) {
                                                 onSuccess() 
-                                            } else {
+                                            }
+                                        } else {
+                                            withContext(Dispatchers.Main) {
                                                 Toast.makeText(context, "Update Failed!", Toast.LENGTH_SHORT).show()
                                             }
                                         }
                                     } catch (e: Exception) {
-                                        
+                                        withContext(Dispatchers.Main) {
+                                            Toast.makeText(context, "Network Error", Toast.LENGTH_SHORT).show()
+                                        }
                                     }
                                 }
                             } else Toast.makeText(context, "Enter a valid amount", Toast.LENGTH_SHORT).show()
