@@ -34,18 +34,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import com.kartikey.rupeeflow.Cloud_Database.Constants
+import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
 import com.kartikey.rupeeflow.UI_Screens.bounceClick 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
-import org.json.JSONObject
 import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 
 // Data Model for Contri Rooms
@@ -132,8 +131,8 @@ fun ContriScreen(
                 room = openedRoom!!,
                 onBackClick = { openedRoom = null },
                 onLeaveClick = { 
-                    Toast.makeText(context, "Balance check logic coming soon!", Toast.LENGTH_SHORT).show()
                     openedRoom = null 
+                    onRefresh()
                 }
             )
         }
@@ -313,7 +312,7 @@ fun ContriScreen(
 }
 
 // ==========================================
-// DIRECT AUTO-JOIN DIALOG (ALIGNMENT BUG FIXED)
+// DIRECT AUTO-JOIN DIALOG 
 // ==========================================
 @Composable
 fun AutoJoinContriDialog(
@@ -330,28 +329,39 @@ fun AutoJoinContriDialog(
     LaunchedEffect(Unit) {
         coroutineScope.launch(Dispatchers.IO) {
             try {
-                val jsonBody = JSONObject().apply {
-                    put("action", "join_contri")
-                    put("username", username)
-                    put("room_code", roomCode)
-                    put("passkey", pin)
-                }
-                val request = Request.Builder()
-                    .url(Constants.GOOGLE_SHEET_API_URL)
-                    .post(jsonBody.toString().toRequestBody("application/json".toMediaType()))
-                    .build()
+                val db = FirebaseFirestore.getInstance()
+                val query = db.collection("Contri")
+                    .whereEqualTo("contri_code", roomCode)
+                    .get()
+                    .await()
                 
-                val response = OkHttpClient().newCall(request).execute()
-                val resData = response.body?.string() ?: ""
-                
-                withContext(Dispatchers.Main) {
-                    if (resData.contains("success")) {
-                        Toast.makeText(context, "Joined $roomName Successfully!", Toast.LENGTH_SHORT).show()
-                        onSuccess()
+                if (!query.isEmpty) {
+                    val doc = query.documents[0]
+                    if (doc.getString("passkey") == pin) {
+                        val todayStr = SimpleDateFormat("dd-MM-yyyy", Locale.getDefault()).format(Date())
+                        val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
+                        val fullName = if (!userQuery.isEmpty) userQuery.documents[0].getString("name") ?: username else username
+                        val exactMemberString = "$fullName/$todayStr"
+
+                        doc.reference.update(
+                            "member_usernames", FieldValue.arrayUnion(username),
+                            "members", FieldValue.arrayUnion(exactMemberString)
+                        ).await()
+                        
+                        withContext(Dispatchers.Main) { 
+                            Toast.makeText(context, "Joined $roomName!", Toast.LENGTH_SHORT).show()
+                            onSuccess() 
+                        }
                     } else {
-                        val errorMsg = try { JSONObject(resData).optString("message", "Invalid Code/Pin") } catch(e:Exception){ "Error joining room" }
-                        Toast.makeText(context, errorMsg, Toast.LENGTH_LONG).show()
-                        onDismiss()
+                        withContext(Dispatchers.Main) { 
+                            Toast.makeText(context, "Invalid Pin!", Toast.LENGTH_LONG).show()
+                            onDismiss() 
+                        }
+                    }
+                } else {
+                    withContext(Dispatchers.Main) { 
+                        Toast.makeText(context, "Room not found!", Toast.LENGTH_LONG).show()
+                        onDismiss() 
                     }
                 }
             } catch (e: Exception) {
@@ -374,7 +384,7 @@ fun AutoJoinContriDialog(
             elevation = CardDefaults.cardElevation(8.dp)
         ) {
             Column(
-                modifier = Modifier.fillMaxWidth().padding(24.dp), // BUG FIXED: Added fillMaxWidth() to center the content
+                modifier = Modifier.fillMaxWidth().padding(24.dp), 
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 CircularProgressIndicator(color = MaterialTheme.colorScheme.primary, modifier = Modifier.size(36.dp), strokeWidth = 3.dp)
@@ -529,29 +539,42 @@ fun CreateContriDialog(username: String, onDismiss: () -> Unit, onSuccess: () ->
                             isSubmitting = true
                             coroutineScope.launch(Dispatchers.IO) {
                                 try {
-                                    val jsonBody = JSONObject().apply {
-                                        put("action", "create_contri")
-                                        put("username", username)
-                                        put("room_name", contriName.trim())
-                                        put("passkey", pin)
-                                    }
-                                    val request = Request.Builder()
-                                        .url(Constants.GOOGLE_SHEET_API_URL)
-                                        .post(jsonBody.toString().toRequestBody("application/json".toMediaType()))
-                                        .build()
+                                    val db = FirebaseFirestore.getInstance()
+                                    val metaRef = db.collection("System").document("Metadata")
+                                    val metaDoc = metaRef.get().await()
                                     
-                                    val response = OkHttpClient().newCall(request).execute()
-                                    val resData = response.body?.string() ?: ""
+                                    val lastCounter = metaDoc.getLong("last_contri_id") ?: 0L
+                                    val nextCounter = lastCounter + 1
+                                    metaRef.set(mapOf("last_contri_id" to nextCounter), SetOptions.merge()).await()
+
+                                    val counterStr = String.format(Locale.US, "%03d", nextCounter)
+                                    val randomChars = (1..6).map { ('A'..'Z').random() }.joinToString("")
+                                    val randomCode = "${randomChars.take(3)}-${(100..999).random()}-${randomChars.takeLast(3)}"
+                                    
+                                    val docId = "${counterStr}_${contriName.replace(" ", "")}_$randomCode"
+                                    val todayStr = SimpleDateFormat("dd-MM-yyyy", Locale.getDefault()).format(Date())
+
+                                    val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
+                                    val fullName = if (!userQuery.isEmpty) userQuery.documents[0].getString("name") ?: username else username
+
+                                    val contriData = hashMapOf(
+                                        "contri_code" to randomCode,
+                                        "contri_date" to todayStr,
+                                        "contri_name" to contriName,
+                                        "full_group_name" to "$contriName / $randomCode / $todayStr",
+                                        "members" to listOf("$fullName/$todayStr"),
+                                        "member_usernames" to listOf(username), 
+                                        "passkey" to pin,
+                                        "admin" to username,
+                                        "total_group_expense" to 0.0
+                                    )
+                                    
+                                    db.collection("Contri").document(docId).set(contriData).await()
                                     
                                     withContext(Dispatchers.Main) {
                                         isSubmitting = false
-                                        if (resData.contains("success")) {
-                                            Toast.makeText(context, "Room Created!", Toast.LENGTH_SHORT).show()
-                                            onSuccess()
-                                        } else {
-                                            val errorMsg = try { JSONObject(resData).optString("message", "Limit Reached") } catch(e:Exception){"Error"}
-                                            Toast.makeText(context, errorMsg, Toast.LENGTH_LONG).show()
-                                        }
+                                        Toast.makeText(context, "Room Created!", Toast.LENGTH_SHORT).show()
+                                        onSuccess()
                                     }
                                 } catch (e: Exception) {
                                     withContext(Dispatchers.Main) {
@@ -735,28 +758,37 @@ fun JoinContriDialog(
                                 val formattedCode = roomCode.chunked(3).joinToString("-")
                                 coroutineScope.launch(Dispatchers.IO) {
                                     try {
-                                        val jsonBody = JSONObject().apply {
-                                            put("action", "join_contri")
-                                            put("username", username)
-                                            put("room_code", formattedCode)
-                                            put("passkey", pin)
-                                        }
-                                        val request = Request.Builder()
-                                            .url(Constants.GOOGLE_SHEET_API_URL)
-                                            .post(jsonBody.toString().toRequestBody("application/json".toMediaType()))
-                                            .build()
+                                        val db = FirebaseFirestore.getInstance()
+                                        val query = db.collection("Contri").whereEqualTo("contri_code", formattedCode).get().await()
                                         
-                                        val response = OkHttpClient().newCall(request).execute()
-                                        val resData = response.body?.string() ?: ""
-                                        
-                                        withContext(Dispatchers.Main) {
-                                            isSubmitting = false
-                                            if (resData.contains("success")) {
-                                                Toast.makeText(context, "Joined Successfully!", Toast.LENGTH_SHORT).show()
-                                                onSuccess()
+                                        if (!query.isEmpty) {
+                                            val doc = query.documents[0]
+                                            if (doc.getString("passkey") == pin) {
+                                                val todayStr = SimpleDateFormat("dd-MM-yyyy", Locale.getDefault()).format(Date())
+                                                val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
+                                                val fullName = if (!userQuery.isEmpty) userQuery.documents[0].getString("name") ?: username else username
+                                                val exactMemberString = "$fullName/$todayStr"
+                                                
+                                                doc.reference.update(
+                                                    "member_usernames", FieldValue.arrayUnion(username),
+                                                    "members", FieldValue.arrayUnion(exactMemberString)
+                                                ).await()
+                                                
+                                                withContext(Dispatchers.Main) {
+                                                    isSubmitting = false
+                                                    Toast.makeText(context, "Joined Successfully!", Toast.LENGTH_SHORT).show()
+                                                    onSuccess()
+                                                }
                                             } else {
-                                                val errorMsg = try { JSONObject(resData).optString("message", "Invalid Code/Pin") } catch(e:Exception){"Error"}
-                                                Toast.makeText(context, errorMsg, Toast.LENGTH_LONG).show()
+                                                withContext(Dispatchers.Main) {
+                                                    isSubmitting = false
+                                                    Toast.makeText(context, "Invalid Pin", Toast.LENGTH_LONG).show()
+                                                }
+                                            }
+                                        } else {
+                                            withContext(Dispatchers.Main) {
+                                                isSubmitting = false
+                                                Toast.makeText(context, "Room not found", Toast.LENGTH_LONG).show()
                                             }
                                         }
                                     } catch (e: Exception) {
