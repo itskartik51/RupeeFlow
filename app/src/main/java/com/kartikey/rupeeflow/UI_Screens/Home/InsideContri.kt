@@ -119,6 +119,7 @@ fun InsideContriScreen(
                     val contriDoc = contriQuery.documents[0]
                     val admin = contriDoc.getString("admin") ?: ""
                     val memberUsernames = contriDoc.get("member_usernames") as? List<String> ?: emptyList()
+                    val membersArray = contriDoc.get("members") as? List<String> ?: emptyList()
                     
                     withContext(Dispatchers.Main) {
                         localRoomName = contriDoc.getString("contri_name") ?: room.roomName
@@ -127,31 +128,41 @@ fun InsideContriScreen(
                         totalGroupExpense = contriDoc.getDouble("total_group_expense") ?: 0.0
                     }
 
-                    // FIX FOR POINT 4: Fetch Active Transactions properly
+                    // 1. Fetch Active Transactions
                     val transDocs = contriDoc.reference.collection("Transactions").get().await()
                     val membersMap = mutableMapOf<String, MemberLedger>()
                     
+                    // Initialize with all members
                     for (m in memberUsernames) { 
                         membersMap[m] = MemberLedger(m, 0.0, mutableListOf()) 
                     }
+                    for (mStr in membersArray) {
+                        val mName = mStr.substringBefore("/")
+                        if (!membersMap.containsKey(mName)) {
+                            membersMap[mName] = MemberLedger(mName, 0.0, mutableListOf())
+                        }
+                    }
                     
                     for (doc in transDocs) {
-                        val paidBy = doc.getString("paid_by") ?: ""
+                        val paidByRaw = doc.getString("paid_by") ?: ""
+                        val paidBy = paidByRaw.substringBefore("/")
                         val amt = doc.getDouble("amount") ?: 0.0
                         val item = doc.getString("item_name") ?: ""
                         val date = doc.getString("date") ?: ""
                         
-                        if (membersMap.containsKey(paidBy)) {
-                            val current = membersMap[paidBy]!!
+                        val matchedKey = membersMap.keys.find { it.equals(paidBy, ignoreCase = true) } ?: paidBy
+                        
+                        if (membersMap.containsKey(matchedKey)) {
+                            val current = membersMap[matchedKey]!!
                             val updatedList = current.expenses.toMutableList()
                             updatedList.add(ContriExpense(item, amt, date))
-                            membersMap[paidBy] = current.copy(totalSpent = current.totalSpent + amt, expenses = updatedList)
+                            membersMap[matchedKey] = current.copy(totalSpent = current.totalSpent + amt, expenses = updatedList)
                         } else {
-                            membersMap[paidBy] = MemberLedger(paidBy, amt, mutableListOf(ContriExpense(item, amt, date)))
+                            membersMap[matchedKey] = MemberLedger(matchedKey, amt, mutableListOf(ContriExpense(item, amt, date)))
                         }
                     }
 
-                    // Fetch Past Cycles (if any)
+                    // Fetch Past Cycles
                     val cyclesList = mutableListOf<PastCycle>()
                     val cycleDocs = contriDoc.reference.collection("Past_Cycles").get().await()
                     for (c in cycleDocs) {
@@ -614,7 +625,7 @@ fun InsideContriScreen(
             AlertDialog(
                 onDismissRequest = { memberToRemove = null },
                 title = { Text("Remove Member?", fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onSurface) },
-                text = { Text("Are you sure you want to kick '$memberToRemove' from this room? Unka saara individual share room se zero ho jayega.", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                text = { Text("Are you sure you want to kick '$memberToRemove' from this room?", color = MaterialTheme.colorScheme.onSurfaceVariant) },
                 containerColor = MaterialTheme.colorScheme.surface,
                 confirmButton = {
                     TextButton(
@@ -670,7 +681,7 @@ fun InsideContriScreen(
             AlertDialog(
                 onDismissRequest = { showNewCycleDialog = false },
                 title = { Text("Start New Cycle?", fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onSurface) },
-                text = { Text("Once created, users cannot change this. It will be saved and calculations will restart from zero.", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                text = { Text("Once created, calculations will restart from zero.", color = MaterialTheme.colorScheme.onSurfaceVariant) },
                 containerColor = MaterialTheme.colorScheme.surface,
                 confirmButton = {
                     TextButton(
@@ -708,7 +719,7 @@ fun InsideContriScreen(
             AlertDialog(
                 onDismissRequest = { showLeaveDialog = false },
                 title = { Text("Leave Room?", fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onSurface) },
-                text = { Text("Are you sure you want to leave this Contri room? This action cannot be undone.", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                text = { Text("Are you sure you want to leave this Contri room?", color = MaterialTheme.colorScheme.onSurfaceVariant) },
                 containerColor = MaterialTheme.colorScheme.surface,
                 confirmButton = {
                     TextButton(
@@ -768,6 +779,14 @@ fun InsideContriScreen(
                             
                             if (!q.isEmpty) {
                                 val ref = q.documents[0].reference
+                                val transCol = ref.collection("Transactions")
+                                
+                                // FIX: Generate Custom Document ID: 001_ExpenseTitle
+                                val existingDocs = transCol.get().await()
+                                val nextIndex = existingDocs.size() + 1
+                                val formattedIndex = String.format(Locale.US, "%03d", nextIndex)
+                                val customDocId = "${formattedIndex}_${title.replace(" ", "")}"
+
                                 val transData = hashMapOf(
                                     "item_name" to title,
                                     "amount" to amount,
@@ -775,7 +794,7 @@ fun InsideContriScreen(
                                     "paid_by" to username,
                                     "timestamp" to FieldValue.serverTimestamp()
                                 )
-                                ref.collection("Transactions").add(transData).await()
+                                transCol.document(customDocId).set(transData).await()
                                 ref.update("total_group_expense", FieldValue.increment(amount)).await()
                                 
                                 withContext(Dispatchers.Main) { refreshTrigger++ }
