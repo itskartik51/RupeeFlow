@@ -1,6 +1,8 @@
 package com.kartikey.rupeeflow.UI_Screens.Home
 
+import android.content.Context
 import android.widget.Toast
+import androidx.compose.animation.*
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -10,11 +12,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -28,17 +33,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
 import com.kartikey.rupeeflow.Cloud_Database.Constants
 import com.kartikey.rupeeflow.R
 import com.kartikey.rupeeflow.UI_Screens.bounceClick 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
-import org.json.JSONObject
 import java.text.NumberFormat
 import java.util.Locale
 
@@ -193,7 +196,7 @@ fun HomeDashboardDesign(
             }
             Spacer(modifier = Modifier.height(24.dp))
             
-            SpendingTrackerCard() // Ye ab alag file se call hoga!
+            SpendingTrackerCard() 
             
             Spacer(modifier = Modifier.height(16.dp))
             
@@ -313,26 +316,43 @@ fun BudgetDialog(
                                 isSaving = true
                                 coroutineScope.launch(Dispatchers.IO) {
                                     try {
-                                        val jsonBody = JSONObject().apply {
-                                            put("action", "update_budget")
-                                            put("username", username)
-                                            put("limit", limitVal)
-                                        }
-                                        val request = Request.Builder()
-                                            .url(Constants.GOOGLE_SHEET_API_URL)
-                                            .post(jsonBody.toString().toRequestBody("application/json".toMediaType()))
-                                            .build()
+                                        val db = FirebaseFirestore.getInstance()
+                                        val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
                                         
-                                        val response = OkHttpClient().newCall(request).execute()
-                                        val resData = response.body?.string() ?: ""
-                                        
-                                        withContext(Dispatchers.Main) {
-                                            isSaving = false
-                                            if (resData.contains("success")) {
+                                        if (!userQuery.isEmpty) {
+                                            val userRef = userQuery.documents[0].reference
+                                            
+                                            // 1. Update fallback double value in main profile
+                                            userRef.update("budget_limit", limitVal).await()
+                                            
+                                            // 2. Format the custom strings for Finances/Budget collection
+                                            val usedPctStr = if (limitVal > 0) (thisMonthUsed / limitVal) * 100 else 0.0
+                                            val availAmtCalc = maxOf(0.0, limitVal - thisMonthUsed)
+                                            val availPctStr = if (limitVal > 0) (availAmtCalc / limitVal) * 100 else 0.0
+                                            
+                                            val formatVal = { amt: Double, pct: Double ->
+                                                "${amt.toInt()} (${String.format(Locale.US, "%.1f", pct)}%)"
+                                            }
+                                            
+                                            val budgetData = hashMapOf<String, Any>(
+                                                "budget" to "${limitVal.toInt()} (100%)",
+                                                "used" to formatVal(thisMonthUsed, usedPctStr),
+                                                "available" to formatVal(availAmtCalc, availPctStr)
+                                            )
+                                            
+                                            // Save new format in sub-collection
+                                            userRef.collection("Finances").document("Budget")
+                                                .set(budgetData, SetOptions.merge()).await()
+                                            
+                                            withContext(Dispatchers.Main) {
+                                                isSaving = false
                                                 Toast.makeText(context, "Budget Saved!", Toast.LENGTH_SHORT).show()
                                                 onSuccess()
-                                            } else {
-                                                Toast.makeText(context, "Error saving budget", Toast.LENGTH_SHORT).show()
+                                            }
+                                        } else {
+                                            withContext(Dispatchers.Main) {
+                                                isSaving = false
+                                                Toast.makeText(context, "User Error!", Toast.LENGTH_SHORT).show()
                                             }
                                         }
                                     } catch (e: Exception) {
