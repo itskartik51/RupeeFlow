@@ -19,30 +19,23 @@ jobs:
       with:
         java-version: '17'
         distribution: 'temurin'
-        cache: gradle
 
-    - name: Auto-Find Project and Build APK
+    # 1. Bina 'gradlew' file ke, sidha GitHub ka Gradle (v8.7) install karega
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v3
+      with:
+        gradle-version: '8.7'
+
+    # 2. JSON file create karega
+    - name: Create Google Services JSON
       env:
         GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
       run: |
-        # 1. gradlew ki asli location dhundo (chahe wo kisi bhi folder me ho)
-        GRADLEW_PATH=$(find . -name "gradlew" -type f | head -n 1)
-        
-        if [ -z "$GRADLEW_PATH" ]; then
-          echo "Error: gradlew file not found in the repository!"
-          exit 1
-        fi
-        
-        PROJECT_DIR=$(dirname "$GRADLEW_PATH")
-        echo "Found Android project at: $PROJECT_DIR"
-        
-        # 2. Us exact folder me jao
-        cd "$PROJECT_DIR"
-        
-        # 3. Google Services JSON ko app/ folder me banao
         mkdir -p app
-        echo "$GOOGLE_SERVICES_JSON" > app/google-services.json
-        
-        # 4. Permission do aur Debug APK Build karo
-        chmod +x gradlew
-        ./gradlew assembleDebug
+        cat << 'EOF' > app/google-services.json
+        ${{ secrets.GOOGLE_SERVICES_JSON }}
+        EOF
+
+    # 3. Direct 'gradle' command se build karega (No ./gradlew required)
+    - name: Build Debug APK
+      run: gradle assembleDebug
