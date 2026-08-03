@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
+import com.google.firebase.FirebaseApp
 import com.kartikey.rupeeflow.UI_Screens.MainScreen
 import com.kartikey.rupeeflow.UI_Screens.LoginScreen
 import com.kartikey.rupeeflow.UI_Screens.RupeeFlowTheme
@@ -28,6 +29,9 @@ import com.kartikey.rupeeflow.UI_Screens.bounceClick
 class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // NEW: Initialize Firebase Engine before UI loads
+        FirebaseApp.initializeApp(this)
         
         val sharedPreferences = getSharedPreferences("RupeeFlowPrefs", Context.MODE_PRIVATE)
         val savedLoginState = sharedPreferences.getBoolean("isLoggedIn", false)
