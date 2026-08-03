@@ -78,9 +78,65 @@ fun ContriScreen(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     
+    // Dynamic List fetched directly from Firestore
+    var fetchedRooms by remember { mutableStateOf<List<ContriRoomModel>>(contriRooms) }
+    var isFetchingRooms by remember { mutableStateOf(false) }
+
     // REFRESH ANIMATION STATES
     var isRefreshing by remember { mutableStateOf(false) }
     var currentRotation by remember { mutableFloatStateOf(0f) }
+
+    // FETCH ROOMS DIRECTLY FROM FIRESTORE
+    val fetchRoomsFromFirestore: suspend () -> Unit = {
+        try {
+            isFetchingRooms = true
+            val db = FirebaseFirestore.getInstance()
+            val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
+            val roomsList = mutableListOf<ContriRoomModel>()
+
+            if (!userQuery.isEmpty) {
+                val userData = userQuery.documents[0].data ?: emptyMap<String, Any>()
+                
+                // 1. Fetch room_X fields
+                val roomKeys = userData.keys.filter { it.startsWith("room_") }
+                for (key in roomKeys) {
+                    val roomVal = userData[key]?.toString() ?: ""
+                    if (roomVal.contains("/")) {
+                        val parts = roomVal.split("/")
+                        val rName = parts.getOrNull(0)?.trim() ?: "Contri Room"
+                        val rCode = parts.getOrNull(1)?.trim() ?: ""
+                        val rPin = parts.getOrNull(2)?.trim() ?: "123456"
+
+                        if (rCode.isNotBlank()) {
+                            roomsList.add(ContriRoomModel(rName, rCode, "", rPin))
+                        }
+                    }
+                }
+
+                // 2. Fallback: Query Contri collection where member_usernames contains username
+                val contriQuery = db.collection("Contri").whereArrayContains("member_usernames", username).get().await()
+                for (doc in contriQuery.documents) {
+                    val code = doc.getString("contri_code") ?: ""
+                    if (code.isNotBlank() && roomsList.none { it.roomCode == code }) {
+                        val name = doc.getString("contri_name") ?: "Contri Room"
+                        val pin = doc.getString("passkey") ?: "123456"
+                        roomsList.add(ContriRoomModel(name, code, "", pin))
+                    }
+                }
+            }
+
+            withContext(Dispatchers.Main) {
+                fetchedRooms = roomsList
+                isFetchingRooms = false
+            }
+        } catch (e: Exception) {
+            withContext(Dispatchers.Main) { isFetchingRooms = false }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        fetchRoomsFromFirestore()
+    }
 
     LaunchedEffect(isRefreshing) {
         if (isRefreshing) {
@@ -132,6 +188,7 @@ fun ContriScreen(
                 onBackClick = { openedRoom = null },
                 onLeaveClick = { 
                     openedRoom = null 
+                    coroutineScope.launch { fetchRoomsFromFirestore() }
                     onRefresh()
                 }
             )
@@ -163,11 +220,12 @@ fun ContriScreen(
                         .bounceClick {
                             if (!isRefreshing) {
                                 isRefreshing = true
-                                onRefresh() 
                                 coroutineScope.launch {
+                                    fetchRoomsFromFirestore()
                                     delay(1200)
                                     isRefreshing = false
                                 }
+                                onRefresh() 
                             }
                         }
                         .padding(4.dp)
@@ -193,8 +251,12 @@ fun ContriScreen(
             ) {
                 Spacer(modifier = Modifier.height(8.dp))
 
-                if (contriRooms.isNotEmpty()) {
-                    contriRooms.forEach { room ->
+                if (isFetchingRooms && fetchedRooms.isEmpty()) {
+                    Box(modifier = Modifier.fillMaxWidth().height(100.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                    }
+                } else if (fetchedRooms.isNotEmpty()) {
+                    fetchedRooms.forEach { room ->
                         ActiveRoomCard(
                             room = room, 
                             onClick = { openedRoom = room }, 
@@ -277,6 +339,7 @@ fun ContriScreen(
             onDismiss = { autoJoinData = null },
             onSuccess = {
                 autoJoinData = null
+                coroutineScope.launch { fetchRoomsFromFirestore() }
                 onRefresh()
             }
         )
@@ -288,6 +351,7 @@ fun ContriScreen(
             onDismiss = { showCreateDialog = false },
             onSuccess = { 
                 showCreateDialog = false
+                coroutineScope.launch { fetchRoomsFromFirestore() }
                 onRefresh() 
             }
         )
@@ -305,6 +369,7 @@ fun ContriScreen(
             onSuccess = {
                 showJoinDialog = false
                 scannedRoomCode = ""
+                coroutineScope.launch { fetchRoomsFromFirestore() }
                 onRefresh()
             }
         )
@@ -347,8 +412,7 @@ fun AutoJoinContriDialog(
                             "member_usernames", FieldValue.arrayUnion(username),
                             "members", FieldValue.arrayUnion(exactMemberString)
                         ).await()
-                        
-                        // FIX FOR POINT 3: Update room_X inside User Document
+
                         if (!userQuery.isEmpty) {
                             val userDocRef = userQuery.documents[0].reference
                             val userData = userQuery.documents[0].data ?: emptyMap<String, Any>()
@@ -581,7 +645,6 @@ fun CreateContriDialog(username: String, onDismiss: () -> Unit, onSuccess: () ->
                                     
                                     db.collection("Contri").document(docId).set(contriData).await()
                                     
-                                    // FIX FOR POINT 3: Save room_X inside User Document
                                     if (!userQuery.isEmpty) {
                                         val userDocRef = userQuery.documents[0].reference
                                         val userData = userQuery.documents[0].data ?: emptyMap<String, Any>()
@@ -795,7 +858,6 @@ fun JoinContriDialog(
                                                     "members", FieldValue.arrayUnion(exactMemberString)
                                                 ).await()
                                                 
-                                                // FIX FOR POINT 3: Save room_X inside User Document
                                                 if (!userQuery.isEmpty) {
                                                     val userDocRef = userQuery.documents[0].reference
                                                     val userData = userQuery.documents[0].data ?: emptyMap<String, Any>()
