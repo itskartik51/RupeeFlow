@@ -1,6 +1,8 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    // NEW: Firebase Google Services Plugin
+    id("com.google.gms.google-services")
 }
 
 android {
@@ -82,9 +84,17 @@ dependencies {
     // Material Icons Extended 
     implementation("androidx.compose.material:material-icons-extended:1.7.0")
     
-    // Google Sheets API & Images
+    // Google Sheets API & Images (Ab OkHttp hatane ka time aayega next step me)
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("io.coil-kt:coil-compose:2.4.0")
+
+    // ==========================================
+    // NEW LIBRARIES: FIREBASE SDK
+    // ==========================================
+    // Firebase BoM (Bill of Materials) - Versions manage karega
+    implementation(platform("com.google.firebase:firebase-bom:32.7.2"))
+    // Firestore Database Dependency
+    implementation("com.google.firebase:firebase-firestore")
 
     // ==========================================
     // NEW LIBRARIES: QR & SCANNER ENGINE
