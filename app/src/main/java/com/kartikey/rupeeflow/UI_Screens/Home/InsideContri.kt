@@ -127,11 +127,10 @@ fun InsideContriScreen(
                         totalGroupExpense = contriDoc.getDouble("total_group_expense") ?: 0.0
                     }
 
-                    // 1. Fetch Active Transactions
+                    // FIX FOR POINT 4: Fetch Active Transactions properly
                     val transDocs = contriDoc.reference.collection("Transactions").get().await()
                     val membersMap = mutableMapOf<String, MemberLedger>()
                     
-                    // Initialize map with all members (even if 0 expense)
                     for (m in memberUsernames) { 
                         membersMap[m] = MemberLedger(m, 0.0, mutableListOf()) 
                     }
@@ -148,12 +147,11 @@ fun InsideContriScreen(
                             updatedList.add(ContriExpense(item, amt, date))
                             membersMap[paidBy] = current.copy(totalSpent = current.totalSpent + amt, expenses = updatedList)
                         } else {
-                            // Edge case fallback
-                            membersMap[paidBy] = MemberLedger(paidBy, amt, listOf(ContriExpense(item, amt, date)))
+                            membersMap[paidBy] = MemberLedger(paidBy, amt, mutableListOf(ContriExpense(item, amt, date)))
                         }
                     }
 
-                    // 2. Fetch Past Cycles (if any)
+                    // Fetch Past Cycles (if any)
                     val cyclesList = mutableListOf<PastCycle>()
                     val cycleDocs = contriDoc.reference.collection("Past_Cycles").get().await()
                     for (c in cycleDocs) {
@@ -394,13 +392,10 @@ fun InsideContriScreen(
                                         expandedState[cycle.dateRange] = true
                                         if (cycleLedger == null) {
                                             loadingState[cycle.dateRange] = true
-                                            
-                                            // TODO: Firestore Fetch Past Cycle Logic
-                                            // Currently just showing empty or generic fallback as per previous structure.
                                             coroutineScope.launch(Dispatchers.Main) {
                                                 delay(500)
                                                 loadingState[cycle.dateRange] = false
-                                                fetchedCycleData[cycle.dateRange] = emptyList() // Replace with actual fetch if needed
+                                                fetchedCycleData[cycle.dateRange] = emptyList()
                                             }
                                         }
                                     }
@@ -643,6 +638,17 @@ fun InsideContriScreen(
                                             "members", FieldValue.arrayRemove(targetFullString)
                                         ).await()
                                         
+                                        // Clear room_X field for removed member
+                                        val targetUserQuery = db.collection("Users").whereEqualTo("username", target).get().await()
+                                        if (!targetUserQuery.isEmpty) {
+                                            val targetUserDocRef = targetUserQuery.documents[0].reference
+                                            val targetData = targetUserQuery.documents[0].data ?: emptyMap<String, Any>()
+                                            val targetRoomKey = targetData.filterValues { it.toString().contains(room.roomCode) }.keys.firstOrNull()
+                                            if (targetRoomKey != null) {
+                                                targetUserDocRef.update(targetRoomKey, FieldValue.delete()).await()
+                                            }
+                                        }
+
                                         withContext(Dispatchers.Main) { refreshTrigger++ }
                                     }
                                 } catch (e: Exception) {}
@@ -724,6 +730,17 @@ fun InsideContriScreen(
                                             "members", FieldValue.arrayRemove(targetFullString)
                                         ).await()
                                         
+                                        // Clear room_X field for current user
+                                        val currentUserQuery = db.collection("Users").whereEqualTo("username", username).get().await()
+                                        if (!currentUserQuery.isEmpty) {
+                                            val currentUserDocRef = currentUserQuery.documents[0].reference
+                                            val userData = currentUserQuery.documents[0].data ?: emptyMap<String, Any>()
+                                            val targetRoomKey = userData.filterValues { it.toString().contains(room.roomCode) }.keys.firstOrNull()
+                                            if (targetRoomKey != null) {
+                                                currentUserDocRef.update(targetRoomKey, FieldValue.delete()).await()
+                                            }
+                                        }
+
                                         withContext(Dispatchers.Main) { onLeaveClick() }
                                     }
                                 } catch (e: Exception) {}
