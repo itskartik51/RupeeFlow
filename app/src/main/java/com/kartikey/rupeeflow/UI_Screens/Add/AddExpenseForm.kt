@@ -564,6 +564,7 @@ fun AddExpenseForm(
                     val finalCategory = categoryText.trim()
                     val finalMode = modeText.trim()
                     val finalExpenseDateStr = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(expenseDateMillis))
+                    val dateFormattedForDoc = SimpleDateFormat("dd-MM-yyyy", Locale.getDefault()).format(Date(expenseDateMillis))
 
                     val canSave = if (hasNoFinance) {
                         amount.isNotBlank() && finalCategory.isNotBlank()
@@ -609,7 +610,14 @@ fun AddExpenseForm(
                                         "payment_detail" to paymentDetailStr
                                     )
 
-                                    userRef.collection("Expenses").add(expData).await()
+                                    // FIX FOR POINT 5: Custom Document ID Format: 001_username_DD-MM-YYYY
+                                    val expensesCol = userRef.collection("Expenses")
+                                    val existingDocs = expensesCol.get().await()
+                                    val nextIndex = existingDocs.size() + 1
+                                    val formattedIndex = String.format(Locale.US, "%03d", nextIndex)
+                                    val customDocId = "${formattedIndex}_${username}_$dateFormattedForDoc"
+
+                                    expensesCol.document(customDocId).set(expData).await()
 
                                     // BALANCE DEDUCTION LOGIC
                                     if (expenseAmt > 0) {
