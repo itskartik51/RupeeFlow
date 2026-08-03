@@ -26,20 +26,17 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.google.firebase.firestore.FirebaseFirestore
 import com.kartikey.rupeeflow.Cloud_Database.Constants
 import com.kartikey.rupeeflow.UI_Screens.Assets.BankAccountItem
 import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.CashItem
 import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.CreditCardItem
 import com.kartikey.rupeeflow.UI_Screens.CustomDatePicker
-import com.kartikey.rupeeflow.UI_Screens.NetworkClient
 import com.kartikey.rupeeflow.UI_Screens.bounceClick
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
-import org.json.JSONObject
+import kotlinx.coroutines.tasks.await
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -433,24 +430,68 @@ fun AddExpenseForm(
 
                         CoroutineScope(Dispatchers.IO).launch {
                             try {
-                                val json = JSONObject().apply {
-                                    put("action", "add_expense")
-                                    put("username", username)
-                                    put("amount", amount)
-                                    put("category", finalCategory)
-                                    put("date", finalExpenseDateStr) 
-                                    put("detail1", remark1)
-                                    put("detail2", remark2)
-                                    put("payment_method", actualMode) 
-                                    put("source_type", actualSourceType) 
-                                    put("source_identifier", actualSourceId) 
+                                val db = FirebaseFirestore.getInstance()
+                                val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
+                                if (!userQuery.isEmpty) {
+                                    val userRef = userQuery.documents[0].reference
+                                    val paymentDetailStr = "$actualMode | $actualSourceType | $actualSourceId"
+
+                                    val expData = hashMapOf<String, Any>(
+                                        "date" to finalExpenseDateStr,
+                                        "amount" to expenseAmt,
+                                        "category" to finalCategory,
+                                        "detail_1" to remark1,
+                                        "detail_2" to remark2,
+                                        "payment_detail" to paymentDetailStr
+                                    )
+
+                                    userRef.collection("Expenses").add(expData).await()
+
+                                    // BALANCE DEDUCTION LOGIC
+                                    if (expenseAmt > 0) {
+                                        when (actualSourceType) {
+                                            "Cash" -> {
+                                                val cashDoc = userRef.collection("Finances").document("Cash").get().await()
+                                                val cur = cashDoc.getDouble("total_cash") ?: 0.0
+                                                val newCash = (cur - expenseAmt).coerceAtLeast(0.0)
+                                                userRef.collection("Finances").document("Cash").update("total_cash", newCash).await()
+                                            }
+                                            "Bank" -> {
+                                                if (actualSourceId.isNotEmpty()) {
+                                                    val bankDoc = userRef.collection("Finances").document("Banking_Data").get().await()
+                                                    val bankData = bankDoc.get(actualSourceId) as? Map<*, *>
+                                                    if (bankData != null) {
+                                                        val curBal = (bankData["current_bal"] as? Number)?.toDouble() ?: 0.0
+                                                        val newBal = (curBal - expenseAmt).coerceAtLeast(0.0)
+                                                        userRef.collection("Finances").document("Banking_Data").update("${actualSourceId}.current_bal", newBal).await()
+                                                    }
+                                                }
+                                            }
+                                            "Credit Card" -> {
+                                                if (actualSourceId.isNotEmpty()) {
+                                                    val ccDoc = userRef.collection("Finances").document("Credit_Cards").get().await()
+                                                    val ccData = ccDoc.get(actualSourceId) as? Map<*, *>
+                                                    if (ccData != null) {
+                                                        val curOut = (ccData["outstanding"] as? Number)?.toDouble() ?: 0.0
+                                                        val limit = (ccData["limit"] as? Number)?.toDouble() ?: 0.0
+                                                        val newOut = curOut + expenseAmt
+                                                        val avail = limit - newOut
+                                                        val util = if (limit > 0) (newOut / limit) * 100.0 else 0.0
+                                                        
+                                                        userRef.collection("Finances").document("Credit_Cards").update(
+                                                            mapOf(
+                                                                "${actualSourceId}.outstanding" to newOut,
+                                                                "${actualSourceId}.available" to avail,
+                                                                "${actualSourceId}.utilization" to util
+                                                            )
+                                                        ).await()
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
-                                val client = NetworkClient.instance
-                                val body = json.toString().toRequestBody("application/json".toMediaType())
-                                val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).post(body).build()
-                                client.newCall(request).execute()
-                            } catch (e: Exception) {
-                            }
+                            } catch (e: Exception) { }
                         }
                     } else {
                         if (!hasNoFinance && finalMode.isNotBlank() && selectedSourceType.isNotEmpty() && selectedSourceId.isEmpty()) {
