@@ -32,8 +32,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.google.firebase.FieldValue
-import com.google.firebase.firestore.FieldValue as FirestoreFieldValue
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import com.kartikey.rupeeflow.R
@@ -417,7 +416,7 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
                                     "password" to password.trim(),
                                     "dob" to "",
                                     "budget_limit" to 0.0,
-                                    "created_at" to FirestoreFieldValue.serverTimestamp()
+                                    "created_at" to FieldValue.serverTimestamp()
                                 )
 
                                 val newUserRef = db.collection("Users").document(newUserId)
