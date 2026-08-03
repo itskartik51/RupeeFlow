@@ -119,9 +119,9 @@ fun InsideContriScreen(
                     val contriDoc = contriQuery.documents[0]
                     val admin = contriDoc.getString("admin") ?: ""
                     
-                    // Legacy Support: Fallback to 'members' array if 'member_usernames' doesn't exist
-                    val memberUsernames = contriDoc.get("member_usernames") as? List<String> ?: emptyList()
-                    val membersArray = contriDoc.get("members") as? List<String> ?: emptyList()
+                    // 100% BULLETPROOF SAFE CASTING FOR FIREBASE ARRAYS
+                    val memberUsernames = (contriDoc.get("member_usernames") as? List<*>)?.map { it.toString() } ?: emptyList()
+                    val membersArray = (contriDoc.get("members") as? List<*>)?.map { it.toString() } ?: emptyList()
                     
                     val activeMembersList = if (memberUsernames.isNotEmpty()) {
                         memberUsernames
@@ -133,47 +133,28 @@ fun InsideContriScreen(
                         localRoomName = contriDoc.getString("contri_name") ?: room.roomName
                         localRoomPin = contriDoc.getString("passkey") ?: room.pin
                         isAdmin = admin == username
-                        totalGroupExpense = contriDoc.getDouble("total_group_expense") ?: 0.0
+                        
+                        val totalExpRaw = contriDoc.get("total_group_expense")
+                        totalGroupExpense = if (totalExpRaw is Number) totalExpRaw.toDouble() else 0.0
                     }
 
+                    // 1. Fetch Active Transactions
                     val transDocs = contriDoc.reference.collection("Transactions").get().await()
                     val membersMap = mutableMapOf<String, MemberLedger>()
                     
-                    // Initialize Map
                     for (m in activeMembersList) { 
                         membersMap[m] = MemberLedger(m, 0.0, mutableListOf()) 
                     }
                     
                     for (doc in transDocs) {
-                        // Support both new ('item_name') and old ('particular') schema
-                        val item = doc.getString("item_name") ?: doc.getString("particular") ?: "Unknown"
-                        var amt = doc.getDouble("amount") ?: 0.0
-                        var paidByRaw = doc.getString("paid_by") ?: ""
-                        var date = doc.getString("date") ?: ""
-
-                        // Legacy Support: Extract amount & paidBy from old 'split' map
-                        if (paidByRaw.isEmpty() && doc.contains("split")) {
-                            val splitMap = doc.get("split") as? Map<String, Number>
-                            if (splitMap != null) {
-                                val payerEntry = splitMap.entries.find { it.value.toDouble() > 0 }
-                                if (payerEntry != null) {
-                                    paidByRaw = payerEntry.key
-                                    amt = payerEntry.value.toDouble()
-                                }
-                            }
-                        }
-
-                        // Legacy Support: Format Timestamp if date is saved as object
-                        if (date.isEmpty() && doc.contains("date")) {
-                            val ts = doc.getTimestamp("date")
-                            if (ts != null) {
-                                date = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(ts.toDate())
-                            } else {
-                                date = doc.get("date")?.toString() ?: ""
-                            }
-                        }
+                        val item = doc.getString("item_name") ?: "Unknown"
                         
-                        val paidBy = paidByRaw.substringBefore("/")
+                        val rawAmt = doc.get("amount")
+                        val amt = if (rawAmt is Number) rawAmt.toDouble() else 0.0
+                        
+                        val date = doc.getString("date") ?: ""
+                        val paidBy = doc.getString("paid_by") ?: ""
+                        
                         val matchedKey = membersMap.keys.find { it.equals(paidBy, ignoreCase = true) } ?: paidBy
                         
                         if (membersMap.containsKey(matchedKey)) {
@@ -186,7 +167,7 @@ fun InsideContriScreen(
                         }
                     }
 
-                    // Fetch Past Cycles
+                    // 2. Fetch Past Cycles
                     val cyclesList = mutableListOf<PastCycle>()
                     val cycleDocs = contriDoc.reference.collection("Past_Cycles").get().await()
                     for (c in cycleDocs) {
@@ -204,10 +185,16 @@ fun InsideContriScreen(
                         isLoading = false 
                     }
                 } else {
-                    withContext(Dispatchers.Main) { isLoading = false }
+                    withContext(Dispatchers.Main) { 
+                        isLoading = false 
+                        Toast.makeText(context, "Error: Room details not found in database.", Toast.LENGTH_LONG).show()
+                    }
                 }
             } catch (e: Exception) {
-                withContext(Dispatchers.Main) { isLoading = false }
+                withContext(Dispatchers.Main) { 
+                    isLoading = false 
+                    Toast.makeText(context, "Data Error: ${e.message}", Toast.LENGTH_LONG).show()
+                }
             }
         }
     }
@@ -665,7 +652,7 @@ fun InsideContriScreen(
                                     val q = db.collection("Contri").whereEqualTo("contri_code", room.roomCode).get().await()
                                     if (!q.isEmpty) {
                                         val doc = q.documents[0]
-                                        val membersArray = doc.get("members") as? List<String> ?: emptyList()
+                                        val membersArray = (doc.get("members") as? List<*>)?.map { it.toString() } ?: emptyList()
                                         val targetFullString = membersArray.find { it.startsWith("$target/") || it.startsWith(target) }
                                         
                                         doc.reference.update(
@@ -757,7 +744,7 @@ fun InsideContriScreen(
                                     val q = db.collection("Contri").whereEqualTo("contri_code", room.roomCode).get().await()
                                     if (!q.isEmpty) {
                                         val doc = q.documents[0]
-                                        val membersArray = doc.get("members") as? List<String> ?: emptyList()
+                                        val membersArray = (doc.get("members") as? List<*>)?.map { it.toString() } ?: emptyList()
                                         val targetFullString = membersArray.find { it.startsWith("$username/") || it.startsWith(username) }
                                         
                                         doc.reference.update(
@@ -799,10 +786,6 @@ fun InsideContriScreen(
                         try {
                             val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
                             val db = FirebaseFirestore.getInstance()
-                            
-                            // 1. Fetch User's actual Name to keep legacy ledger working
-                            val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
-                            val myFullName = if (!userQuery.isEmpty) userQuery.documents[0].getString("name") ?: username else username
 
                             val q = db.collection("Contri").whereEqualTo("contri_code", room.roomCode).get().await()
                             if (!q.isEmpty) {
@@ -813,21 +796,26 @@ fun InsideContriScreen(
                                 val existingDocs = transCol.get().await()
                                 val nextIndex = existingDocs.size() + 1
                                 val formattedIndex = String.format(Locale.US, "%03d", nextIndex)
-                                val customDocId = "${formattedIndex}_${title.replace(" ", "")}"
+                                val safeTitle = title.replace(Regex("[^A-Za-z0-9]"), "")
+                                val customDocId = "${formattedIndex}_${safeTitle}"
 
                                 val transData = hashMapOf(
                                     "item_name" to title,
                                     "amount" to amount,
                                     "date" to sdf.format(Date(dateMillis)),
-                                    "paid_by" to myFullName, // Saving Name so it merges with old data
+                                    "paid_by" to username,
                                     "timestamp" to FieldValue.serverTimestamp()
                                 )
                                 transCol.document(customDocId).set(transData).await()
                                 ref.update("total_group_expense", FieldValue.increment(amount)).await()
                                 
                                 withContext(Dispatchers.Main) { refreshTrigger++ }
+                            } else {
+                                withContext(Dispatchers.Main) { Toast.makeText(context, "Error: Room not found in DB", Toast.LENGTH_LONG).show() }
                             }
-                        } catch (e: Exception) {}
+                        } catch (e: Exception) {
+                            withContext(Dispatchers.Main) { Toast.makeText(context, "Save Error: ${e.message}", Toast.LENGTH_LONG).show() }
+                        }
                     }
                 }
             )
