@@ -402,7 +402,10 @@ fun AutoJoinContriDialog(
                 
                 if (!query.isEmpty) {
                     val doc = query.documents[0]
-                    if (doc.getString("passkey") == pin) {
+                    
+                    // Legacy Support: Allow join if passkey is null or matches
+                    val dbPasskey = doc.getString("passkey")
+                    if (dbPasskey == pin || dbPasskey.isNullOrEmpty()) {
                         val todayStr = SimpleDateFormat("dd-MM-yyyy", Locale.getDefault()).format(Date())
                         val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
                         val fullName = if (!userQuery.isEmpty) userQuery.documents[0].getString("name") ?: username else username
@@ -846,7 +849,10 @@ fun JoinContriDialog(
                                         
                                         if (!query.isEmpty) {
                                             val doc = query.documents[0]
-                                            if (doc.getString("passkey") == pin) {
+                                            
+                                            // Legacy Support: Allow join if passkey is null or matches
+                                            val dbPasskey = doc.getString("passkey")
+                                            if (dbPasskey == pin || dbPasskey.isNullOrEmpty()) {
                                                 val todayStr = SimpleDateFormat("dd-MM-yyyy", Locale.getDefault()).format(Date())
                                                 val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
                                                 val fullName = if (!userQuery.isEmpty) userQuery.documents[0].getString("name") ?: username else username
