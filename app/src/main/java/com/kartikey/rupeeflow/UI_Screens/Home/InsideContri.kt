@@ -56,13 +56,13 @@ import kotlin.math.abs
 // DATA MODELS
 // ==========================================
 data class ContriExpense(val itemName: String, val amount: Double, val date: String)
-data class MemberLedger(val memberName: String, val totalSpent: Double, val expenses: List<ContriExpense>)
+data class MemberLedger(val userId: String, val memberName: String, val totalSpent: Double, val expenses: List<ContriExpense>)
 data class Settlement(val from: String, val to: String, val amount: Double)
 data class PastCycle(val dateRange: String, val totalAmount: String)
 
 @Composable
 fun InsideContriScreen(
-    username: String,
+    username: String, // Kept to identify self internally
     room: ContriRoomModel,
     onBackClick: () -> Unit,
     onLeaveClick: () -> Unit
@@ -75,12 +75,14 @@ fun InsideContriScreen(
     var localRoomPin by remember { mutableStateOf(room.pin) }
     val formattedName = if (localRoomName.length > 10) "${localRoomName.take(10)}..." else localRoomName
 
+    var currentUserId by remember { mutableStateOf("") }
     var ledgers by remember { mutableStateOf<List<MemberLedger>>(emptyList()) }
     var pastCycles by remember { mutableStateOf<List<PastCycle>>(emptyList()) }
     var totalGroupExpense by remember { mutableDoubleStateOf(0.0) }
     var isAdmin by remember { mutableStateOf(false) } 
     var isLoading by remember { mutableStateOf(true) }
     var refreshTrigger by remember { mutableIntStateOf(0) }
+    var actionProcessing by remember { mutableStateOf(false) }
     
     var showAddExpenseDialog by remember { mutableStateOf(false) }
     var showLeaveDialog by remember { mutableStateOf(false) }
@@ -88,7 +90,7 @@ fun InsideContriScreen(
     var showNewCycleDialog by remember { mutableStateOf(false) }
     var showSettingsDialog by remember { mutableStateOf(false) }
     
-    var memberToRemove by remember { mutableStateOf<String?>(null) }
+    var memberToRemove by remember { mutableStateOf<MemberLedger?>(null) }
 
     val expandedState = remember { mutableStateMapOf<String, Boolean>() }
     val loadingState = remember { mutableStateMapOf<String, Boolean>() }
@@ -96,8 +98,8 @@ fun InsideContriScreen(
 
     // ROTATION ANIMATION FOR SYNC WHEEL
     var currentRotation by remember { mutableFloatStateOf(0f) }
-    LaunchedEffect(isLoading) {
-        if (isLoading) {
+    LaunchedEffect(isLoading || actionProcessing) {
+        if (isLoading || actionProcessing) {
             while (true) {
                 delay(16)
                 currentRotation += 8f
@@ -113,36 +115,38 @@ fun InsideContriScreen(
         withContext(Dispatchers.IO) {
             try {
                 val db = FirebaseFirestore.getInstance()
+                
+                // 1. Get my own User ID securely
+                val myUserQuery = db.collection("Users").whereEqualTo("username", username).get().await()
+                if (!myUserQuery.isEmpty) {
+                    currentUserId = myUserQuery.documents[0].id
+                }
+
                 val contriQuery = db.collection("Contri").whereEqualTo("contri_code", room.roomCode).get().await()
                 
                 if (!contriQuery.isEmpty) {
                     val contriDoc = contriQuery.documents[0]
-                    val admin = contriDoc.getString("admin") ?: ""
+                    val adminId = contriDoc.getString("admin_id") ?: ""
                     
-                    val memberUsernames = (contriDoc.get("member_usernames") as? List<*>)?.map { it.toString() } ?: emptyList()
-                    val membersArray = (contriDoc.get("members") as? List<*>)?.map { it.toString() } ?: emptyList()
-                    
-                    val activeMembersList = if (memberUsernames.isNotEmpty()) {
-                        memberUsernames
-                    } else {
-                        membersArray.map { it.substringBefore("/") }
-                    }
+                    val memberIds = (contriDoc.get("member_ids") as? List<*>)?.map { it.toString() } ?: emptyList()
                     
                     withContext(Dispatchers.Main) {
                         localRoomName = contriDoc.getString("contri_name") ?: room.roomName
                         localRoomPin = contriDoc.getString("passkey") ?: room.pin
-                        isAdmin = admin == username
+                        isAdmin = adminId == currentUserId
                         
                         val totalExpRaw = contriDoc.get("total_group_expense")
                         totalGroupExpense = if (totalExpRaw is Number) totalExpRaw.toDouble() else 0.0
                     }
 
-                    // 1. Fetch Transactions from EACH user's personal collection
+                    // 2. Fetch User Profiles to map ID -> Actual Current Name
                     val membersMap = mutableMapOf<String, MemberLedger>()
-                    
-                    for (m in activeMembersList) { 
-                        // Fetch the specific user's collection
-                        val userExpDocs = contriDoc.reference.collection(m).get().await()
+                    for (mId in memberIds) {
+                        val uDoc = db.collection("Users").document(mId).get().await()
+                        val actualName = uDoc.getString("name") ?: uDoc.getString("username") ?: "Unknown User"
+                        
+                        // Fetch the specific user's expense collection
+                        val userExpDocs = contriDoc.reference.collection(mId).get().await()
                         var userSpent = 0.0
                         val expList = mutableListOf<ContriExpense>()
                         
@@ -156,10 +160,10 @@ fun InsideContriScreen(
                             expList.add(ContriExpense(item, amt, date))
                         }
                         
-                        membersMap[m] = MemberLedger(m, userSpent, expList)
+                        membersMap[mId] = MemberLedger(mId, actualName, userSpent, expList)
                     }
 
-                    // 2. Fetch Past Cycles
+                    // 3. Fetch Past Cycles
                     val cyclesList = mutableListOf<PastCycle>()
                     val cycleDocs = contriDoc.reference.collection("Past_Cycles").get().await()
                     for (c in cycleDocs) {
@@ -285,11 +289,11 @@ fun InsideContriScreen(
                             Icon(
                                 imageVector = Icons.Outlined.Sync,
                                 contentDescription = "Sync",
-                                tint = if (isLoading) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                tint = if (isLoading || actionProcessing) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier
                                     .size(24.dp)
                                     .rotate(currentRotation)
-                                    .bounceClick { if (!isLoading) refreshTrigger++ }
+                                    .bounceClick { if (!isLoading && !actionProcessing) refreshTrigger++ }
                                     .padding(2.dp)
                             )
                         }
@@ -553,14 +557,14 @@ fun InsideContriScreen(
                                             val dispName = if (member.memberName.length > 10) member.memberName.take(10) + "..." else member.memberName
                                             Text(text = dispName, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onBackground)
                                             
-                                            if (member.memberName == username || member.memberName.equals(username, ignoreCase = true)) {
+                                            if (member.userId == currentUserId) {
                                                 Text("Admin", fontSize = 12.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                                             } else {
                                                 Icon(
                                                     imageVector = Icons.AutoMirrored.Outlined.ExitToApp,
                                                     contentDescription = "Remove",
                                                     tint = MaterialTheme.colorScheme.error,
-                                                    modifier = Modifier.size(24.dp).bounceClick { memberToRemove = member.memberName }
+                                                    modifier = Modifier.size(24.dp).bounceClick { memberToRemove = member }
                                                 )
                                             }
                                         }
@@ -628,15 +632,16 @@ fun InsideContriScreen(
             AlertDialog(
                 onDismissRequest = { memberToRemove = null },
                 title = { Text("Remove Member?", fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onSurface) },
-                text = { Text("Are you sure you want to kick '$memberToRemove' from this room?", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                text = { Text("Are you sure you want to kick '${memberToRemove!!.memberName}'? This will deduct their expenses from the total.", color = MaterialTheme.colorScheme.onSurfaceVariant) },
                 containerColor = MaterialTheme.colorScheme.surface,
                 confirmButton = {
                     TextButton(
                         onClick = { 
-                            val target = memberToRemove!!
+                            val targetUserId = memberToRemove!!.userId
                             memberToRemove = null
                             showSettingsDialog = false
-                            Toast.makeText(context, "Removing $target...", Toast.LENGTH_SHORT).show()
+                            actionProcessing = true
+                            Toast.makeText(context, "Removing member...", Toast.LENGTH_SHORT).show()
                             
                             CoroutineScope(Dispatchers.IO).launch {
                                 try {
@@ -644,32 +649,41 @@ fun InsideContriScreen(
                                     val q = db.collection("Contri").whereEqualTo("contri_code", room.roomCode).get().await()
                                     if (!q.isEmpty) {
                                         val doc = q.documents[0]
-                                        val membersArray = (doc.get("members") as? List<*>)?.map { it.toString() } ?: emptyList()
-                                        val targetFullString = membersArray.find { it.startsWith("$target/") || it.startsWith(target) }
                                         
-                                        doc.reference.update(
-                                            "member_usernames", FieldValue.arrayRemove(target),
-                                            "members", FieldValue.arrayRemove(targetFullString)
-                                        ).await()
-                                        
-                                        // Clear room_X field for removed member securely
-                                        val targetUserQuery = db.collection("Users").whereEqualTo("username", target).get().await()
-                                        if (!targetUserQuery.isEmpty) {
-                                            val targetUserDocRef = targetUserQuery.documents[0].reference
-                                            val targetData = targetUserQuery.documents[0].data ?: emptyMap<String, Any>()
-                                            val targetRoomKey = targetData.entries.find { 
-                                                it.key.startsWith("room_") && it.value.toString().contains(room.roomCode, ignoreCase = true) 
-                                            }?.key
-                                            
-                                            if (targetRoomKey != null) {
-                                                val updates = mapOf<String, Any>(targetRoomKey to FieldValue.delete())
-                                                targetUserDocRef.update(updates).await()
-                                            }
+                                        // 1. DELETE EXPENSES & DEDUCT FROM TOTAL
+                                        var amountToDeduct = 0.0
+                                        val userExpDocs = doc.reference.collection(targetUserId).get().await()
+                                        for (eDoc in userExpDocs) {
+                                            val amt = eDoc.getDouble("amount") ?: 0.0
+                                            amountToDeduct += amt
+                                            eDoc.reference.delete().await()
                                         }
 
-                                        withContext(Dispatchers.Main) { refreshTrigger++ }
+                                        doc.reference.update(
+                                            "total_group_expense", FieldValue.increment(-amountToDeduct),
+                                            "member_ids", FieldValue.arrayRemove(targetUserId)
+                                        ).await()
+                                        
+                                        // 2. CLEAR ROOM FROM USER'S PROFILE
+                                        val targetUserDocRef = db.collection("Users").document(targetUserId)
+                                        val targetData = targetUserDocRef.get().await().data ?: emptyMap<String, Any>()
+                                        
+                                        val targetRoomKey = targetData.entries.find { 
+                                            it.key.startsWith("room_") && it.value.toString().contains(room.roomCode, ignoreCase = true) 
+                                        }?.key
+                                        
+                                        if (targetRoomKey != null) {
+                                            targetUserDocRef.update(mapOf(targetRoomKey to FieldValue.delete())).await()
+                                        }
+
+                                        withContext(Dispatchers.Main) { 
+                                            actionProcessing = false
+                                            refreshTrigger++ 
+                                        }
                                     }
-                                } catch (e: Exception) {}
+                                } catch (e: Exception) {
+                                    withContext(Dispatchers.Main) { actionProcessing = false }
+                                }
                             }
                         }
                     ) { Text("Remove", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold) }
@@ -681,7 +695,8 @@ fun InsideContriScreen(
         }
 
         if (showSettleDialog) {
-            SettleUpDialog(myName = username, ledgers = ledgers, totalExpense = totalGroupExpense, onDismiss = { showSettleDialog = false })
+            val myDisplayName = ledgers.find { it.userId == currentUserId }?.memberName ?: username
+            SettleUpDialog(myName = myDisplayName, ledgers = ledgers, totalExpense = totalGroupExpense, onDismiss = { showSettleDialog = false })
         }
 
         if (showNewCycleDialog) {
@@ -694,6 +709,7 @@ fun InsideContriScreen(
                     TextButton(
                         onClick = { 
                             showNewCycleDialog = false
+                            actionProcessing = true
                             Toast.makeText(context, "Starting new cycle...", Toast.LENGTH_SHORT).show()
                             
                             CoroutineScope(Dispatchers.IO).launch {
@@ -704,10 +720,10 @@ fun InsideContriScreen(
                                     if (!q.isEmpty) {
                                         val doc = q.documents[0]
                                         val ref = doc.reference
-                                        val activeUsers = (doc.get("member_usernames") as? List<*>)?.map { it.toString() } ?: emptyList()
+                                        val activeUsers = (doc.get("member_ids") as? List<*>)?.map { it.toString() } ?: emptyList()
                                         
-                                        for (m in activeUsers) {
-                                            val userExpDocs = ref.collection(m).get().await()
+                                        for (mId in activeUsers) {
+                                            val userExpDocs = ref.collection(mId).get().await()
                                             for (eDoc in userExpDocs) {
                                                 eDoc.reference.delete().await()
                                             }
@@ -715,9 +731,14 @@ fun InsideContriScreen(
                                         
                                         ref.update("total_group_expense", 0.0).await()
                                         
-                                        withContext(Dispatchers.Main) { refreshTrigger++ }
+                                        withContext(Dispatchers.Main) { 
+                                            actionProcessing = false
+                                            refreshTrigger++ 
+                                        }
                                     }
-                                } catch (e: Exception) {}
+                                } catch (e: Exception) {
+                                    withContext(Dispatchers.Main) { actionProcessing = false }
+                                }
                             }
                         }
                     ) { Text("New", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold) }
@@ -730,12 +751,13 @@ fun InsideContriScreen(
             AlertDialog(
                 onDismissRequest = { showLeaveDialog = false },
                 title = { Text("Leave Room?", fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onSurface) },
-                text = { Text("Are you sure you want to leave this Contri room?", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                text = { Text("Are you sure you want to leave this Contri room? Your expenses will be deducted from the total.", color = MaterialTheme.colorScheme.onSurfaceVariant) },
                 containerColor = MaterialTheme.colorScheme.surface,
                 confirmButton = {
                     TextButton(
                         onClick = { 
                             showLeaveDialog = false
+                            actionProcessing = true
                             Toast.makeText(context, "Leaving room...", Toast.LENGTH_SHORT).show()
                             
                             CoroutineScope(Dispatchers.IO).launch {
@@ -744,32 +766,40 @@ fun InsideContriScreen(
                                     val q = db.collection("Contri").whereEqualTo("contri_code", room.roomCode).get().await()
                                     if (!q.isEmpty) {
                                         val doc = q.documents[0]
-                                        val membersArray = (doc.get("members") as? List<*>)?.map { it.toString() } ?: emptyList()
-                                        val targetFullString = membersArray.find { it.startsWith("$username/") || it.startsWith(username) }
                                         
-                                        doc.reference.update(
-                                            "member_usernames", FieldValue.arrayRemove(username),
-                                            "members", FieldValue.arrayRemove(targetFullString)
-                                        ).await()
-                                        
-                                        // Clear room_X field for current user securely
-                                        val currentUserQuery = db.collection("Users").whereEqualTo("username", username).get().await()
-                                        if (!currentUserQuery.isEmpty) {
-                                            val currentUserDocRef = currentUserQuery.documents[0].reference
-                                            val userData = currentUserQuery.documents[0].data ?: emptyMap<String, Any>()
-                                            val targetRoomKey = userData.entries.find { 
-                                                it.key.startsWith("room_") && it.value.toString().contains(room.roomCode, ignoreCase = true) 
-                                            }?.key
-                                            
-                                            if (targetRoomKey != null) {
-                                                val updates = mapOf<String, Any>(targetRoomKey to FieldValue.delete())
-                                                currentUserDocRef.update(updates).await()
-                                            }
+                                        // 1. DELETE EXPENSES & DEDUCT FROM TOTAL
+                                        var amountToDeduct = 0.0
+                                        val userExpDocs = doc.reference.collection(currentUserId).get().await()
+                                        for (eDoc in userExpDocs) {
+                                            val amt = eDoc.getDouble("amount") ?: 0.0
+                                            amountToDeduct += amt
+                                            eDoc.reference.delete().await()
                                         }
 
-                                        withContext(Dispatchers.Main) { onLeaveClick() }
+                                        doc.reference.update(
+                                            "total_group_expense", FieldValue.increment(-amountToDeduct),
+                                            "member_ids", FieldValue.arrayRemove(currentUserId)
+                                        ).await()
+                                        
+                                        // 2. CLEAR ROOM FROM MY PROFILE
+                                        val currentUserDocRef = db.collection("Users").document(currentUserId)
+                                        val userData = currentUserDocRef.get().await().data ?: emptyMap<String, Any>()
+                                        val targetRoomKey = userData.entries.find { 
+                                            it.key.startsWith("room_") && it.value.toString().contains(room.roomCode, ignoreCase = true) 
+                                        }?.key
+                                        
+                                        if (targetRoomKey != null) {
+                                            currentUserDocRef.update(mapOf(targetRoomKey to FieldValue.delete())).await()
+                                        }
+
+                                        withContext(Dispatchers.Main) { 
+                                            actionProcessing = false
+                                            onLeaveClick() 
+                                        }
                                     }
-                                } catch (e: Exception) {}
+                                } catch (e: Exception) {
+                                    withContext(Dispatchers.Main) { actionProcessing = false }
+                                }
                             }
                         }
                     ) { Text("Leave", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold) }
@@ -784,6 +814,7 @@ fun InsideContriScreen(
                 onAdd = { title, dateMillis, amount ->
                     
                     showAddExpenseDialog = false
+                    actionProcessing = true
                     Toast.makeText(context, "Adding expense...", Toast.LENGTH_SHORT).show()
                     
                     CoroutineScope(Dispatchers.IO).launch {
@@ -796,7 +827,7 @@ fun InsideContriScreen(
                             if (!q.isEmpty) {
                                 val ref = q.documents[0].reference
                                 
-                                val userCol = ref.collection(username)
+                                val userCol = ref.collection(currentUserId)
                                 val existingDocs = userCol.get().await()
                                 val nextIndex = existingDocs.size() + 1
                                 val formattedIndex = String.format(Locale.US, "%03d", nextIndex)
@@ -814,12 +845,21 @@ fun InsideContriScreen(
                                 userCol.document(customDocId).set(transData).await()
                                 ref.update("total_group_expense", FieldValue.increment(amount)).await()
                                 
-                                withContext(Dispatchers.Main) { refreshTrigger++ }
+                                withContext(Dispatchers.Main) { 
+                                    actionProcessing = false
+                                    refreshTrigger++ 
+                                }
                             } else {
-                                withContext(Dispatchers.Main) { Toast.makeText(context, "Error: Room not found in DB", Toast.LENGTH_LONG).show() }
+                                withContext(Dispatchers.Main) { 
+                                    actionProcessing = false
+                                    Toast.makeText(context, "Error: Room not found", Toast.LENGTH_LONG).show() 
+                                }
                             }
                         } catch (e: Exception) {
-                            withContext(Dispatchers.Main) { Toast.makeText(context, "Save Error: ${e.message}", Toast.LENGTH_LONG).show() }
+                            withContext(Dispatchers.Main) { 
+                                actionProcessing = false
+                                Toast.makeText(context, "Save Error: ${e.message}", Toast.LENGTH_LONG).show() 
+                            }
                         }
                     }
                 }
