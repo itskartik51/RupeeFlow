@@ -99,29 +99,29 @@ fun ContriScreen(
                 val currentUserId = userDoc.id
                 val userData = userDoc.data ?: emptyMap<String, Any>()
                 
-                // 1. Fetch room_X fields safely
-                val roomKeys = userData.keys.filter { it.startsWith("room_") }
-                for (key in roomKeys) {
-                    val roomVal = userData[key]?.toString() ?: ""
-                    if (roomVal.contains("/")) {
-                        val parts = roomVal.split("/")
-                        val rName = parts.getOrNull(0)?.trim() ?: "Contri Room"
-                        val rCode = parts.getOrNull(1)?.trim() ?: ""
-                        val rPin = parts.getOrNull(2)?.trim() ?: "123456"
-
-                        if (rCode.isNotBlank()) {
-                            roomsList.add(ContriRoomModel(rName, rCode, "", rPin))
-                        }
+                // 1. Fetch from 'rooms' array seamlessly (Phase 1 & 2 logic)
+                val roomsArray = userData["rooms"] as? List<String> ?: emptyList()
+                for (roomStr in roomsArray) {
+                    // Expecting Format: "001_ContriCode_ContriName"
+                    val parts = roomStr.split("_", limit = 3)
+                    if (parts.size >= 3) {
+                        val rCode = parts[1]
+                        val rName = parts[2]
+                        roomsList.add(ContriRoomModel(rName, rCode, "", "123456"))
                     }
                 }
 
-                // 2. Fallback Query (Using member_ids)
+                // 2. Fallback Query (Fetches Exact Pin and Data)
                 val contriQuery = db.collection("Contri").whereArrayContains("member_ids", currentUserId).get().await()
                 for (doc in contriQuery.documents) {
                     val code = doc.getString("contri_code") ?: ""
-                    if (code.isNotBlank() && roomsList.none { it.roomCode == code }) {
-                        val name = doc.getString("contri_name") ?: "Contri Room"
-                        val pin = doc.getString("passkey") ?: "123456"
+                    val name = doc.getString("contri_name") ?: "Contri Room"
+                    val pin = doc.getString("passkey") ?: "123456"
+                    
+                    val existingIndex = roomsList.indexOfFirst { it.roomCode == code }
+                    if (existingIndex != -1) {
+                        roomsList[existingIndex] = ContriRoomModel(name, code, "", pin)
+                    } else if (code.isNotBlank()) {
                         roomsList.add(ContriRoomModel(name, code, "", pin))
                     }
                 }
@@ -139,7 +139,6 @@ fun ContriScreen(
     }
 
     LaunchedEffect(Unit) {
-        // Initial Fetch
         fetchRoomsFromFirestore()
     }
 
@@ -417,19 +416,19 @@ fun AutoJoinContriDialog(
                             val userDocRef = userQuery.documents[0].reference
                             val currentUserId = userQuery.documents[0].id
                             
-                            // Using member_ids for Bulletproof ID tracking
                             doc.reference.update("member_ids", FieldValue.arrayUnion(currentUserId)).await()
 
-                            val userData = userQuery.documents[0].data ?: emptyMap<String, Any>()
-                            val existingRooms = userData.keys.filter { it.startsWith("room_") }
-                            val maxIndex = existingRooms.mapNotNull { it.removePrefix("room_").toIntOrNull() }.maxOrNull() ?: 0
-                            val nextRoomIndex = maxIndex + 1
-                            val roomVal = "$roomName / $roomCode / $pin"
+                            // Logic for storing in rooms Array (Phase 2)
+                            val docId = doc.id 
+                            val prefix = docId.split("_").firstOrNull() ?: "000"
+                            val exactRoomName = doc.getString("contri_name") ?: roomName
                             
-                            userDocRef.update("room_$nextRoomIndex", roomVal).await()
+                            val roomArrayString = "${prefix}_${roomCode}_${exactRoomName}"
+                            
+                            userDocRef.update("rooms", FieldValue.arrayUnion(roomArrayString)).await()
                             
                             withContext(Dispatchers.Main) { 
-                                Toast.makeText(context, "Joined $roomName!", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "Joined $exactRoomName!", Toast.LENGTH_SHORT).show()
                                 onSuccess() 
                             }
                         } else {
@@ -649,7 +648,7 @@ fun CreateContriDialog(username: String, onDismiss: () -> Unit, onSuccess: () ->
                                             "contri_code" to randomCode,
                                             "contri_date" to todayStr,
                                             "contri_name" to contriName,
-                                            "member_ids" to listOf(currentUserId), // Clean ID Based Tracking
+                                            "member_ids" to listOf(currentUserId),
                                             "admin_id" to currentUserId,
                                             "passkey" to pin,
                                             "total_group_expense" to 0.0
@@ -658,12 +657,10 @@ fun CreateContriDialog(username: String, onDismiss: () -> Unit, onSuccess: () ->
                                         db.collection("Contri").document(docId).set(contriData).await()
                                         
                                         val userDocRef = userQuery.documents[0].reference
-                                        val userData = userQuery.documents[0].data ?: emptyMap<String, Any>()
-                                        val existingRooms = userData.keys.filter { it.startsWith("room_") }
-                                        val maxIndex = existingRooms.mapNotNull { it.removePrefix("room_").toIntOrNull() }.maxOrNull() ?: 0
-                                        val nextRoomIndex = maxIndex + 1
-                                        val roomVal = "$contriName / $randomCode / $pin"
-                                        userDocRef.update("room_$nextRoomIndex", roomVal).await()
+                                        
+                                        // Logic for storing in rooms Array (Phase 1)
+                                        val roomArrayString = "${counterStr}_${randomCode}_${contriName}"
+                                        userDocRef.update("rooms", FieldValue.arrayUnion(roomArrayString)).await()
                                         
                                         withContext(Dispatchers.Main) {
                                             isSubmitting = false
@@ -870,12 +867,12 @@ fun JoinContriDialog(
                                                     
                                                     doc.reference.update("member_ids", FieldValue.arrayUnion(currentUserId)).await()
                                                     
-                                                    val userData = userQuery.documents[0].data ?: emptyMap<String, Any>()
-                                                    val existingRooms = userData.keys.filter { it.startsWith("room_") }
-                                                    val maxIndex = existingRooms.mapNotNull { it.removePrefix("room_").toIntOrNull() }.maxOrNull() ?: 0
-                                                    val nextRoomIndex = maxIndex + 1
-                                                    val roomVal = "$roomName / $formattedCode / $pin"
-                                                    userDocRef.update("room_$nextRoomIndex", roomVal).await()
+                                                    // Logic for storing in rooms Array (Phase 2)
+                                                    val docId = doc.id 
+                                                    val prefix = docId.split("_").firstOrNull() ?: "000"
+                                                    val roomArrayString = "${prefix}_${formattedCode}_${roomName}"
+                                                    
+                                                    userDocRef.update("rooms", FieldValue.arrayUnion(roomArrayString)).await()
                                                     
                                                     withContext(Dispatchers.Main) {
                                                         isSubmitting = false
