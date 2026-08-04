@@ -42,6 +42,7 @@ data class InvestmentItem(
     val oneDayChangePrice: Double
 )
 
+// PERFECT MAPPING: Phase 2 JSON seamlessly connects with this Data Class
 data class BankAccountItem(
     val bankName: String,
     val accountNo: String,
@@ -286,7 +287,6 @@ fun FinanceGridCard(
     }
 }
 
-// Basic Networth card (Agar pehle yahan tha to ye bhi dark mode me rahega)
 @Composable
 fun NetworthCard(networthAmount: Double, isLoading: Boolean, onClick: () -> Unit) {
     Card(
