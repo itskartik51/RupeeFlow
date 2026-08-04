@@ -42,6 +42,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import java.text.NumberFormat
+import java.util.Calendar
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -252,6 +253,28 @@ fun QuickUpdateDialog(bank: BankAccountItem, username: String, onDismiss: () -> 
                             if (amountEntered != null && amountEntered != 0.0) {
                                 val newCalculatedBalance = bank.currentBalance + amountEntered 
                                 
+                                // PHASE 3: DYNAMIC DATE & MONTH MATH
+                                val cal = Calendar.getInstance()
+                                val day = cal.get(Calendar.DAY_OF_MONTH)
+                                val month = cal.get(Calendar.MONTH) // 0-indexed (Jan=0, Feb=1...)
+
+                                val dayKey = if (day == 31) "31" else {
+                                    when (day % 6) {
+                                        1 -> "01, 07, 13, 19, 25"
+                                        2 -> "02, 08, 14, 20, 26"
+                                        3 -> "03, 09, 15, 21, 27"
+                                        4 -> "04, 10, 16, 22, 28"
+                                        5 -> "05, 11, 17, 23, 29"
+                                        else -> "06, 12, 18, 24, 30"
+                                    }
+                                }
+
+                                val monthKey = when (month) {
+                                    0, 3, 6, 9 -> "jan, april, july, oct"
+                                    1, 4, 7, 10 -> "feb, may, aug, nov"
+                                    else -> "march, june, sep, dec"
+                                }
+
                                 onDismiss()
                                 Toast.makeText(context, "Updating balance...", Toast.LENGTH_SHORT).show()
                                 
@@ -262,16 +285,46 @@ fun QuickUpdateDialog(bank: BankAccountItem, username: String, onDismiss: () -> 
                                         
                                         if (!userQuery.isEmpty) {
                                             val userRef = userQuery.documents[0].reference
-                                            userRef.collection("Finances").document("Banking_Data")
-                                                .update("${bank.accountNo}.current_bal", newCalculatedBalance)
-                                                .await()
+                                            val bankDocRef = userRef.collection("Finances").document("Bank")
+                                            val bankDoc = bankDocRef.get().await()
+                                            
+                                            if (bankDoc.exists()) {
+                                                val data = bankDoc.data ?: emptyMap()
+                                                var targetKey: String? = null
                                                 
-                                            withContext(Dispatchers.Main) {
-                                                onSuccess() 
+                                                // Find the correct bank ID (1, 2, 3...) using Account No
+                                                for ((key, rawBank) in data) {
+                                                    if (key != "last_updated" && rawBank is Map<*, *>) {
+                                                        val accNo = rawBank["account no."]?.toString()
+                                                        if (accNo == bank.accountNo) {
+                                                            targetKey = key
+                                                            break
+                                                        }
+                                                    }
+                                                }
+                                                
+                                                if (targetKey != null) {
+                                                    // Triple Update Query
+                                                    val updates = hashMapOf<String, Any>(
+                                                        "$targetKey.current bal." to newCalculatedBalance,
+                                                        "$targetKey.6D bal. Block.$dayKey" to newCalculatedBalance,
+                                                        "$targetKey.monthly avg.$monthKey" to newCalculatedBalance
+                                                    )
+                                                    
+                                                    bankDocRef.update(updates).await()
+                                                    
+                                                    withContext(Dispatchers.Main) {
+                                                        onSuccess() 
+                                                    }
+                                                } else {
+                                                    withContext(Dispatchers.Main) {
+                                                        Toast.makeText(context, "Bank not found in Engine!", Toast.LENGTH_SHORT).show()
+                                                    }
+                                                }
                                             }
                                         } else {
                                             withContext(Dispatchers.Main) {
-                                                Toast.makeText(context, "Balance Update Failed!", Toast.LENGTH_SHORT).show()
+                                                Toast.makeText(context, "User Profile Failed!", Toast.LENGTH_SHORT).show()
                                             }
                                         }
                                     } catch (e: Exception) {
