@@ -80,8 +80,8 @@ fun InsideContriScreen(
     var pastCycles by remember { mutableStateOf<List<PastCycle>>(emptyList()) }
     var totalGroupExpense by remember { mutableDoubleStateOf(0.0) }
     var isAdmin by remember { mutableStateOf(false) } 
-    var isSyncing by remember { mutableStateOf(false) } // Background Sync State
-    var isLoading by remember { mutableStateOf(true) } // Full UI Blocking State
+    var isSyncing by remember { mutableStateOf(false) } 
+    var isLoading by remember { mutableStateOf(true) } 
     var refreshTrigger by remember { mutableIntStateOf(0) }
     var actionProcessing by remember { mutableStateOf(false) }
     
@@ -111,7 +111,6 @@ fun InsideContriScreen(
     }
 
     LaunchedEffect(room.roomCode, refreshTrigger) {
-        // Only block UI if we have no data at all
         if (ledgers.isEmpty()) {
             isLoading = true
         } else {
@@ -158,7 +157,6 @@ fun InsideContriScreen(
                             val rawAmt = doc.get("amount")
                             val amt = if (rawAmt is Number) rawAmt.toDouble() else 0.0
                             
-                            // Handling Timestamp Format & String Fallback
                             val rawDate = doc.get("date")
                             val formattedDate = if (rawDate is com.google.firebase.Timestamp) {
                                 SimpleDateFormat("dd MMMM", Locale.getDefault()).format(rawDate.toDate())
@@ -319,7 +317,6 @@ fun InsideContriScreen(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Box(
                                 modifier = Modifier
-                                    // Removed hardcoded height(28.dp) for perfect visual centering
                                     .bounceClick { showSettleDialog = true }
                                     .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(8.dp))
                                     .padding(horizontal = 12.dp, vertical = 6.dp),
@@ -678,15 +675,14 @@ fun InsideContriScreen(
                                             "member_ids", FieldValue.arrayRemove(targetUserId)
                                         ).await()
                                         
+                                        // Array Room Remove Logic (Phase 3)
                                         val targetUserDocRef = db.collection("Users").document(targetUserId)
                                         val targetData = targetUserDocRef.get().await().data ?: emptyMap<String, Any>()
+                                        val roomsArray = targetData["rooms"] as? List<String> ?: emptyList()
+                                        val targetRoomString = roomsArray.find { it.contains(room.roomCode, ignoreCase = true) }
                                         
-                                        val targetRoomKey = targetData.entries.find { 
-                                            it.key.startsWith("room_") && it.value.toString().contains(room.roomCode, ignoreCase = true) 
-                                        }?.key
-                                        
-                                        if (targetRoomKey != null) {
-                                            targetUserDocRef.update(mapOf(targetRoomKey to FieldValue.delete())).await()
+                                        if (targetRoomString != null) {
+                                            targetUserDocRef.update("rooms", FieldValue.arrayRemove(targetRoomString)).await()
                                         }
 
                                         withContext(Dispatchers.Main) { 
@@ -793,14 +789,14 @@ fun InsideContriScreen(
                                             "member_ids", FieldValue.arrayRemove(currentUserId)
                                         ).await()
                                         
+                                        // Array Room Remove Logic (Phase 3)
                                         val currentUserDocRef = db.collection("Users").document(currentUserId)
                                         val userData = currentUserDocRef.get().await().data ?: emptyMap<String, Any>()
-                                        val targetRoomKey = userData.entries.find { 
-                                            it.key.startsWith("room_") && it.value.toString().contains(room.roomCode, ignoreCase = true) 
-                                        }?.key
+                                        val roomsArray = userData["rooms"] as? List<String> ?: emptyList()
+                                        val targetRoomString = roomsArray.find { it.contains(room.roomCode, ignoreCase = true) }
                                         
-                                        if (targetRoomKey != null) {
-                                            currentUserDocRef.update(mapOf(targetRoomKey to FieldValue.delete())).await()
+                                        if (targetRoomString != null) {
+                                            currentUserDocRef.update("rooms", FieldValue.arrayRemove(targetRoomString)).await()
                                         }
 
                                         withContext(Dispatchers.Main) { 
@@ -843,12 +839,11 @@ fun InsideContriScreen(
                                 val safeTitle = title.filter { it.isLetterOrDigit() }
                                 val customDocId = "${formattedIndex}_${safeTitle}"
 
-                                // Fix: Save Date directly as Firebase Timestamp Object
+                                // Clean Logic: Only Date as Timestamp (No Double Field)
                                 val transData = hashMapOf(
                                     "item_name" to title,
                                     "amount" to amount,
-                                    "date" to com.google.firebase.Timestamp(Date(dateMillis)),
-                                    "timestamp" to FieldValue.serverTimestamp()
+                                    "date" to com.google.firebase.Timestamp(Date(dateMillis))
                                 )
                                 
                                 userCol.document(customDocId).set(transData).await()
@@ -928,13 +923,11 @@ fun DynamicLedgerView(ledgers: List<MemberLedger>) {
                 ) {
                     ledger.expenses.forEach { expense ->
                         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(bottom = 12.dp)) {
-                            // Fixed: Title size increased to 17sp, bold
                             Text(text = expense.itemName, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Spacer(modifier = Modifier.height(2.dp))
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(text = "₹${expense.amount.toInt()}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                                 Spacer(modifier = Modifier.width(6.dp))
-                                // Fixed: Date format reflects "04 August" directly based on the new logic
                                 Text(text = expense.date, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Medium)
                             }
                         }
