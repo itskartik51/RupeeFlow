@@ -2,6 +2,7 @@ package com.kartikey.rupeeflow.UI_Screens
 
 import android.content.Context
 import com.google.firebase.Timestamp
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.kartikey.rupeeflow.UI_Screens.Add.TransactionModel
 import com.kartikey.rupeeflow.UI_Screens.Assets.InvestmentItem
@@ -56,7 +57,6 @@ object CacheManager {
             try {
                 val db = FirebaseFirestore.getInstance()
 
-                // 1. Fetch User Profile Document by Username
                 val userQuery = db.collection("Users")
                     .whereEqualTo("username", username)
                     .get()
@@ -67,7 +67,6 @@ object CacheManager {
                 val userDoc = userQuery.documents[0]
                 val userRef = userDoc.reference
 
-                // Profile Fields
                 val profileObj = JSONObject().apply {
                     put("name", userDoc.getString("name") ?: "")
                     put("email", userDoc.getString("email") ?: "")
@@ -85,7 +84,6 @@ object CacheManager {
 
                 val budgetLimit = userDoc.getDouble("budget_limit") ?: 0.0
 
-                // 2. Fetch Expenses Sub-collection
                 val expensesDocs = userRef.collection("Expenses").get().await()
                 val expensesArray = JSONArray()
 
@@ -114,7 +112,6 @@ object CacheManager {
                     expensesArray.put(expObj)
                 }
 
-                // 3. Fetch Finances Sub-collection
                 val financesDocs = userRef.collection("Finances").get().await()
                 var cashObj = JSONObject().apply {
                     put("amount", 0.0)
@@ -130,37 +127,86 @@ object CacheManager {
                             cashObj.put("amount", doc.getDouble("total_cash") ?: doc.getDouble("amount") ?: 0.0)
                             cashObj.put("last_updated", doc.getString("last_updated") ?: "")
                         }
-                        "Banking_Data" -> {
+                        
+                        // PHASE 2: NEW BANKING ENGINE LOGIC (Catch-up Sync)
+                        "Bank" -> {
                             val dataMap = doc.data
-                            dataMap.forEach { (accNo, rawBank) ->
-                                if (rawBank is Map<*, *>) {
-                                    val bName = rawBank["bank_name"]?.toString() ?: ""
-                                    val curBal = (rawBank["current_bal"] as? Number)?.toDouble() ?: 0.0
-                                    val rate = (rawBank["interest_rate"] as? Number)?.toDouble() ?: 0.0
-                                    
-                                    val qtrPct = rate / 4.0
-                                    val expQtr = curBal * (qtrPct / 100.0)
-                                    val expYr = curBal * (rate / 100.0)
-                                    val oneDay = (curBal * (rate / 100.0)) / 365.0
-                                    val accruedQtr = (rawBank["accrued_qtr_int"] as? Number)?.toDouble() ?: (expQtr / 2.0)
-                                    val accruedYr = (rawBank["accrued_yr_int"] as? Number)?.toDouble() ?: (expYr / 2.0)
+                            val updateMap = mutableMapOf<String, Any>()
+                            
+                            val lastUpdatedTs = dataMap["last_updated"] as? Timestamp
+                            var gapDays = 0L
+                            
+                            // 1. Calculate Offline Days
+                            if (lastUpdatedTs != null) {
+                                val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                                val todayStr = sdf.format(Date())
+                                val lastStr = sdf.format(lastUpdatedTs.toDate())
+                                
+                                if (todayStr != lastStr) {
+                                    val d1 = sdf.parse(lastStr)
+                                    val d2 = sdf.parse(todayStr)
+                                    if (d1 != null && d2 != null) {
+                                        val diff = d2.time - d1.time
+                                        gapDays = diff / (1000 * 60 * 60 * 24)
+                                    }
+                                }
+                            }
 
+                            // If gap exists, mark the master switch to update
+                            if (gapDays > 0) {
+                                updateMap["last_updated"] = FieldValue.serverTimestamp()
+                            }
+
+                            dataMap.forEach { (key, rawBank) ->
+                                if (key != "last_updated" && rawBank is Map<*, *>) {
+                                    val bName = rawBank["bank"]?.toString() ?: ""
+                                    val accNo = rawBank["account no."]?.toString() ?: ""
+                                    val curBal = (rawBank["current bal."] as? Number)?.toDouble() ?: 0.0
+                                    val rateYr = (rawBank["intrest % (yr)"] as? Number)?.toDouble() ?: 0.0
+                                    val rateQtr = (rawBank["intrest % (qtr)"] as? Number)?.toDouble() ?: (rateYr / 4.0)
+
+                                    var accruedQtr = (rawBank["accrued qtr"] as? Number)?.toDouble() ?: 0.0
+                                    var accruedYr = (rawBank["accrued yr"] as? Number)?.toDouble() ?: 0.0
+                                    val oneDayInt = (curBal * (rateYr / 100.0)) / 365.0
+
+                                    // 2. The Catch-up Math (Adding Pending Interest)
+                                    if (gapDays > 0) {
+                                        val addedInterest = oneDayInt * gapDays
+                                        accruedQtr += addedInterest
+                                        accruedYr += addedInterest
+                                        
+                                        // Queue for immediate database update
+                                        updateMap["$key.accrued qtr"] = accruedQtr
+                                        updateMap["$key.accrued yr"] = accruedYr
+                                        updateMap["$key.1d int"] = oneDayInt
+                                    }
+
+                                    val expQtr = curBal * (rateQtr / 100.0)
+                                    val expYr = curBal * (rateYr / 100.0)
+
+                                    // Pass structured data to frontend exactly as it expects
                                     val bObj = JSONObject().apply {
                                         put("bank_name", bName)
                                         put("account_no", accNo)
                                         put("current_bal", curBal)
-                                        put("interest_rate", rate)
-                                        put("qtr_interest_pct", qtrPct)
+                                        put("interest_rate", rateYr)
+                                        put("qtr_interest_pct", rateQtr)
                                         put("exp_qtr_int", expQtr)
                                         put("accrued_qtr_int", accruedQtr)
                                         put("exp_yr_int", expYr)
                                         put("accrued_yr_int", accruedYr)
-                                        put("one_day_int", oneDay)
+                                        put("one_day_int", oneDayInt)
                                     }
                                     banksArray.put(bObj)
                                 }
                             }
+
+                            // 3. One-Shot Backend Push
+                            if (updateMap.isNotEmpty()) {
+                                doc.reference.update(updateMap).await()
+                            }
                         }
+                        
                         "Fixed_Deposits" -> {
                             val dataMap = doc.data
                             dataMap.forEach { (accNo, rawFd) ->
@@ -221,7 +267,6 @@ object CacheManager {
                     }
                 }
 
-                // 4. Fetch Investments Sub-collection
                 val invDocs = userRef.collection("Investments").get().await()
                 val invArray = JSONArray()
                 for (doc in invDocs) {
@@ -236,7 +281,6 @@ object CacheManager {
                     invArray.put(invObj)
                 }
 
-                // 5. Fetch Contri Rooms (Updated: Reads direct from 'rooms' array seamlessly)
                 val contriArray = JSONArray()
                 val roomsArray = userDoc.get("rooms") as? List<*> ?: emptyList<Any>()
 
@@ -248,13 +292,12 @@ object CacheManager {
                             put("room_name", parts[2])
                             put("room_code", parts[1])
                             put("passkey", "123456")
-                            put("expenses", JSONArray()) // Fetching inside room will populate true expenses
+                            put("expenses", JSONArray()) 
                         }
                         contriArray.put(cObj)
                     }
                 }
 
-                // Construct Master Payload
                 val masterJson = JSONObject().apply {
                     put("status", "success")
                     put("profile", profileObj)
@@ -270,7 +313,6 @@ object CacheManager {
 
                 val responseData = masterJson.toString()
 
-                // Local Cache Update
                 val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                 prefs.edit().putString("data_$username", responseData).apply()
 
