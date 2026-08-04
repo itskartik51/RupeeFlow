@@ -368,12 +368,12 @@ fun InsideContriScreen(
                 Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                 }
-            } else if (ledgers.isEmpty() || ledgers.all { it.expenses.isEmpty() }) {
+            } else if (ledgers.isEmpty()) {
                 Box(modifier = Modifier.fillMaxWidth().height(200.dp).padding(top = 40.dp), contentAlignment = Alignment.TopCenter) {
-                    Text("No expenses yet. Tap + to add!", color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f), fontWeight = FontWeight.Medium)
+                    Text("No members yet.", color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f), fontWeight = FontWeight.Medium)
                 }
             } else {
-                DynamicLedgerView(ledgers.filter { it.expenses.isNotEmpty() || it.totalSpent > 0 })
+                DynamicLedgerView(ledgers)
             }
 
             // PAST CYCLES
@@ -652,14 +652,18 @@ fun InsideContriScreen(
                                             "members", FieldValue.arrayRemove(targetFullString)
                                         ).await()
                                         
-                                        // Clear room_X field for removed member
+                                        // Clear room_X field for removed member securely
                                         val targetUserQuery = db.collection("Users").whereEqualTo("username", target).get().await()
                                         if (!targetUserQuery.isEmpty) {
                                             val targetUserDocRef = targetUserQuery.documents[0].reference
                                             val targetData = targetUserQuery.documents[0].data ?: emptyMap<String, Any>()
-                                            val targetRoomKey = targetData.filterValues { it.toString().contains(room.roomCode) }.keys.firstOrNull()
+                                            val targetRoomKey = targetData.entries.find { 
+                                                it.key.startsWith("room_") && it.value.toString().contains(room.roomCode, ignoreCase = true) 
+                                            }?.key
+                                            
                                             if (targetRoomKey != null) {
-                                                targetUserDocRef.update(targetRoomKey, FieldValue.delete()).await()
+                                                val updates = mapOf<String, Any>(targetRoomKey to FieldValue.delete())
+                                                targetUserDocRef.update(updates).await()
                                             }
                                         }
 
@@ -702,7 +706,6 @@ fun InsideContriScreen(
                                         val ref = doc.reference
                                         val activeUsers = (doc.get("member_usernames") as? List<*>)?.map { it.toString() } ?: emptyList()
                                         
-                                        // CLEAR EXPENSES FROM EACH USER'S COLLECTION
                                         for (m in activeUsers) {
                                             val userExpDocs = ref.collection(m).get().await()
                                             for (eDoc in userExpDocs) {
@@ -749,14 +752,18 @@ fun InsideContriScreen(
                                             "members", FieldValue.arrayRemove(targetFullString)
                                         ).await()
                                         
-                                        // Clear room_X field for current user
+                                        // Clear room_X field for current user securely
                                         val currentUserQuery = db.collection("Users").whereEqualTo("username", username).get().await()
                                         if (!currentUserQuery.isEmpty) {
                                             val currentUserDocRef = currentUserQuery.documents[0].reference
                                             val userData = currentUserQuery.documents[0].data ?: emptyMap<String, Any>()
-                                            val targetRoomKey = userData.filterValues { it.toString().contains(room.roomCode) }.keys.firstOrNull()
+                                            val targetRoomKey = userData.entries.find { 
+                                                it.key.startsWith("room_") && it.value.toString().contains(room.roomCode, ignoreCase = true) 
+                                            }?.key
+                                            
                                             if (targetRoomKey != null) {
-                                                currentUserDocRef.update(targetRoomKey, FieldValue.delete()).await()
+                                                val updates = mapOf<String, Any>(targetRoomKey to FieldValue.delete())
+                                                currentUserDocRef.update(updates).await()
                                             }
                                         }
 
@@ -789,13 +796,11 @@ fun InsideContriScreen(
                             if (!q.isEmpty) {
                                 val ref = q.documents[0].reference
                                 
-                                // FIX: Save expense in the specific USER's sub-collection
                                 val userCol = ref.collection(username)
                                 val existingDocs = userCol.get().await()
                                 val nextIndex = existingDocs.size() + 1
                                 val formattedIndex = String.format(Locale.US, "%03d", nextIndex)
                                 
-                                // Make string completely safe without relying on Regex import
                                 val safeTitle = title.filter { it.isLetterOrDigit() }
                                 val customDocId = "${formattedIndex}_${safeTitle}"
 
