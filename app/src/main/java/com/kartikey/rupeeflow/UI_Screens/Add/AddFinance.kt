@@ -98,12 +98,14 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
         return if (millis == null) "" else SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date(millis))
     }
 
+    // PHASE 1: FULL SCHEMA INSTANTIATION (SHADOW BANKING ENGINE)
     val submitBankAccount = {
         val bal = currentBalance.toDoubleOrNull() ?: 0.0
         val rate = bankInterestRate.toDoubleOrNull() ?: 0.0
         
-        if (bankName.isBlank() || bankAccountNo.isBlank() || bal <= 0) {
-            Toast.makeText(context, "Fill all details correctly", Toast.LENGTH_SHORT).show()
+        // Exact 3 digit validation logic
+        if (bankName.isBlank() || bankAccountNo.length != 3 || bal <= 0) {
+            Toast.makeText(context, "Fill details correctly (Acc No. must be 3 digits)", Toast.LENGTH_SHORT).show()
         } else if (!dynamicBankList.contains(bankName)) {
             Toast.makeText(context, "Select a valid bank from dropdown!", Toast.LENGTH_SHORT).show()
         } else {
@@ -117,16 +119,86 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                     val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
                     if (!userQuery.isEmpty) {
                         val userRef = userQuery.documents[0].reference
-                        val bankMap = hashMapOf<String, Any>(
-                            "bank_name" to bankName,
-                            "account_no" to formattedAcc,
-                            "current_bal" to bal,
-                            "interest_rate" to rate
+                        
+                        // Generating the Pre-filled Nested Maps
+                        val avg6D = hashMapOf(
+                            "01-06" to bal, "07-12" to bal, "13-18" to bal, "19-24" to bal, "25-31" to bal
                         )
-                        userRef.collection("Finances").document("Banking_Data")
-                            .set(mapOf(formattedAcc to bankMap), SetOptions.merge()).await()
+                        val balBlock6D = hashMapOf(
+                            "01, 07, 13, 19, 25" to bal,
+                            "02, 08, 14, 20, 26" to bal,
+                            "03, 09, 15, 21, 27" to bal,
+                            "04, 10, 16, 22, 28" to bal,
+                            "05, 11, 17, 23, 29" to bal,
+                            "06, 12, 18, 24, 30" to bal,
+                            "31" to bal
+                        )
+                        val monthlyAvg = hashMapOf(
+                            "jan, april, july, oct" to bal,
+                            "feb, may, aug, nov" to bal,
+                            "march, june, sep, dec" to bal
+                        )
+                        val qtrAvg = hashMapOf(
+                            "q1" to bal, "q2" to bal, "q3" to bal, "q4" to bal
+                        )
+                        val yrAvg = hashMapOf(
+                            "cur" to bal, "last" to bal, "2nd last" to bal
+                        )
+
+                        // Compiling the Master Blueprint
+                        val bankMap = hashMapOf<String, Any>(
+                            "1d int" to 0.0,
+                            "6D avg." to avg6D,
+                            "6D bal. Block" to balBlock6D,
+                            "account no." to formattedAcc,
+                            "accrued qtr" to 0.0,
+                            "accrued yr" to 0.0,
+                            "bank" to bankName,
+                            "current bal." to bal,
+                            "exp qtr int" to 0.0,
+                            "exp yr int" to 0.0,
+                            "intrest % (qtr)" to (rate / 4.0),
+                            "intrest % (yr)" to rate,
+                            "monthly avg." to monthlyAvg,
+                            "qtr. avg." to qtrAvg,
+                            "yr avg" to yrAvg
+                        )
+                        
+                        // Creating/Updating the 'Bank' document natively
+                        val bankDocRef = userRef.collection("Finances").document("Bank")
+                        val bankDoc = bankDocRef.get().await()
+                        
+                        var nextId = 1
+                        var needsLastUpdated = true
+                        
+                        if (bankDoc.exists()) {
+                            val data = bankDoc.data ?: emptyMap()
+                            if (data.containsKey("last_updated")) {
+                                needsLastUpdated = false
+                            }
+                            // Auto-increment the bank IDs (1, 2, 3...)
+                            val existingIds = data.keys.mapNotNull { it.toIntOrNull() }
+                            if (existingIds.isNotEmpty()) {
+                                nextId = existingIds.maxOrNull()!! + 1
+                            }
+                        }
+                        
+                        val updateData = hashMapOf<String, Any>(
+                            nextId.toString() to bankMap
+                        )
+                        
+                        // Placing Common Timestamp ONLY if this is the first initialization
+                        if (needsLastUpdated) {
+                            updateData["last_updated"] = com.google.firebase.Timestamp.now()
+                        }
+                        
+                        bankDocRef.set(updateData, SetOptions.merge()).await()
                     }
-                } catch (e: Exception) {}
+                } catch (e: Exception) {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(context, "Network Error", Toast.LENGTH_SHORT).show()
+                    }
+                }
             }
         }
     }
@@ -284,12 +356,18 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                         }
                     }
                     Spacer(modifier = Modifier.height(10.dp))
+                    
+                    // FIXED: UI strictly accepts 3 digits, prefixes exact length
                     OutlinedTextField(
-                        value = bankAccountNo, onValueChange = { if (it.length <= 4 && it.all { char -> char.isDigit() }) bankAccountNo = it },
-                        label = { Text("Account No. (Last 3-4 Digits)") }, prefix = { Text("XXXXX", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, letterSpacing = 2.sp) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth(), singleLine = true, shape = RoundedCornerShape(12.dp),
+                        value = bankAccountNo, 
+                        onValueChange = { if (it.length <= 3 && it.all { char -> char.isDigit() }) bankAccountNo = it },
+                        label = { Text("Account No. (Last 3 Digits)") }, 
+                        prefix = { Text("XXXXX", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, letterSpacing = 2.sp) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), 
+                        modifier = Modifier.fillMaxWidth(), singleLine = true, shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary, focusedLabelColor = MaterialTheme.colorScheme.primary, focusedTextColor = MaterialTheme.colorScheme.onSurface, unfocusedTextColor = MaterialTheme.colorScheme.onSurface)
                     )
+                    
                     Spacer(modifier = Modifier.height(10.dp))
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedTextField(
