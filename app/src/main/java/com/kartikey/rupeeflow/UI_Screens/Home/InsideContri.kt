@@ -698,14 +698,15 @@ fun InsideContriScreen(
                                     val q = db.collection("Contri").whereEqualTo("contri_code", room.roomCode).get().await()
                                     
                                     if (!q.isEmpty) {
-                                        val ref = q.documents[0].reference
-                                        val activeUsers = (ref.get("member_usernames") as? List<*>)?.map { it.toString() } ?: emptyList()
+                                        val doc = q.documents[0]
+                                        val ref = doc.reference
+                                        val activeUsers = (doc.get("member_usernames") as? List<*>)?.map { it.toString() } ?: emptyList()
                                         
                                         // CLEAR EXPENSES FROM EACH USER'S COLLECTION
                                         for (m in activeUsers) {
                                             val userExpDocs = ref.collection(m).get().await()
-                                            for (doc in userExpDocs) {
-                                                doc.reference.delete().await()
+                                            for (eDoc in userExpDocs) {
+                                                eDoc.reference.delete().await()
                                             }
                                         }
                                         
@@ -793,7 +794,10 @@ fun InsideContriScreen(
                                 val existingDocs = userCol.get().await()
                                 val nextIndex = existingDocs.size() + 1
                                 val formattedIndex = String.format(Locale.US, "%03d", nextIndex)
-                                val customDocId = "${formattedIndex}_${dateForDocId}"
+                                
+                                // Make string completely safe without relying on Regex import
+                                val safeTitle = title.filter { it.isLetterOrDigit() }
+                                val customDocId = "${formattedIndex}_${safeTitle}"
 
                                 val transData = hashMapOf(
                                     "item_name" to title,
