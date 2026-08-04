@@ -115,7 +115,7 @@ fun ContriScreen(
                     }
                 }
 
-                // 2. Fallback Query (Using member_ids instead of member_usernames)
+                // 2. Fallback Query (Using member_ids)
                 val contriQuery = db.collection("Contri").whereArrayContains("member_ids", currentUserId).get().await()
                 for (doc in contriQuery.documents) {
                     val code = doc.getString("contri_code") ?: ""
@@ -139,6 +139,7 @@ fun ContriScreen(
     }
 
     LaunchedEffect(Unit) {
+        // Initial Fetch
         fetchRoomsFromFirestore()
     }
 
@@ -187,7 +188,7 @@ fun ContriScreen(
             )
         ) {
             InsideContriScreen(
-                username = username, // still passed to identify self globally, but logic uses ID
+                username = username, 
                 room = openedRoom!!,
                 onBackClick = { openedRoom = null },
                 onLeaveClick = { 
@@ -226,7 +227,7 @@ fun ContriScreen(
                                 isRefreshing = true
                                 coroutineScope.launch {
                                     fetchRoomsFromFirestore()
-                                    delay(1200)
+                                    delay(800)
                                     isRefreshing = false
                                 }
                                 onRefresh() 
@@ -255,6 +256,7 @@ fun ContriScreen(
             ) {
                 Spacer(modifier = Modifier.height(8.dp))
 
+                // Only show loading indicator if list is completely empty
                 if (isFetchingRooms && fetchedRooms.isEmpty()) {
                     Box(modifier = Modifier.fillMaxWidth().height(100.dp), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
@@ -399,7 +401,10 @@ fun AutoJoinContriDialog(
         coroutineScope.launch(Dispatchers.IO) {
             try {
                 val db = FirebaseFirestore.getInstance()
-                val query = db.collection("Contri").whereEqualTo("contri_code", roomCode).get().await()
+                val query = db.collection("Contri")
+                    .whereEqualTo("contri_code", roomCode)
+                    .get()
+                    .await()
                 
                 if (!query.isEmpty) {
                     val doc = query.documents[0]
