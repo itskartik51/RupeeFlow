@@ -236,21 +236,22 @@ object CacheManager {
                     invArray.put(invObj)
                 }
 
-                // 5. Fetch Contri Rooms
+                // 5. Fetch Contri Rooms (Updated: Reads direct from 'rooms' array seamlessly)
                 val contriArray = JSONArray()
-                val contriDocs = db.collection("Contri")
-                    .whereArrayContains("members", username)
-                    .get()
-                    .await()
+                val roomsArray = userDoc.get("rooms") as? List<*> ?: emptyList<Any>()
 
-                for (doc in contriDocs) {
-                    val cObj = JSONObject().apply {
-                        put("room_name", doc.getString("room_name") ?: "")
-                        put("room_code", doc.id)
-                        put("passkey", doc.getString("passkey") ?: "123456")
-                        put("expenses", JSONArray())
+                for (roomItem in roomsArray) {
+                    val roomStr = roomItem.toString()
+                    val parts = roomStr.split("_", limit = 3)
+                    if (parts.size >= 3) {
+                        val cObj = JSONObject().apply {
+                            put("room_name", parts[2])
+                            put("room_code", parts[1])
+                            put("passkey", "123456")
+                            put("expenses", JSONArray()) // Fetching inside room will populate true expenses
+                        }
+                        contriArray.put(cObj)
                     }
-                    contriArray.put(cObj)
                 }
 
                 // Construct Master Payload
