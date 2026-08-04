@@ -95,7 +95,9 @@ fun ContriScreen(
             val roomsList = mutableListOf<ContriRoomModel>()
 
             if (!userQuery.isEmpty) {
-                val userData = userQuery.documents[0].data ?: emptyMap<String, Any>()
+                val userDoc = userQuery.documents[0]
+                val currentUserId = userDoc.id
+                val userData = userDoc.data ?: emptyMap<String, Any>()
                 
                 // 1. Fetch room_X fields safely
                 val roomKeys = userData.keys.filter { it.startsWith("room_") }
@@ -113,8 +115,8 @@ fun ContriScreen(
                     }
                 }
 
-                // 2. Fallback Query
-                val contriQuery = db.collection("Contri").whereArrayContains("member_usernames", username).get().await()
+                // 2. Fallback Query (Using member_ids instead of member_usernames)
+                val contriQuery = db.collection("Contri").whereArrayContains("member_ids", currentUserId).get().await()
                 for (doc in contriQuery.documents) {
                     val code = doc.getString("contri_code") ?: ""
                     if (code.isNotBlank() && roomsList.none { it.roomCode == code }) {
@@ -185,7 +187,7 @@ fun ContriScreen(
             )
         ) {
             InsideContriScreen(
-                username = username,
+                username = username, // still passed to identify self globally, but logic uses ID
                 room = openedRoom!!,
                 onBackClick = { openedRoom = null },
                 onLeaveClick = { 
@@ -397,39 +399,39 @@ fun AutoJoinContriDialog(
         coroutineScope.launch(Dispatchers.IO) {
             try {
                 val db = FirebaseFirestore.getInstance()
-                val query = db.collection("Contri")
-                    .whereEqualTo("contri_code", roomCode)
-                    .get()
-                    .await()
+                val query = db.collection("Contri").whereEqualTo("contri_code", roomCode).get().await()
                 
                 if (!query.isEmpty) {
                     val doc = query.documents[0]
                     val dbPasskey = doc.getString("passkey")
                     
                     if (dbPasskey == pin || dbPasskey.isNullOrEmpty()) {
-                        val todayStr = SimpleDateFormat("dd-MM-yyyy", Locale.getDefault()).format(Date())
                         val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
-                        val fullName = if (!userQuery.isEmpty) userQuery.documents[0].getString("name") ?: username else username
-                        val exactMemberString = "$fullName/$todayStr"
-
-                        doc.reference.update(
-                            "member_usernames", FieldValue.arrayUnion(username),
-                            "members", FieldValue.arrayUnion(exactMemberString)
-                        ).await()
-
+                        
                         if (!userQuery.isEmpty) {
                             val userDocRef = userQuery.documents[0].reference
+                            val currentUserId = userQuery.documents[0].id
+                            
+                            // Using member_ids for Bulletproof ID tracking
+                            doc.reference.update("member_ids", FieldValue.arrayUnion(currentUserId)).await()
+
                             val userData = userQuery.documents[0].data ?: emptyMap<String, Any>()
                             val existingRooms = userData.keys.filter { it.startsWith("room_") }
                             val maxIndex = existingRooms.mapNotNull { it.removePrefix("room_").toIntOrNull() }.maxOrNull() ?: 0
                             val nextRoomIndex = maxIndex + 1
                             val roomVal = "$roomName / $roomCode / $pin"
+                            
                             userDocRef.update("room_$nextRoomIndex", roomVal).await()
-                        }
-                        
-                        withContext(Dispatchers.Main) { 
-                            Toast.makeText(context, "Joined $roomName!", Toast.LENGTH_SHORT).show()
-                            onSuccess() 
+                            
+                            withContext(Dispatchers.Main) { 
+                                Toast.makeText(context, "Joined $roomName!", Toast.LENGTH_SHORT).show()
+                                onSuccess() 
+                            }
+                        } else {
+                            withContext(Dispatchers.Main) { 
+                                Toast.makeText(context, "Error: User Profile not found!", Toast.LENGTH_LONG).show()
+                                onDismiss() 
+                            }
                         }
                     } else {
                         withContext(Dispatchers.Main) { 
@@ -634,23 +636,22 @@ fun CreateContriDialog(username: String, onDismiss: () -> Unit, onSuccess: () ->
                                     val todayStr = SimpleDateFormat("dd-MM-yyyy", Locale.getDefault()).format(Date())
 
                                     val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
-                                    val fullName = if (!userQuery.isEmpty) userQuery.documents[0].getString("name") ?: username else username
-
-                                    val contriData = hashMapOf(
-                                        "contri_code" to randomCode,
-                                        "contri_date" to todayStr,
-                                        "contri_name" to contriName,
-                                        "full_group_name" to "$contriName / $randomCode / $todayStr",
-                                        "members" to listOf("$fullName/$todayStr"),
-                                        "member_usernames" to listOf(username), 
-                                        "passkey" to pin,
-                                        "admin" to username,
-                                        "total_group_expense" to 0.0
-                                    )
-                                    
-                                    db.collection("Contri").document(docId).set(contriData).await()
                                     
                                     if (!userQuery.isEmpty) {
+                                        val currentUserId = userQuery.documents[0].id
+                                        
+                                        val contriData = hashMapOf(
+                                            "contri_code" to randomCode,
+                                            "contri_date" to todayStr,
+                                            "contri_name" to contriName,
+                                            "member_ids" to listOf(currentUserId), // Clean ID Based Tracking
+                                            "admin_id" to currentUserId,
+                                            "passkey" to pin,
+                                            "total_group_expense" to 0.0
+                                        )
+                                        
+                                        db.collection("Contri").document(docId).set(contriData).await()
+                                        
                                         val userDocRef = userQuery.documents[0].reference
                                         val userData = userQuery.documents[0].data ?: emptyMap<String, Any>()
                                         val existingRooms = userData.keys.filter { it.startsWith("room_") }
@@ -658,12 +659,12 @@ fun CreateContriDialog(username: String, onDismiss: () -> Unit, onSuccess: () ->
                                         val nextRoomIndex = maxIndex + 1
                                         val roomVal = "$contriName / $randomCode / $pin"
                                         userDocRef.update("room_$nextRoomIndex", roomVal).await()
-                                    }
-                                    
-                                    withContext(Dispatchers.Main) {
-                                        isSubmitting = false
-                                        Toast.makeText(context, "Room Created!", Toast.LENGTH_SHORT).show()
-                                        onSuccess()
+                                        
+                                        withContext(Dispatchers.Main) {
+                                            isSubmitting = false
+                                            Toast.makeText(context, "Room Created!", Toast.LENGTH_SHORT).show()
+                                            onSuccess()
+                                        }
                                     }
                                 } catch (e: Exception) {
                                     withContext(Dispatchers.Main) {
@@ -855,31 +856,27 @@ fun JoinContriDialog(
                                             val dbPasskey = doc.getString("passkey")
                                             
                                             if (dbPasskey == pin || dbPasskey.isNullOrEmpty()) {
-                                                val todayStr = SimpleDateFormat("dd-MM-yyyy", Locale.getDefault()).format(Date())
                                                 val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
-                                                val fullName = if (!userQuery.isEmpty) userQuery.documents[0].getString("name") ?: username else username
-                                                val exactMemberString = "$fullName/$todayStr"
                                                 val roomName = doc.getString("contri_name") ?: "Contri Room"
                                                 
-                                                doc.reference.update(
-                                                    "member_usernames", FieldValue.arrayUnion(username),
-                                                    "members", FieldValue.arrayUnion(exactMemberString)
-                                                ).await()
-                                                
                                                 if (!userQuery.isEmpty) {
+                                                    val currentUserId = userQuery.documents[0].id
                                                     val userDocRef = userQuery.documents[0].reference
+                                                    
+                                                    doc.reference.update("member_ids", FieldValue.arrayUnion(currentUserId)).await()
+                                                    
                                                     val userData = userQuery.documents[0].data ?: emptyMap<String, Any>()
                                                     val existingRooms = userData.keys.filter { it.startsWith("room_") }
                                                     val maxIndex = existingRooms.mapNotNull { it.removePrefix("room_").toIntOrNull() }.maxOrNull() ?: 0
                                                     val nextRoomIndex = maxIndex + 1
                                                     val roomVal = "$roomName / $formattedCode / $pin"
                                                     userDocRef.update("room_$nextRoomIndex", roomVal).await()
-                                                }
-                                                
-                                                withContext(Dispatchers.Main) {
-                                                    isSubmitting = false
-                                                    Toast.makeText(context, "Joined Successfully!", Toast.LENGTH_SHORT).show()
-                                                    onSuccess()
+                                                    
+                                                    withContext(Dispatchers.Main) {
+                                                        isSubmitting = false
+                                                        Toast.makeText(context, "Joined Successfully!", Toast.LENGTH_SHORT).show()
+                                                        onSuccess()
+                                                    }
                                                 }
                                             } else {
                                                 withContext(Dispatchers.Main) {
