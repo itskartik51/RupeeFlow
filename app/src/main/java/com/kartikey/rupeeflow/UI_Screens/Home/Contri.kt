@@ -421,7 +421,8 @@ fun AutoJoinContriDialog(
                             val userDocRef = userQuery.documents[0].reference
                             val userData = userQuery.documents[0].data ?: emptyMap<String, Any>()
                             val existingRooms = userData.keys.filter { it.startsWith("room_") }
-                            val nextRoomIndex = existingRooms.size + 1
+                            val maxIndex = existingRooms.mapNotNull { it.removePrefix("room_").toIntOrNull() }.maxOrNull() ?: 0
+                            val nextRoomIndex = maxIndex + 1
                             val roomVal = "$roomName / $roomCode / $pin"
                             userDocRef.update("room_$nextRoomIndex", roomVal).await()
                         }
@@ -653,7 +654,8 @@ fun CreateContriDialog(username: String, onDismiss: () -> Unit, onSuccess: () ->
                                         val userDocRef = userQuery.documents[0].reference
                                         val userData = userQuery.documents[0].data ?: emptyMap<String, Any>()
                                         val existingRooms = userData.keys.filter { it.startsWith("room_") }
-                                        val nextRoomIndex = existingRooms.size + 1
+                                        val maxIndex = existingRooms.mapNotNull { it.removePrefix("room_").toIntOrNull() }.maxOrNull() ?: 0
+                                        val nextRoomIndex = maxIndex + 1
                                         val roomVal = "$contriName / $randomCode / $pin"
                                         userDocRef.update("room_$nextRoomIndex", roomVal).await()
                                     }
@@ -868,7 +870,8 @@ fun JoinContriDialog(
                                                     val userDocRef = userQuery.documents[0].reference
                                                     val userData = userQuery.documents[0].data ?: emptyMap<String, Any>()
                                                     val existingRooms = userData.keys.filter { it.startsWith("room_") }
-                                                    val nextRoomIndex = existingRooms.size + 1
+                                                    val maxIndex = existingRooms.mapNotNull { it.removePrefix("room_").toIntOrNull() }.maxOrNull() ?: 0
+                                                    val nextRoomIndex = maxIndex + 1
                                                     val roomVal = "$roomName / $formattedCode / $pin"
                                                     userDocRef.update("room_$nextRoomIndex", roomVal).await()
                                                 }
