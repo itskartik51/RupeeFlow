@@ -62,7 +62,7 @@ data class PastCycle(val dateRange: String, val totalAmount: String)
 
 @Composable
 fun InsideContriScreen(
-    username: String, // Kept to identify self internally
+    username: String, 
     room: ContriRoomModel,
     onBackClick: () -> Unit,
     onLeaveClick: () -> Unit
@@ -80,7 +80,8 @@ fun InsideContriScreen(
     var pastCycles by remember { mutableStateOf<List<PastCycle>>(emptyList()) }
     var totalGroupExpense by remember { mutableDoubleStateOf(0.0) }
     var isAdmin by remember { mutableStateOf(false) } 
-    var isLoading by remember { mutableStateOf(true) }
+    var isSyncing by remember { mutableStateOf(false) } // Background Sync State
+    var isLoading by remember { mutableStateOf(true) } // Full UI Blocking State
     var refreshTrigger by remember { mutableIntStateOf(0) }
     var actionProcessing by remember { mutableStateOf(false) }
     
@@ -98,8 +99,8 @@ fun InsideContriScreen(
 
     // ROTATION ANIMATION FOR SYNC WHEEL
     var currentRotation by remember { mutableFloatStateOf(0f) }
-    LaunchedEffect(isLoading || actionProcessing) {
-        if (isLoading || actionProcessing) {
+    LaunchedEffect(isSyncing || actionProcessing) {
+        if (isSyncing || actionProcessing) {
             while (true) {
                 delay(16)
                 currentRotation += 8f
@@ -110,13 +111,17 @@ fun InsideContriScreen(
     }
 
     LaunchedEffect(room.roomCode, refreshTrigger) {
-        isLoading = true
+        // Only block UI if we have no data at all
+        if (ledgers.isEmpty()) {
+            isLoading = true
+        } else {
+            isSyncing = true
+        }
 
         withContext(Dispatchers.IO) {
             try {
                 val db = FirebaseFirestore.getInstance()
                 
-                // 1. Get my own User ID securely
                 val myUserQuery = db.collection("Users").whereEqualTo("username", username).get().await()
                 if (!myUserQuery.isEmpty) {
                     currentUserId = myUserQuery.documents[0].id
@@ -139,13 +144,11 @@ fun InsideContriScreen(
                         totalGroupExpense = if (totalExpRaw is Number) totalExpRaw.toDouble() else 0.0
                     }
 
-                    // 2. Fetch User Profiles to map ID -> Actual Current Name
                     val membersMap = mutableMapOf<String, MemberLedger>()
                     for (mId in memberIds) {
                         val uDoc = db.collection("Users").document(mId).get().await()
                         val actualName = uDoc.getString("name") ?: uDoc.getString("username") ?: "Unknown User"
                         
-                        // Fetch the specific user's expense collection
                         val userExpDocs = contriDoc.reference.collection(mId).get().await()
                         var userSpent = 0.0
                         val expList = mutableListOf<ContriExpense>()
@@ -154,16 +157,27 @@ fun InsideContriScreen(
                             val item = doc.getString("item_name") ?: "Unknown"
                             val rawAmt = doc.get("amount")
                             val amt = if (rawAmt is Number) rawAmt.toDouble() else 0.0
-                            val date = doc.getString("date") ?: ""
+                            
+                            // Handling Timestamp Format & String Fallback
+                            val rawDate = doc.get("date")
+                            val formattedDate = if (rawDate is com.google.firebase.Timestamp) {
+                                SimpleDateFormat("dd MMMM", Locale.getDefault()).format(rawDate.toDate())
+                            } else if (rawDate is String) {
+                                try {
+                                    val parsed = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).parse(rawDate)
+                                    if (parsed != null) SimpleDateFormat("dd MMMM", Locale.getDefault()).format(parsed) else rawDate
+                                } catch (e: Exception) { rawDate }
+                            } else {
+                                ""
+                            }
                             
                             userSpent += amt
-                            expList.add(ContriExpense(item, amt, date))
+                            expList.add(ContriExpense(item, amt, formattedDate))
                         }
                         
                         membersMap[mId] = MemberLedger(mId, actualName, userSpent, expList)
                     }
 
-                    // 3. Fetch Past Cycles
                     val cyclesList = mutableListOf<PastCycle>()
                     val cycleDocs = contriDoc.reference.collection("Past_Cycles").get().await()
                     for (c in cycleDocs) {
@@ -178,17 +192,20 @@ fun InsideContriScreen(
                     withContext(Dispatchers.Main) {
                         ledgers = membersMap.values.toList()
                         pastCycles = cyclesList
-                        isLoading = false 
+                        isLoading = false
+                        isSyncing = false
                     }
                 } else {
                     withContext(Dispatchers.Main) { 
-                        isLoading = false 
+                        isLoading = false
+                        isSyncing = false
                         Toast.makeText(context, "Error: Room details not found in database.", Toast.LENGTH_LONG).show()
                     }
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) { 
-                    isLoading = false 
+                    isLoading = false
+                    isSyncing = false
                     Toast.makeText(context, "Data Error: ${e.message}", Toast.LENGTH_LONG).show()
                 }
             }
@@ -216,7 +233,6 @@ fun InsideContriScreen(
                 
                 Text(text = formattedName, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp, color = MaterialTheme.colorScheme.onSurface)
                 
-                // ADMIN / MEMBER BADGE
                 Spacer(modifier = Modifier.width(8.dp))
                 Box(
                     modifier = Modifier
@@ -289,11 +305,11 @@ fun InsideContriScreen(
                             Icon(
                                 imageVector = Icons.Outlined.Sync,
                                 contentDescription = "Sync",
-                                tint = if (isLoading || actionProcessing) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                tint = if (isSyncing || actionProcessing) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier
                                     .size(24.dp)
                                     .rotate(currentRotation)
-                                    .bounceClick { if (!isLoading && !actionProcessing) refreshTrigger++ }
+                                    .bounceClick { if (!isSyncing && !actionProcessing) refreshTrigger++ }
                                     .padding(2.dp)
                             )
                         }
@@ -303,13 +319,13 @@ fun InsideContriScreen(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Box(
                                 modifier = Modifier
-                                    .height(28.dp)
+                                    // Removed hardcoded height(28.dp) for perfect visual centering
                                     .bounceClick { showSettleDialog = true }
                                     .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(8.dp))
-                                    .padding(horizontal = 12.dp, vertical = 4.dp),
+                                    .padding(horizontal = 12.dp, vertical = 6.dp),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text("Settle-up", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimary)
+                                Text("Settle-up", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimary)
                             }
 
                             if (isAdmin) {
@@ -319,7 +335,7 @@ fun InsideContriScreen(
                                         .clip(RoundedCornerShape(50))
                                         .bounceClick { showNewCycleDialog = true }
                                         .border(1.2.dp, MaterialTheme.colorScheme.onSurfaceVariant, RoundedCornerShape(50))
-                                        .padding(horizontal = 12.dp, vertical = 4.dp),
+                                        .padding(horizontal = 12.dp, vertical = 5.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text("New", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.SemiBold)
@@ -380,7 +396,6 @@ fun InsideContriScreen(
                 DynamicLedgerView(ledgers)
             }
 
-            // PAST CYCLES
             if (pastCycles.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(24.dp))
                 Text(
@@ -650,7 +665,6 @@ fun InsideContriScreen(
                                     if (!q.isEmpty) {
                                         val doc = q.documents[0]
                                         
-                                        // 1. DELETE EXPENSES & DEDUCT FROM TOTAL
                                         var amountToDeduct = 0.0
                                         val userExpDocs = doc.reference.collection(targetUserId).get().await()
                                         for (eDoc in userExpDocs) {
@@ -664,7 +678,6 @@ fun InsideContriScreen(
                                             "member_ids", FieldValue.arrayRemove(targetUserId)
                                         ).await()
                                         
-                                        // 2. CLEAR ROOM FROM USER'S PROFILE
                                         val targetUserDocRef = db.collection("Users").document(targetUserId)
                                         val targetData = targetUserDocRef.get().await().data ?: emptyMap<String, Any>()
                                         
@@ -767,7 +780,6 @@ fun InsideContriScreen(
                                     if (!q.isEmpty) {
                                         val doc = q.documents[0]
                                         
-                                        // 1. DELETE EXPENSES & DEDUCT FROM TOTAL
                                         var amountToDeduct = 0.0
                                         val userExpDocs = doc.reference.collection(currentUserId).get().await()
                                         for (eDoc in userExpDocs) {
@@ -781,7 +793,6 @@ fun InsideContriScreen(
                                             "member_ids", FieldValue.arrayRemove(currentUserId)
                                         ).await()
                                         
-                                        // 2. CLEAR ROOM FROM MY PROFILE
                                         val currentUserDocRef = db.collection("Users").document(currentUserId)
                                         val userData = currentUserDocRef.get().await().data ?: emptyMap<String, Any>()
                                         val targetRoomKey = userData.entries.find { 
@@ -819,14 +830,11 @@ fun InsideContriScreen(
                     
                     CoroutineScope(Dispatchers.IO).launch {
                         try {
-                            val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
-                            val dateForDocId = SimpleDateFormat("dd-MM-yyyy", Locale.getDefault()).format(Date(dateMillis))
                             val db = FirebaseFirestore.getInstance()
-
                             val q = db.collection("Contri").whereEqualTo("contri_code", room.roomCode).get().await()
+                            
                             if (!q.isEmpty) {
                                 val ref = q.documents[0].reference
-                                
                                 val userCol = ref.collection(currentUserId)
                                 val existingDocs = userCol.get().await()
                                 val nextIndex = existingDocs.size() + 1
@@ -835,10 +843,11 @@ fun InsideContriScreen(
                                 val safeTitle = title.filter { it.isLetterOrDigit() }
                                 val customDocId = "${formattedIndex}_${safeTitle}"
 
+                                // Fix: Save Date directly as Firebase Timestamp Object
                                 val transData = hashMapOf(
                                     "item_name" to title,
                                     "amount" to amount,
-                                    "date" to sdf.format(Date(dateMillis)),
+                                    "date" to com.google.firebase.Timestamp(Date(dateMillis)),
                                     "timestamp" to FieldValue.serverTimestamp()
                                 )
                                 
@@ -918,12 +927,14 @@ fun DynamicLedgerView(ledgers: List<MemberLedger>) {
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     ledger.expenses.forEach { expense ->
-                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(bottom = 10.dp)) {
-                            Text(text = expense.itemName, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Spacer(modifier = Modifier.height(1.dp))
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(bottom = 12.dp)) {
+                            // Fixed: Title size increased to 17sp, bold
+                            Text(text = expense.itemName, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Spacer(modifier = Modifier.height(2.dp))
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(text = "₹${expense.amount.toInt()}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
-                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(text = "₹${expense.amount.toInt()}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                Spacer(modifier = Modifier.width(6.dp))
+                                // Fixed: Date format reflects "04 August" directly based on the new logic
                                 Text(text = expense.date, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Medium)
                             }
                         }
@@ -1021,9 +1032,9 @@ fun SettleUpDialog(myName: String, ledgers: List<MemberLedger>, totalExpense: Do
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(48.dp)
                         .bounceClick { onDismiss() }
-                        .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp)),
+                        .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp))
+                        .padding(vertical = 12.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text("Dismiss", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
