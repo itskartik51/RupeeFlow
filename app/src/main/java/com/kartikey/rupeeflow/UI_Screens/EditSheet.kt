@@ -647,6 +647,9 @@ fun DeleteExpenseDialog(
                             if (!userQuery.isEmpty) {
                                 val userRef = userQuery.documents[0].reference
                                 
+                                // ==========================================
+                                // FIXED: Using Underscore instead of Dot
+                                // ==========================================
                                 val expDateOnly = expense.date.split(" ")[0]
                                 val targetDate = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).parse(expDateOnly) ?: Date()
                                 val docId = SimpleDateFormat("yyyy_MM", Locale.getDefault()).format(targetDate)
@@ -669,6 +672,7 @@ fun DeleteExpenseDialog(
                                             val dbAmount = (value["amount"] as? Number)?.toDouble() ?: 0.0
                                             val dbCategory = value["category"]?.toString() ?: ""
                                             
+                                            // FIX: Safe float math compare instead of precise `==`
                                             val amountMatch = Math.abs(dbAmount - expense.amount) < 0.01
                                             
                                             if (dbDateStr == expDateOnly && amountMatch && dbCategory == expense.category) {
@@ -682,13 +686,14 @@ fun DeleteExpenseDialog(
                                 if (targetKey != null) {
                                     val updates = hashMapOf<String, Any>(
                                         targetKey to FieldValue.delete(),
-                                        "000. total" to FieldValue.increment(-expense.amount)
+                                        "000_total" to FieldValue.increment(-expense.amount)
                                     )
                                     expensesDocRef.update(updates).await()
                                 } else {
                                     withContext(Dispatchers.Main) { Toast.makeText(context, "Error: Record not found in database.", Toast.LENGTH_LONG).show() }
                                     return@launch 
                                 }
+                                // ==========================================
 
                                 // REFUND LOGIC
                                 val refundAmt = expense.amount
@@ -1134,6 +1139,9 @@ fun EditExpenseDialog(
                                         if (!userQuery.isEmpty) {
                                             val userRef = userQuery.documents[0].reference
                                             
+                                            // ==========================================
+                                            // FIXED: Using Underscore instead of Dot
+                                            // ==========================================
                                             val expDateOnly = expense.date.split(" ")[0]
                                             val oldTargetDate = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).parse(expDateOnly) ?: Date()
                                             val oldDocId = SimpleDateFormat("yyyy_MM", Locale.getDefault()).format(oldTargetDate)
@@ -1160,6 +1168,7 @@ fun EditExpenseDialog(
                                                         val dbAmount = (value["amount"] as? Number)?.toDouble() ?: 0.0
                                                         val dbCategory = value["category"]?.toString() ?: ""
                                                         
+                                                        // FIX: Safe float math compare
                                                         val amountMatch = Math.abs(dbAmount - expense.amount) < 0.01
 
                                                         if (dbDateStr == expDateOnly && amountMatch && dbCategory == expense.category) {
@@ -1185,8 +1194,8 @@ fun EditExpenseDialog(
                                             )
 
                                             if (oldDocId == newDocId) {
-                                                val seqNumber = targetKey.substringBefore(".")
-                                                val newKey = "$seqNumber. $finalCategory"
+                                                val seqNumber = targetKey.substringBefore("_")
+                                                val newKey = "${seqNumber}_${finalCategory}"
                                                 
                                                 val updates = hashMapOf<String, Any>()
                                                 if (newKey != targetKey) {
@@ -1194,14 +1203,14 @@ fun EditExpenseDialog(
                                                 }
                                                 updates[newKey] = expData
                                                 if (diff != 0.0) {
-                                                    updates["000. total"] = FieldValue.increment(diff)
+                                                    updates["000_total"] = FieldValue.increment(diff)
                                                 }
                                                 oldDocRef.update(updates).await()
                                             } else {
                                                 oldDocRef.update(
                                                     mapOf(
                                                         targetKey to FieldValue.delete(),
-                                                        "000. total" to FieldValue.increment(-expense.amount)
+                                                        "000_total" to FieldValue.increment(-expense.amount)
                                                     )
                                                 ).await()
                                                 
@@ -1211,19 +1220,19 @@ fun EditExpenseDialog(
                                                 
                                                 if (newDocSnap.exists()) {
                                                     val dataMap = newDocSnap.data ?: emptyMap()
-                                                    val seqKeys = dataMap.keys.filter { it.matches(Regex("^\\d{3}\\..*")) }
+                                                    val seqKeys = dataMap.keys.filter { it.matches(Regex("^\\d{3}_.*")) }
                                                     if (seqKeys.isNotEmpty()) {
                                                         val maxSeq = seqKeys.maxOf { it.substring(0, 3).toInt() }
                                                         nextSeq = maxSeq + 1
                                                     }
                                                 }
                                                 val formattedSeq = String.format(Locale.US, "%03d", nextSeq)
-                                                val newKey = "$formattedSeq. $finalCategory"
+                                                val newKey = "${formattedSeq}_${finalCategory}"
                                                 
                                                 newDocRef.set(
                                                     mapOf(
                                                         newKey to expData,
-                                                        "000. total" to FieldValue.increment(newAmt)
+                                                        "000_total" to FieldValue.increment(newAmt)
                                                     ), SetOptions.merge()
                                                 ).await()
                                             }
