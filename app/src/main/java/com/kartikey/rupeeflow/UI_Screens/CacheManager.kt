@@ -128,34 +128,66 @@ object CacheManager {
                             cashObj.put("last_updated", doc.getString("last_updated") ?: "")
                         }
                         
-                        // PHASE 2: NEW BANKING ENGINE LOGIC (Catch-up Sync)
+                        // PHASE 2: "TRUE SPARSE DATA" & "PRORATED MATH" ENGINE
                         "Bank" -> {
                             val dataMap = doc.data
                             val updateMap = mutableMapOf<String, Any>()
                             
                             val lastUpdatedTs = dataMap["last_updated"] as? Timestamp
+                            val calToday = Calendar.getInstance().apply {
+                                set(Calendar.HOUR_OF_DAY, 0)
+                                set(Calendar.MINUTE, 0)
+                                set(Calendar.SECOND, 0)
+                                set(Calendar.MILLISECOND, 0)
+                            }
+                            
+                            var yearShifted = false
                             var gapDays = 0L
                             
-                            // 1. Calculate Offline Days
                             if (lastUpdatedTs != null) {
-                                val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-                                val todayStr = sdf.format(Date())
-                                val lastStr = sdf.format(lastUpdatedTs.toDate())
-                                
-                                if (todayStr != lastStr) {
-                                    val d1 = sdf.parse(lastStr)
-                                    val d2 = sdf.parse(todayStr)
-                                    if (d1 != null && d2 != null) {
-                                        val diff = d2.time - d1.time
-                                        gapDays = diff / (1000 * 60 * 60 * 24)
-                                    }
+                                val calLast = Calendar.getInstance().apply {
+                                    time = lastUpdatedTs.toDate()
+                                    set(Calendar.HOUR_OF_DAY, 0)
+                                    set(Calendar.MINUTE, 0)
+                                    set(Calendar.SECOND, 0)
+                                    set(Calendar.MILLISECOND, 0)
+                                }
+                                if (calToday.get(Calendar.YEAR) > calLast.get(Calendar.YEAR)) {
+                                    yearShifted = true
+                                }
+                                if (calToday.timeInMillis > calLast.timeInMillis) {
+                                    gapDays = (calToday.timeInMillis - calLast.timeInMillis) / (1000 * 60 * 60 * 24)
                                 }
                             }
 
-                            // If gap exists, mark the master switch to update
                             if (gapDays > 0) {
                                 updateMap["last_updated"] = FieldValue.serverTimestamp()
                             }
+
+                            // Qtr Math Basics
+                            val startOfQtr = Calendar.getInstance().apply {
+                                set(Calendar.MONTH, (calToday.get(Calendar.MONTH) / 3) * 3)
+                                set(Calendar.DAY_OF_MONTH, 1)
+                                set(Calendar.HOUR_OF_DAY, 0)
+                                set(Calendar.MINUTE, 0)
+                                set(Calendar.SECOND, 0)
+                                set(Calendar.MILLISECOND, 0)
+                            }
+                            val daysPassedQtr = ((calToday.timeInMillis - startOfQtr.timeInMillis) / (1000 * 60 * 60 * 24)).toInt() + 1
+                            
+                            // Year Math Basics
+                            val startOfYear = Calendar.getInstance().apply {
+                                set(Calendar.MONTH, Calendar.JANUARY)
+                                set(Calendar.DAY_OF_MONTH, 1)
+                                set(Calendar.HOUR_OF_DAY, 0)
+                                set(Calendar.MINUTE, 0)
+                                set(Calendar.SECOND, 0)
+                                set(Calendar.MILLISECOND, 0)
+                            }
+                            val daysPassedYr = ((calToday.timeInMillis - startOfYear.timeInMillis) / (1000 * 60 * 60 * 24)).toInt() + 1
+
+                            val currentMonth = calToday.get(Calendar.MONTH)
+                            val qtrStr = "q${(currentMonth / 3) + 1}"
 
                             dataMap.forEach { (key, rawBank) ->
                                 if (key != "last_updated" && rawBank is Map<*, *>) {
@@ -164,27 +196,39 @@ object CacheManager {
                                     val curBal = (rawBank["current bal."] as? Number)?.toDouble() ?: 0.0
                                     val rateYr = (rawBank["intrest % (yr)"] as? Number)?.toDouble() ?: 0.0
                                     val rateQtr = (rawBank["intrest % (qtr)"] as? Number)?.toDouble() ?: (rateYr / 4.0)
-
-                                    var accruedQtr = (rawBank["accrued qtr"] as? Number)?.toDouble() ?: 0.0
-                                    var accruedYr = (rawBank["accrued yr"] as? Number)?.toDouble() ?: 0.0
                                     val oneDayInt = (curBal * (rateYr / 100.0)) / 365.0
 
-                                    // 2. The Catch-up Math (Adding Pending Interest)
-                                    if (gapDays > 0) {
-                                        val addedInterest = oneDayInt * gapDays
-                                        accruedQtr += addedInterest
-                                        accruedYr += addedInterest
+                                    val qtrAvgMap = rawBank["qtr. avg."] as? Map<*,*> ?: emptyMap<String, Any>()
+                                    val yrAvgMap = rawBank["yr avg"] as? Map<*,*> ?: emptyMap<String, Any>()
+
+                                    val currentQtrAvg = (qtrAvgMap[qtrStr] as? Number)?.toDouble() ?: curBal
+                                    var curYrAvg = (yrAvgMap["cur"] as? Number)?.toDouble() ?: curBal
+
+                                    // The Year Shift Execution
+                                    if (yearShifted) {
+                                        val lastYrAvg = (yrAvgMap["cur"] as? Number)?.toDouble() ?: 0.0
+                                        val secondLastYrAvg = (yrAvgMap["last"] as? Number)?.toDouble() ?: 0.0
                                         
-                                        // Queue for immediate database update
+                                        updateMap["$key.yr avg.2nd last"] = secondLastYrAvg
+                                        updateMap["$key.yr avg.last"] = lastYrAvg
+                                        updateMap["$key.yr avg.cur"] = curBal
+                                        curYrAvg = curBal 
+                                    }
+
+                                    // True Prorated Formula Injector
+                                    val expQtr = currentQtrAvg * (rateQtr / 100.0)
+                                    val accruedQtr = expQtr * (daysPassedQtr / 90.0)
+                                    val expYr = curYrAvg * (rateYr / 100.0)
+                                    val accruedYr = expYr * (daysPassedYr / 365.0)
+
+                                    if (gapDays > 0 || yearShifted) {
+                                        updateMap["$key.exp qtr int"] = expQtr
                                         updateMap["$key.accrued qtr"] = accruedQtr
+                                        updateMap["$key.exp yr int"] = expYr
                                         updateMap["$key.accrued yr"] = accruedYr
                                         updateMap["$key.1d int"] = oneDayInt
                                     }
 
-                                    val expQtr = curBal * (rateQtr / 100.0)
-                                    val expYr = curBal * (rateYr / 100.0)
-
-                                    // Pass structured data to frontend exactly as it expects
                                     val bObj = JSONObject().apply {
                                         put("bank_name", bName)
                                         put("account_no", accNo)
@@ -200,8 +244,6 @@ object CacheManager {
                                     banksArray.put(bObj)
                                 }
                             }
-
-                            // 3. One-Shot Backend Push
                             if (updateMap.isNotEmpty()) {
                                 doc.reference.update(updateMap).await()
                             }
