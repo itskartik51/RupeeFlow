@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
@@ -645,14 +646,47 @@ fun DeleteExpenseDialog(
                             val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
                             if (!userQuery.isEmpty) {
                                 val userRef = userQuery.documents[0].reference
-                                val expQuery = userRef.collection("Expenses")
-                                    .whereEqualTo("date", expense.date)
-                                    .get()
-                                    .await()
-
-                                for (doc in expQuery.documents) {
-                                    doc.reference.delete().await()
+                                
+                                // ==========================================
+                                // NEW DELETE LOGIC (Map Structure)
+                                // ==========================================
+                                val targetDate = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).parse(expense.date) ?: Date()
+                                val docId = SimpleDateFormat("yyyy_MM", Locale.getDefault()).format(targetDate)
+                                val expensesDocRef = userRef.collection("Expenses").document(docId)
+                                val docSnap = expensesDocRef.get().await()
+                                
+                                if (docSnap.exists()) {
+                                    val dataMap = docSnap.data ?: emptyMap()
+                                    var targetKey: String? = null
+                                    
+                                    for ((key, value) in dataMap) {
+                                        if (value is Map<*, *>) {
+                                            val dbDate = value["date"]
+                                            val dbDateStr = when (dbDate) {
+                                                is Timestamp -> SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(dbDate.toDate())
+                                                is String -> dbDate.toString().split(" ")[0]
+                                                else -> ""
+                                            }
+                                            val dbAmount = (value["amount"] as? Number)?.toDouble() ?: 0.0
+                                            val dbCategory = value["category"]?.toString() ?: ""
+                                            
+                                            // Find exact match
+                                            if (dbDateStr == expense.date && dbAmount == expense.amount && dbCategory == expense.category) {
+                                                targetKey = key
+                                                break
+                                            }
+                                        }
+                                    }
+                                    
+                                    if (targetKey != null) {
+                                        val updates = hashMapOf<String, Any>(
+                                            targetKey to FieldValue.delete(),
+                                            "000. total" to FieldValue.increment(-expense.amount)
+                                        )
+                                        expensesDocRef.update(updates).await()
+                                    }
                                 }
+                                // ==========================================
 
                                 // REFUND LOGIC
                                 val refundAmt = expense.amount
@@ -1082,7 +1116,6 @@ fun EditExpenseDialog(
                     Button(
                         onClick = {
                             val finalCategory = if(isCustomCategory) customCategoryText.trim() else categoryText.trim()
-                            val finalExpenseDateStr = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(expenseDateMillis))
                             
                             if (amount.isNotBlank() && finalCategory.isNotBlank() && modeText.isNotBlank()) {
                                 if (selectedSourceType.isNotEmpty() && selectedSourceId.isEmpty()) {
@@ -1098,16 +1131,46 @@ fun EditExpenseDialog(
                                         val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
                                         if (!userQuery.isEmpty) {
                                             val userRef = userQuery.documents[0].reference
-                                            val expQuery = userRef.collection("Expenses")
-                                                .whereEqualTo("date", expense.date)
-                                                .get()
-                                                .await()
-
+                                            
+                                            // ==========================================
+                                            // NEW EDIT LOGIC (Map Structure)
+                                            // ==========================================
+                                            val oldTargetDate = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).parse(expense.date) ?: Date()
+                                            val oldDocId = SimpleDateFormat("yyyy_MM", Locale.getDefault()).format(oldTargetDate)
+                                            val newDocId = SimpleDateFormat("yyyy_MM", Locale.getDefault()).format(Date(expenseDateMillis))
+                                            
                                             val newAmt = amount.toDoubleOrNull() ?: expense.amount
                                             val paymentDetailStr = "$modeText | $selectedSourceType | $selectedSourceId"
+                                            val diff = newAmt - expense.amount
+
+                                            val oldDocRef = userRef.collection("Expenses").document(oldDocId)
+                                            val oldDocSnap = oldDocRef.get().await()
+                                            var targetKey: String? = null
+                                            
+                                            if (oldDocSnap.exists()) {
+                                                val dataMap = oldDocSnap.data ?: emptyMap()
+                                                for ((key, value) in dataMap) {
+                                                    if (value is Map<*, *>) {
+                                                        val dbDate = value["date"]
+                                                        val dbDateStr = when (dbDate) {
+                                                            is Timestamp -> SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(dbDate.toDate())
+                                                            is String -> dbDate.toString().split(" ")[0]
+                                                            else -> ""
+                                                        }
+                                                        val dbAmount = (value["amount"] as? Number)?.toDouble() ?: 0.0
+                                                        val dbCategory = value["category"]?.toString() ?: ""
+                                                        
+                                                        // Find exact match
+                                                        if (dbDateStr == expense.date && dbAmount == expense.amount && dbCategory == expense.category) {
+                                                            targetKey = key
+                                                            break
+                                                        }
+                                                    }
+                                                }
+                                            }
 
                                             val expData = hashMapOf<String, Any>(
-                                                "date" to finalExpenseDateStr,
+                                                "date" to Timestamp(Date(expenseDateMillis)),
                                                 "amount" to newAmt,
                                                 "category" to finalCategory,
                                                 "detail_1" to remark1,
@@ -1115,14 +1178,58 @@ fun EditExpenseDialog(
                                                 "payment_detail" to paymentDetailStr
                                             )
 
-                                            if (!expQuery.isEmpty) {
-                                                expQuery.documents[0].reference.set(expData, SetOptions.merge()).await()
+                                            if (oldDocId == newDocId) {
+                                                // SAME MONTH UPDATE
+                                                if (targetKey != null) {
+                                                    val seqNumber = targetKey.substringBefore(".")
+                                                    val newKey = "$seqNumber. $finalCategory"
+                                                    
+                                                    val updates = hashMapOf<String, Any>()
+                                                    if (newKey != targetKey) {
+                                                        updates[targetKey] = FieldValue.delete()
+                                                    }
+                                                    updates[newKey] = expData
+                                                    if (diff != 0.0) {
+                                                        updates["000. total"] = FieldValue.increment(diff)
+                                                    }
+                                                    oldDocRef.update(updates).await()
+                                                }
                                             } else {
-                                                userRef.collection("Expenses").add(expData).await()
+                                                // MONTH CHANGED - Move from Old Doc to New Doc
+                                                if (targetKey != null) {
+                                                    oldDocRef.update(
+                                                        mapOf(
+                                                            targetKey to FieldValue.delete(),
+                                                            "000. total" to FieldValue.increment(-expense.amount)
+                                                        )
+                                                    ).await()
+                                                }
+                                                
+                                                val newDocRef = userRef.collection("Expenses").document(newDocId)
+                                                val newDocSnap = newDocRef.get().await()
+                                                var nextSeq = 1
+                                                
+                                                if (newDocSnap.exists()) {
+                                                    val dataMap = newDocSnap.data ?: emptyMap()
+                                                    val seqKeys = dataMap.keys.filter { it.matches(Regex("^\\d{3}\\..*")) }
+                                                    if (seqKeys.isNotEmpty()) {
+                                                        val maxSeq = seqKeys.maxOf { it.substring(0, 3).toInt() }
+                                                        nextSeq = maxSeq + 1
+                                                    }
+                                                }
+                                                val formattedSeq = String.format(Locale.US, "%03d", nextSeq)
+                                                val newKey = "$formattedSeq. $finalCategory"
+                                                
+                                                newDocRef.set(
+                                                    mapOf(
+                                                        newKey to expData,
+                                                        "000. total" to FieldValue.increment(newAmt)
+                                                    ), SetOptions.merge()
+                                                ).await()
                                             }
+                                            // ==========================================
 
                                             // BALANCE ADJUSTMENT
-                                            val diff = newAmt - expense.amount
                                             if (diff != 0.0) {
                                                 when (selectedSourceType) {
                                                     "Cash" -> {
