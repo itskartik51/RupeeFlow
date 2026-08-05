@@ -253,11 +253,13 @@ fun QuickUpdateDialog(bank: BankAccountItem, username: String, onDismiss: () -> 
                             if (amountEntered != null && amountEntered != 0.0) {
                                 val newCalculatedBalance = bank.currentBalance + amountEntered 
                                 
-                                // PHASE 3: DYNAMIC DATE & MONTH MATH
+                                // PHASE 3: TRUE SPARSE DATA & PRORATED LIVE INJECTOR
                                 val cal = Calendar.getInstance()
                                 val day = cal.get(Calendar.DAY_OF_MONTH)
-                                val month = cal.get(Calendar.MONTH) // 0-indexed (Jan=0, Feb=1...)
+                                val month = cal.get(Calendar.MONTH) 
+                                val qtr = (month / 3) + 1
 
+                                // Dynamic Key Generators
                                 val dayKey = if (day == 31) "31" else {
                                     when (day % 6) {
                                         1 -> "01, 07, 13, 19, 25"
@@ -268,12 +270,58 @@ fun QuickUpdateDialog(bank: BankAccountItem, username: String, onDismiss: () -> 
                                         else -> "06, 12, 18, 24, 30"
                                     }
                                 }
-
+                                val avg6dKey = when {
+                                    day <= 6 -> "01-06"
+                                    day <= 12 -> "07-12"
+                                    day <= 18 -> "13-18"
+                                    day <= 24 -> "19-24"
+                                    else -> "25-31"
+                                }
                                 val monthKey = when (month) {
                                     0, 3, 6, 9 -> "jan, april, july, oct"
                                     1, 4, 7, 10 -> "feb, may, aug, nov"
                                     else -> "march, june, sep, dec"
                                 }
+                                val qtrKey = "q$qtr"
+
+                                // Live Math Recalculation
+                                val rateYr = bank.interestRate
+                                val rateQtr = rateYr / 4.0
+                                val oneDayInt = (newCalculatedBalance * (rateYr / 100.0)) / 365.0
+                                
+                                val expQtrInt = newCalculatedBalance * (rateQtr / 100.0)
+                                val expYrInt = newCalculatedBalance * (rateYr / 100.0)
+                                
+                                val todayReset = Calendar.getInstance().apply {
+                                    set(Calendar.HOUR_OF_DAY, 0)
+                                    set(Calendar.MINUTE, 0)
+                                    set(Calendar.SECOND, 0)
+                                    set(Calendar.MILLISECOND, 0)
+                                }
+
+                                val startOfQtr = Calendar.getInstance().apply {
+                                    set(Calendar.MONTH, (cal.get(Calendar.MONTH) / 3) * 3)
+                                    set(Calendar.DAY_OF_MONTH, 1)
+                                    set(Calendar.HOUR_OF_DAY, 0)
+                                    set(Calendar.MINUTE, 0)
+                                    set(Calendar.SECOND, 0)
+                                    set(Calendar.MILLISECOND, 0)
+                                }
+                                val diffQtr = todayReset.timeInMillis - startOfQtr.timeInMillis
+                                val daysPassedQtr = (diffQtr / (1000 * 60 * 60 * 24)).toInt() + 1
+                                val accruedQtr = expQtrInt * (daysPassedQtr / 90.0)
+
+                                val startOfYear = Calendar.getInstance().apply {
+                                    set(Calendar.MONTH, Calendar.JANUARY)
+                                    set(Calendar.DAY_OF_MONTH, 1)
+                                    set(Calendar.HOUR_OF_DAY, 0)
+                                    set(Calendar.MINUTE, 0)
+                                    set(Calendar.SECOND, 0)
+                                    set(Calendar.MILLISECOND, 0)
+                                }
+                                val diffYr = todayReset.timeInMillis - startOfYear.timeInMillis
+                                val daysPassedYr = (diffYr / (1000 * 60 * 60 * 24)).toInt() + 1
+                                val accruedYr = expYrInt * (daysPassedYr / 365.0)
 
                                 onDismiss()
                                 Toast.makeText(context, "Updating balance...", Toast.LENGTH_SHORT).show()
@@ -292,7 +340,6 @@ fun QuickUpdateDialog(bank: BankAccountItem, username: String, onDismiss: () -> 
                                                 val data = bankDoc.data ?: emptyMap()
                                                 var targetKey: String? = null
                                                 
-                                                // Find the correct bank ID (1, 2, 3...) using Account No
                                                 for ((key, rawBank) in data) {
                                                     if (key != "last_updated" && rawBank is Map<*, *>) {
                                                         val accNo = rawBank["account no."]?.toString()
@@ -304,11 +351,19 @@ fun QuickUpdateDialog(bank: BankAccountItem, username: String, onDismiss: () -> 
                                                 }
                                                 
                                                 if (targetKey != null) {
-                                                    // Triple Update Query
+                                                    // Hyper-Accurate Update Object
                                                     val updates = hashMapOf<String, Any>(
                                                         "$targetKey.current bal." to newCalculatedBalance,
                                                         "$targetKey.6D bal. Block.$dayKey" to newCalculatedBalance,
-                                                        "$targetKey.monthly avg.$monthKey" to newCalculatedBalance
+                                                        "$targetKey.6D avg.$avg6dKey" to newCalculatedBalance,
+                                                        "$targetKey.monthly avg.$monthKey" to newCalculatedBalance,
+                                                        "$targetKey.qtr. avg.$qtrKey" to newCalculatedBalance,
+                                                        "$targetKey.yr avg.cur" to newCalculatedBalance,
+                                                        "$targetKey.1d int" to oneDayInt,
+                                                        "$targetKey.exp qtr int" to expQtrInt,
+                                                        "$targetKey.accrued qtr" to accruedQtr,
+                                                        "$targetKey.exp yr int" to expYrInt,
+                                                        "$targetKey.accrued yr" to accruedYr
                                                     )
                                                     
                                                     bankDocRef.update(updates).await()
