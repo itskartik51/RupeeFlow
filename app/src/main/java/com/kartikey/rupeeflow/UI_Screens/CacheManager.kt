@@ -87,30 +87,41 @@ object CacheManager {
                 val expensesDocs = userRef.collection("Expenses").get().await()
                 val expensesArray = JSONArray()
 
+                // ==========================================
+                // STRICT NEW LOGIC: Only Reads Nested Map Data Structure
+                // ==========================================
                 for (doc in expensesDocs) {
-                    val expObj = JSONObject()
-                    val rawDate = doc.get("date")
-                    val dateStr = when (rawDate) {
-                        is Timestamp -> SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(rawDate.toDate())
-                        is String -> rawDate
-                        else -> doc.id
+                    val dataMap = doc.data
+                    
+                    for ((key, value) in dataMap) {
+                        // "000. total" is not a map, so this condition automatically skips it and only parses transactions
+                        if (value is Map<*, *>) {
+                            val expObj = JSONObject()
+                            val rawDate = value["date"]
+                            val dateStr = when (rawDate) {
+                                is Timestamp -> SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(rawDate.toDate())
+                                is String -> rawDate.toString()
+                                else -> ""
+                            }
+
+                            expObj.put("date", dateStr)
+                            expObj.put("amount", (value["amount"] as? Number)?.toDouble() ?: 0.0)
+                            expObj.put("category", value["category"]?.toString() ?: "")
+                            expObj.put("detail1", value["detail_1"]?.toString() ?: value["detail1"]?.toString() ?: "")
+                            expObj.put("detail2", value["detail_2"]?.toString() ?: value["detail2"]?.toString() ?: "")
+                            
+                            val paymentDetail = value["payment_detail"]?.toString() ?: ""
+                            val splitPayment = paymentDetail.split("|").map { it.trim() }
+                            
+                            expObj.put("mode", if (splitPayment.isNotEmpty()) splitPayment[0] else "")
+                            expObj.put("source_type", if (splitPayment.size > 1) splitPayment[1] else "")
+                            expObj.put("source_id", if (splitPayment.size > 2) splitPayment[2] else "")
+
+                            expensesArray.put(expObj)
+                        }
                     }
-
-                    expObj.put("date", dateStr)
-                    expObj.put("amount", doc.getDouble("amount") ?: 0.0)
-                    expObj.put("category", doc.getString("category") ?: "")
-                    expObj.put("detail1", doc.getString("detail_1") ?: doc.getString("detail1") ?: "")
-                    expObj.put("detail2", doc.getString("detail_2") ?: doc.getString("detail2") ?: "")
-                    
-                    val paymentDetail = doc.getString("payment_detail") ?: ""
-                    val splitPayment = paymentDetail.split("|").map { it.trim() }
-                    
-                    expObj.put("mode", if (splitPayment.isNotEmpty()) splitPayment[0] else "")
-                    expObj.put("source_type", if (splitPayment.size > 1) splitPayment[1] else "")
-                    expObj.put("source_id", if (splitPayment.size > 2) splitPayment[2] else "")
-
-                    expensesArray.put(expObj)
                 }
+                // ==========================================
 
                 val financesDocs = userRef.collection("Finances").get().await()
                 var cashObj = JSONObject().apply {
