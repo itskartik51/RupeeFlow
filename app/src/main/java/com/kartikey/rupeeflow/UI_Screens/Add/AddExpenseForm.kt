@@ -603,7 +603,7 @@ fun AddExpenseForm(
                                     val paymentDetailStr = "$actualMode | $actualSourceType | $actualSourceId"
 
                                     // ==========================================
-                                    // NEW LOGIC: App-Level Sequence, Auto-Total & Timestamp
+                                    // FIXED: Using Underscore instead of Dot
                                     // ==========================================
                                     val dateForDoc = SimpleDateFormat("yyyy_MM", Locale.getDefault()).format(Date(expenseDateMillis))
                                     val expensesDocRef = userRef.collection("Expenses").document(dateForDoc)
@@ -614,7 +614,7 @@ fun AddExpenseForm(
                                     if (expenseDocSnap.exists()) {
                                         val dataMap = expenseDocSnap.data
                                         if (dataMap != null) {
-                                            val seqKeys = dataMap.keys.filter { it.matches(Regex("^\\d{3}\\..*")) }
+                                            val seqKeys = dataMap.keys.filter { it.matches(Regex("^\\d{3}_.*")) }
                                             if (seqKeys.isNotEmpty()) {
                                                 val maxSeq = seqKeys.maxOf { it.substring(0, 3).toInt() }
                                                 nextSeq = maxSeq + 1
@@ -623,10 +623,10 @@ fun AddExpenseForm(
                                     }
                                     
                                     val formattedSeq = String.format(Locale.US, "%03d", nextSeq)
-                                    val fieldKey = "$formattedSeq. $finalCategory"
+                                    val fieldKey = "${formattedSeq}_${finalCategory}"
                                     
                                     val expData = hashMapOf<String, Any>(
-                                        "date" to Timestamp(Date(expenseDateMillis)), // <-- Saved as proper Firestore Timestamp
+                                        "date" to Timestamp(Date(expenseDateMillis)),
                                         "amount" to expenseAmt,
                                         "category" to finalCategory,
                                         "detail_1" to remark1,
@@ -636,7 +636,7 @@ fun AddExpenseForm(
                                     
                                     val updateMap = hashMapOf<String, Any>(
                                         fieldKey to expData,
-                                        "000. total" to FieldValue.increment(expenseAmt)
+                                        "000_total" to FieldValue.increment(expenseAmt)
                                     )
                                     
                                     expensesDocRef.set(updateMap, SetOptions.merge()).await()
