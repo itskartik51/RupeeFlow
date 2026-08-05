@@ -26,6 +26,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.google.firebase.Timestamp
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import com.kartikey.rupeeflow.Cloud_Database.Constants
@@ -564,8 +566,7 @@ fun AddExpenseForm(
                     val finalCategory = categoryText.trim()
                     val finalMode = modeText.trim()
                     val finalExpenseDateStr = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(expenseDateMillis))
-                    val dateFormattedForDoc = SimpleDateFormat("dd-MM-yyyy", Locale.getDefault()).format(Date(expenseDateMillis))
-
+                    
                     val canSave = if (hasNoFinance) {
                         amount.isNotBlank() && finalCategory.isNotBlank()
                     } else {
@@ -601,23 +602,45 @@ fun AddExpenseForm(
                                     val userRef = userQuery.documents[0].reference
                                     val paymentDetailStr = "$actualMode | $actualSourceType | $actualSourceId"
 
+                                    // ==========================================
+                                    // NEW LOGIC: App-Level Sequence, Auto-Total & Timestamp
+                                    // ==========================================
+                                    val dateForDoc = SimpleDateFormat("yyyy_MM", Locale.getDefault()).format(Date(expenseDateMillis))
+                                    val expensesDocRef = userRef.collection("Expenses").document(dateForDoc)
+                                    
+                                    val expenseDocSnap = expensesDocRef.get().await()
+                                    var nextSeq = 1
+                                    
+                                    if (expenseDocSnap.exists()) {
+                                        val dataMap = expenseDocSnap.data
+                                        if (dataMap != null) {
+                                            val seqKeys = dataMap.keys.filter { it.matches(Regex("^\\d{3}\\..*")) }
+                                            if (seqKeys.isNotEmpty()) {
+                                                val maxSeq = seqKeys.maxOf { it.substring(0, 3).toInt() }
+                                                nextSeq = maxSeq + 1
+                                            }
+                                        }
+                                    }
+                                    
+                                    val formattedSeq = String.format(Locale.US, "%03d", nextSeq)
+                                    val fieldKey = "$formattedSeq. $finalCategory"
+                                    
                                     val expData = hashMapOf<String, Any>(
-                                        "date" to finalExpenseDateStr,
+                                        "date" to Timestamp(Date(expenseDateMillis)), // <-- Saved as proper Firestore Timestamp
                                         "amount" to expenseAmt,
                                         "category" to finalCategory,
                                         "detail_1" to remark1,
                                         "detail_2" to remark2,
                                         "payment_detail" to paymentDetailStr
                                     )
-
-                                    // FIX FOR POINT 5: Custom Document ID Format: 001_username_DD-MM-YYYY
-                                    val expensesCol = userRef.collection("Expenses")
-                                    val existingDocs = expensesCol.get().await()
-                                    val nextIndex = existingDocs.size() + 1
-                                    val formattedIndex = String.format(Locale.US, "%03d", nextIndex)
-                                    val customDocId = "${formattedIndex}_${username}_$dateFormattedForDoc"
-
-                                    expensesCol.document(customDocId).set(expData).await()
+                                    
+                                    val updateMap = hashMapOf<String, Any>(
+                                        fieldKey to expData,
+                                        "000. total" to FieldValue.increment(expenseAmt)
+                                    )
+                                    
+                                    expensesDocRef.set(updateMap, SetOptions.merge()).await()
+                                    // ==========================================
 
                                     // BALANCE DEDUCTION LOGIC
                                     if (expenseAmt > 0) {
