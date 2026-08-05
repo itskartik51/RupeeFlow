@@ -647,17 +647,16 @@ fun DeleteExpenseDialog(
                             if (!userQuery.isEmpty) {
                                 val userRef = userQuery.documents[0].reference
                                 
-                                // ==========================================
-                                // NEW DELETE LOGIC (Map Structure)
-                                // ==========================================
-                                val targetDate = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).parse(expense.date) ?: Date()
+                                val expDateOnly = expense.date.split(" ")[0]
+                                val targetDate = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).parse(expDateOnly) ?: Date()
                                 val docId = SimpleDateFormat("yyyy_MM", Locale.getDefault()).format(targetDate)
                                 val expensesDocRef = userRef.collection("Expenses").document(docId)
                                 val docSnap = expensesDocRef.get().await()
                                 
+                                var targetKey: String? = null
+                                
                                 if (docSnap.exists()) {
                                     val dataMap = docSnap.data ?: emptyMap()
-                                    var targetKey: String? = null
                                     
                                     for ((key, value) in dataMap) {
                                         if (value is Map<*, *>) {
@@ -670,23 +669,26 @@ fun DeleteExpenseDialog(
                                             val dbAmount = (value["amount"] as? Number)?.toDouble() ?: 0.0
                                             val dbCategory = value["category"]?.toString() ?: ""
                                             
-                                            // Find exact match
-                                            if (dbDateStr == expense.date && dbAmount == expense.amount && dbCategory == expense.category) {
+                                            val amountMatch = Math.abs(dbAmount - expense.amount) < 0.01
+                                            
+                                            if (dbDateStr == expDateOnly && amountMatch && dbCategory == expense.category) {
                                                 targetKey = key
                                                 break
                                             }
                                         }
                                     }
-                                    
-                                    if (targetKey != null) {
-                                        val updates = hashMapOf<String, Any>(
-                                            targetKey to FieldValue.delete(),
-                                            "000. total" to FieldValue.increment(-expense.amount)
-                                        )
-                                        expensesDocRef.update(updates).await()
-                                    }
                                 }
-                                // ==========================================
+
+                                if (targetKey != null) {
+                                    val updates = hashMapOf<String, Any>(
+                                        targetKey to FieldValue.delete(),
+                                        "000. total" to FieldValue.increment(-expense.amount)
+                                    )
+                                    expensesDocRef.update(updates).await()
+                                } else {
+                                    withContext(Dispatchers.Main) { Toast.makeText(context, "Error: Record not found in database.", Toast.LENGTH_LONG).show() }
+                                    return@launch 
+                                }
 
                                 // REFUND LOGIC
                                 val refundAmt = expense.amount
@@ -1132,10 +1134,8 @@ fun EditExpenseDialog(
                                         if (!userQuery.isEmpty) {
                                             val userRef = userQuery.documents[0].reference
                                             
-                                            // ==========================================
-                                            // NEW EDIT LOGIC (Map Structure)
-                                            // ==========================================
-                                            val oldTargetDate = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).parse(expense.date) ?: Date()
+                                            val expDateOnly = expense.date.split(" ")[0]
+                                            val oldTargetDate = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).parse(expDateOnly) ?: Date()
                                             val oldDocId = SimpleDateFormat("yyyy_MM", Locale.getDefault()).format(oldTargetDate)
                                             val newDocId = SimpleDateFormat("yyyy_MM", Locale.getDefault()).format(Date(expenseDateMillis))
                                             
@@ -1160,13 +1160,19 @@ fun EditExpenseDialog(
                                                         val dbAmount = (value["amount"] as? Number)?.toDouble() ?: 0.0
                                                         val dbCategory = value["category"]?.toString() ?: ""
                                                         
-                                                        // Find exact match
-                                                        if (dbDateStr == expense.date && dbAmount == expense.amount && dbCategory == expense.category) {
+                                                        val amountMatch = Math.abs(dbAmount - expense.amount) < 0.01
+
+                                                        if (dbDateStr == expDateOnly && amountMatch && dbCategory == expense.category) {
                                                             targetKey = key
                                                             break
                                                         }
                                                     }
                                                 }
+                                            }
+
+                                            if (targetKey == null) {
+                                                withContext(Dispatchers.Main) { Toast.makeText(context, "Error: Record not found in database.", Toast.LENGTH_LONG).show() }
+                                                return@launch 
                                             }
 
                                             val expData = hashMapOf<String, Any>(
@@ -1179,31 +1185,25 @@ fun EditExpenseDialog(
                                             )
 
                                             if (oldDocId == newDocId) {
-                                                // SAME MONTH UPDATE
-                                                if (targetKey != null) {
-                                                    val seqNumber = targetKey.substringBefore(".")
-                                                    val newKey = "$seqNumber. $finalCategory"
-                                                    
-                                                    val updates = hashMapOf<String, Any>()
-                                                    if (newKey != targetKey) {
-                                                        updates[targetKey] = FieldValue.delete()
-                                                    }
-                                                    updates[newKey] = expData
-                                                    if (diff != 0.0) {
-                                                        updates["000. total"] = FieldValue.increment(diff)
-                                                    }
-                                                    oldDocRef.update(updates).await()
+                                                val seqNumber = targetKey.substringBefore(".")
+                                                val newKey = "$seqNumber. $finalCategory"
+                                                
+                                                val updates = hashMapOf<String, Any>()
+                                                if (newKey != targetKey) {
+                                                    updates[targetKey] = FieldValue.delete()
                                                 }
+                                                updates[newKey] = expData
+                                                if (diff != 0.0) {
+                                                    updates["000. total"] = FieldValue.increment(diff)
+                                                }
+                                                oldDocRef.update(updates).await()
                                             } else {
-                                                // MONTH CHANGED - Move from Old Doc to New Doc
-                                                if (targetKey != null) {
-                                                    oldDocRef.update(
-                                                        mapOf(
-                                                            targetKey to FieldValue.delete(),
-                                                            "000. total" to FieldValue.increment(-expense.amount)
-                                                        )
-                                                    ).await()
-                                                }
+                                                oldDocRef.update(
+                                                    mapOf(
+                                                        targetKey to FieldValue.delete(),
+                                                        "000. total" to FieldValue.increment(-expense.amount)
+                                                    )
+                                                ).await()
                                                 
                                                 val newDocRef = userRef.collection("Expenses").document(newDocId)
                                                 val newDocSnap = newDocRef.get().await()
