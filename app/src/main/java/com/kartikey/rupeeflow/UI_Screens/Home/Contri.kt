@@ -3,7 +3,6 @@ package com.kartikey.rupeeflow.UI_Screens.Home
 import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -75,72 +74,14 @@ fun ContriScreen(
     // Auto-Join State from QR (Code, Pin, RoomName)
     var autoJoinData by remember { mutableStateOf<Triple<String, String, String>?>(null) }
 
-    val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     
-    // Dynamic List fetched directly from Firestore
-    var fetchedRooms by remember { mutableStateOf<List<ContriRoomModel>>(contriRooms) }
-    var isFetchingRooms by remember { mutableStateOf(false) }
+    // Phase 3: Directly sync with CacheManager's lightweight live data
+    var fetchedRooms by remember(contriRooms) { mutableStateOf(contriRooms) }
 
     // REFRESH ANIMATION STATES
     var isRefreshing by remember { mutableStateOf(false) }
     var currentRotation by remember { mutableFloatStateOf(0f) }
-
-    // FETCH ROOMS DIRECTLY FROM FIRESTORE
-    val fetchRoomsFromFirestore: suspend () -> Unit = {
-        try {
-            isFetchingRooms = true
-            val db = FirebaseFirestore.getInstance()
-            val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
-            val roomsList = mutableListOf<ContriRoomModel>()
-
-            if (!userQuery.isEmpty) {
-                val userDoc = userQuery.documents[0]
-                val currentUserId = userDoc.id
-                val userData = userDoc.data ?: emptyMap<String, Any>()
-                
-                // 1. Fetch from 'rooms' array seamlessly (Phase 1 & 2 logic)
-                val roomsArray = userData["rooms"] as? List<String> ?: emptyList()
-                for (roomStr in roomsArray) {
-                    // Expecting Format: "001_ContriCode_ContriName"
-                    val parts = roomStr.split("_", limit = 3)
-                    if (parts.size >= 3) {
-                        val rCode = parts[1]
-                        val rName = parts[2]
-                        roomsList.add(ContriRoomModel(rName, rCode, "", "123456"))
-                    }
-                }
-
-                // 2. Fallback Query (Fetches Exact Pin and Data)
-                val contriQuery = db.collection("Contri").whereArrayContains("member_ids", currentUserId).get().await()
-                for (doc in contriQuery.documents) {
-                    val code = doc.getString("contri_code") ?: ""
-                    val name = doc.getString("contri_name") ?: "Contri Room"
-                    val pin = doc.getString("passkey") ?: "123456"
-                    
-                    val existingIndex = roomsList.indexOfFirst { it.roomCode == code }
-                    if (existingIndex != -1) {
-                        roomsList[existingIndex] = ContriRoomModel(name, code, "", pin)
-                    } else if (code.isNotBlank()) {
-                        roomsList.add(ContriRoomModel(name, code, "", pin))
-                    }
-                }
-            }
-
-            withContext(Dispatchers.Main) {
-                fetchedRooms = roomsList
-                isFetchingRooms = false
-            }
-        } catch (e: Exception) {
-            withContext(Dispatchers.Main) { 
-                isFetchingRooms = false 
-            }
-        }
-    }
-
-    LaunchedEffect(Unit) {
-        fetchRoomsFromFirestore()
-    }
 
     LaunchedEffect(isRefreshing) {
         if (isRefreshing) {
@@ -192,8 +133,7 @@ fun ContriScreen(
                 onBackClick = { openedRoom = null },
                 onLeaveClick = { 
                     openedRoom = null 
-                    coroutineScope.launch { fetchRoomsFromFirestore() }
-                    onRefresh()
+                    onRefresh() // Trigger parent CacheManager refresh
                 }
             )
         }
@@ -225,11 +165,10 @@ fun ContriScreen(
                             if (!isRefreshing) {
                                 isRefreshing = true
                                 coroutineScope.launch {
-                                    fetchRoomsFromFirestore()
-                                    delay(800)
+                                    onRefresh() // Triggers CacheManager to fetch latest
+                                    delay(1000) // Visual feedback for sync
                                     isRefreshing = false
                                 }
-                                onRefresh() 
                             }
                         }
                         .padding(4.dp)
@@ -255,12 +194,11 @@ fun ContriScreen(
             ) {
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Only show loading indicator if list is completely empty
-                if (isFetchingRooms && fetchedRooms.isEmpty()) {
+                if (fetchedRooms.isEmpty()) {
                     Box(modifier = Modifier.fillMaxWidth().height(100.dp), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                        Text("No Contri Rooms yet. Create or Join one!", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
                     }
-                } else if (fetchedRooms.isNotEmpty()) {
+                } else {
                     fetchedRooms.forEach { room ->
                         ActiveRoomCard(
                             room = room, 
@@ -344,8 +282,7 @@ fun ContriScreen(
             onDismiss = { autoJoinData = null },
             onSuccess = {
                 autoJoinData = null
-                coroutineScope.launch { fetchRoomsFromFirestore() }
-                onRefresh()
+                onRefresh() // Trigger parent CacheManager refresh
             }
         )
     }
@@ -356,8 +293,7 @@ fun ContriScreen(
             onDismiss = { showCreateDialog = false },
             onSuccess = { 
                 showCreateDialog = false
-                coroutineScope.launch { fetchRoomsFromFirestore() }
-                onRefresh() 
+                onRefresh() // Trigger parent CacheManager refresh
             }
         )
     }
@@ -374,8 +310,7 @@ fun ContriScreen(
             onSuccess = {
                 showJoinDialog = false
                 scannedRoomCode = ""
-                coroutineScope.launch { fetchRoomsFromFirestore() }
-                onRefresh()
+                onRefresh() // Trigger parent CacheManager refresh
             }
         )
     }
@@ -418,7 +353,6 @@ fun AutoJoinContriDialog(
                             
                             doc.reference.update("member_ids", FieldValue.arrayUnion(currentUserId)).await()
 
-                            // Logic for storing in rooms Array (Phase 2)
                             val docId = doc.id 
                             val prefix = docId.split("_").firstOrNull() ?: "000"
                             val exactRoomName = doc.getString("contri_name") ?: roomName
@@ -658,7 +592,6 @@ fun CreateContriDialog(username: String, onDismiss: () -> Unit, onSuccess: () ->
                                         
                                         val userDocRef = userQuery.documents[0].reference
                                         
-                                        // Logic for storing in rooms Array (Phase 1)
                                         val roomArrayString = "${counterStr}_${randomCode}_${contriName}"
                                         userDocRef.update("rooms", FieldValue.arrayUnion(roomArrayString)).await()
                                         
@@ -867,7 +800,6 @@ fun JoinContriDialog(
                                                     
                                                     doc.reference.update("member_ids", FieldValue.arrayUnion(currentUserId)).await()
                                                     
-                                                    // Logic for storing in rooms Array (Phase 2)
                                                     val docId = doc.id 
                                                     val prefix = docId.split("_").firstOrNull() ?: "000"
                                                     val roomArrayString = "${prefix}_${formattedCode}_${roomName}"
