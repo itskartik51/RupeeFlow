@@ -119,10 +119,13 @@ object CacheManager {
                 }
 
                 val financesDocs = userRef.collection("Finances").get().await()
+                
+                // Initialize Cash with defaults
                 var cashObj = JSONObject().apply {
                     put("amount", 0.0)
                     put("last_updated", "")
                 }
+                
                 val banksArray = JSONArray()
                 val fdArray = JSONArray()
                 val ccArray = JSONArray()
@@ -131,11 +134,8 @@ object CacheManager {
 
                 for (doc in financesDocs) {
                     when (doc.id) {
-                        "Cash" -> {
-                            cashObj.put("amount", doc.getDouble("total_cash") ?: doc.getDouble("amount") ?: 0.0)
-                            cashObj.put("last_updated", doc.getString("last_updated") ?: "")
-                        }
-                        
+                        // OLD "Cash" DOCUMENT BLOCK IS COMPLETELY REMOVED
+
                         "Bank" -> {
                             val dataMap = doc.data
                             val updateMap = mutableMapOf<String, Any>()
@@ -194,8 +194,26 @@ object CacheManager {
                             val currentMonth = calToday.get(Calendar.MONTH)
                             val qtrStr = "q${(currentMonth / 3) + 1}"
 
-                            dataMap.forEach { (key, rawBank) ->
-                                if (key != "last_updated" && rawBank is Map<*, *>) {
+                            dataMap.forEach { (key, rawData) ->
+                                // ==========================================
+                                // NEW CASH LOGIC INSIDE BANK DOCUMENT
+                                // ==========================================
+                                if (key == "cash" && rawData is Map<*, *>) {
+                                    val amnt = (rawData["amnt"] as? Number)?.toDouble() ?: 0.0
+                                    val lastUpd = rawData["last update"]
+                                    val lastUpdStr = when (lastUpd) {
+                                        is Timestamp -> SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(lastUpd.toDate())
+                                        is String -> lastUpd
+                                        else -> ""
+                                    }
+                                    cashObj.put("amount", amnt)
+                                    cashObj.put("last_updated", lastUpdStr)
+                                } 
+                                // ==========================================
+                                // EXISTING BANK ACCOUNTS LOGIC
+                                // ==========================================
+                                else if (key != "last_updated" && key != "cash" && rawData is Map<*, *>) {
+                                    val rawBank = rawData
                                     val bName = rawBank["bank"]?.toString() ?: ""
                                     val accNo = rawBank["account no."]?.toString() ?: ""
                                     val curBal = (rawBank["current bal."] as? Number)?.toDouble() ?: 0.0
@@ -252,14 +270,9 @@ object CacheManager {
                             }
                         }
 
-                        // ==========================================
-                        // STRICT NEW LOGIC: Reads purely from "CC FD"
-                        // Completely ignores old docs (Fixed_Deposits, Credit_Cards)
-                        // ==========================================
                         "CC FD" -> {
                             val dataMap = doc.data
                             
-                            // Parse Credit Cards
                             val ccMap = dataMap["CC"] as? Map<*, *>
                             ccMap?.forEach { (key, rawCc) ->
                                 if (rawCc is Map<*, *>) {
@@ -269,7 +282,6 @@ object CacheManager {
                                     val limit = (rawCc["limit"] as? Number)?.toDouble() ?: 0.0
                                     val outstanding = (rawCc["outstanding"] as? Number)?.toDouble() ?: 0.0
                                     
-                                    // App-Level Calculations
                                     val avail = limit - outstanding
                                     val util = if (limit > 0) (outstanding / limit) * 100.0 else 0.0
                                     val cibilStatus = if (util <= 30.0) "Safe" else "High Risk"
@@ -297,7 +309,6 @@ object CacheManager {
                                 }
                             }
 
-                            // Parse Fixed Deposits
                             val fdMap = dataMap["FD"] as? Map<*, *>
                             fdMap?.forEach { (key, rawFd) ->
                                 if (rawFd is Map<*, *>) {
@@ -322,7 +333,6 @@ object CacheManager {
                                         val createMillis = createTs.toDate().time
                                         val maturMillis = maturTs.toDate().time
                                         
-                                        // App-Level Mathematical Engine
                                         val totalDays = maxOf(0L, (maturMillis - createMillis) / (1000 * 60 * 60 * 24))
                                         daysToMat = maxOf(0L, (maturMillis - todayMillis) / (1000 * 60 * 60 * 24)).toInt()
                                         val daysPassed = maxOf(0L, (minOf(todayMillis, maturMillis) - createMillis) / (1000 * 60 * 60 * 24))
