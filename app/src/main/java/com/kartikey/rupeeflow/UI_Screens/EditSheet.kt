@@ -273,9 +273,6 @@ fun EditBankDialog(bank: BankAccountItem, username: String, onDismiss: () -> Uni
     }
 }
 
-// ==========================================
-// PHASE 3: NEW TRIMMED CREDIT CARD QUICK UPDATE
-// ==========================================
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun QuickUpdateCCDialog(cc: CreditCardItem, username: String, onDismiss: () -> Unit, onSuccess: () -> Unit) {
@@ -337,7 +334,6 @@ fun QuickUpdateCCDialog(cc: CreditCardItem, username: String, onDismiss: () -> U
                                         if (!userQuery.isEmpty) {
                                             val userRef = userQuery.documents[0].reference
                                             
-                                            // TRIMMED: Only updating outstanding in new CC FD document
                                             val updateMap = hashMapOf<String, Any>(
                                                 "CC.${cc.cardNo}.outstanding" to newCalculatedOutstanding
                                             )
@@ -364,9 +360,6 @@ fun QuickUpdateCCDialog(cc: CreditCardItem, username: String, onDismiss: () -> U
     }
 }
 
-// ==========================================
-// PHASE 3: NEW TRIMMED CREDIT CARD EDITOR
-// ==========================================
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditCreditCardDialog(cc: CreditCardItem, username: String, onDismiss: () -> Unit, onUpdateSuccess: () -> Unit) {
@@ -397,7 +390,6 @@ fun EditCreditCardDialog(cc: CreditCardItem, username: String, onDismiss: () -> 
                                 if (!userQuery.isEmpty) {
                                     val userRef = userQuery.documents[0].reference
                                     
-                                    // UPDATED: Removing card from new document
                                     val updates = hashMapOf<String, Any>("CC.${cc.cardNo}" to FieldValue.delete())
                                     userRef.collection("Finances").document("CC FD").update(updates).await()
                                     withContext(Dispatchers.Main) { onUpdateSuccess() }
@@ -507,7 +499,6 @@ fun EditCreditCardDialog(cc: CreditCardItem, username: String, onDismiss: () -> 
                                         if (!userQuery.isEmpty) {
                                             val userRef = userQuery.documents[0].reference
 
-                                            // UPDATED: Saving raw variables according to new structure
                                             val updateMap = hashMapOf<String, Any>(
                                                 "CC.${cc.cardNo}.limit" to newLimit,
                                                 "CC.${cc.cardNo}.billing" to (billingDay.toIntOrNull() ?: 0),
@@ -537,9 +528,6 @@ fun EditCreditCardDialog(cc: CreditCardItem, username: String, onDismiss: () -> 
     }
 }
 
-// ==========================================
-// PHASE 3: FD DELETER UPDATE
-// ==========================================
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditFDDialog(fd: FDItem, username: String, onDismiss: () -> Unit, onUpdateSuccess: () -> Unit) {
@@ -565,7 +553,6 @@ fun EditFDDialog(fd: FDItem, username: String, onDismiss: () -> Unit, onUpdateSu
                                 if (!userQuery.isEmpty) {
                                     val userRef = userQuery.documents[0].reference
                                     
-                                    // UPDATED: Removing FD from the new document
                                     val updates = hashMapOf<String, Any>("FD.${fd.accountNo}" to FieldValue.delete())
                                     userRef.collection("Finances").document("CC FD").update(updates).await()
                                     withContext(Dispatchers.Main) { onUpdateSuccess() }
@@ -696,13 +683,17 @@ fun DeleteExpenseDialog(
                                     return@launch 
                                 }
 
-                                // REFUND LOGIC (Updated to target new paths)
+                                // PHASE 3: NEW CASH ADJUSTMENT LOGIC
                                 val refundAmt = expense.amount
                                 when (expense.sourceType) {
                                     "Cash" -> {
-                                        val cashDoc = userRef.collection("Finances").document("Cash").get().await()
-                                        val cur = cashDoc.getDouble("total_cash") ?: 0.0
-                                        userRef.collection("Finances").document("Cash").update("total_cash", cur + refundAmt).await()
+                                        val bankDoc = userRef.collection("Finances").document("Bank").get().await()
+                                        var cur = 0.0
+                                        if (bankDoc.exists()) {
+                                            val cashMap = bankDoc.get("cash") as? Map<*, *>
+                                            cur = (cashMap?.get("amnt") as? Number)?.toDouble() ?: 0.0
+                                        }
+                                        userRef.collection("Finances").document("Bank").update("cash.amnt", cur + refundAmt).await()
                                     }
                                     "Bank" -> {
                                         if (expense.sourceId.isNotEmpty()) {
@@ -728,7 +719,6 @@ fun DeleteExpenseDialog(
                                     }
                                 }
                                 
-                                // UPDATE BUDGET
                                 updateBudgetUsage(userRef, -refundAmt)
 
                                 withContext(Dispatchers.Main) { onSuccess() }
@@ -1225,13 +1215,17 @@ fun EditExpenseDialog(
                                                 ).await()
                                             }
 
-                                            // REFUND LOGIC (Updated to target new paths)
+                                            // PHASE 3: NEW CASH ADJUSTMENT LOGIC
                                             if (diff != 0.0) {
                                                 when (selectedSourceType) {
                                                     "Cash" -> {
-                                                        val cashDoc = userRef.collection("Finances").document("Cash").get().await()
-                                                        val cur = cashDoc.getDouble("total_cash") ?: 0.0
-                                                        userRef.collection("Finances").document("Cash").update("total_cash", cur - diff).await()
+                                                        val bankDoc = userRef.collection("Finances").document("Bank").get().await()
+                                                        var cur = 0.0
+                                                        if (bankDoc.exists()) {
+                                                            val cashMap = bankDoc.get("cash") as? Map<*, *>
+                                                            cur = (cashMap?.get("amnt") as? Number)?.toDouble() ?: 0.0
+                                                        }
+                                                        userRef.collection("Finances").document("Bank").update("cash.amnt", cur - diff).await()
                                                     }
                                                     "Bank" -> {
                                                         if (selectedSourceId.isNotEmpty()) {
