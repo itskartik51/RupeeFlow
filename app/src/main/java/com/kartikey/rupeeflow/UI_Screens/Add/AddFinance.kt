@@ -96,7 +96,10 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
     
     val context = LocalContext.current
 
-    // PHASE 1: TRUE SPARSE DATA ENGINE (Prorated Calculations) - Bank Account
+    fun formatForSheet(millis: Long?): String {
+        return if (millis == null) "" else SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date(millis))
+    }
+
     val submitBankAccount = {
         val bal = currentBalance.toDoubleOrNull() ?: 0.0
         val rateYr = bankInterestRate.toDoubleOrNull() ?: 0.0
@@ -117,7 +120,6 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                     if (!userQuery.isEmpty) {
                         val userRef = userQuery.documents[0].reference
                         
-                        // --- MATHEMATICAL ENGINE (Google Sheet Formulas) ---
                         val rateQtr = rateYr / 4.0
                         val oneDayInt = (bal * (rateYr / 100.0)) / 365.0
                         
@@ -132,7 +134,6 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                             set(Calendar.MILLISECOND, 0)
                         }
 
-                        // Qtr Accrued Proration
                         val startOfQtr = Calendar.getInstance().apply {
                             set(Calendar.MONTH, (cal.get(Calendar.MONTH) / 3) * 3)
                             set(Calendar.DAY_OF_MONTH, 1)
@@ -145,7 +146,6 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                         val daysPassedQtr = (diffQtr / (1000 * 60 * 60 * 24)).toInt() + 1
                         val accruedQtr = expQtrInt * (daysPassedQtr / 90.0)
 
-                        // Yearly Accrued Proration
                         val startOfYear = Calendar.getInstance().apply {
                             set(Calendar.MONTH, Calendar.JANUARY)
                             set(Calendar.DAY_OF_MONTH, 1)
@@ -158,7 +158,6 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                         val daysPassedYr = (diffYr / (1000 * 60 * 60 * 24)).toInt() + 1
                         val accruedYr = expYrInt * (daysPassedYr / 365.0)
 
-                        // --- TRUE SPARSE DATA (Dynamic Key Generation) ---
                         val day = cal.get(Calendar.DAY_OF_MONTH)
                         val month = cal.get(Calendar.MONTH) 
                         val qtr = (month / 3) + 1
@@ -194,7 +193,6 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                         val qtrAvg = hashMapOf("q$qtr" to bal)
                         val yrAvg = hashMapOf("cur" to bal)
 
-                        // Compiling the Master Blueprint
                         val bankMap = hashMapOf<String, Any>(
                             "1d int" to oneDayInt,
                             "6D avg." to avg6D,
@@ -249,9 +247,6 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
         }
     }
 
-    // ==========================================
-    // FIXED DEPOSIT - NEW TRIMMED STRUCTURE
-    // ==========================================
     val submitFixedDeposit = {
         val invAmt = fdAmount.toDoubleOrNull() ?: 0.0
         val rate = fdInterestRate.toDoubleOrNull() ?: 0.0
@@ -288,6 +283,9 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
         }
     }
 
+    // ==========================================
+    // PHASE 2: NEW CASH STRUCTURE INSIDE "BANK"
+    // ==========================================
     val submitCashData = {
         val cAmt = cashAmount.toDoubleOrNull()
         if (cAmt == null || cAmt <= 0) {
@@ -302,25 +300,30 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                     val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
                     if (!userQuery.isEmpty) {
                         val userRef = userQuery.documents[0].reference
-                        val cashDocRef = userRef.collection("Finances").document("Cash")
-                        val cashDoc = cashDocRef.get().await()
-                        val existingCash = cashDoc.getDouble("total_cash") ?: 0.0
+                        val bankDocRef = userRef.collection("Finances").document("Bank")
+                        val bankDoc = bankDocRef.get().await()
+                        
+                        var existingCash = 0.0
+                        if (bankDoc.exists()) {
+                            val cashMap = bankDoc.get("cash") as? Map<*, *>
+                            existingCash = (cashMap?.get("amnt") as? Number)?.toDouble() ?: 0.0
+                        }
+                        
                         val finalAmount = existingCash + cAmt
                         
-                        val cashDataMap = hashMapOf<String, Any>(
-                            "total_cash" to finalAmount,
-                            "last_updated" to SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
+                        val updateMap = hashMapOf<String, Any>(
+                            "cash" to hashMapOf(
+                                "amnt" to finalAmount,
+                                "last update" to com.google.firebase.Timestamp.now()
+                            )
                         )
-                        cashDocRef.set(cashDataMap, SetOptions.merge()).await()
+                        bankDocRef.set(updateMap, SetOptions.merge()).await()
                     }
                 } catch (e: Exception) {}
             }
         }
     }
 
-    // ==========================================
-    // CREDIT CARD - NEW TRIMMED STRUCTURE
-    // ==========================================
     val submitCreditCard = {
         val limitAmt = ccLimit.toDoubleOrNull() ?: 0.0
         val billDay = ccBillingDay.toIntOrNull() ?: 0
