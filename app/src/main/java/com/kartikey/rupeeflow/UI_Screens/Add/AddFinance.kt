@@ -96,11 +96,7 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
     
     val context = LocalContext.current
 
-    fun formatForSheet(millis: Long?): String {
-        return if (millis == null) "" else SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date(millis))
-    }
-
-    // PHASE 1: TRUE SPARSE DATA ENGINE (Prorated Calculations)
+    // PHASE 1: TRUE SPARSE DATA ENGINE (Prorated Calculations) - Bank Account
     val submitBankAccount = {
         val bal = currentBalance.toDoubleOrNull() ?: 0.0
         val rateYr = bankInterestRate.toDoubleOrNull() ?: 0.0
@@ -253,6 +249,9 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
         }
     }
 
+    // ==========================================
+    // FIXED DEPOSIT - NEW TRIMMED STRUCTURE
+    // ==========================================
     val submitFixedDeposit = {
         val invAmt = fdAmount.toDoubleOrNull() ?: 0.0
         val rate = fdInterestRate.toDoubleOrNull() ?: 0.0
@@ -271,16 +270,18 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                     val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
                     if (!userQuery.isEmpty) {
                         val userRef = userQuery.documents[0].reference
+                        
                         val fdMap = hashMapOf<String, Any>(
-                            "bank_name" to bankName,
-                            "account_no" to fdAccountNo,
-                            "invested_amt" to invAmt,
-                            "interest_rate" to rate,
-                            "create_date" to formatForSheet(createDateMillis),
-                            "maturity_date" to formatForSheet(maturityDateMillis)
+                            "bank" to bankName,
+                            "fd ac" to fdAccountNo,
+                            "amnt" to invAmt,
+                            "int % yr" to rate,
+                            "create" to com.google.firebase.Timestamp(Date(createDateMillis!!)),
+                            "matur" to com.google.firebase.Timestamp(Date(maturityDateMillis!!))
                         )
-                        userRef.collection("Finances").document("Fixed_Deposits")
-                            .set(mapOf(fdAccountNo to fdMap), SetOptions.merge()).await()
+                        
+                        userRef.collection("Finances").document("CC FD")
+                            .set(mapOf("FD" to mapOf(fdAccountNo to fdMap)), SetOptions.merge()).await()
                     }
                 } catch (e: Exception) {}
             }
@@ -317,6 +318,9 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
         }
     }
 
+    // ==========================================
+    // CREDIT CARD - NEW TRIMMED STRUCTURE
+    // ==========================================
     val submitCreditCard = {
         val limitAmt = ccLimit.toDoubleOrNull() ?: 0.0
         val billDay = ccBillingDay.toIntOrNull() ?: 0
@@ -341,23 +345,23 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                     val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
                     if (!userQuery.isEmpty) {
                         val userRef = userQuery.documents[0].reference
+                        
                         val ccMap = hashMapOf<String, Any>(
                             "issuer" to ccIssuer,
-                            "card_no" to formattedCardNo,
+                            "card no." to formattedCardNo,
                             "type" to finalType,
                             "limit" to limitAmt,
                             "outstanding" to 0.0,
-                            "available" to limitAmt,
-                            "utilization" to 0.0,
-                            "billing_day" to billDay,
-                            "due_day" to dueD,
-                            "reminder_day" to remindD,
-                            "annual_fee" to annFee,
-                            "joining_fee" to joinFee,
-                            "last_used" to ""
+                            "billing" to billDay,
+                            "due" to dueD,
+                            "rmndr" to remindD,
+                            "yr fee" to annFee,
+                            "join fee" to joinFee,
+                            "last use" to com.google.firebase.Timestamp.now()
                         )
-                        userRef.collection("Finances").document("Credit_Cards")
-                            .set(mapOf(formattedCardNo to ccMap), SetOptions.merge()).await()
+                        
+                        userRef.collection("Finances").document("CC FD")
+                            .set(mapOf("CC" to mapOf(formattedCardNo to ccMap)), SetOptions.merge()).await()
                     }
                 } catch (e: Exception) {}
             }
