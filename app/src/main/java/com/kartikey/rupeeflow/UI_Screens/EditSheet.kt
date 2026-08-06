@@ -552,9 +552,17 @@ fun EditCreditCardDialog(cc: CreditCardItem, username: String, onDismiss: () -> 
                                             val updateMap = hashMapOf<String, Any>(
                                                 "CC.${cc.cardNo}.limit" to newLimit,
                                                 "CC.${cc.cardNo}.billing" to (billingDay.toIntOrNull() ?: 0),
-                                                "CC.${cc.cardNo}.due" to (dueDay.toIntOrNull() ?: 0),
-                                                "CC.${cc.cardNo}.yr fee" to (annualFee.toDoubleOrNull() ?: 0.0)
+                                                "CC.${cc.cardNo}.due" to (dueDay.toIntOrNull() ?: 0)
                                             )
+                                            
+                                            // SPARSE DATA LOGIC: Delete key if fee is updated to 0
+                                            val updatedAnnFee = annualFee.toDoubleOrNull() ?: 0.0
+                                            if (updatedAnnFee > 0.0) {
+                                                updateMap["CC.${cc.cardNo}.yr fee"] = updatedAnnFee
+                                            } else {
+                                                updateMap["CC.${cc.cardNo}.yr fee"] = FieldValue.delete()
+                                            }
+
                                             userRef.collection("Finances").document("CC FD").update(updateMap).await()
                                             withContext(Dispatchers.Main) { onUpdateSuccess() }
                                         } else {
