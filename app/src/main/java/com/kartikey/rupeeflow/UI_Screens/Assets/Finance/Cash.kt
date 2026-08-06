@@ -31,8 +31,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import java.text.NumberFormat
-import java.text.SimpleDateFormat
-import java.util.Date
 import java.util.Locale
 
 data class CashItem(
@@ -188,12 +186,16 @@ fun UpdateCashDialog(currentAmount: Double, username: String, onDismiss: () -> U
                                         
                                         if (!userQuery.isEmpty) {
                                             val userRef = userQuery.documents[0].reference
-                                            val cashData = hashMapOf(
-                                                "total_cash" to amt,
-                                                "last_updated" to SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
+                                            
+                                            // PHASE 3: NEW CASH UPDATE LOGIC (Into "Bank" Document)
+                                            val updateMap = hashMapOf<String, Any>(
+                                                "cash" to hashMapOf(
+                                                    "amnt" to amt,
+                                                    "last update" to com.google.firebase.Timestamp.now()
+                                                )
                                             )
-                                            userRef.collection("Finances").document("Cash")
-                                                .set(cashData, SetOptions.merge())
+                                            userRef.collection("Finances").document("Bank")
+                                                .set(updateMap, SetOptions.merge())
                                                 .await()
 
                                             withContext(Dispatchers.Main) {
