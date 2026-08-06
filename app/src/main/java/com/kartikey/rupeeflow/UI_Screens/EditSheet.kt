@@ -117,7 +117,7 @@ fun EditBankDialog(bank: BankAccountItem, username: String, onDismiss: () -> Uni
                                     val updates = hashMapOf<String, Any>(
                                         bank.accountNo to FieldValue.delete()
                                     )
-                                    userRef.collection("Finances").document("Banking_Data").update(updates).await()
+                                    userRef.collection("Finances").document("Bank").update(updates).await()
                                     withContext(Dispatchers.Main) { onUpdateSuccess() }
                                 } else {
                                     withContext(Dispatchers.Main) { Toast.makeText(context, "Failed to delete account!", Toast.LENGTH_SHORT).show() }
@@ -244,11 +244,11 @@ fun EditBankDialog(bank: BankAccountItem, username: String, onDismiss: () -> Uni
                                         if (!userQuery.isEmpty) {
                                             val userRef = userQuery.documents[0].reference
                                             val updateMap = hashMapOf<String, Any>(
-                                                "${bank.accountNo}.bank_name" to bankName,
-                                                "${bank.accountNo}.current_bal" to newBal,
-                                                "${bank.accountNo}.interest_rate" to newRate
+                                                "${bank.accountNo}.bank" to bankName,
+                                                "${bank.accountNo}.current bal." to newBal,
+                                                "${bank.accountNo}.intrest % (yr)" to newRate
                                             )
-                                            userRef.collection("Finances").document("Banking_Data").update(updateMap).await()
+                                            userRef.collection("Finances").document("Bank").update(updateMap).await()
                                             withContext(Dispatchers.Main) { onUpdateSuccess() }
                                         } else {
                                             withContext(Dispatchers.Main) { Toast.makeText(context, "Update Failed!", Toast.LENGTH_SHORT).show() }
@@ -273,6 +273,9 @@ fun EditBankDialog(bank: BankAccountItem, username: String, onDismiss: () -> Uni
     }
 }
 
+// ==========================================
+// PHASE 3: NEW TRIMMED CREDIT CARD QUICK UPDATE
+// ==========================================
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun QuickUpdateCCDialog(cc: CreditCardItem, username: String, onDismiss: () -> Unit, onSuccess: () -> Unit) {
@@ -333,16 +336,12 @@ fun QuickUpdateCCDialog(cc: CreditCardItem, username: String, onDismiss: () -> U
                                         val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
                                         if (!userQuery.isEmpty) {
                                             val userRef = userQuery.documents[0].reference
-                                            val limit = cc.limit
-                                            val avail = limit - newCalculatedOutstanding
-                                            val util = if (limit > 0) (newCalculatedOutstanding / limit) * 100.0 else 0.0
-
+                                            
+                                            // TRIMMED: Only updating outstanding in new CC FD document
                                             val updateMap = hashMapOf<String, Any>(
-                                                "${cc.cardNo}.outstanding" to newCalculatedOutstanding,
-                                                "${cc.cardNo}.available" to avail,
-                                                "${cc.cardNo}.utilization" to util
+                                                "CC.${cc.cardNo}.outstanding" to newCalculatedOutstanding
                                             )
-                                            userRef.collection("Finances").document("Credit_Cards").update(updateMap).await()
+                                            userRef.collection("Finances").document("CC FD").update(updateMap).await()
                                             withContext(Dispatchers.Main) { onSuccess() }
                                         } else {
                                             withContext(Dispatchers.Main) { Toast.makeText(context, "Update Failed!", Toast.LENGTH_SHORT).show() }
@@ -365,6 +364,9 @@ fun QuickUpdateCCDialog(cc: CreditCardItem, username: String, onDismiss: () -> U
     }
 }
 
+// ==========================================
+// PHASE 3: NEW TRIMMED CREDIT CARD EDITOR
+// ==========================================
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditCreditCardDialog(cc: CreditCardItem, username: String, onDismiss: () -> Unit, onUpdateSuccess: () -> Unit) {
@@ -394,8 +396,10 @@ fun EditCreditCardDialog(cc: CreditCardItem, username: String, onDismiss: () -> 
                                 val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
                                 if (!userQuery.isEmpty) {
                                     val userRef = userQuery.documents[0].reference
-                                    val updates = hashMapOf<String, Any>(cc.cardNo to FieldValue.delete())
-                                    userRef.collection("Finances").document("Credit_Cards").update(updates).await()
+                                    
+                                    // UPDATED: Removing card from new document
+                                    val updates = hashMapOf<String, Any>("CC.${cc.cardNo}" to FieldValue.delete())
+                                    userRef.collection("Finances").document("CC FD").update(updates).await()
                                     withContext(Dispatchers.Main) { onUpdateSuccess() }
                                 } else {
                                     withContext(Dispatchers.Main) { Toast.makeText(context, "Failed to delete card!", Toast.LENGTH_SHORT).show() }
@@ -502,18 +506,15 @@ fun EditCreditCardDialog(cc: CreditCardItem, username: String, onDismiss: () -> 
                                         val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
                                         if (!userQuery.isEmpty) {
                                             val userRef = userQuery.documents[0].reference
-                                            val avail = newLimit - cc.outstanding
-                                            val util = if (newLimit > 0) (cc.outstanding / newLimit) * 100.0 else 0.0
 
+                                            // UPDATED: Saving raw variables according to new structure
                                             val updateMap = hashMapOf<String, Any>(
-                                                "${cc.cardNo}.limit" to newLimit,
-                                                "${cc.cardNo}.available" to avail,
-                                                "${cc.cardNo}.utilization" to util,
-                                                "${cc.cardNo}.billing_day" to (billingDay.toIntOrNull() ?: 0),
-                                                "${cc.cardNo}.due_day" to (dueDay.toIntOrNull() ?: 0),
-                                                "${cc.cardNo}.annual_fee" to (annualFee.toDoubleOrNull() ?: 0.0)
+                                                "CC.${cc.cardNo}.limit" to newLimit,
+                                                "CC.${cc.cardNo}.billing" to (billingDay.toIntOrNull() ?: 0),
+                                                "CC.${cc.cardNo}.due" to (dueDay.toIntOrNull() ?: 0),
+                                                "CC.${cc.cardNo}.yr fee" to (annualFee.toDoubleOrNull() ?: 0.0)
                                             )
-                                            userRef.collection("Finances").document("Credit_Cards").update(updateMap).await()
+                                            userRef.collection("Finances").document("CC FD").update(updateMap).await()
                                             withContext(Dispatchers.Main) { onUpdateSuccess() }
                                         } else {
                                             withContext(Dispatchers.Main) { Toast.makeText(context, "Update Failed!", Toast.LENGTH_SHORT).show() }
@@ -536,6 +537,9 @@ fun EditCreditCardDialog(cc: CreditCardItem, username: String, onDismiss: () -> 
     }
 }
 
+// ==========================================
+// PHASE 3: FD DELETER UPDATE
+// ==========================================
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditFDDialog(fd: FDItem, username: String, onDismiss: () -> Unit, onUpdateSuccess: () -> Unit) {
@@ -560,8 +564,10 @@ fun EditFDDialog(fd: FDItem, username: String, onDismiss: () -> Unit, onUpdateSu
                                 val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
                                 if (!userQuery.isEmpty) {
                                     val userRef = userQuery.documents[0].reference
-                                    val updates = hashMapOf<String, Any>(fd.accountNo to FieldValue.delete())
-                                    userRef.collection("Finances").document("Fixed_Deposits").update(updates).await()
+                                    
+                                    // UPDATED: Removing FD from the new document
+                                    val updates = hashMapOf<String, Any>("FD.${fd.accountNo}" to FieldValue.delete())
+                                    userRef.collection("Finances").document("CC FD").update(updates).await()
                                     withContext(Dispatchers.Main) { onUpdateSuccess() }
                                 } else {
                                     withContext(Dispatchers.Main) { Toast.makeText(context, "Failed to delete FD!", Toast.LENGTH_SHORT).show() }
@@ -647,9 +653,6 @@ fun DeleteExpenseDialog(
                             if (!userQuery.isEmpty) {
                                 val userRef = userQuery.documents[0].reference
                                 
-                                // ==========================================
-                                // FIXED: Using Underscore instead of Dot
-                                // ==========================================
                                 val expDateOnly = expense.date.split(" ")[0]
                                 val targetDate = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).parse(expDateOnly) ?: Date()
                                 val docId = SimpleDateFormat("yyyy_MM", Locale.getDefault()).format(targetDate)
@@ -672,7 +675,6 @@ fun DeleteExpenseDialog(
                                             val dbAmount = (value["amount"] as? Number)?.toDouble() ?: 0.0
                                             val dbCategory = value["category"]?.toString() ?: ""
                                             
-                                            // FIX: Safe float math compare instead of precise `==`
                                             val amountMatch = Math.abs(dbAmount - expense.amount) < 0.01
                                             
                                             if (dbDateStr == expDateOnly && amountMatch && dbCategory == expense.category) {
@@ -693,9 +695,8 @@ fun DeleteExpenseDialog(
                                     withContext(Dispatchers.Main) { Toast.makeText(context, "Error: Record not found in database.", Toast.LENGTH_LONG).show() }
                                     return@launch 
                                 }
-                                // ==========================================
 
-                                // REFUND LOGIC
+                                // REFUND LOGIC (Updated to target new paths)
                                 val refundAmt = expense.amount
                                 when (expense.sourceType) {
                                     "Cash" -> {
@@ -705,32 +706,23 @@ fun DeleteExpenseDialog(
                                     }
                                     "Bank" -> {
                                         if (expense.sourceId.isNotEmpty()) {
-                                            val bankDoc = userRef.collection("Finances").document("Banking_Data").get().await()
+                                            val bankDoc = userRef.collection("Finances").document("Bank").get().await()
                                             val bankData = bankDoc.get(expense.sourceId) as? Map<*, *>
                                             if (bankData != null) {
-                                                val curBal = (bankData["current_bal"] as? Number)?.toDouble() ?: 0.0
-                                                userRef.collection("Finances").document("Banking_Data").update("${expense.sourceId}.current_bal", curBal + refundAmt).await()
+                                                val curBal = (bankData["current bal."] as? Number)?.toDouble() ?: 0.0
+                                                userRef.collection("Finances").document("Bank").update("${expense.sourceId}.current bal.", curBal + refundAmt).await()
                                             }
                                         }
                                     }
                                     "Credit Card" -> {
                                         if (expense.sourceId.isNotEmpty()) {
-                                            val ccDoc = userRef.collection("Finances").document("Credit_Cards").get().await()
-                                            val ccData = ccDoc.get(expense.sourceId) as? Map<*, *>
+                                            val ccDoc = userRef.collection("Finances").document("CC FD").get().await()
+                                            val ccMap = ccDoc.get("CC") as? Map<*, *>
+                                            val ccData = ccMap?.get(expense.sourceId) as? Map<*, *>
                                             if (ccData != null) {
                                                 val curOut = (ccData["outstanding"] as? Number)?.toDouble() ?: 0.0
-                                                val limit = (ccData["limit"] as? Number)?.toDouble() ?: 0.0
                                                 val newOut = (curOut - refundAmt).coerceAtLeast(0.0)
-                                                val avail = limit - newOut
-                                                val util = if (limit > 0) (newOut / limit) * 100.0 else 0.0
-
-                                                userRef.collection("Finances").document("Credit_Cards").update(
-                                                    mapOf(
-                                                        "${expense.sourceId}.outstanding" to newOut,
-                                                        "${expense.sourceId}.available" to avail,
-                                                        "${expense.sourceId}.utilization" to util
-                                                    )
-                                                ).await()
+                                                userRef.collection("Finances").document("CC FD").update("CC.${expense.sourceId}.outstanding", newOut).await()
                                             }
                                         }
                                     }
@@ -1139,9 +1131,6 @@ fun EditExpenseDialog(
                                         if (!userQuery.isEmpty) {
                                             val userRef = userQuery.documents[0].reference
                                             
-                                            // ==========================================
-                                            // FIXED: Using Underscore instead of Dot
-                                            // ==========================================
                                             val expDateOnly = expense.date.split(" ")[0]
                                             val oldTargetDate = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).parse(expDateOnly) ?: Date()
                                             val oldDocId = SimpleDateFormat("yyyy_MM", Locale.getDefault()).format(oldTargetDate)
@@ -1168,7 +1157,6 @@ fun EditExpenseDialog(
                                                         val dbAmount = (value["amount"] as? Number)?.toDouble() ?: 0.0
                                                         val dbCategory = value["category"]?.toString() ?: ""
                                                         
-                                                        // FIX: Safe float math compare
                                                         val amountMatch = Math.abs(dbAmount - expense.amount) < 0.01
 
                                                         if (dbDateStr == expDateOnly && amountMatch && dbCategory == expense.category) {
@@ -1236,9 +1224,8 @@ fun EditExpenseDialog(
                                                     ), SetOptions.merge()
                                                 ).await()
                                             }
-                                            // ==========================================
 
-                                            // BALANCE ADJUSTMENT
+                                            // REFUND LOGIC (Updated to target new paths)
                                             if (diff != 0.0) {
                                                 when (selectedSourceType) {
                                                     "Cash" -> {
@@ -1248,38 +1235,27 @@ fun EditExpenseDialog(
                                                     }
                                                     "Bank" -> {
                                                         if (selectedSourceId.isNotEmpty()) {
-                                                            val bankDoc = userRef.collection("Finances").document("Banking_Data").get().await()
+                                                            val bankDoc = userRef.collection("Finances").document("Bank").get().await()
                                                             val bankData = bankDoc.get(selectedSourceId) as? Map<*, *>
                                                             if (bankData != null) {
-                                                                val curBal = (bankData["current_bal"] as? Number)?.toDouble() ?: 0.0
-                                                                userRef.collection("Finances").document("Banking_Data").update("${selectedSourceId}.current_bal", curBal - diff).await()
+                                                                val curBal = (bankData["current bal."] as? Number)?.toDouble() ?: 0.0
+                                                                userRef.collection("Finances").document("Bank").update("${selectedSourceId}.current bal.", curBal - diff).await()
                                                             }
                                                         }
                                                     }
                                                     "Credit Card" -> {
                                                         if (selectedSourceId.isNotEmpty()) {
-                                                            val ccDoc = userRef.collection("Finances").document("Credit_Cards").get().await()
-                                                            val ccData = ccDoc.get(selectedSourceId) as? Map<*, *>
+                                                            val ccDoc = userRef.collection("Finances").document("CC FD").get().await()
+                                                            val ccMap = ccDoc.get("CC") as? Map<*, *>
+                                                            val ccData = ccMap?.get(selectedSourceId) as? Map<*, *>
                                                             if (ccData != null) {
                                                                 val curOut = (ccData["outstanding"] as? Number)?.toDouble() ?: 0.0
-                                                                val limit = (ccData["limit"] as? Number)?.toDouble() ?: 0.0
                                                                 val newOut = (curOut + diff).coerceAtLeast(0.0)
-                                                                val avail = limit - newOut
-                                                                val util = if (limit > 0) (newOut / limit) * 100.0 else 0.0
-
-                                                                userRef.collection("Finances").document("Credit_Cards").update(
-                                                                    mapOf(
-                                                                        "${selectedSourceId}.outstanding" to newOut,
-                                                                        "${selectedSourceId}.available" to avail,
-                                                                        "${selectedSourceId}.utilization" to util
-                                                                    )
-                                                                ).await()
+                                                                userRef.collection("Finances").document("CC FD").update("CC.${selectedSourceId}.outstanding", newOut).await()
                                                             }
                                                         }
                                                     }
                                                 }
-                                                
-                                                // UPDATE BUDGET
                                                 updateBudgetUsage(userRef, diff)
                                             }
                                             withContext(Dispatchers.Main) { onSuccess() }
