@@ -283,9 +283,6 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
         }
     }
 
-    // ==========================================
-    // PHASE 2: NEW CASH STRUCTURE INSIDE "BANK"
-    // ==========================================
     val submitCashData = {
         val cAmt = cashAmount.toDoubleOrNull()
         if (cAmt == null || cAmt <= 0) {
@@ -337,7 +334,8 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
         } else if (!dynamicBankList.contains(ccIssuer)) {
             Toast.makeText(context, "Select a valid Issuer from dropdown!", Toast.LENGTH_SHORT).show()
         } else {
-            val finalType = "$ccNetwork/$ccSecurity"
+            // FIXED: Space requested around the pipe |
+            val finalType = "$ccNetwork | $ccSecurity"
             val formattedCardNo = "XXXXX$ccCardNo"
             onFinanceAdded()
             onDismiss()
@@ -349,6 +347,7 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                     if (!userQuery.isEmpty) {
                         val userRef = userQuery.documents[0].reference
                         
+                        // SPARSE DATA LOGIC: Won't write 0 fee variables
                         val ccMap = hashMapOf<String, Any>(
                             "issuer" to ccIssuer,
                             "card no." to formattedCardNo,
@@ -358,10 +357,10 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                             "billing" to billDay,
                             "due" to dueD,
                             "rmndr" to remindD,
-                            "yr fee" to annFee,
-                            "join fee" to joinFee,
                             "last use" to com.google.firebase.Timestamp.now()
                         )
+                        if (annFee > 0.0) ccMap["yr fee"] = annFee
+                        if (joinFee > 0.0) ccMap["join fee"] = joinFee
                         
                         userRef.collection("Finances").document("CC FD")
                             .set(mapOf("CC" to mapOf(formattedCardNo to ccMap)), SetOptions.merge()).await()
