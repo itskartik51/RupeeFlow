@@ -87,14 +87,10 @@ object CacheManager {
                 val expensesDocs = userRef.collection("Expenses").get().await()
                 val expensesArray = JSONArray()
 
-                // ==========================================
-                // STRICT NEW LOGIC: Only Reads Nested Map Data Structure
-                // ==========================================
                 for (doc in expensesDocs) {
                     val dataMap = doc.data
                     
                     for ((key, value) in dataMap) {
-                        // "000. total" is not a map, so this condition automatically skips it and only parses transactions
                         if (value is Map<*, *>) {
                             val expObj = JSONObject()
                             val rawDate = value["date"]
@@ -121,7 +117,6 @@ object CacheManager {
                         }
                     }
                 }
-                // ==========================================
 
                 val financesDocs = userRef.collection("Finances").get().await()
                 var cashObj = JSONObject().apply {
@@ -131,6 +126,8 @@ object CacheManager {
                 val banksArray = JSONArray()
                 val fdArray = JSONArray()
                 val ccArray = JSONArray()
+                
+                val todayMillis = System.currentTimeMillis()
 
                 for (doc in financesDocs) {
                     when (doc.id) {
@@ -139,7 +136,6 @@ object CacheManager {
                             cashObj.put("last_updated", doc.getString("last_updated") ?: "")
                         }
                         
-                        // PHASE 2: "TRUE SPARSE DATA" & "PRORATED MATH" ENGINE
                         "Bank" -> {
                             val dataMap = doc.data
                             val updateMap = mutableMapOf<String, Any>()
@@ -175,7 +171,6 @@ object CacheManager {
                                 updateMap["last_updated"] = FieldValue.serverTimestamp()
                             }
 
-                            // Qtr Math Basics
                             val startOfQtr = Calendar.getInstance().apply {
                                 set(Calendar.MONTH, (calToday.get(Calendar.MONTH) / 3) * 3)
                                 set(Calendar.DAY_OF_MONTH, 1)
@@ -186,7 +181,6 @@ object CacheManager {
                             }
                             val daysPassedQtr = ((calToday.timeInMillis - startOfQtr.timeInMillis) / (1000 * 60 * 60 * 24)).toInt() + 1
                             
-                            // Year Math Basics
                             val startOfYear = Calendar.getInstance().apply {
                                 set(Calendar.MONTH, Calendar.JANUARY)
                                 set(Calendar.DAY_OF_MONTH, 1)
@@ -215,7 +209,6 @@ object CacheManager {
                                     val currentQtrAvg = (qtrAvgMap[qtrStr] as? Number)?.toDouble() ?: curBal
                                     var curYrAvg = (yrAvgMap["cur"] as? Number)?.toDouble() ?: curBal
 
-                                    // The Year Shift Execution
                                     if (yearShifted) {
                                         val lastYrAvg = (yrAvgMap["cur"] as? Number)?.toDouble() ?: 0.0
                                         val secondLastYrAvg = (yrAvgMap["last"] as? Number)?.toDouble() ?: 0.0
@@ -226,7 +219,6 @@ object CacheManager {
                                         curYrAvg = curBal 
                                     }
 
-                                    // True Prorated Formula Injector
                                     val expQtr = currentQtrAvg * (rateQtr / 100.0)
                                     val accruedQtr = expQtr * (daysPassedQtr / 90.0)
                                     val expYr = curYrAvg * (rateYr / 100.0)
@@ -259,61 +251,103 @@ object CacheManager {
                                 doc.reference.update(updateMap).await()
                             }
                         }
-                        
-                        "Fixed_Deposits" -> {
+
+                        // ==========================================
+                        // STRICT NEW LOGIC: Reads purely from "CC FD"
+                        // Completely ignores old docs (Fixed_Deposits, Credit_Cards)
+                        // ==========================================
+                        "CC FD" -> {
                             val dataMap = doc.data
-                            dataMap.forEach { (accNo, rawFd) ->
+                            
+                            // Parse Credit Cards
+                            val ccMap = dataMap["CC"] as? Map<*, *>
+                            ccMap?.forEach { (key, rawCc) ->
+                                if (rawCc is Map<*, *>) {
+                                    val issuer = rawCc["issuer"]?.toString() ?: ""
+                                    val cardNo = rawCc["card no."]?.toString() ?: ""
+                                    val type = rawCc["type"]?.toString() ?: ""
+                                    val limit = (rawCc["limit"] as? Number)?.toDouble() ?: 0.0
+                                    val outstanding = (rawCc["outstanding"] as? Number)?.toDouble() ?: 0.0
+                                    
+                                    // App-Level Calculations
+                                    val avail = limit - outstanding
+                                    val util = if (limit > 0) (outstanding / limit) * 100.0 else 0.0
+                                    val cibilStatus = if (util <= 30.0) "Safe" else "High Risk"
+
+                                    val ccObj = JSONObject().apply {
+                                        put("issuer", issuer)
+                                        put("card_no", cardNo)
+                                        put("type", type)
+                                        put("limit", limit)
+                                        put("outstanding", outstanding)
+                                        put("available", avail)
+                                        put("utilization", util)
+                                        put("cibil_status", cibilStatus)
+                                        put("billing_day", (rawCc["billing"] as? Number)?.toInt() ?: 0)
+                                        put("due_day", (rawCc["due"] as? Number)?.toInt() ?: 0)
+                                        put("reminder_day", (rawCc["rmndr"] as? Number)?.toInt() ?: 0)
+                                        put("annual_fee", (rawCc["yr fee"] as? Number)?.toDouble() ?: 0.0)
+                                        put("joining_fee", (rawCc["join fee"] as? Number)?.toDouble() ?: 0.0)
+                                        
+                                        val lastUseTs = rawCc["last use"] as? Timestamp
+                                        val lastUseStr = lastUseTs?.let { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(it.toDate()) } ?: ""
+                                        put("last_used", lastUseStr)
+                                    }
+                                    ccArray.put(ccObj)
+                                }
+                            }
+
+                            // Parse Fixed Deposits
+                            val fdMap = dataMap["FD"] as? Map<*, *>
+                            fdMap?.forEach { (key, rawFd) ->
                                 if (rawFd is Map<*, *>) {
-                                    val invAmt = (rawFd["invested_amt"] as? Number)?.toDouble() ?: 0.0
-                                    val rate = (rawFd["interest_rate"] as? Number)?.toDouble() ?: 0.0
-                                    val matVal = (rawFd["maturity_value"] as? Number)?.toDouble() ?: invAmt
-                                    val accVal = (rawFd["accrued_value"] as? Number)?.toDouble() ?: invAmt
-                                    val accInt = (rawFd["accrued_int"] as? Number)?.toDouble() ?: (accVal - invAmt)
-                                    val oneDay = (invAmt * (rate / 100.0)) / 365.0
+                                    val bank = rawFd["bank"]?.toString() ?: ""
+                                    val accNo = rawFd["fd ac"]?.toString() ?: ""
+                                    val amnt = (rawFd["amnt"] as? Number)?.toDouble() ?: 0.0
+                                    val rate = (rawFd["int % yr"] as? Number)?.toDouble() ?: 0.0
+                                    
+                                    val createTs = rawFd["create"] as? Timestamp
+                                    val maturTs = rawFd["matur"] as? Timestamp
+                                    
+                                    val createStr = createTs?.let { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(it.toDate()) } ?: ""
+                                    val maturStr = maturTs?.let { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(it.toDate()) } ?: ""
+                                    
+                                    var daysToMat = 0
+                                    var matVal = amnt
+                                    var accVal = amnt
+                                    var accInt = 0.0
+                                    var oneDayInt = 0.0
+                                    
+                                    if (createTs != null && maturTs != null) {
+                                        val createMillis = createTs.toDate().time
+                                        val maturMillis = maturTs.toDate().time
+                                        
+                                        // App-Level Mathematical Engine
+                                        val totalDays = maxOf(0L, (maturMillis - createMillis) / (1000 * 60 * 60 * 24))
+                                        daysToMat = maxOf(0L, (maturMillis - todayMillis) / (1000 * 60 * 60 * 24)).toInt()
+                                        val daysPassed = maxOf(0L, (minOf(todayMillis, maturMillis) - createMillis) / (1000 * 60 * 60 * 24))
+                                        
+                                        matVal = amnt * Math.pow(1 + (rate / 100.0), totalDays / 365.0)
+                                        accVal = amnt * Math.pow(1 + (rate / 100.0), daysPassed / 365.0)
+                                        accInt = accVal - amnt
+                                        
+                                        oneDayInt = if (todayMillis >= maturMillis || todayMillis < createMillis) 0.0 else (accVal * (rate / 100.0)) / 365.0
+                                    }
 
                                     val fdObj = JSONObject().apply {
-                                        put("bank_name", rawFd["bank_name"]?.toString() ?: "")
+                                        put("bank_name", bank)
                                         put("account_no", accNo)
-                                        put("create_date", rawFd["create_date"]?.toString() ?: "")
-                                        put("maturity_date", rawFd["maturity_date"]?.toString() ?: "")
-                                        put("days_to_maturity", (rawFd["days_to_maturity"] as? Number)?.toInt() ?: 0)
-                                        put("invested_amt", invAmt)
+                                        put("create_date", createStr)
+                                        put("maturity_date", maturStr)
+                                        put("days_to_maturity", daysToMat)
+                                        put("invested_amt", amnt)
                                         put("interest_rate", rate)
                                         put("maturity_value", matVal)
                                         put("accrued_value", accVal)
                                         put("accrued_int", accInt)
-                                        put("one_day_int", oneDay)
+                                        put("one_day_int", oneDayInt)
                                     }
                                     fdArray.put(fdObj)
-                                }
-                            }
-                        }
-                        "Credit_Cards" -> {
-                            val dataMap = doc.data
-                            dataMap.forEach { (cardNo, rawCc) ->
-                                if (rawCc is Map<*, *>) {
-                                    val limit = (rawCc["limit"] as? Number)?.toDouble() ?: 0.0
-                                    val out = (rawCc["outstanding"] as? Number)?.toDouble() ?: 0.0
-                                    val avail = (rawCc["available"] as? Number)?.toDouble() ?: (limit - out)
-                                    val util = if (limit > 0) (out / limit) * 100.0 else 0.0
-
-                                    val ccObj = JSONObject().apply {
-                                        put("issuer", rawCc["issuer"]?.toString() ?: "")
-                                        put("card_no", cardNo)
-                                        put("type", rawCc["type"]?.toString() ?: "Visa")
-                                        put("limit", limit)
-                                        put("outstanding", out)
-                                        put("available", avail)
-                                        put("utilization", util)
-                                        put("cibil_status", rawCc["cibil_status"]?.toString() ?: "Good")
-                                        put("billing_day", (rawCc["billing_day"] as? Number)?.toInt() ?: 0)
-                                        put("due_day", (rawCc["due_day"] as? Number)?.toInt() ?: 0)
-                                        put("reminder_day", (rawCc["reminder_day"] as? Number)?.toInt() ?: 0)
-                                        put("annual_fee", (rawCc["annual_fee"] as? Number)?.toDouble() ?: 0.0)
-                                        put("joining_fee", (rawCc["joining_fee"] as? Number)?.toDouble() ?: 0.0)
-                                        put("last_used", rawCc["last_used"]?.toString() ?: "")
-                                    }
-                                    ccArray.put(ccObj)
                                 }
                             }
                         }
