@@ -322,27 +322,8 @@ fun BudgetDialog(
                                         if (!userQuery.isEmpty) {
                                             val userRef = userQuery.documents[0].reference
                                             
-                                            // 1. Update fallback double value in main profile
+                                            // 1. Single Clean Update in root document
                                             userRef.update("budget_limit", limitVal).await()
-                                            
-                                            // 2. Format the custom strings for Finances/Budget collection
-                                            val usedPctStr = if (limitVal > 0) (thisMonthUsed / limitVal) * 100 else 0.0
-                                            val availAmtCalc = maxOf(0.0, limitVal - thisMonthUsed)
-                                            val availPctStr = if (limitVal > 0) (availAmtCalc / limitVal) * 100 else 0.0
-                                            
-                                            val formatVal = { amt: Double, pct: Double ->
-                                                "${amt.toInt()} (${String.format(Locale.US, "%.1f", pct)}%)"
-                                            }
-                                            
-                                            val budgetData = hashMapOf<String, Any>(
-                                                "budget" to "${limitVal.toInt()} (100%)",
-                                                "used" to formatVal(thisMonthUsed, usedPctStr),
-                                                "available" to formatVal(availAmtCalc, availPctStr)
-                                            )
-                                            
-                                            // Save new format in sub-collection
-                                            userRef.collection("Finances").document("Budget")
-                                                .set(budgetData, SetOptions.merge()).await()
                                             
                                             withContext(Dispatchers.Main) {
                                                 isSaving = false
