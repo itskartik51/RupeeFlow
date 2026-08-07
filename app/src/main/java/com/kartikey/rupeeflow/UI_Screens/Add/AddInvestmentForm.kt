@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
+import com.kartikey.rupeeflow.Cloud_Database.Constants
 import com.kartikey.rupeeflow.UI_Screens.bounceClick
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -25,8 +26,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -227,7 +230,10 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                                     }
                                 },
                                 onClick = {
-                                    val cleanSymbol = row.rawSymbol.replace(".NS", "").replace(".BO", "")
+                                    // Always append NSE: or BSE: based on the raw symbol to match the Sheet format
+                                    val prefix = if (row.rawSymbol.endsWith(".NS")) "NSE:" else if (row.rawSymbol.endsWith(".BO")) "BOM:" else ""
+                                    val cleanSymbol = prefix + row.rawSymbol.replace(".NS", "").replace(".BO", "")
+                                    
                                     assetName = row.name 
                                     selectedSymbol = cleanSymbol
                                     searchExpanded = false
@@ -283,6 +289,7 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                         onDismiss() 
                         
                         CoroutineScope(Dispatchers.IO).launch {
+                            // 1. Static Data Save to Firebase
                             try {
                                 val db = FirebaseFirestore.getInstance()
                                 val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
@@ -293,13 +300,33 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                                         "asset_type" to assetType,
                                         "quantity" to qty,
                                         "buy_price" to price,
-                                        "current_price" to price,
-                                        "one_day_change" to 0.0,
                                         "inv_date" to date
                                     )
                                     userRef.collection("Investments").document(selectedSymbol).set(invData, SetOptions.merge()).await()
                                 }
                             } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+
+                            // 2. Silent Ping to Google Sheet for Auto-Append
+                            try {
+                                val client = OkHttpClient()
+                                val jsonPayload = JSONObject().apply {
+                                    put("action", "addTicker")
+                                    put("ticker", selectedSymbol)
+                                    put("name", assetName)
+                                }.toString()
+                                
+                                val requestBody = jsonPayload.toRequestBody("application/json; charset=utf-8".toMediaTypeOrNull())
+                                
+                                val request = Request.Builder()
+                                    .url(Constants.GOOGLE_SHEET_API_URL)
+                                    .post(requestBody)
+                                    .build()
+                                    
+                                client.newCall(request).execute()
+                            } catch (e: Exception) {
+                                e.printStackTrace()
                             }
                         }
                     } else {
