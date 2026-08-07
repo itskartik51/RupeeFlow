@@ -37,7 +37,10 @@ import java.util.Locale
 fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss: () -> Unit) { 
     var assetType by remember { mutableStateOf("Stock") }
     var assetName by remember { mutableStateOf("") }
-    var selectedSymbol by remember { mutableStateOf("") } 
+    
+    var selectedSymbol by remember { mutableStateOf("") } // Clean Ticker for Firebase (e.g. SBIN)
+    var sheetTicker by remember { mutableStateOf("") }    // Full Ticker for Google Sheet (e.g. NSE:SBIN)
+    
     var quantity by remember { mutableStateOf("") }
     var buyPrice by remember { mutableStateOf("") }
     
@@ -170,6 +173,7 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                                 assetType = selectionOption
                                 assetName = "" 
                                 selectedSymbol = ""
+                                sheetTicker = ""
                                 typeExpanded = false
                             }
                         )
@@ -192,6 +196,7 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                     onValueChange = { 
                         assetName = it 
                         selectedSymbol = "" 
+                        sheetTicker = ""
                         searchExpanded = it.isNotEmpty()
                     },
                     label = { Text("Search $assetType Name") },
@@ -230,10 +235,12 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                                 },
                                 onClick = {
                                     val prefix = if (row.rawSymbol.endsWith(".NS")) "NSE:" else if (row.rawSymbol.endsWith(".BO")) "BOM:" else ""
-                                    val cleanSymbol = prefix + row.rawSymbol.replace(".NS", "").replace(".BO", "")
+                                    val cleanSymbol = row.rawSymbol.replace(".NS", "").replace(".BO", "")
                                     
                                     assetName = row.name 
-                                    selectedSymbol = cleanSymbol
+                                    selectedSymbol = cleanSymbol // Only SBIN
+                                    sheetTicker = prefix + cleanSymbol // NSE:SBIN
+                                    
                                     searchExpanded = false
                                 }
                             )
@@ -277,7 +284,7 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                         onDismiss() 
                         
                         CoroutineScope(Dispatchers.IO).launch {
-                            // Structuring data into the 'invest' Map field directly inside root User document
+                            // Structuring clean data into the 'invest' Map
                             try {
                                 val db = FirebaseFirestore.getInstance()
                                 val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
@@ -292,26 +299,25 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                                     val newKey = String.format(Locale.US, "%03d", maxKey + 1)
                                     
                                     val newInvestment = mapOf(
-                                        "name" to selectedSymbol,
+                                        "name" to selectedSymbol, // Stores clean name (e.g. SBIN)
                                         "type" to assetType,
                                         "qnt" to qty,
                                         "avg" to price,
                                         "amnt" to (qty * price)
                                     )
                                     
-                                    // Direct field update logic mapping exactly to image_52ba1e.png
                                     userRef.update("invest.$newKey", newInvestment).await()
                                 }
                             } catch (e: Exception) {
                                 e.printStackTrace()
                             }
 
-                            // Sheet Auto-append ping logic
+                            // Sheet Auto-append ping logic (Sends Full Ticker)
                             try {
                                 val client = OkHttpClient()
                                 val jsonPayload = JSONObject().apply {
                                     put("action", "addTicker")
-                                    put("ticker", selectedSymbol)
+                                    put("ticker", sheetTicker) // Sends Full name (e.g. NSE:SBIN)
                                     put("name", assetName)
                                 }.toString()
                                 
