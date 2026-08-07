@@ -18,7 +18,6 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Calendar
-import java.util.Date
 import java.util.Locale
 
 data class AppData(
@@ -120,7 +119,6 @@ object CacheManager {
 
                 val financesDocs = userRef.collection("Finances").get().await()
                 
-                // Initialize Cash with defaults
                 var cashObj = JSONObject().apply {
                     put("amount", 0.0)
                     put("last_updated", "")
@@ -134,8 +132,6 @@ object CacheManager {
 
                 for (doc in financesDocs) {
                     when (doc.id) {
-                        // OLD "Cash" DOCUMENT BLOCK IS COMPLETELY REMOVED
-
                         "Bank" -> {
                             val dataMap = doc.data
                             val updateMap = mutableMapOf<String, Any>()
@@ -195,9 +191,6 @@ object CacheManager {
                             val qtrStr = "q${(currentMonth / 3) + 1}"
 
                             dataMap.forEach { (key, rawData) ->
-                                // ==========================================
-                                // NEW CASH LOGIC INSIDE BANK DOCUMENT
-                                // ==========================================
                                 if (key == "cash" && rawData is Map<*, *>) {
                                     val amnt = (rawData["amnt"] as? Number)?.toDouble() ?: 0.0
                                     val lastUpd = rawData["last update"]
@@ -209,9 +202,6 @@ object CacheManager {
                                     cashObj.put("amount", amnt)
                                     cashObj.put("last_updated", lastUpdStr)
                                 } 
-                                // ==========================================
-                                // EXISTING BANK ACCOUNTS LOGIC
-                                // ==========================================
                                 else if (key != "last_updated" && key != "cash" && rawData is Map<*, *>) {
                                     val rawBank = rawData
                                     val bName = rawBank["bank"]?.toString() ?: ""
@@ -364,6 +354,7 @@ object CacheManager {
                     }
                 }
 
+                // Phase 3: Firebase se sirf STATIC data load karna hai
                 val invDocs = userRef.collection("Investments").get().await()
                 val invArray = JSONArray()
                 for (doc in invDocs) {
@@ -372,8 +363,6 @@ object CacheManager {
                         put("asset_type", doc.getString("asset_type") ?: "Stock")
                         put("quantity", doc.getDouble("quantity") ?: 0.0)
                         put("buy_price", doc.getDouble("buy_price") ?: 0.0)
-                        put("current_price", doc.getDouble("current_price") ?: doc.getDouble("buy_price") ?: 0.0)
-                        put("one_day_change", doc.getDouble("one_day_change") ?: 0.0)
                     }
                     invArray.put(invObj)
                 }
@@ -486,9 +475,9 @@ object CacheManager {
                         assetName = item.optString("asset_name", ""),
                         assetType = item.optString("asset_type", "Stock"),
                         quantity = item.optDouble("quantity", 0.0), 
-                        avgBuyPrice = item.optDouble("buy_price", 0.0), 
-                        currentPrice = item.optDouble("current_price", item.optDouble("buy_price", 0.0)), 
-                        oneDayChangePrice = item.optDouble("one_day_change", 0.0)
+                        avgBuyPrice = item.optDouble("buy_price", 0.0),
+                        currentPrice = item.optDouble("buy_price", 0.0), // Setting static fallback
+                        oneDayChangePrice = 0.0 // Setting static fallback
                     )
                 ) 
             }
