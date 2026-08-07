@@ -15,7 +15,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -161,7 +160,8 @@ fun InvestmentSummaryCard(
 @Composable
 fun SummaryRow(label: String, amount: Double, percent: Double) {
     val isPositive = amount >= 0
-    val color = if (isPositive) Color(0xFF00A36C) else MaterialTheme.colorScheme.error
+    // Dynamic theme color injection for profit/loss
+    val color = if (isPositive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
     val sign = if (isPositive) "+" else ""
 
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -191,10 +191,11 @@ fun InvestmentListItem(item: InvestmentItem) {
     val totalRetPct = if (investedVal > 0) (totalRet / investedVal) * 100 else 0.0
     val oneDPct = if (item.currentPrice - item.oneDayChangePrice > 0) (item.oneDayChangePrice / (item.currentPrice - item.oneDayChangePrice)) * 100 else 0.0
 
-    val oneDayColor = if (item.oneDayChangePrice >= 0) Color(0xFF00A36C) else MaterialTheme.colorScheme.error
+    // Dynamic theme color injection for list items
+    val oneDayColor = if (item.oneDayChangePrice >= 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
     val oneDaySign = if (item.oneDayChangePrice >= 0) "+" else ""
     
-    val totalRetColor = if (totalRet >= 0) Color(0xFF00A36C) else MaterialTheme.colorScheme.error
+    val totalRetColor = if (totalRet >= 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
     val totalRetSign = if (totalRet >= 0) "+" else ""
 
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
