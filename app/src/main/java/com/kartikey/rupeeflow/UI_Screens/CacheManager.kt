@@ -4,6 +4,7 @@ import android.content.Context
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.kartikey.rupeeflow.Cloud_Database.Constants
 import com.kartikey.rupeeflow.UI_Screens.Add.TransactionModel
 import com.kartikey.rupeeflow.UI_Screens.Assets.InvestmentItem
 import com.kartikey.rupeeflow.UI_Screens.Assets.BankAccountItem
@@ -14,6 +15,8 @@ import com.kartikey.rupeeflow.UI_Screens.Home.ContriRoomModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import org.json.JSONArray
 import org.json.JSONObject
 import java.text.SimpleDateFormat
@@ -355,7 +358,52 @@ object CacheManager {
                 }
 
                 // ==========================================
-                // FETCH INVESTMENTS EXACTLY FROM "invest" MAP
+                // GLOBAL BACKGROUND FETCH: LIVE MARKET DATA
+                // ==========================================
+                val liveMap = mutableMapOf<String, Pair<Double, Double>>()
+                try {
+                    val client = OkHttpClient()
+                    val request = Request.Builder()
+                        .url(Constants.GOOGLE_SHEET_API_URL)
+                        .header("Accept", "application/json")
+                        .build()
+                        
+                    val response = client.newCall(request).execute()
+                    val responseData = response.body?.string() ?: ""
+
+                    if (response.isSuccessful && responseData.isNotEmpty()) {
+                        val json = JSONObject(responseData)
+                        if (json.optString("status") == "success") {
+                            val dataObj = json.optJSONObject("data")
+                            fun extractCategory(category: String) {
+                                val arr = dataObj?.optJSONArray(category)
+                                if (arr != null) {
+                                    for (i in 0 until arr.length()) {
+                                        val item = arr.getJSONObject(i)
+                                        val rawTicker = item.optString("ticker", "").trim().uppercase()
+                                        val price = item.optString("live_price").toDoubleOrNull() ?: item.optDouble("live_price", 0.0)
+                                        val changeRs = item.optString("change_rs").toDoubleOrNull() ?: item.optDouble("change_rs", 0.0)
+                                        
+                                        if (rawTicker.isNotEmpty() && price > 0) {
+                                            // Automatically maps "NSE:SBIN" to "SBIN" so it connects with Firebase DB effortlessly
+                                            val cleanKey = if (rawTicker.contains(":")) rawTicker.substringAfter(":") else rawTicker
+                                            liveMap[cleanKey] = Pair(price, changeRs)
+                                        }
+                                    }
+                                }
+                            }
+                            extractCategory("stocks")
+                            extractCategory("mutual_funds")
+                            extractCategory("etfs")
+                            extractCategory("bonds")
+                        }
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace() // Graceful failure, if offline it will just use buy_price
+                }
+
+                // ==========================================
+                // MERGE FIREBASE WITH LIVE MARKET DATA
                 // ==========================================
                 val investMap = userDoc.get("invest") as? Map<String, Any> ?: emptyMap()
                 val invArray = JSONArray()
@@ -363,11 +411,21 @@ object CacheManager {
                 for ((key, value) in investMap) {
                     val itemData = value as? Map<String, Any>
                     if (itemData != null) {
+                        val dbName = itemData["name"]?.toString()?.trim()?.uppercase() ?: ""
+                        val buyPrice = (itemData["avg"] as? Number)?.toDouble() ?: 0.0
+                        
+                        // Map using the clean ticker (e.g. SBIN)
+                        val liveData = liveMap[dbName]
+                        val currentPrice = liveData?.first ?: buyPrice
+                        val oneDayChange = liveData?.second ?: 0.0
+                        
                         val invObj = JSONObject().apply {
-                            put("asset_name", itemData["name"]?.toString() ?: "")
+                            put("asset_name", dbName) // Ensures only SBIN is saved in app state
                             put("asset_type", itemData["type"]?.toString() ?: "Stock")
                             put("quantity", (itemData["qnt"] as? Number)?.toDouble() ?: 0.0)
-                            put("buy_price", (itemData["avg"] as? Number)?.toDouble() ?: 0.0)
+                            put("buy_price", buyPrice)
+                            put("current_price", currentPrice)
+                            put("one_day_change", oneDayChange)
                         }
                         invArray.put(invObj)
                     }
@@ -399,7 +457,7 @@ object CacheManager {
                     put("banks", banksArray)
                     put("fds", fdArray)
                     put("credit_cards", ccArray)
-                    put("investments", invArray)
+                    put("investments", invArray) // Fully synced with live prices
                     put("contri_rooms", contriArray)
                 }
 
@@ -482,8 +540,8 @@ object CacheManager {
                         assetType = item.optString("asset_type", "Stock"),
                         quantity = item.optDouble("quantity", 0.0), 
                         avgBuyPrice = item.optDouble("buy_price", 0.0),
-                        currentPrice = item.optDouble("buy_price", 0.0), // Initial fallback
-                        oneDayChangePrice = 0.0 // Initial fallback
+                        currentPrice = item.optDouble("current_price", item.optDouble("buy_price", 0.0)),
+                        oneDayChangePrice = item.optDouble("one_day_change", 0.0)
                     )
                 ) 
             }
