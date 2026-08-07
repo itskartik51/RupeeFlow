@@ -144,27 +144,35 @@ fun InsideContriScreen(
                     }
 
                     val membersMap = mutableMapOf<String, MemberLedger>()
+                    
+                    // PHASE 3: Fetching entire room data from Master Map "expenses_data"
+                    val expensesData = contriDoc.get("expenses_data") as? Map<String, Any> ?: emptyMap()
+
                     for (mId in memberIds) {
                         val uDoc = db.collection("Users").document(mId).get().await()
                         val actualName = uDoc.getString("name") ?: uDoc.getString("username") ?: "Unknown User"
                         
-                        val userExpDocs = contriDoc.reference.collection(mId).get().await()
+                        val userExpMap = expensesData[mId] as? Map<String, Any> ?: emptyMap()
                         var userSpent = 0.0
                         val expList = mutableListOf<ContriExpense>()
                         
-                        for (doc in userExpDocs) {
-                            val item = doc.getString("item_name") ?: "Unknown"
-                            val rawAmt = doc.get("amount")
+                        // Sorting Keys (000A, 000B...) so sequence remains intact
+                        val sortedKeys = userExpMap.keys.sorted()
+                        
+                        for (key in sortedKeys) {
+                            val expObj = userExpMap[key] as? Map<String, Any> ?: continue
+                            val item = expObj["itm"]?.toString() ?: "Unknown"
+                            val rawAmt = expObj["amnt"]
                             val amt = if (rawAmt is Number) rawAmt.toDouble() else 0.0
                             
-                            val rawDate = doc.get("date")
+                            val rawDate = expObj["date"]
                             val formattedDate = if (rawDate is com.google.firebase.Timestamp) {
                                 SimpleDateFormat("dd MMMM", Locale.getDefault()).format(rawDate.toDate())
                             } else if (rawDate is String) {
                                 try {
                                     val parsed = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).parse(rawDate)
                                     if (parsed != null) SimpleDateFormat("dd MMMM", Locale.getDefault()).format(parsed) else rawDate
-                                } catch (e: Exception) { rawDate }
+                                } catch (e: Exception) { rawDate.toString() }
                             } else {
                                 ""
                             }
@@ -469,7 +477,7 @@ fun InsideContriScreen(
         }
 
         // ==========================================
-        // DIALOG TRIGGERS (Phase 2 Extracted)
+        // DIALOG TRIGGERS 
         // ==========================================
 
         if (showSettingsDialog) {
@@ -517,17 +525,22 @@ fun InsideContriScreen(
                             val q = db.collection("Contri").whereEqualTo("contri_code", room.roomCode).get().await()
                             if (!q.isEmpty) {
                                 val doc = q.documents[0]
+                                
+                                // Clean Map Deduction Logic
+                                val expensesData = doc.get("expenses_data") as? Map<String, Any> ?: emptyMap()
+                                val userExpMap = expensesData[targetUserId] as? Map<String, Any> ?: emptyMap()
+                                
                                 var amountToDeduct = 0.0
-                                val userExpDocs = doc.reference.collection(targetUserId).get().await()
-                                for (eDoc in userExpDocs) {
-                                    val amt = eDoc.getDouble("amount") ?: 0.0
+                                for ((_, expObj) in userExpMap) {
+                                    val mapObj = expObj as? Map<String, Any> ?: continue
+                                    val amt = (mapObj["amnt"] as? Number)?.toDouble() ?: 0.0
                                     amountToDeduct += amt
-                                    eDoc.reference.delete().await()
                                 }
 
                                 doc.reference.update(
                                     "total_group_expense", FieldValue.increment(-amountToDeduct),
-                                    "member_ids", FieldValue.arrayRemove(targetUserId)
+                                    "member_ids", FieldValue.arrayRemove(targetUserId),
+                                    "expenses_data.$targetUserId", FieldValue.delete() // Master Delete User map
                                 ).await()
                                 
                                 val targetUserDocRef = db.collection("Users").document(targetUserId)
@@ -572,13 +585,13 @@ fun InsideContriScreen(
                             if (!q.isEmpty) {
                                 val doc = q.documents[0]
                                 val ref = doc.reference
-                                val activeUsers = (doc.get("member_ids") as? List<*>)?.map { it.toString() } ?: emptyList()
                                 
-                                for (mId in activeUsers) {
-                                    val userExpDocs = ref.collection(mId).get().await()
-                                    for (eDoc in userExpDocs) { eDoc.reference.delete().await() }
-                                }
-                                ref.update("total_group_expense", 0.0).await()
+                                // Master map reset for new cycle
+                                ref.update(
+                                    "total_group_expense", 0.0,
+                                    "expenses_data", emptyMap<String, Any>()
+                                ).await()
+                                
                                 withContext(Dispatchers.Main) { 
                                     actionProcessing = false
                                     refreshTrigger++ 
@@ -606,17 +619,22 @@ fun InsideContriScreen(
                             val q = db.collection("Contri").whereEqualTo("contri_code", room.roomCode).get().await()
                             if (!q.isEmpty) {
                                 val doc = q.documents[0]
+                                
+                                // Clean Map Deduction Logic for leaving
+                                val expensesData = doc.get("expenses_data") as? Map<String, Any> ?: emptyMap()
+                                val userExpMap = expensesData[currentUserId] as? Map<String, Any> ?: emptyMap()
+                                
                                 var amountToDeduct = 0.0
-                                val userExpDocs = doc.reference.collection(currentUserId).get().await()
-                                for (eDoc in userExpDocs) {
-                                    val amt = eDoc.getDouble("amount") ?: 0.0
+                                for ((_, expObj) in userExpMap) {
+                                    val mapObj = expObj as? Map<String, Any> ?: continue
+                                    val amt = (mapObj["amnt"] as? Number)?.toDouble() ?: 0.0
                                     amountToDeduct += amt
-                                    eDoc.reference.delete().await()
                                 }
 
                                 doc.reference.update(
                                     "total_group_expense", FieldValue.increment(-amountToDeduct),
-                                    "member_ids", FieldValue.arrayRemove(currentUserId)
+                                    "member_ids", FieldValue.arrayRemove(currentUserId),
+                                    "expenses_data.$currentUserId", FieldValue.delete() // Wipe from map
                                 ).await()
                                 
                                 val currentUserDocRef = db.collection("Users").document(currentUserId)
@@ -655,23 +673,28 @@ fun InsideContriScreen(
                             val q = db.collection("Contri").whereEqualTo("contri_code", room.roomCode).get().await()
                             
                             if (!q.isEmpty) {
-                                val ref = q.documents[0].reference
-                                val userCol = ref.collection(currentUserId)
-                                val existingDocs = userCol.get().await()
-                                val nextIndex = existingDocs.size() + 1
-                                val formattedIndex = String.format(Locale.US, "%03d", nextIndex)
+                                val doc = q.documents[0]
+                                val ref = doc.reference
                                 
-                                val safeTitle = title.filter { it.isLetterOrDigit() }
-                                val customDocId = "${formattedIndex}_${safeTitle}"
+                                // Sequence Generator Map Logic
+                                val expensesData = doc.get("expenses_data") as? Map<String, Any> ?: emptyMap()
+                                val userExpMap = expensesData[currentUserId] as? Map<String, Any> ?: emptyMap()
+                                
+                                val nextIndex = userExpMap.size
+                                val expenseId = generateExpenseId(nextIndex)
 
-                                val transData = hashMapOf(
-                                    "item_name" to title,
-                                    "amount" to amount,
+                                val transData = mapOf(
+                                    "itm" to title,
+                                    "amnt" to amount,
                                     "date" to com.google.firebase.Timestamp(Date(dateMillis))
                                 )
                                 
-                                userCol.document(customDocId).set(transData).await()
-                                ref.update("total_group_expense", FieldValue.increment(amount)).await()
+                                val updates = hashMapOf<String, Any>(
+                                    "expenses_data.$currentUserId.$expenseId" to transData,
+                                    "total_group_expense" to FieldValue.increment(amount)
+                                )
+                                
+                                ref.update(updates).await()
                                 
                                 withContext(Dispatchers.Main) { 
                                     actionProcessing = false
@@ -1167,4 +1190,17 @@ fun PremiumFloatingButton(onClick: () -> Unit) {
     ) { 
         Icon(imageVector = Icons.Outlined.Add, contentDescription = "Add Expense", tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(28.dp)) 
     }
+}
+
+// ==========================================
+// BASE-26 ID GENERATOR (000A, 000B... 000Z, 00AA)
+// ==========================================
+fun generateExpenseId(index: Int): String {
+    var n = index
+    var result = ""
+    while (n >= 0) {
+        result = ('A' + (n % 26)).toString() + result
+        n = (n / 26) - 1
+    }
+    return result.padStart(4, '0')
 }
