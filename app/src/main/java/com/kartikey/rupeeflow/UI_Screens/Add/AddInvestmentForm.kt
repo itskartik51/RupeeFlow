@@ -30,6 +30,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -276,7 +277,6 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                         onDismiss() 
                         
                         CoroutineScope(Dispatchers.IO).launch {
-                            // 1. EXACT "invest" map root-level implementation
                             try {
                                 val db = FirebaseFirestore.getInstance()
                                 val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
@@ -304,7 +304,6 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                                 e.printStackTrace()
                             }
 
-                            // 2. Silent Ping to Google Sheet for Auto-Append
                             try {
                                 val client = OkHttpClient()
                                 val jsonPayload = JSONObject().apply {
