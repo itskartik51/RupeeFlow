@@ -40,12 +40,10 @@ fun InvestmentScreen(
     isLoading: Boolean = false, 
     onRefreshClick: () -> Unit = {}
 ) { 
-    // Live List to hold merged data (Static Firebase + Live Google Sheet)
     var liveInvestmentList by remember(investmentList) { mutableStateOf(investmentList) }
     var isFetchingLive by remember { mutableStateOf(false) }
     var apiRefreshTrigger by remember { mutableIntStateOf(0) }
 
-    // Direct API Call Logic to map Live Market Prices
     LaunchedEffect(investmentList, apiRefreshTrigger) {
         if (investmentList.isEmpty()) return@LaunchedEffect
 
@@ -55,6 +53,7 @@ fun InvestmentScreen(
                 val client = OkHttpClient()
                 val request = Request.Builder()
                     .url(Constants.GOOGLE_SHEET_API_URL)
+                    .header("Accept", "application/json")
                     .build()
                     
                 val response = client.newCall(request).execute()
@@ -66,15 +65,24 @@ fun InvestmentScreen(
                         val dataObj = json.optJSONObject("data")
                         val liveMap = mutableMapOf<String, Pair<Double, Double>>()
 
+                        // Robust Extractor to handle Strings and Double from Google Sheets
                         fun extractCategory(category: String) {
                             val arr = dataObj?.optJSONArray(category)
                             if (arr != null) {
                                 for (i in 0 until arr.length()) {
                                     val item = arr.getJSONObject(i)
-                                    val ticker = item.optString("ticker")
-                                    val price = item.optDouble("live_price", 0.0)
-                                    val changeRs = item.optDouble("change_rs", 0.0)
-                                    liveMap[ticker] = Pair(price, changeRs)
+                                    val rawTicker = item.optString("ticker", "").trim().uppercase()
+                                    
+                                    val price = item.optString("live_price").toDoubleOrNull() ?: item.optDouble("live_price", 0.0)
+                                    val changeRs = item.optString("change_rs").toDoubleOrNull() ?: item.optDouble("change_rs", 0.0)
+                                    
+                                    if (rawTicker.isNotEmpty() && price > 0) {
+                                        liveMap[rawTicker] = Pair(price, changeRs)
+                                        // Create a fallback key without "NSE:" prefix so aggressive matching works
+                                        if (rawTicker.contains(":")) {
+                                            liveMap[rawTicker.substringAfter(":")] = Pair(price, changeRs)
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -87,15 +95,21 @@ fun InvestmentScreen(
                         if(bondsArr != null) {
                             for(i in 0 until bondsArr.length()) {
                                 val item = bondsArr.getJSONObject(i)
-                                val ticker = item.optString("ticker")
-                                val price = item.optDouble("live_price", 0.0)
-                                liveMap[ticker] = Pair(price, 0.0) 
+                                val rawTicker = item.optString("ticker", "").trim().uppercase()
+                                val price = item.optString("live_price").toDoubleOrNull() ?: item.optDouble("live_price", 0.0)
+                                if (rawTicker.isNotEmpty() && price > 0) {
+                                    liveMap[rawTicker] = Pair(price, 0.0)
+                                    if (rawTicker.contains(":")) liveMap[rawTicker.substringAfter(":")] = Pair(price, 0.0)
+                                }
                             }
                         }
 
-                        // Map live data into the static list
+                        // Map Live Data strictly matching formatting
                         val updatedList = investmentList.map { inv ->
-                            val liveData = liveMap[inv.assetName] 
+                            val invKey = inv.assetName.trim().uppercase()
+                            
+                            val liveData = liveMap[invKey] ?: liveMap[invKey.substringAfter(":")]
+                            
                             if (liveData != null) {
                                 inv.copy(
                                     currentPrice = liveData.first,
@@ -124,7 +138,6 @@ fun InvestmentScreen(
         }
     }
 
-    // Dynamic Calculations based on the newly mapped Live List
     val totalInvested = liveInvestmentList.sumOf { it.quantity * it.avgBuyPrice }
     val totalCurrent = liveInvestmentList.sumOf { it.quantity * it.currentPrice }
     val total1DChange = liveInvestmentList.sumOf { it.quantity * it.oneDayChangePrice }
@@ -163,8 +176,8 @@ fun InvestmentScreen(
                     totalInvested = totalInvested,
                     isLoading = isLoading || isFetchingLive, 
                     onRefreshClick = {
-                        onRefreshClick() // Re-fetch Firebase if needed
-                        apiRefreshTrigger++ // Re-fetch Live Sheet
+                        onRefreshClick() 
+                        apiRefreshTrigger++ 
                     }
                 )
                 Spacer(modifier = Modifier.height(24.dp))
