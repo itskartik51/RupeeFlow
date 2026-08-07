@@ -42,7 +42,6 @@ data class InvestmentItem(
     val oneDayChangePrice: Double
 )
 
-// PERFECT MAPPING: Phase 2 JSON seamlessly connects with this Data Class
 data class BankAccountItem(
     val bankName: String,
     val accountNo: String,
@@ -73,15 +72,16 @@ fun AssetsScreen(
     onEditCCClick: (CreditCardItem) -> Unit,
     onEditFDClick: (FDItem) -> Unit
 ) { 
-    val totalBank = bankList.sumOf { it.currentBalance }
-    val totalCash = cashData.amount
-    val totalFD = fdList.sumOf { it.accruedValue }
-    val totalCC = ccList.sumOf { it.outstanding }
-    val totalInv = investmentList.sumOf { it.quantity * it.currentPrice }
-    
-    val networthAmount = totalBank + totalCash + totalFD + totalInv - totalCC
-
     if (currentView == "Main") {
+        // App-level On-the-fly Calculations (Zero API Calls)
+        val totalBank = bankList.sumOf { it.currentBalance }
+        val totalCash = cashData.amount
+        val totalFD = fdList.sumOf { it.accruedValue }
+        val totalCC = ccList.sumOf { it.outstanding }
+        val totalInv = investmentList.sumOf { it.quantity * it.currentPrice }
+        
+        val networthAmount = totalBank + totalCash + totalFD + totalInv - totalCC
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -90,7 +90,11 @@ fun AssetsScreen(
                 .verticalScroll(rememberScrollState()) 
                 .padding(16.dp)
         ) {
-            NetworthCard(networthAmount = networthAmount, isLoading = isLoading, onClick = { })
+            NetworthCard(
+                networthAmount = networthAmount, 
+                isLoading = isLoading, 
+                onClick = { onRefreshClick() }
+            )
             Spacer(modifier = Modifier.height(24.dp))
             
             Text(text = "My Investments", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.onBackground, modifier = Modifier.padding(horizontal = 4.dp))
