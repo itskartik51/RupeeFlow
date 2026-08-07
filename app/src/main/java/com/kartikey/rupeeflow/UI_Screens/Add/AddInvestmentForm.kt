@@ -277,6 +277,7 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                         onDismiss() 
                         
                         CoroutineScope(Dispatchers.IO).launch {
+                            // Structuring data into the 'invest' Map field directly inside root User document
                             try {
                                 val db = FirebaseFirestore.getInstance()
                                 val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
@@ -298,12 +299,14 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                                         "amnt" to (qty * price)
                                     )
                                     
+                                    // Direct field update logic mapping exactly to image_52ba1e.png
                                     userRef.update("invest.$newKey", newInvestment).await()
                                 }
                             } catch (e: Exception) {
                                 e.printStackTrace()
                             }
 
+                            // Sheet Auto-append ping logic
                             try {
                                 val client = OkHttpClient()
                                 val jsonPayload = JSONObject().apply {
