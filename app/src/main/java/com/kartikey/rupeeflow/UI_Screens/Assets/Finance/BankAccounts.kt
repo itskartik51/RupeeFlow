@@ -411,9 +411,3 @@ fun MetricItem(label: String, value: String, valueColor: Color, alignment: Align
         Text(text = value, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = valueColor)
     }
 }
-
-fun formatRupeeAmount(amount: Double): String {
-    val format = NumberFormat.getCurrencyInstance(Locale("en", "IN"))
-    format.maximumFractionDigits = 2
-    return format.format(amount).replace("-₹", "-₹ ")
-}
