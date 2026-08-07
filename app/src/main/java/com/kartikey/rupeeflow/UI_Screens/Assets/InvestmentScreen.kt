@@ -21,13 +21,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.kartikey.rupeeflow.Cloud_Database.Constants
 import com.kartikey.rupeeflow.UI_Screens.bounceClick
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import org.json.JSONObject
 import java.text.NumberFormat
 import java.util.Locale
 
@@ -40,107 +34,9 @@ fun InvestmentScreen(
     isLoading: Boolean = false, 
     onRefreshClick: () -> Unit = {}
 ) { 
-    var liveInvestmentList by remember(investmentList) { mutableStateOf(investmentList) }
-    var isFetchingLive by remember { mutableStateOf(false) }
-    var apiRefreshTrigger by remember { mutableIntStateOf(0) }
-
-    LaunchedEffect(investmentList, apiRefreshTrigger) {
-        if (investmentList.isEmpty()) return@LaunchedEffect
-
-        isFetchingLive = true
-        withContext(Dispatchers.IO) {
-            try {
-                val client = OkHttpClient()
-                val request = Request.Builder()
-                    .url(Constants.GOOGLE_SHEET_API_URL)
-                    .header("Accept", "application/json")
-                    .build()
-                    
-                val response = client.newCall(request).execute()
-                val responseData = response.body?.string() ?: ""
-
-                if (response.isSuccessful && responseData.isNotEmpty()) {
-                    val json = JSONObject(responseData)
-                    if (json.optString("status") == "success") {
-                        val dataObj = json.optJSONObject("data")
-                        val liveMap = mutableMapOf<String, Pair<Double, Double>>()
-
-                        // Robust Extractor to handle Strings and Double from Google Sheets
-                        fun extractCategory(category: String) {
-                            val arr = dataObj?.optJSONArray(category)
-                            if (arr != null) {
-                                for (i in 0 until arr.length()) {
-                                    val item = arr.getJSONObject(i)
-                                    val rawTicker = item.optString("ticker", "").trim().uppercase()
-                                    
-                                    val price = item.optString("live_price").toDoubleOrNull() ?: item.optDouble("live_price", 0.0)
-                                    val changeRs = item.optString("change_rs").toDoubleOrNull() ?: item.optDouble("change_rs", 0.0)
-                                    
-                                    if (rawTicker.isNotEmpty() && price > 0) {
-                                        liveMap[rawTicker] = Pair(price, changeRs)
-                                        // Create a fallback key without "NSE:" prefix so aggressive matching works
-                                        if (rawTicker.contains(":")) {
-                                            liveMap[rawTicker.substringAfter(":")] = Pair(price, changeRs)
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        extractCategory("stocks")
-                        extractCategory("mutual_funds")
-                        extractCategory("etfs")
-                        
-                        val bondsArr = dataObj?.optJSONArray("bonds")
-                        if(bondsArr != null) {
-                            for(i in 0 until bondsArr.length()) {
-                                val item = bondsArr.getJSONObject(i)
-                                val rawTicker = item.optString("ticker", "").trim().uppercase()
-                                val price = item.optString("live_price").toDoubleOrNull() ?: item.optDouble("live_price", 0.0)
-                                if (rawTicker.isNotEmpty() && price > 0) {
-                                    liveMap[rawTicker] = Pair(price, 0.0)
-                                    if (rawTicker.contains(":")) liveMap[rawTicker.substringAfter(":")] = Pair(price, 0.0)
-                                }
-                            }
-                        }
-
-                        // Map Live Data strictly matching formatting
-                        val updatedList = investmentList.map { inv ->
-                            val invKey = inv.assetName.trim().uppercase()
-                            
-                            val liveData = liveMap[invKey] ?: liveMap[invKey.substringAfter(":")]
-                            
-                            if (liveData != null) {
-                                inv.copy(
-                                    currentPrice = liveData.first,
-                                    oneDayChangePrice = liveData.second
-                                )
-                            } else {
-                                inv.copy(
-                                    currentPrice = if (inv.currentPrice > 0) inv.currentPrice else inv.avgBuyPrice,
-                                    oneDayChangePrice = 0.0
-                                )
-                            }
-                        }
-
-                        withContext(Dispatchers.Main) {
-                            liveInvestmentList = updatedList
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            } finally {
-                withContext(Dispatchers.Main) {
-                    isFetchingLive = false
-                }
-            }
-        }
-    }
-
-    val totalInvested = liveInvestmentList.sumOf { it.quantity * it.avgBuyPrice }
-    val totalCurrent = liveInvestmentList.sumOf { it.quantity * it.currentPrice }
-    val total1DChange = liveInvestmentList.sumOf { it.quantity * it.oneDayChangePrice }
+    val totalInvested = investmentList.sumOf { it.quantity * it.avgBuyPrice }
+    val totalCurrent = investmentList.sumOf { it.quantity * it.currentPrice }
+    val total1DChange = investmentList.sumOf { it.quantity * it.oneDayChangePrice }
     val totalReturn = totalCurrent - totalInvested
     val totalReturnPercent = if (totalInvested > 0) (totalReturn / totalInvested) * 100 else 0.0
     val total1DPercent = if (totalCurrent - total1DChange > 0) (total1DChange / (totalCurrent - total1DChange)) * 100 else 0.0
@@ -167,18 +63,15 @@ fun InvestmentScreen(
         ) {
             item {
                 InvestmentSummaryCard(
-                    itemCount = liveInvestmentList.size,
+                    itemCount = investmentList.size,
                     totalCurrent = totalCurrent,
                     total1DChange = total1DChange,
                     total1DPercent = total1DPercent,
                     totalReturn = totalReturn,
                     totalReturnPercent = totalReturnPercent,
                     totalInvested = totalInvested,
-                    isLoading = isLoading || isFetchingLive, 
-                    onRefreshClick = {
-                        onRefreshClick() 
-                        apiRefreshTrigger++ 
-                    }
+                    isLoading = isLoading, 
+                    onRefreshClick = onRefreshClick
                 )
                 Spacer(modifier = Modifier.height(24.dp))
                 
@@ -186,7 +79,7 @@ fun InvestmentScreen(
                 Spacer(modifier = Modifier.height(8.dp))
             }
 
-            items(liveInvestmentList) { item ->
+            items(investmentList) { item ->
                 InvestmentListItem(item)
                 HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), thickness = 1.dp, modifier = Modifier.padding(vertical = 8.dp))
             }
