@@ -17,7 +17,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.SetOptions
 import com.kartikey.rupeeflow.Cloud_Database.Constants
 import com.kartikey.rupeeflow.UI_Screens.bounceClick
 import kotlinx.coroutines.CoroutineScope
@@ -40,7 +39,6 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
     var selectedSymbol by remember { mutableStateOf("") } 
     var quantity by remember { mutableStateOf("") }
     var buyPrice by remember { mutableStateOf("") }
-    var date by remember { mutableStateOf("") } 
     
     var typeExpanded by remember { mutableStateOf(false) }
     var searchExpanded by remember { mutableStateOf(false) }
@@ -230,7 +228,6 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                                     }
                                 },
                                 onClick = {
-                                    // Always append NSE: or BSE: based on the raw symbol to match the Sheet format
                                     val prefix = if (row.rawSymbol.endsWith(".NS")) "NSE:" else if (row.rawSymbol.endsWith(".BO")) "BOM:" else ""
                                     val cleanSymbol = prefix + row.rawSymbol.replace(".NS", "").replace(".BO", "")
                                     
@@ -266,16 +263,6 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                 )
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            OutlinedTextField(
-                value = date, onValueChange = { date = it },
-                label = { Text("Date (Optional)") },
-                modifier = Modifier.fillMaxWidth(), singleLine = true,
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary, unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), focusedTextColor = MaterialTheme.colorScheme.onSurface, unfocusedTextColor = MaterialTheme.colorScheme.onSurface)
-            )
-
             Spacer(modifier = Modifier.height(24.dp))
 
             Button(
@@ -289,20 +276,29 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                         onDismiss() 
                         
                         CoroutineScope(Dispatchers.IO).launch {
-                            // 1. Static Data Save to Firebase
+                            // 1. EXACT "invest" map root-level implementation
                             try {
                                 val db = FirebaseFirestore.getInstance()
                                 val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
+                                
                                 if (!userQuery.isEmpty) {
-                                    val userRef = userQuery.documents[0].reference
-                                    val invData = hashMapOf<String, Any>(
-                                        "asset_name" to selectedSymbol,
-                                        "asset_type" to assetType,
-                                        "quantity" to qty,
-                                        "buy_price" to price,
-                                        "inv_date" to date
+                                    val userDoc = userQuery.documents[0]
+                                    val userRef = userDoc.reference
+                                    
+                                    val investMap = userDoc.get("invest") as? Map<String, Any> ?: emptyMap()
+                                    
+                                    val maxKey = investMap.keys.mapNotNull { it.toIntOrNull() }.maxOrNull() ?: 0
+                                    val newKey = String.format(Locale.US, "%03d", maxKey + 1)
+                                    
+                                    val newInvestment = mapOf(
+                                        "name" to selectedSymbol,
+                                        "type" to assetType,
+                                        "qnt" to qty,
+                                        "avg" to price,
+                                        "amnt" to (qty * price)
                                     )
-                                    userRef.collection("Investments").document(selectedSymbol).set(invData, SetOptions.merge()).await()
+                                    
+                                    userRef.update("invest.$newKey", newInvestment).await()
                                 }
                             } catch (e: Exception) {
                                 e.printStackTrace()
@@ -330,7 +326,7 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                             }
                         }
                     } else {
-                        Toast.makeText(context, "Please select an Asset from the search list, and enter valid Quantity & Price", Toast.LENGTH_LONG).show()
+                        Toast.makeText(context, "Please select an Asset and enter valid Details", Toast.LENGTH_LONG).show()
                     }
                 },
                 modifier = Modifier
