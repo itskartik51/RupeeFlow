@@ -21,7 +21,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.kartikey.rupeeflow.Cloud_Database.Constants
 import com.kartikey.rupeeflow.UI_Screens.bounceClick
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import org.json.JSONObject
 import java.text.NumberFormat
 import java.util.Locale
 
@@ -34,9 +40,94 @@ fun InvestmentScreen(
     isLoading: Boolean = false, 
     onRefreshClick: () -> Unit = {}
 ) { 
-    val totalInvested = investmentList.sumOf { it.quantity * it.avgBuyPrice }
-    val totalCurrent = investmentList.sumOf { it.quantity * it.currentPrice }
-    val total1DChange = investmentList.sumOf { it.quantity * it.oneDayChangePrice }
+    // Live List to hold merged data (Static Firebase + Live Google Sheet)
+    var liveInvestmentList by remember(investmentList) { mutableStateOf(investmentList) }
+    var isFetchingLive by remember { mutableStateOf(false) }
+    var apiRefreshTrigger by remember { mutableIntStateOf(0) }
+
+    // Direct API Call Logic to map Live Market Prices
+    LaunchedEffect(investmentList, apiRefreshTrigger) {
+        if (investmentList.isEmpty()) return@LaunchedEffect
+
+        isFetchingLive = true
+        withContext(Dispatchers.IO) {
+            try {
+                val client = OkHttpClient()
+                val request = Request.Builder()
+                    .url(Constants.GOOGLE_SHEET_API_URL)
+                    .build()
+                    
+                val response = client.newCall(request).execute()
+                val responseData = response.body?.string() ?: ""
+
+                if (response.isSuccessful && responseData.isNotEmpty()) {
+                    val json = JSONObject(responseData)
+                    if (json.optString("status") == "success") {
+                        val dataObj = json.optJSONObject("data")
+                        val liveMap = mutableMapOf<String, Pair<Double, Double>>()
+
+                        fun extractCategory(category: String) {
+                            val arr = dataObj?.optJSONArray(category)
+                            if (arr != null) {
+                                for (i in 0 until arr.length()) {
+                                    val item = arr.getJSONObject(i)
+                                    val ticker = item.optString("ticker")
+                                    val price = item.optDouble("live_price", 0.0)
+                                    val changeRs = item.optDouble("change_rs", 0.0)
+                                    liveMap[ticker] = Pair(price, changeRs)
+                                }
+                            }
+                        }
+
+                        extractCategory("stocks")
+                        extractCategory("mutual_funds")
+                        extractCategory("etfs")
+                        
+                        val bondsArr = dataObj?.optJSONArray("bonds")
+                        if(bondsArr != null) {
+                            for(i in 0 until bondsArr.length()) {
+                                val item = bondsArr.getJSONObject(i)
+                                val ticker = item.optString("ticker")
+                                val price = item.optDouble("live_price", 0.0)
+                                liveMap[ticker] = Pair(price, 0.0) 
+                            }
+                        }
+
+                        // Map live data into the static list
+                        val updatedList = investmentList.map { inv ->
+                            val liveData = liveMap[inv.assetName] 
+                            if (liveData != null) {
+                                inv.copy(
+                                    currentPrice = liveData.first,
+                                    oneDayChangePrice = liveData.second
+                                )
+                            } else {
+                                inv.copy(
+                                    currentPrice = if (inv.currentPrice > 0) inv.currentPrice else inv.avgBuyPrice,
+                                    oneDayChangePrice = 0.0
+                                )
+                            }
+                        }
+
+                        withContext(Dispatchers.Main) {
+                            liveInvestmentList = updatedList
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                withContext(Dispatchers.Main) {
+                    isFetchingLive = false
+                }
+            }
+        }
+    }
+
+    // Dynamic Calculations based on the newly mapped Live List
+    val totalInvested = liveInvestmentList.sumOf { it.quantity * it.avgBuyPrice }
+    val totalCurrent = liveInvestmentList.sumOf { it.quantity * it.currentPrice }
+    val total1DChange = liveInvestmentList.sumOf { it.quantity * it.oneDayChangePrice }
     val totalReturn = totalCurrent - totalInvested
     val totalReturnPercent = if (totalInvested > 0) (totalReturn / totalInvested) * 100 else 0.0
     val total1DPercent = if (totalCurrent - total1DChange > 0) (total1DChange / (totalCurrent - total1DChange)) * 100 else 0.0
@@ -63,15 +154,18 @@ fun InvestmentScreen(
         ) {
             item {
                 InvestmentSummaryCard(
-                    itemCount = investmentList.size,
+                    itemCount = liveInvestmentList.size,
                     totalCurrent = totalCurrent,
                     total1DChange = total1DChange,
                     total1DPercent = total1DPercent,
                     totalReturn = totalReturn,
                     totalReturnPercent = totalReturnPercent,
                     totalInvested = totalInvested,
-                    isLoading = isLoading, 
-                    onRefreshClick = onRefreshClick
+                    isLoading = isLoading || isFetchingLive, 
+                    onRefreshClick = {
+                        onRefreshClick() // Re-fetch Firebase if needed
+                        apiRefreshTrigger++ // Re-fetch Live Sheet
+                    }
                 )
                 Spacer(modifier = Modifier.height(24.dp))
                 
@@ -79,7 +173,7 @@ fun InvestmentScreen(
                 Spacer(modifier = Modifier.height(8.dp))
             }
 
-            items(investmentList) { item ->
+            items(liveInvestmentList) { item ->
                 InvestmentListItem(item)
                 HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), thickness = 1.dp, modifier = Modifier.padding(vertical = 8.dp))
             }
