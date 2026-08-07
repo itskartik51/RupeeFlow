@@ -578,6 +578,7 @@ fun CreateContriDialog(username: String, onDismiss: () -> Unit, onSuccess: () ->
                                     if (!userQuery.isEmpty) {
                                         val currentUserId = userQuery.documents[0].id
                                         
+                                        // Initializes the clean master map for the room
                                         val contriData = hashMapOf(
                                             "contri_code" to randomCode,
                                             "contri_date" to todayStr,
@@ -585,7 +586,8 @@ fun CreateContriDialog(username: String, onDismiss: () -> Unit, onSuccess: () ->
                                             "member_ids" to listOf(currentUserId),
                                             "admin_id" to currentUserId,
                                             "passkey" to pin,
-                                            "total_group_expense" to 0.0
+                                            "total_group_expense" to 0.0,
+                                            "expenses_data" to emptyMap<String, Any>() 
                                         )
                                         
                                         db.collection("Contri").document(docId).set(contriData).await()
