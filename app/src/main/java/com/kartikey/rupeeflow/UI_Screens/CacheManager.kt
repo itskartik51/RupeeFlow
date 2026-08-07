@@ -354,17 +354,23 @@ object CacheManager {
                     }
                 }
 
-                // Phase 3: Firebase se sirf STATIC data load karna hai
-                val invDocs = userRef.collection("Investments").get().await()
+                // ==========================================
+                // FETCH INVESTMENTS EXACTLY FROM "invest" MAP
+                // ==========================================
+                val investMap = userDoc.get("invest") as? Map<String, Any> ?: emptyMap()
                 val invArray = JSONArray()
-                for (doc in invDocs) {
-                    val invObj = JSONObject().apply {
-                        put("asset_name", doc.getString("asset_name") ?: doc.id)
-                        put("asset_type", doc.getString("asset_type") ?: "Stock")
-                        put("quantity", doc.getDouble("quantity") ?: 0.0)
-                        put("buy_price", doc.getDouble("buy_price") ?: 0.0)
+                
+                for ((key, value) in investMap) {
+                    val itemData = value as? Map<String, Any>
+                    if (itemData != null) {
+                        val invObj = JSONObject().apply {
+                            put("asset_name", itemData["name"]?.toString() ?: "")
+                            put("asset_type", itemData["type"]?.toString() ?: "Stock")
+                            put("quantity", (itemData["qnt"] as? Number)?.toDouble() ?: 0.0)
+                            put("buy_price", (itemData["avg"] as? Number)?.toDouble() ?: 0.0)
+                        }
+                        invArray.put(invObj)
                     }
-                    invArray.put(invObj)
                 }
 
                 val contriArray = JSONArray()
