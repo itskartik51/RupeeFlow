@@ -482,8 +482,8 @@ object CacheManager {
                         assetType = item.optString("asset_type", "Stock"),
                         quantity = item.optDouble("quantity", 0.0), 
                         avgBuyPrice = item.optDouble("buy_price", 0.0),
-                        currentPrice = item.optDouble("buy_price", 0.0), // Setting static fallback
-                        oneDayChangePrice = 0.0 // Setting static fallback
+                        currentPrice = item.optDouble("buy_price", 0.0), // Initial fallback
+                        oneDayChangePrice = 0.0 // Initial fallback
                     )
                 ) 
             }
