@@ -164,10 +164,10 @@ object CacheManager {
                     contriArray.put(JSONObject().apply {
                         put("room_name", cr.roomName)
                         put("room_code", cr.roomCode)
-                        put("passkey", cr.passkey)
+                        put("passkey", cr.pin) // Fixed: using pin
                         put("expenses", JSONArray().apply {
-                            if (cr.lastExpenseDate.isNotEmpty()) {
-                                put(JSONObject().apply { put("date", cr.lastExpenseDate) })
+                            if (cr.lastUpdated.isNotEmpty()) { // Fixed: using lastUpdated
+                                put(JSONObject().apply { put("date", cr.lastUpdated) }) // Fixed: using lastUpdated
                             }
                         })
                     })
