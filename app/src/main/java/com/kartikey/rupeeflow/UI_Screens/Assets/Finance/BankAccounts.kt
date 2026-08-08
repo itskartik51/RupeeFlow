@@ -311,7 +311,7 @@ fun QuickUpdateDialog(bank: BankAccountItem, username: String, onDismiss: () -> 
                                     onSuccess() 
                                 }
 
-                                // MASTERSTROKE: No Loop Searching! Direct Update using firebaseKey
+                                // 🔥 ULTIMATE MASTERSTROKE: USING FIELDPATH TO BYPASS DOT (.) ISSUE 🔥
                                 CoroutineScope(Dispatchers.IO).launch {
                                     try {
                                         val db = FirebaseFirestore.getInstance()
@@ -321,21 +321,19 @@ fun QuickUpdateDialog(bank: BankAccountItem, username: String, onDismiss: () -> 
                                             val userRef = userQuery.documents[0].reference
                                             val bankDocRef = userRef.collection("Finances").document("Bank")
                                             
-                                            val updates = hashMapOf<String, Any>(
-                                                "${bank.firebaseKey}.current bal." to newCalculatedBalance,
-                                                "${bank.firebaseKey}.6D bal. Block.$dayKey" to newCalculatedBalance,
-                                                "${bank.firebaseKey}.6D avg.$avg6dKey" to newCalculatedBalance,
-                                                "${bank.firebaseKey}.monthly avg.$monthKey" to newCalculatedBalance,
-                                                "${bank.firebaseKey}.qtr. avg.$qtrKey" to newCalculatedBalance,
-                                                "${bank.firebaseKey}.yr avg.cur" to newCalculatedBalance,
-                                                "${bank.firebaseKey}.1d int" to oneDayInt,
-                                                "${bank.firebaseKey}.exp qtr int" to expQtrInt,
-                                                "${bank.firebaseKey}.accrued qtr" to accruedQtr,
-                                                "${bank.firebaseKey}.exp yr int" to expYrInt,
-                                                "${bank.firebaseKey}.accrued yr" to accruedYr
-                                            )
-                                            
-                                            bankDocRef.update(updates).await()
+                                            bankDocRef.update(
+                                                com.google.firebase.firestore.FieldPath.of(bank.firebaseKey, "current bal."), newCalculatedBalance,
+                                                com.google.firebase.firestore.FieldPath.of(bank.firebaseKey, "6D bal. Block", dayKey), newCalculatedBalance,
+                                                com.google.firebase.firestore.FieldPath.of(bank.firebaseKey, "6D avg.", avg6dKey), newCalculatedBalance,
+                                                com.google.firebase.firestore.FieldPath.of(bank.firebaseKey, "monthly avg.", monthKey), newCalculatedBalance,
+                                                com.google.firebase.firestore.FieldPath.of(bank.firebaseKey, "qtr. avg.", qtrKey), newCalculatedBalance,
+                                                com.google.firebase.firestore.FieldPath.of(bank.firebaseKey, "yr avg", "cur"), newCalculatedBalance,
+                                                com.google.firebase.firestore.FieldPath.of(bank.firebaseKey, "1d int"), oneDayInt,
+                                                com.google.firebase.firestore.FieldPath.of(bank.firebaseKey, "exp qtr int"), expQtrInt,
+                                                com.google.firebase.firestore.FieldPath.of(bank.firebaseKey, "accrued qtr"), accruedQtr,
+                                                com.google.firebase.firestore.FieldPath.of(bank.firebaseKey, "exp yr int"), expYrInt,
+                                                com.google.firebase.firestore.FieldPath.of(bank.firebaseKey, "accrued yr"), accruedYr
+                                            ).await()
                                         }
                                     } catch (e: Exception) {}
                                 }
