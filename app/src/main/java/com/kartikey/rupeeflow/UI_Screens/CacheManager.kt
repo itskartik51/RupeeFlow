@@ -54,6 +54,136 @@ object CacheManager {
         }
     }
 
+    // ⚡ NEW: Optimistic Cache Update Function
+    // Call this immediately in ViewModel/UI to overwrite local DB for instant updates
+    fun updateOptimisticCache(context: Context, username: String, data: AppData) {
+        try {
+            val masterJson = JSONObject().apply {
+                put("status", "success")
+                put("profile", JSONObject().apply {
+                    put("name", data.userFullName)
+                    put("email", data.userEmail)
+                    put("mobile", data.userMobile)
+                    put("password", data.userPassword)
+                    put("dob", data.userDob)
+                })
+                put("budget_limit", data.budgetLimit)
+
+                val expArray = JSONArray()
+                // transactionList UI me reversed hai (newest first). JSON me wapas oldest first save karna hota hai.
+                data.transactionList.reversed().forEach { tx ->
+                    expArray.put(JSONObject().apply {
+                        put("date", tx.date)
+                        put("amount", tx.amount)
+                        put("category", tx.category)
+                        put("detail1", tx.remark1)
+                        put("detail2", tx.remark2)
+                        put("mode", tx.mode)
+                        put("source_type", tx.sourceType)
+                        put("source_id", tx.sourceId)
+                    })
+                }
+                put("expenses", expArray)
+
+                put("cash", JSONObject().apply {
+                    put("amount", data.cashData.amount)
+                    put("last_updated", data.cashData.lastUpdated)
+                })
+
+                val banksArray = JSONArray()
+                data.bankList.forEach { b ->
+                    banksArray.put(JSONObject().apply {
+                        put("bank_name", b.bankName)
+                        put("account_no", b.accountNo)
+                        put("current_bal", b.currentBalance)
+                        put("interest_rate", b.interestRate)
+                        put("qtr_interest_pct", b.qtrInterestPct)
+                        put("exp_qtr_int", b.expQtrInt)
+                        put("accrued_qtr_int", b.accruedQtrInt)
+                        put("exp_yr_int", b.expYrInt)
+                        put("accrued_yr_int", b.accruedYrInt)
+                        put("one_day_int", b.oneDayInt)
+                    })
+                }
+                put("banks", banksArray)
+
+                val fdArray = JSONArray()
+                data.fdList.forEach { fd ->
+                    fdArray.put(JSONObject().apply {
+                        put("bank_name", fd.bankName)
+                        put("account_no", fd.accountNo)
+                        put("create_date", fd.createDate)
+                        put("maturity_date", fd.maturityDate)
+                        put("days_to_maturity", fd.daysToMaturity)
+                        put("invested_amt", fd.investedAmt)
+                        put("interest_rate", fd.interestRate)
+                        put("maturity_value", fd.maturityValue)
+                        put("accrued_value", fd.accruedValue)
+                        put("accrued_int", fd.accruedInt)
+                        put("one_day_int", fd.oneDayInt)
+                    })
+                }
+                put("fds", fdArray)
+
+                val ccArray = JSONArray()
+                data.ccList.forEach { cc ->
+                    ccArray.put(JSONObject().apply {
+                        put("issuer", cc.issuer)
+                        put("card_no", cc.cardNo)
+                        put("type", cc.type)
+                        put("limit", cc.limit)
+                        put("outstanding", cc.outstanding)
+                        put("available", cc.available)
+                        put("utilization", cc.utilization)
+                        put("cibil_status", cc.cibilStatus)
+                        put("billing_day", cc.billingDay)
+                        put("due_day", cc.dueDay)
+                        put("reminder_day", cc.reminderDay)
+                        put("annual_fee", cc.annualFee)
+                        put("joining_fee", cc.joiningFee)
+                        put("last_used", cc.lastUsed)
+                    })
+                }
+                put("credit_cards", ccArray)
+
+                val invArray = JSONArray()
+                data.investmentList.forEach { inv ->
+                    invArray.put(JSONObject().apply {
+                        put("asset_name", inv.assetName)
+                        put("asset_type", inv.assetType)
+                        put("quantity", inv.quantity)
+                        put("buy_price", inv.avgBuyPrice)
+                        put("current_price", inv.currentPrice)
+                        put("one_day_change", inv.oneDayChangePrice)
+                    })
+                }
+                put("investments", invArray)
+
+                val contriArray = JSONArray()
+                data.contriRoomsList.forEach { cr ->
+                    contriArray.put(JSONObject().apply {
+                        put("room_name", cr.roomName)
+                        put("room_code", cr.roomCode)
+                        put("passkey", cr.passkey)
+                        put("expenses", JSONArray().apply {
+                            if (cr.lastExpenseDate.isNotEmpty()) {
+                                put(JSONObject().apply { put("date", cr.lastExpenseDate) })
+                            }
+                        })
+                    })
+                }
+                put("contri_rooms", contriArray)
+            }
+
+            // Immediately overwrite local preferences
+            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            prefs.edit().putString("data_$username", masterJson.toString()).apply()
+
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
     suspend fun fetchAndCacheData(context: Context, username: String, forceRefresh: Boolean = false): AppData? {
         return withContext(Dispatchers.IO) {
             try {
