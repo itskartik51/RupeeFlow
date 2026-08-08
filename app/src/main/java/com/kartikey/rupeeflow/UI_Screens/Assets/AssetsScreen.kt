@@ -43,6 +43,7 @@ data class InvestmentItem(
 )
 
 data class BankAccountItem(
+    val firebaseKey: String = "", // MASTERSTROKE: To hold exact Firebase Document Key
     val bankName: String,
     val accountNo: String,
     val currentBalance: Double,
@@ -54,6 +55,10 @@ data class BankAccountItem(
     val accruedYrInt: Double,
     val oneDayInt: Double
 )
+
+// Re-defining CreditCardItem and FDItem here if they need the key. 
+// Assuming they are defined in their respective files, but if they are mapped here, update them.
+// Note: As per your original code, CC and FD items were fetched from CacheManager which expected them to exist.
 
 @Composable
 fun AssetsScreen(
