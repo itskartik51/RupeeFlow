@@ -115,11 +115,32 @@ fun EditBankDialog(bank: BankAccountItem, username: String, onDismiss: () -> Uni
                                 val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
                                 if (!userQuery.isEmpty) {
                                     val userRef = userQuery.documents[0].reference
-                                    val updates = hashMapOf<String, Any>(
-                                        bank.accountNo to FieldValue.delete()
-                                    )
-                                    userRef.collection("Finances").document("Bank").update(updates).await()
-                                    withContext(Dispatchers.Main) { onUpdateSuccess() }
+                                    val bankDocRef = userRef.collection("Finances").document("Bank")
+                                    val bankDoc = bankDocRef.get().await()
+                                    
+                                    if (bankDoc.exists()) {
+                                        val data = bankDoc.data ?: emptyMap()
+                                        var targetKey: String? = null
+                                        for ((key, rawBank) in data) {
+                                            if (key != "last_updated" && rawBank is Map<*, *>) {
+                                                val accNo = rawBank["account no."]?.toString()
+                                                if (accNo == bank.accountNo) {
+                                                    targetKey = key
+                                                    break
+                                                }
+                                            }
+                                        }
+                                        
+                                        if (targetKey != null) {
+                                            val updates = hashMapOf<String, Any>(
+                                                targetKey to FieldValue.delete()
+                                            )
+                                            bankDocRef.update(updates).await()
+                                            withContext(Dispatchers.Main) { onUpdateSuccess() }
+                                        } else {
+                                            withContext(Dispatchers.Main) { Toast.makeText(context, "Bank not found to delete!", Toast.LENGTH_SHORT).show() }
+                                        }
+                                    }
                                 } else {
                                     withContext(Dispatchers.Main) { Toast.makeText(context, "Failed to delete account!", Toast.LENGTH_SHORT).show() }
                                 }
@@ -259,13 +280,34 @@ fun EditBankDialog(bank: BankAccountItem, username: String, onDismiss: () -> Uni
                                         val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
                                         if (!userQuery.isEmpty) {
                                             val userRef = userQuery.documents[0].reference
-                                            val updateMap = hashMapOf<String, Any>(
-                                                "${bank.accountNo}.bank" to bankName,
-                                                "${bank.accountNo}.current bal." to newBal,
-                                                "${bank.accountNo}.intrest % (yr)" to newRate
-                                            )
-                                            userRef.collection("Finances").document("Bank").update(updateMap).await()
-                                            withContext(Dispatchers.Main) { onUpdateSuccess() }
+                                            val bankDocRef = userRef.collection("Finances").document("Bank")
+                                            val bankDoc = bankDocRef.get().await()
+                                            
+                                            if (bankDoc.exists()) {
+                                                val data = bankDoc.data ?: emptyMap()
+                                                var targetKey: String? = null
+                                                for ((key, rawBank) in data) {
+                                                    if (key != "last_updated" && rawBank is Map<*, *>) {
+                                                        val accNo = rawBank["account no."]?.toString()
+                                                        if (accNo == bank.accountNo) {
+                                                            targetKey = key
+                                                            break
+                                                        }
+                                                    }
+                                                }
+                                                
+                                                if (targetKey != null) {
+                                                    val updateMap = hashMapOf<String, Any>(
+                                                        "$targetKey.bank" to bankName,
+                                                        "$targetKey.current bal." to newBal,
+                                                        "$targetKey.intrest % (yr)" to newRate
+                                                    )
+                                                    bankDocRef.update(updateMap).await()
+                                                    withContext(Dispatchers.Main) { onUpdateSuccess() }
+                                                } else {
+                                                    withContext(Dispatchers.Main) { Toast.makeText(context, "Bank not found to update!", Toast.LENGTH_SHORT).show() }
+                                                }
+                                            }
                                         } else {
                                             withContext(Dispatchers.Main) { Toast.makeText(context, "Update Failed!", Toast.LENGTH_SHORT).show() }
                                         }
