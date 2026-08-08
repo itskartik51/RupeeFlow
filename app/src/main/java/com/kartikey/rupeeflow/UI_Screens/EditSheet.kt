@@ -117,7 +117,7 @@ fun EditBankDialog(bank: BankAccountItem, username: String, onDismiss: () -> Uni
                             onUpdateSuccess() 
                         }
                         
-                        // BACKGROUND FIREBASE DIRECT PATH UPDATE
+                        // BACKGROUND FIREBASE DIRECT PATH DELETE
                         CoroutineScope(Dispatchers.IO).launch {
                             try {
                                 val db = FirebaseFirestore.getInstance()
@@ -125,8 +125,9 @@ fun EditBankDialog(bank: BankAccountItem, username: String, onDismiss: () -> Uni
                                 if (!userQuery.isEmpty) {
                                     val userRef = userQuery.documents[0].reference
                                     val bankDocRef = userRef.collection("Finances").document("Bank")
-                                    val updates = hashMapOf<String, Any>(bank.firebaseKey to FieldValue.delete())
-                                    bankDocRef.update(updates).await()
+                                    
+                                    // 🔥 Using FieldPath.of for clean deletion of the entire bank node 🔥
+                                    bankDocRef.update(com.google.firebase.firestore.FieldPath.of(bank.firebaseKey), FieldValue.delete()).await()
                                 }
                             } catch (e: Exception) {}
                         }
@@ -207,7 +208,7 @@ fun EditBankDialog(bank: BankAccountItem, username: String, onDismiss: () -> Uni
                                 onUpdateSuccess() 
                             }
                             
-                            // BACKGROUND FIREBASE DIRECT PATH UPDATE
+                            // 🔥 BACKGROUND FIREBASE DIRECT PATH UPDATE (USING FIELDPATH) 🔥
                             CoroutineScope(Dispatchers.IO).launch {
                                 try {
                                     val db = FirebaseFirestore.getInstance()
@@ -216,12 +217,11 @@ fun EditBankDialog(bank: BankAccountItem, username: String, onDismiss: () -> Uni
                                         val userRef = userQuery.documents[0].reference
                                         val bankDocRef = userRef.collection("Finances").document("Bank")
                                         
-                                        val updateMap = hashMapOf<String, Any>(
-                                            "${bank.firebaseKey}.bank" to bankName,
-                                            "${bank.firebaseKey}.current bal." to newBal,
-                                            "${bank.firebaseKey}.intrest % (yr)" to newRate
-                                        )
-                                        bankDocRef.update(updateMap).await()
+                                        bankDocRef.update(
+                                            com.google.firebase.firestore.FieldPath.of(bank.firebaseKey, "bank"), bankName,
+                                            com.google.firebase.firestore.FieldPath.of(bank.firebaseKey, "current bal."), newBal,
+                                            com.google.firebase.firestore.FieldPath.of(bank.firebaseKey, "intrest % (yr)"), newRate
+                                        ).await()
                                     }
                                 } catch (e: Exception) {}
                             }
@@ -291,8 +291,9 @@ fun QuickUpdateCCDialog(cc: CreditCardItem, username: String, onDismiss: () -> U
                                     val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
                                     if (!userQuery.isEmpty) {
                                         val userRef = userQuery.documents[0].reference
-                                        val updateMap = hashMapOf<String, Any>("CC.${cc.cardNo}.outstanding" to newCalculatedOutstanding)
-                                        userRef.collection("Finances").document("CC FD").update(updateMap).await()
+                                        userRef.collection("Finances").document("CC FD").update(
+                                            com.google.firebase.firestore.FieldPath.of("CC", cc.firebaseKey, "outstanding"), newCalculatedOutstanding
+                                        ).await()
                                     }
                                 } catch (e: Exception) {}
                             }
@@ -342,8 +343,9 @@ fun EditCreditCardDialog(cc: CreditCardItem, username: String, onDismiss: () -> 
                                 val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
                                 if (!userQuery.isEmpty) {
                                     val userRef = userQuery.documents[0].reference
-                                    val updates = hashMapOf<String, Any>("CC.${cc.cardNo}" to FieldValue.delete())
-                                    userRef.collection("Finances").document("CC FD").update(updates).await()
+                                    userRef.collection("Finances").document("CC FD").update(
+                                        com.google.firebase.firestore.FieldPath.of("CC", cc.firebaseKey), FieldValue.delete()
+                                    ).await()
                                 }
                             } catch (e: Exception) {}
                         }
@@ -405,17 +407,23 @@ fun EditCreditCardDialog(cc: CreditCardItem, username: String, onDismiss: () -> 
                                     val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
                                     if (!userQuery.isEmpty) {
                                         val userRef = userQuery.documents[0].reference
-                                        val updateMap = hashMapOf<String, Any>(
-                                            "CC.${cc.cardNo}.limit" to newLimit,
-                                            "CC.${cc.cardNo}.billing" to (billingDay.toIntOrNull() ?: 0),
-                                            "CC.${cc.cardNo}.due" to (dueDay.toIntOrNull() ?: 0)
-                                        )
-                                        
                                         val updatedAnnFee = annualFee.toDoubleOrNull() ?: 0.0
-                                        if (updatedAnnFee > 0.0) { updateMap["CC.${cc.cardNo}.yr fee"] = updatedAnnFee } 
-                                        else { updateMap["CC.${cc.cardNo}.yr fee"] = FieldValue.delete() }
                                         
-                                        userRef.collection("Finances").document("CC FD").update(updateMap).await()
+                                        if (updatedAnnFee > 0.0) {
+                                            userRef.collection("Finances").document("CC FD").update(
+                                                com.google.firebase.firestore.FieldPath.of("CC", cc.firebaseKey, "limit"), newLimit,
+                                                com.google.firebase.firestore.FieldPath.of("CC", cc.firebaseKey, "billing"), billingDay.toIntOrNull() ?: 0,
+                                                com.google.firebase.firestore.FieldPath.of("CC", cc.firebaseKey, "due"), dueDay.toIntOrNull() ?: 0,
+                                                com.google.firebase.firestore.FieldPath.of("CC", cc.firebaseKey, "yr fee"), updatedAnnFee
+                                            ).await()
+                                        } else {
+                                            userRef.collection("Finances").document("CC FD").update(
+                                                com.google.firebase.firestore.FieldPath.of("CC", cc.firebaseKey, "limit"), newLimit,
+                                                com.google.firebase.firestore.FieldPath.of("CC", cc.firebaseKey, "billing"), billingDay.toIntOrNull() ?: 0,
+                                                com.google.firebase.firestore.FieldPath.of("CC", cc.firebaseKey, "due"), dueDay.toIntOrNull() ?: 0,
+                                                com.google.firebase.firestore.FieldPath.of("CC", cc.firebaseKey, "yr fee"), FieldValue.delete()
+                                            ).await()
+                                        }
                                     }
                                 } catch (e: Exception) {}
                             }
@@ -460,8 +468,9 @@ fun EditFDDialog(fd: FDItem, username: String, onDismiss: () -> Unit, onUpdateSu
                                 val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
                                 if (!userQuery.isEmpty) {
                                     val userRef = userQuery.documents[0].reference
-                                    val updates = hashMapOf<String, Any>("FD.${fd.accountNo}" to FieldValue.delete())
-                                    userRef.collection("Finances").document("CC FD").update(updates).await()
+                                    userRef.collection("Finances").document("CC FD").update(
+                                        com.google.firebase.firestore.FieldPath.of("FD", fd.firebaseKey), FieldValue.delete()
+                                    ).await()
                                 }
                             } catch (e: Exception) {}
                         }
@@ -577,7 +586,9 @@ fun DeleteExpenseDialog(
                                             val cashMap = bankDoc.get("cash") as? Map<*, *>
                                             cur = (cashMap?.get("amnt") as? Number)?.toDouble() ?: 0.0
                                         }
-                                        userRef.collection("Finances").document("Bank").update("cash.amnt", cur + refundAmt).await()
+                                        userRef.collection("Finances").document("Bank").update(
+                                            com.google.firebase.firestore.FieldPath.of("cash", "amnt"), cur + refundAmt
+                                        ).await()
                                     }
                                     "Bank" -> {
                                         if (expense.sourceId.isNotEmpty()) {
@@ -647,20 +658,19 @@ fun DeleteExpenseDialog(
                                                 val daysPassedYr = (diffYr / (1000 * 60 * 60 * 24)).toInt() + 1
                                                 val accruedYr = expYrInt * (daysPassedYr / 365.0)
 
-                                                val updates = hashMapOf<String, Any>(
-                                                    "$targetBankKey.current bal." to newCalculatedBalance,
-                                                    "$targetBankKey.6D bal. Block.$dayKey" to newCalculatedBalance,
-                                                    "$targetBankKey.6D avg.$avg6dKey" to newCalculatedBalance,
-                                                    "$targetBankKey.monthly avg.$monthKey" to newCalculatedBalance,
-                                                    "$targetBankKey.qtr. avg.$qtrKey" to newCalculatedBalance,
-                                                    "$targetBankKey.yr avg.cur" to newCalculatedBalance,
-                                                    "$targetBankKey.1d int" to oneDayInt,
-                                                    "$targetBankKey.exp qtr int" to expQtrInt,
-                                                    "$targetBankKey.accrued qtr" to accruedQtr,
-                                                    "$targetBankKey.exp yr int" to expYrInt,
-                                                    "$targetBankKey.accrued yr" to accruedYr
-                                                )
-                                                userRef.collection("Finances").document("Bank").update(updates).await()
+                                                userRef.collection("Finances").document("Bank").update(
+                                                    com.google.firebase.firestore.FieldPath.of(targetBankKey, "current bal."), newCalculatedBalance,
+                                                    com.google.firebase.firestore.FieldPath.of(targetBankKey, "6D bal. Block", dayKey), newCalculatedBalance,
+                                                    com.google.firebase.firestore.FieldPath.of(targetBankKey, "6D avg.", avg6dKey), newCalculatedBalance,
+                                                    com.google.firebase.firestore.FieldPath.of(targetBankKey, "monthly avg.", monthKey), newCalculatedBalance,
+                                                    com.google.firebase.firestore.FieldPath.of(targetBankKey, "qtr. avg.", qtrKey), newCalculatedBalance,
+                                                    com.google.firebase.firestore.FieldPath.of(targetBankKey, "yr avg", "cur"), newCalculatedBalance,
+                                                    com.google.firebase.firestore.FieldPath.of(targetBankKey, "1d int"), oneDayInt,
+                                                    com.google.firebase.firestore.FieldPath.of(targetBankKey, "exp qtr int"), expQtrInt,
+                                                    com.google.firebase.firestore.FieldPath.of(targetBankKey, "accrued qtr"), accruedQtr,
+                                                    com.google.firebase.firestore.FieldPath.of(targetBankKey, "exp yr int"), expYrInt,
+                                                    com.google.firebase.firestore.FieldPath.of(targetBankKey, "accrued yr"), accruedYr
+                                                ).await()
                                             }
                                         }
                                     }
@@ -683,7 +693,9 @@ fun DeleteExpenseDialog(
                                                 val ccDataMap = cMap?.get(targetCCKey) as? Map<*, *>
                                                 val curOut = (ccDataMap?.get("outstanding") as? Number)?.toDouble() ?: 0.0
                                                 val newOut = (curOut - refundAmt).coerceAtLeast(0.0)
-                                                userRef.collection("Finances").document("CC FD").update("CC.$targetCCKey.outstanding", newOut).await()
+                                                userRef.collection("Finances").document("CC FD").update(
+                                                    com.google.firebase.firestore.FieldPath.of("CC", targetCCKey, "outstanding"), newOut
+                                                ).await()
                                             }
                                         }
                                     }
@@ -1065,7 +1077,9 @@ fun EditExpenseDialog(
                                                         val cashMap = bankDoc.get("cash") as? Map<*, *>
                                                         cur = (cashMap?.get("amnt") as? Number)?.toDouble() ?: 0.0
                                                     }
-                                                    userRef.collection("Finances").document("Bank").update("cash.amnt", cur - diff).await()
+                                                    userRef.collection("Finances").document("Bank").update(
+                                                        com.google.firebase.firestore.FieldPath.of("cash", "amnt"), cur - diff
+                                                    ).await()
                                                 }
                                                 "Bank" -> {
                                                     if (selectedSourceId.isNotEmpty()) {
@@ -1135,20 +1149,19 @@ fun EditExpenseDialog(
                                                             val daysPassedYr = (diffYr / (1000 * 60 * 60 * 24)).toInt() + 1
                                                             val accruedYr = expYrInt * (daysPassedYr / 365.0)
 
-                                                            val updates = hashMapOf<String, Any>(
-                                                                "$targetBankKey.current bal." to newCalculatedBalance,
-                                                                "$targetBankKey.6D bal. Block.$dayKey" to newCalculatedBalance,
-                                                                "$targetBankKey.6D avg.$avg6dKey" to newCalculatedBalance,
-                                                                "$targetBankKey.monthly avg.$monthKey" to newCalculatedBalance,
-                                                                "$targetBankKey.qtr. avg.$qtrKey" to newCalculatedBalance,
-                                                                "$targetBankKey.yr avg.cur" to newCalculatedBalance,
-                                                                "$targetBankKey.1d int" to oneDayInt,
-                                                                "$targetBankKey.exp qtr int" to expQtrInt,
-                                                                "$targetBankKey.accrued qtr" to accruedQtr,
-                                                                "$targetBankKey.exp yr int" to expYrInt,
-                                                                "$targetBankKey.accrued yr" to accruedYr
-                                                            )
-                                                            userRef.collection("Finances").document("Bank").update(updates).await()
+                                                            userRef.collection("Finances").document("Bank").update(
+                                                                com.google.firebase.firestore.FieldPath.of(targetBankKey, "current bal."), newCalculatedBalance,
+                                                                com.google.firebase.firestore.FieldPath.of(targetBankKey, "6D bal. Block", dayKey), newCalculatedBalance,
+                                                                com.google.firebase.firestore.FieldPath.of(targetBankKey, "6D avg.", avg6dKey), newCalculatedBalance,
+                                                                com.google.firebase.firestore.FieldPath.of(targetBankKey, "monthly avg.", monthKey), newCalculatedBalance,
+                                                                com.google.firebase.firestore.FieldPath.of(targetBankKey, "qtr. avg.", qtrKey), newCalculatedBalance,
+                                                                com.google.firebase.firestore.FieldPath.of(targetBankKey, "yr avg", "cur"), newCalculatedBalance,
+                                                                com.google.firebase.firestore.FieldPath.of(targetBankKey, "1d int"), oneDayInt,
+                                                                com.google.firebase.firestore.FieldPath.of(targetBankKey, "exp qtr int"), expQtrInt,
+                                                                com.google.firebase.firestore.FieldPath.of(targetBankKey, "accrued qtr"), accruedQtr,
+                                                                com.google.firebase.firestore.FieldPath.of(targetBankKey, "exp yr int"), expYrInt,
+                                                                com.google.firebase.firestore.FieldPath.of(targetBankKey, "accrued yr"), accruedYr
+                                                            ).await()
                                                         }
                                                     }
                                                 }
@@ -1171,7 +1184,9 @@ fun EditExpenseDialog(
                                                             val ccDataMap = cMap?.get(targetCCKey) as? Map<*, *>
                                                             val curOut = (ccDataMap?.get("outstanding") as? Number)?.toDouble() ?: 0.0
                                                             val newOut = (curOut + diff).coerceAtLeast(0.0)
-                                                            userRef.collection("Finances").document("CC FD").update("CC.$targetCCKey.outstanding", newOut).await()
+                                                            userRef.collection("Finances").document("CC FD").update(
+                                                                com.google.firebase.firestore.FieldPath.of("CC", targetCCKey, "outstanding"), newOut
+                                                            ).await()
                                                         }
                                                     }
                                                 }
