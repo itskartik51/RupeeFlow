@@ -33,6 +33,7 @@ import com.kartikey.rupeeflow.UI_Screens.bounceClick
 import java.util.Locale
 
 data class CreditCardItem(
+    val firebaseKey: String = "", // Added to fix the compiler error
     val issuer: String,
     val cardNo: String,
     val type: String,
