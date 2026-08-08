@@ -28,6 +28,7 @@ import com.kartikey.rupeeflow.Cloud_Database.Constants
 import com.kartikey.rupeeflow.UI_Screens.bounceClick
 
 data class FDItem(
+    val firebaseKey: String = "", // Added to fix the compiler error
     val bankName: String,
     val accountNo: String,
     val createDate: String,
