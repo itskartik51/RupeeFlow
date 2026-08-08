@@ -54,8 +54,6 @@ object CacheManager {
         }
     }
 
-    // ⚡ NEW: Optimistic Cache Update Function
-    // Call this immediately in ViewModel/UI to overwrite local DB for instant updates
     fun updateOptimisticCache(context: Context, username: String, data: AppData) {
         try {
             val masterJson = JSONObject().apply {
@@ -70,7 +68,6 @@ object CacheManager {
                 put("budget_limit", data.budgetLimit)
 
                 val expArray = JSONArray()
-                // transactionList UI me reversed hai (newest first). JSON me wapas oldest first save karna hota hai.
                 data.transactionList.reversed().forEach { tx ->
                     expArray.put(JSONObject().apply {
                         put("date", tx.date)
@@ -93,6 +90,7 @@ object CacheManager {
                 val banksArray = JSONArray()
                 data.bankList.forEach { b ->
                     banksArray.put(JSONObject().apply {
+                        put("firebase_key", b.firebaseKey) // NEW
                         put("bank_name", b.bankName)
                         put("account_no", b.accountNo)
                         put("current_bal", b.currentBalance)
@@ -110,6 +108,7 @@ object CacheManager {
                 val fdArray = JSONArray()
                 data.fdList.forEach { fd ->
                     fdArray.put(JSONObject().apply {
+                        put("firebase_key", fd.firebaseKey) // NEW
                         put("bank_name", fd.bankName)
                         put("account_no", fd.accountNo)
                         put("create_date", fd.createDate)
@@ -128,6 +127,7 @@ object CacheManager {
                 val ccArray = JSONArray()
                 data.ccList.forEach { cc ->
                     ccArray.put(JSONObject().apply {
+                        put("firebase_key", cc.firebaseKey) // NEW
                         put("issuer", cc.issuer)
                         put("card_no", cc.cardNo)
                         put("type", cc.type)
@@ -164,10 +164,10 @@ object CacheManager {
                     contriArray.put(JSONObject().apply {
                         put("room_name", cr.roomName)
                         put("room_code", cr.roomCode)
-                        put("passkey", cr.pin) // Fixed: using pin
+                        put("passkey", cr.pin)
                         put("expenses", JSONArray().apply {
-                            if (cr.lastUpdated.isNotEmpty()) { // Fixed: using lastUpdated
-                                put(JSONObject().apply { put("date", cr.lastUpdated) }) // Fixed: using lastUpdated
+                            if (cr.lastUpdated.isNotEmpty()) {
+                                put(JSONObject().apply { put("date", cr.lastUpdated) })
                             }
                         })
                     })
@@ -175,7 +175,6 @@ object CacheManager {
                 put("contri_rooms", contriArray)
             }
 
-            // Immediately overwrite local preferences
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             prefs.edit().putString("data_$username", masterJson.toString()).apply()
 
@@ -189,11 +188,7 @@ object CacheManager {
             try {
                 val db = FirebaseFirestore.getInstance()
 
-                val userQuery = db.collection("Users")
-                    .whereEqualTo("username", username)
-                    .get()
-                    .await()
-
+                val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
                 if (userQuery.isEmpty) return@withContext null
 
                 val userDoc = userQuery.documents[0]
@@ -204,14 +199,12 @@ object CacheManager {
                     put("email", userDoc.getString("email") ?: "")
                     put("mobile", userDoc.getString("mobile_no_") ?: userDoc.getString("mobile") ?: "")
                     put("password", userDoc.getString("password") ?: "")
-                    
                     val rawDob = userDoc.get("dob")
-                    val formattedDob = when (rawDob) {
+                    put("dob", when (rawDob) {
                         is Timestamp -> SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(rawDob.toDate())
                         is String -> rawDob
                         else -> ""
-                    }
-                    put("dob", formattedDob)
+                    })
                 }
 
                 val budgetLimit = userDoc.getDouble("budget_limit") ?: 0.0
@@ -220,19 +213,15 @@ object CacheManager {
                 val expensesArray = JSONArray()
 
                 for (doc in expensesDocs) {
-                    val dataMap = doc.data
-                    
-                    for ((key, value) in dataMap) {
+                    for ((key, value) in doc.data) {
                         if (value is Map<*, *>) {
                             val expObj = JSONObject()
                             val rawDate = value["date"]
-                            val dateStr = when (rawDate) {
+                            expObj.put("date", when (rawDate) {
                                 is Timestamp -> SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(rawDate.toDate())
                                 is String -> rawDate.toString()
                                 else -> ""
-                            }
-
-                            expObj.put("date", dateStr)
+                            })
                             expObj.put("amount", (value["amount"] as? Number)?.toDouble() ?: 0.0)
                             expObj.put("category", value["category"]?.toString() ?: "")
                             expObj.put("detail1", value["detail_1"]?.toString() ?: value["detail1"]?.toString() ?: "")
@@ -270,70 +259,29 @@ object CacheManager {
                             val updateMap = mutableMapOf<String, Any>()
                             
                             val lastUpdatedTs = dataMap["last_updated"] as? Timestamp
-                            val calToday = Calendar.getInstance().apply {
-                                set(Calendar.HOUR_OF_DAY, 0)
-                                set(Calendar.MINUTE, 0)
-                                set(Calendar.SECOND, 0)
-                                set(Calendar.MILLISECOND, 0)
-                            }
-                            
+                            val calToday = Calendar.getInstance().apply { set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }
                             var yearShifted = false
                             var gapDays = 0L
                             
                             if (lastUpdatedTs != null) {
-                                val calLast = Calendar.getInstance().apply {
-                                    time = lastUpdatedTs.toDate()
-                                    set(Calendar.HOUR_OF_DAY, 0)
-                                    set(Calendar.MINUTE, 0)
-                                    set(Calendar.SECOND, 0)
-                                    set(Calendar.MILLISECOND, 0)
-                                }
-                                if (calToday.get(Calendar.YEAR) > calLast.get(Calendar.YEAR)) {
-                                    yearShifted = true
-                                }
-                                if (calToday.timeInMillis > calLast.timeInMillis) {
-                                    gapDays = (calToday.timeInMillis - calLast.timeInMillis) / (1000 * 60 * 60 * 24)
-                                }
+                                val calLast = Calendar.getInstance().apply { time = lastUpdatedTs.toDate(); set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }
+                                if (calToday.get(Calendar.YEAR) > calLast.get(Calendar.YEAR)) yearShifted = true
+                                if (calToday.timeInMillis > calLast.timeInMillis) gapDays = (calToday.timeInMillis - calLast.timeInMillis) / (1000 * 60 * 60 * 24)
                             }
+                            if (gapDays > 0) updateMap["last_updated"] = FieldValue.serverTimestamp()
 
-                            if (gapDays > 0) {
-                                updateMap["last_updated"] = FieldValue.serverTimestamp()
-                            }
-
-                            val startOfQtr = Calendar.getInstance().apply {
-                                set(Calendar.MONTH, (calToday.get(Calendar.MONTH) / 3) * 3)
-                                set(Calendar.DAY_OF_MONTH, 1)
-                                set(Calendar.HOUR_OF_DAY, 0)
-                                set(Calendar.MINUTE, 0)
-                                set(Calendar.SECOND, 0)
-                                set(Calendar.MILLISECOND, 0)
-                            }
+                            val startOfQtr = Calendar.getInstance().apply { set(Calendar.MONTH, (calToday.get(Calendar.MONTH) / 3) * 3); set(Calendar.DAY_OF_MONTH, 1); set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }
                             val daysPassedQtr = ((calToday.timeInMillis - startOfQtr.timeInMillis) / (1000 * 60 * 60 * 24)).toInt() + 1
-                            
-                            val startOfYear = Calendar.getInstance().apply {
-                                set(Calendar.MONTH, Calendar.JANUARY)
-                                set(Calendar.DAY_OF_MONTH, 1)
-                                set(Calendar.HOUR_OF_DAY, 0)
-                                set(Calendar.MINUTE, 0)
-                                set(Calendar.SECOND, 0)
-                                set(Calendar.MILLISECOND, 0)
-                            }
+                            val startOfYear = Calendar.getInstance().apply { set(Calendar.MONTH, Calendar.JANUARY); set(Calendar.DAY_OF_MONTH, 1); set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }
                             val daysPassedYr = ((calToday.timeInMillis - startOfYear.timeInMillis) / (1000 * 60 * 60 * 24)).toInt() + 1
-
-                            val currentMonth = calToday.get(Calendar.MONTH)
-                            val qtrStr = "q${(currentMonth / 3) + 1}"
+                            val qtrStr = "q${(calToday.get(Calendar.MONTH) / 3) + 1}"
 
                             dataMap.forEach { (key, rawData) ->
                                 if (key == "cash" && rawData is Map<*, *>) {
                                     val amnt = (rawData["amnt"] as? Number)?.toDouble() ?: 0.0
                                     val lastUpd = rawData["last update"]
-                                    val lastUpdStr = when (lastUpd) {
-                                        is Timestamp -> SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(lastUpd.toDate())
-                                        is String -> lastUpd
-                                        else -> ""
-                                    }
                                     cashObj.put("amount", amnt)
-                                    cashObj.put("last_updated", lastUpdStr)
+                                    cashObj.put("last_updated", when (lastUpd) { is Timestamp -> SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(lastUpd.toDate()); is String -> lastUpd; else -> "" })
                                 } 
                                 else if (key != "last_updated" && key != "cash" && rawData is Map<*, *>) {
                                     val rawBank = rawData
@@ -353,7 +301,6 @@ object CacheManager {
                                     if (yearShifted) {
                                         val lastYrAvg = (yrAvgMap["cur"] as? Number)?.toDouble() ?: 0.0
                                         val secondLastYrAvg = (yrAvgMap["last"] as? Number)?.toDouble() ?: 0.0
-                                        
                                         updateMap["$key.yr avg.2nd last"] = secondLastYrAvg
                                         updateMap["$key.yr avg.last"] = lastYrAvg
                                         updateMap["$key.yr avg.cur"] = curBal
@@ -373,7 +320,8 @@ object CacheManager {
                                         updateMap["$key.1d int"] = oneDayInt
                                     }
 
-                                    val bObj = JSONObject().apply {
+                                    banksArray.put(JSONObject().apply {
+                                        put("firebase_key", key) // CAPTURING THE ACTUAL DOC KEY
                                         put("bank_name", bName)
                                         put("account_no", accNo)
                                         put("current_bal", curBal)
@@ -384,40 +332,31 @@ object CacheManager {
                                         put("exp_yr_int", expYr)
                                         put("accrued_yr_int", accruedYr)
                                         put("one_day_int", oneDayInt)
-                                    }
-                                    banksArray.put(bObj)
+                                    })
                                 }
                             }
-                            if (updateMap.isNotEmpty()) {
-                                doc.reference.update(updateMap).await()
-                            }
+                            if (updateMap.isNotEmpty()) doc.reference.update(updateMap).await()
                         }
 
                         "CC FD" -> {
                             val dataMap = doc.data
-                            
                             val ccMap = dataMap["CC"] as? Map<*, *>
                             ccMap?.forEach { (key, rawCc) ->
                                 if (rawCc is Map<*, *>) {
-                                    val issuer = rawCc["issuer"]?.toString() ?: ""
-                                    val cardNo = rawCc["card no."]?.toString() ?: ""
-                                    val type = rawCc["type"]?.toString() ?: ""
                                     val limit = (rawCc["limit"] as? Number)?.toDouble() ?: 0.0
                                     val outstanding = (rawCc["outstanding"] as? Number)?.toDouble() ?: 0.0
-                                    
-                                    val avail = limit - outstanding
                                     val util = if (limit > 0) (outstanding / limit) * 100.0 else 0.0
-                                    val cibilStatus = if (util <= 30.0) "Safe" else "High Risk"
 
-                                    val ccObj = JSONObject().apply {
-                                        put("issuer", issuer)
-                                        put("card_no", cardNo)
-                                        put("type", type)
+                                    ccArray.put(JSONObject().apply {
+                                        put("firebase_key", key.toString()) // CAPTURING CC KEY
+                                        put("issuer", rawCc["issuer"]?.toString() ?: "")
+                                        put("card_no", rawCc["card no."]?.toString() ?: "")
+                                        put("type", rawCc["type"]?.toString() ?: "")
                                         put("limit", limit)
                                         put("outstanding", outstanding)
-                                        put("available", avail)
+                                        put("available", limit - outstanding)
                                         put("utilization", util)
-                                        put("cibil_status", cibilStatus)
+                                        put("cibil_status", if (util <= 30.0) "Safe" else "High Risk")
                                         put("billing_day", (rawCc["billing"] as? Number)?.toInt() ?: 0)
                                         put("due_day", (rawCc["due"] as? Number)?.toInt() ?: 0)
                                         put("reminder_day", (rawCc["rmndr"] as? Number)?.toInt() ?: 0)
@@ -425,37 +364,25 @@ object CacheManager {
                                         put("joining_fee", (rawCc["join fee"] as? Number)?.toDouble() ?: 0.0)
                                         
                                         val lastUseTs = rawCc["last use"] as? Timestamp
-                                        val lastUseStr = lastUseTs?.let { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(it.toDate()) } ?: ""
-                                        put("last_used", lastUseStr)
-                                    }
-                                    ccArray.put(ccObj)
+                                        put("last_used", lastUseTs?.let { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(it.toDate()) } ?: "")
+                                    })
                                 }
                             }
 
                             val fdMap = dataMap["FD"] as? Map<*, *>
                             fdMap?.forEach { (key, rawFd) ->
                                 if (rawFd is Map<*, *>) {
-                                    val bank = rawFd["bank"]?.toString() ?: ""
-                                    val accNo = rawFd["fd ac"]?.toString() ?: ""
                                     val amnt = (rawFd["amnt"] as? Number)?.toDouble() ?: 0.0
                                     val rate = (rawFd["int % yr"] as? Number)?.toDouble() ?: 0.0
-                                    
                                     val createTs = rawFd["create"] as? Timestamp
                                     val maturTs = rawFd["matur"] as? Timestamp
                                     
-                                    val createStr = createTs?.let { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(it.toDate()) } ?: ""
-                                    val maturStr = maturTs?.let { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(it.toDate()) } ?: ""
-                                    
                                     var daysToMat = 0
-                                    var matVal = amnt
-                                    var accVal = amnt
-                                    var accInt = 0.0
-                                    var oneDayInt = 0.0
+                                    var matVal = amnt; var accVal = amnt; var accInt = 0.0; var oneDayInt = 0.0
                                     
                                     if (createTs != null && maturTs != null) {
                                         val createMillis = createTs.toDate().time
                                         val maturMillis = maturTs.toDate().time
-                                        
                                         val totalDays = maxOf(0L, (maturMillis - createMillis) / (1000 * 60 * 60 * 24))
                                         daysToMat = maxOf(0L, (maturMillis - todayMillis) / (1000 * 60 * 60 * 24)).toInt()
                                         val daysPassed = maxOf(0L, (minOf(todayMillis, maturMillis) - createMillis) / (1000 * 60 * 60 * 24))
@@ -463,15 +390,15 @@ object CacheManager {
                                         matVal = amnt * Math.pow(1 + (rate / 100.0), totalDays / 365.0)
                                         accVal = amnt * Math.pow(1 + (rate / 100.0), daysPassed / 365.0)
                                         accInt = accVal - amnt
-                                        
                                         oneDayInt = if (todayMillis >= maturMillis || todayMillis < createMillis) 0.0 else (accVal * (rate / 100.0)) / 365.0
                                     }
 
-                                    val fdObj = JSONObject().apply {
-                                        put("bank_name", bank)
-                                        put("account_no", accNo)
-                                        put("create_date", createStr)
-                                        put("maturity_date", maturStr)
+                                    fdArray.put(JSONObject().apply {
+                                        put("firebase_key", key.toString()) // CAPTURING FD KEY
+                                        put("bank_name", rawFd["bank"]?.toString() ?: "")
+                                        put("account_no", rawFd["fd ac"]?.toString() ?: "")
+                                        put("create_date", createTs?.let { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(it.toDate()) } ?: "")
+                                        put("maturity_date", maturTs?.let { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(it.toDate()) } ?: "")
                                         put("days_to_maturity", daysToMat)
                                         put("invested_amt", amnt)
                                         put("interest_rate", rate)
@@ -479,25 +406,17 @@ object CacheManager {
                                         put("accrued_value", accVal)
                                         put("accrued_int", accInt)
                                         put("one_day_int", oneDayInt)
-                                    }
-                                    fdArray.put(fdObj)
+                                    })
                                 }
                             }
                         }
                     }
                 }
 
-                // ==========================================
-                // GLOBAL BACKGROUND FETCH: LIVE MARKET DATA
-                // ==========================================
                 val liveMap = mutableMapOf<String, Pair<Double, Double>>()
                 try {
                     val client = OkHttpClient()
-                    val request = Request.Builder()
-                        .url(Constants.GOOGLE_SHEET_API_URL)
-                        .header("Accept", "application/json")
-                        .build()
-                        
+                    val request = Request.Builder().url(Constants.GOOGLE_SHEET_API_URL).header("Accept", "application/json").build()
                     val response = client.newCall(request).execute()
                     val responseData = response.body?.string() ?: ""
 
@@ -513,68 +432,40 @@ object CacheManager {
                                         val rawTicker = item.optString("ticker", "").trim().uppercase()
                                         val price = item.optString("live_price").toDoubleOrNull() ?: item.optDouble("live_price", 0.0)
                                         val changeRs = item.optString("change_rs").toDoubleOrNull() ?: item.optDouble("change_rs", 0.0)
-                                        
-                                        if (rawTicker.isNotEmpty() && price > 0) {
-                                            // Automatically maps "NSE:SBIN" to "SBIN" so it connects with Firebase DB effortlessly
-                                            val cleanKey = if (rawTicker.contains(":")) rawTicker.substringAfter(":") else rawTicker
-                                            liveMap[cleanKey] = Pair(price, changeRs)
-                                        }
+                                        if (rawTicker.isNotEmpty() && price > 0) liveMap[if (rawTicker.contains(":")) rawTicker.substringAfter(":") else rawTicker] = Pair(price, changeRs)
                                     }
                                 }
                             }
-                            extractCategory("stocks")
-                            extractCategory("mutual_funds")
-                            extractCategory("etfs")
-                            extractCategory("bonds")
+                            extractCategory("stocks"); extractCategory("mutual_funds"); extractCategory("etfs"); extractCategory("bonds")
                         }
                     }
-                } catch (e: Exception) {
-                    e.printStackTrace() // Graceful failure, if offline it will just use buy_price
-                }
+                } catch (e: Exception) {}
 
-                // ==========================================
-                // MERGE FIREBASE WITH LIVE MARKET DATA
-                // ==========================================
                 val investMap = userDoc.get("invest") as? Map<String, Any> ?: emptyMap()
                 val invArray = JSONArray()
-                
                 for ((key, value) in investMap) {
                     val itemData = value as? Map<String, Any>
                     if (itemData != null) {
                         val dbName = itemData["name"]?.toString()?.trim()?.uppercase() ?: ""
                         val buyPrice = (itemData["avg"] as? Number)?.toDouble() ?: 0.0
-                        
-                        // Map using the clean ticker (e.g. SBIN)
                         val liveData = liveMap[dbName]
-                        val currentPrice = liveData?.first ?: buyPrice
-                        val oneDayChange = liveData?.second ?: 0.0
-                        
-                        val invObj = JSONObject().apply {
-                            put("asset_name", dbName) // Ensures only SBIN is saved in app state
+                        invArray.put(JSONObject().apply {
+                            put("asset_name", dbName)
                             put("asset_type", itemData["type"]?.toString() ?: "Stock")
                             put("quantity", (itemData["qnt"] as? Number)?.toDouble() ?: 0.0)
                             put("buy_price", buyPrice)
-                            put("current_price", currentPrice)
-                            put("one_day_change", oneDayChange)
-                        }
-                        invArray.put(invObj)
+                            put("current_price", liveData?.first ?: buyPrice)
+                            put("one_day_change", liveData?.second ?: 0.0)
+                        })
                     }
                 }
 
                 val contriArray = JSONArray()
                 val roomsArray = userDoc.get("rooms") as? List<*> ?: emptyList<Any>()
-
                 for (roomItem in roomsArray) {
-                    val roomStr = roomItem.toString()
-                    val parts = roomStr.split("_", limit = 3)
+                    val parts = roomItem.toString().split("_", limit = 3)
                     if (parts.size >= 3) {
-                        val cObj = JSONObject().apply {
-                            put("room_name", parts[2])
-                            put("room_code", parts[1])
-                            put("passkey", "123456")
-                            put("expenses", JSONArray()) 
-                        }
-                        contriArray.put(cObj)
+                        contriArray.put(JSONObject().apply { put("room_name", parts[2]); put("room_code", parts[1]); put("passkey", "123456"); put("expenses", JSONArray()) })
                     }
                 }
 
@@ -587,20 +478,17 @@ object CacheManager {
                     put("banks", banksArray)
                     put("fds", fdArray)
                     put("credit_cards", ccArray)
-                    put("investments", invArray) // Fully synced with live prices
+                    put("investments", invArray)
                     put("contri_rooms", contriArray)
                 }
 
                 val responseData = masterJson.toString()
-
                 val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                 prefs.edit().putString("data_$username", responseData).apply()
 
                 return@withContext parseJsonToAppData(responseData)
 
-            } catch (e: Exception) {
-                null
-            }
+            } catch (e: Exception) { null }
         }
     }
 
@@ -612,16 +500,8 @@ object CacheManager {
         val currY = cal.get(Calendar.YEAR)
 
         val profileObj = jsonResponse.optJSONObject("profile")
-        val tempName = profileObj?.optString("name", "") ?: ""
-        val tempEmail = profileObj?.optString("email", "") ?: ""
-        val tempMobile = profileObj?.optString("mobile", "") ?: ""
-        val tempPass = profileObj?.optString("password", "") ?: ""
-        val tempDob = profileObj?.optString("dob", "") ?: ""
-
         val expensesArray = jsonResponse.optJSONArray("expenses")
-        var tempTotal = 0.0
-        var tempMonth = 0.0
-        var tempYear = 0.0
+        var tempTotal = 0.0; var tempMonth = 0.0; var tempYear = 0.0
         val tempHistory = mutableListOf<TransactionModel>()
 
         if (expensesArray != null && expensesArray.length() > 0) {
@@ -636,154 +516,42 @@ object CacheManager {
                 
                 if (amt > 0.0) {
                     tempTotal += amt 
-                    tempHistory.add(
-                        TransactionModel(
-                            date = rawDate, 
-                            amount = amt, 
-                            category = item.optString("category", "Unknown"), 
-                            remark1 = item.optString("detail1", ""), 
-                            remark2 = item.optString("detail2", ""), 
-                            mode = item.optString("mode", ""), 
-                            sourceType = item.optString("source_type", ""), 
-                            sourceId = item.optString("source_id", "")
-                        )
-                    )
-                    
+                    tempHistory.add(TransactionModel(date = rawDate, amount = amt, category = item.optString("category", "Unknown"), remark1 = item.optString("detail1", ""), remark2 = item.optString("detail2", ""), mode = item.optString("mode", ""), sourceType = item.optString("source_type", ""), sourceId = item.optString("source_id", "")))
                     if (rawDate.contains(currYearStr)) {
                         tempYear += amt
-                        if (rawDate.contains("-$currMonthStr-") || rawDate.contains("/$currMonthStr/") || rawDate.startsWith("$currMonthStr-") || rawDate.startsWith("$currMonthStr/")) {
-                            tempMonth += amt
-                        }
+                        if (rawDate.contains("-$currMonthStr-") || rawDate.contains("/$currMonthStr/") || rawDate.startsWith("$currMonthStr-") || rawDate.startsWith("$currMonthStr/")) tempMonth += amt
                     }
                 }
             }
         }
 
-        val invArray = jsonResponse.optJSONArray("investments")
         val fetchedInvList = mutableListOf<InvestmentItem>()
-        if (invArray != null) {
-            for (i in 0 until invArray.length()) { 
-                val item = invArray.getJSONObject(i)
-                fetchedInvList.add(
-                    InvestmentItem(
-                        assetName = item.optString("asset_name", ""),
-                        assetType = item.optString("asset_type", "Stock"),
-                        quantity = item.optDouble("quantity", 0.0), 
-                        avgBuyPrice = item.optDouble("buy_price", 0.0),
-                        currentPrice = item.optDouble("current_price", item.optDouble("buy_price", 0.0)),
-                        oneDayChangePrice = item.optDouble("one_day_change", 0.0)
-                    )
-                ) 
-            }
-        }
+        jsonResponse.optJSONArray("investments")?.let { arr -> for (i in 0 until arr.length()) { val item = arr.getJSONObject(i); fetchedInvList.add(InvestmentItem(assetName = item.optString("asset_name", ""), assetType = item.optString("asset_type", "Stock"), quantity = item.optDouble("quantity", 0.0), avgBuyPrice = item.optDouble("buy_price", 0.0), currentPrice = item.optDouble("current_price", item.optDouble("buy_price", 0.0)), oneDayChangePrice = item.optDouble("one_day_change", 0.0))) } }
 
-        val banksArray = jsonResponse.optJSONArray("banks")
         val fetchedBankList = mutableListOf<BankAccountItem>()
-        if (banksArray != null) {
-            for (i in 0 until banksArray.length()) { 
-                val item = banksArray.getJSONObject(i)
-                fetchedBankList.add(
-                    BankAccountItem(
-                        bankName = item.optString("bank_name", ""), 
-                        accountNo = item.optString("account_no", ""), 
-                        currentBalance = item.optDouble("current_bal", 0.0), 
-                        interestRate = item.optDouble("interest_rate", 0.0), 
-                        qtrInterestPct = item.optDouble("qtr_interest_pct", 0.0), 
-                        expQtrInt = item.optDouble("exp_qtr_int", 0.0), 
-                        accruedQtrInt = item.optDouble("accrued_qtr_int", 0.0), 
-                        expYrInt = item.optDouble("exp_yr_int", 0.0), 
-                        accruedYrInt = item.optDouble("accrued_yr_int", 0.0), 
-                        oneDayInt = item.optDouble("one_day_int", 0.0)
-                    )
-                ) 
-            }
-        }
+        jsonResponse.optJSONArray("banks")?.let { arr -> for (i in 0 until arr.length()) { val item = arr.getJSONObject(i); fetchedBankList.add(BankAccountItem(firebaseKey = item.optString("firebase_key", ""), bankName = item.optString("bank_name", ""), accountNo = item.optString("account_no", ""), currentBalance = item.optDouble("current_bal", 0.0), interestRate = item.optDouble("interest_rate", 0.0), qtrInterestPct = item.optDouble("qtr_interest_pct", 0.0), expQtrInt = item.optDouble("exp_qtr_int", 0.0), accruedQtrInt = item.optDouble("accrued_qtr_int", 0.0), expYrInt = item.optDouble("exp_yr_int", 0.0), accruedYrInt = item.optDouble("accrued_yr_int", 0.0), oneDayInt = item.optDouble("one_day_int", 0.0))) } }
 
         val cashObj = jsonResponse.optJSONObject("cash")
-        val fetchedCash = if (cashObj != null) { 
-            CashItem(amount = cashObj.optDouble("amount", 0.0), lastUpdated = cashObj.optString("last_updated", "")) 
-        } else {
-            CashItem(0.0, "")
-        }
+        val fetchedCash = if (cashObj != null) CashItem(amount = cashObj.optDouble("amount", 0.0), lastUpdated = cashObj.optString("last_updated", "")) else CashItem(0.0, "")
 
-        val fdArray = jsonResponse.optJSONArray("fds")
         val fetchedFDList = mutableListOf<FDItem>()
-        if (fdArray != null) {
-            for (i in 0 until fdArray.length()) { 
-                val item = fdArray.getJSONObject(i)
-                fetchedFDList.add(
-                    FDItem(
-                        bankName = item.optString("bank_name", ""), 
-                        accountNo = item.optString("account_no", ""), 
-                        createDate = item.optString("create_date", ""), 
-                        maturityDate = item.optString("maturity_date", ""), 
-                        daysToMaturity = item.optInt("days_to_maturity", 0), 
-                        investedAmt = item.optDouble("invested_amt", 0.0), 
-                        interestRate = item.optDouble("interest_rate", 0.0), 
-                        maturityValue = item.optDouble("maturity_value", 0.0), 
-                        accruedValue = item.optDouble("accrued_value", 0.0), 
-                        accruedInt = item.optDouble("accrued_int", 0.0), 
-                        oneDayInt = item.optDouble("one_day_int", 0.0)
-                    )
-                ) 
-            }
-        }
+        jsonResponse.optJSONArray("fds")?.let { arr -> for (i in 0 until arr.length()) { val item = arr.getJSONObject(i); fetchedFDList.add(FDItem(firebaseKey = item.optString("firebase_key", ""), bankName = item.optString("bank_name", ""), accountNo = item.optString("account_no", ""), createDate = item.optString("create_date", ""), maturityDate = item.optString("maturity_date", ""), daysToMaturity = item.optInt("days_to_maturity", 0), investedAmt = item.optDouble("invested_amt", 0.0), interestRate = item.optDouble("interest_rate", 0.0), maturityValue = item.optDouble("maturity_value", 0.0), accruedValue = item.optDouble("accrued_value", 0.0), accruedInt = item.optDouble("accrued_int", 0.0), oneDayInt = item.optDouble("one_day_int", 0.0))) } }
 
-        val ccArray = jsonResponse.optJSONArray("credit_cards")
         val fetchedCCList = mutableListOf<CreditCardItem>()
-        if (ccArray != null) {
-            for (i in 0 until ccArray.length()) { 
-                val item = ccArray.getJSONObject(i)
-                fetchedCCList.add(
-                    CreditCardItem(
-                        issuer = item.optString("issuer", ""), 
-                        cardNo = item.optString("card_no", ""), 
-                        type = item.optString("type", ""), 
-                        limit = item.optDouble("limit", 0.0), 
-                        outstanding = item.optDouble("outstanding", 0.0), 
-                        available = item.optDouble("available", 0.0), 
-                        utilization = item.optDouble("utilization", 0.0), 
-                        cibilStatus = item.optString("cibil_status", ""), 
-                        billingDay = item.optInt("billing_day", 0), 
-                        dueDay = item.optInt("due_day", 0), 
-                        reminderDay = item.optInt("reminder_day", 0), 
-                        annualFee = item.optDouble("annual_fee", 0.0), 
-                        joiningFee = item.optDouble("joining_fee", 0.0), 
-                        lastUsed = item.optString("last_used", "")
-                    )
-                ) 
-            }
-        }
+        jsonResponse.optJSONArray("credit_cards")?.let { arr -> for (i in 0 until arr.length()) { val item = arr.getJSONObject(i); fetchedCCList.add(CreditCardItem(firebaseKey = item.optString("firebase_key", ""), issuer = item.optString("issuer", ""), cardNo = item.optString("card_no", ""), type = item.optString("type", ""), limit = item.optDouble("limit", 0.0), outstanding = item.optDouble("outstanding", 0.0), available = item.optDouble("available", 0.0), utilization = item.optDouble("utilization", 0.0), cibilStatus = item.optString("cibil_status", ""), billingDay = item.optInt("billing_day", 0), dueDay = item.optInt("due_day", 0), reminderDay = item.optInt("reminder_day", 0), annualFee = item.optDouble("annual_fee", 0.0), joiningFee = item.optDouble("joining_fee", 0.0), lastUsed = item.optString("last_used", ""))) } }
 
-        val contriArray = jsonResponse.optJSONArray("contri_rooms")
         val fetchedContriRooms = mutableListOf<ContriRoomModel>()
-        if (contriArray != null) {
-            for (i in 0 until contriArray.length()) {
-                val item = contriArray.getJSONObject(i)
-                val rName = item.optString("room_name", "")
-                val rCode = item.optString("room_code", "")
-                val rPin = item.optString("passkey", "123456") 
-                val expArray = item.optJSONArray("expenses")
-                var lastDate = ""
-                if (expArray != null && expArray.length() > 0) {
-                    val lastExp = expArray.getJSONObject(0)
-                    lastDate = lastExp.optString("date", "")
-                }
-                fetchedContriRooms.add(ContriRoomModel(rName, rCode, lastDate, rPin))
-            }
-        }
-
-        val fetchedBudgetLimit = jsonResponse.optDouble("budget_limit", 0.0)
+        jsonResponse.optJSONArray("contri_rooms")?.let { arr -> for (i in 0 until arr.length()) { val item = arr.getJSONObject(i); val rName = item.optString("room_name", ""); val rCode = item.optString("room_code", ""); val rPin = item.optString("passkey", "123456"); val expArray = item.optJSONArray("expenses"); var lastDate = ""; if (expArray != null && expArray.length() > 0) { lastDate = expArray.getJSONObject(0).optString("date", "") }; fetchedContriRooms.add(ContriRoomModel(rName, rCode, lastDate, rPin)) } }
         
         return AppData(
-            userFullName = tempName,
-            userEmail = tempEmail,
-            userMobile = tempMobile,
-            userPassword = tempPass,
-            userDob = tempDob,
+            userFullName = profileObj?.optString("name", "") ?: "",
+            userEmail = profileObj?.optString("email", "") ?: "",
+            userMobile = profileObj?.optString("mobile", "") ?: "",
+            userPassword = profileObj?.optString("password", "") ?: "",
+            userDob = profileObj?.optString("dob", "") ?: "",
             thisMonthExpenses = tempMonth,
             thisYearExpenses = tempYear,
-            budgetLimit = fetchedBudgetLimit,
+            budgetLimit = jsonResponse.optDouble("budget_limit", 0.0),
             transactionList = tempHistory.reversed(),
             investmentList = fetchedInvList,
             bankList = fetchedBankList,
