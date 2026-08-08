@@ -109,23 +109,47 @@ fun EditBankDialog(bank: BankAccountItem, username: String, onDismiss: () -> Uni
                         onDismiss()
                         Toast.makeText(context, "Deleting bank...", Toast.LENGTH_SHORT).show()
                         
+                        // 1. INSTANT OPTIMISTIC CACHE UPDATE (UI Fast Load)
+                        val cachedData = CacheManager.getCachedData(context, username)
+                        if (cachedData != null) {
+                            val updatedList = cachedData.bankList.filter { it.accountNo != bank.accountNo || it.bankName != bank.bankName }
+                            CacheManager.updateOptimisticCache(context, username, cachedData.copy(bankList = updatedList))
+                            onUpdateSuccess() 
+                        }
+                        
+                        // 2. BACKGROUND FIREBASE UPDATE (Searching securely by EXACT Name AND EXACT Account No)
                         CoroutineScope(Dispatchers.IO).launch {
                             try {
                                 val db = FirebaseFirestore.getInstance()
                                 val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
                                 if (!userQuery.isEmpty) {
                                     val userRef = userQuery.documents[0].reference
-                                    val updates = hashMapOf<String, Any>(
-                                        bank.accountNo to FieldValue.delete()
-                                    )
-                                    userRef.collection("Finances").document("Bank").update(updates).await()
-                                    withContext(Dispatchers.Main) { onUpdateSuccess() }
-                                } else {
-                                    withContext(Dispatchers.Main) { Toast.makeText(context, "Failed to delete account!", Toast.LENGTH_SHORT).show() }
+                                    val bankDocRef = userRef.collection("Finances").document("Bank")
+                                    val bankDoc = bankDocRef.get().await()
+                                    
+                                    if (bankDoc.exists()) {
+                                        val data = bankDoc.data ?: emptyMap()
+                                        var targetKey: String? = null
+                                        
+                                        for ((key, rawBank) in data) {
+                                            if (key != "last_updated" && key != "cash" && rawBank is Map<*, *>) {
+                                                val dbBankName = rawBank["bank"]?.toString() ?: ""
+                                                val dbAccNo = rawBank["account no."]?.toString() ?: ""
+                                                
+                                                if (dbBankName == bank.bankName && dbAccNo == bank.accountNo) {
+                                                    targetKey = key
+                                                    break
+                                                }
+                                            }
+                                        }
+                                        
+                                        if (targetKey != null) {
+                                            val updates = hashMapOf<String, Any>(targetKey to FieldValue.delete())
+                                            bankDocRef.update(updates).await()
+                                        }
+                                    }
                                 }
-                            } catch (e: Exception) {
-                                withContext(Dispatchers.Main) { Toast.makeText(context, "Failed to delete account!", Toast.LENGTH_SHORT).show() }
-                            }
+                            } catch (e: Exception) {}
                         }
                     }, 
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
@@ -192,30 +216,57 @@ fun EditBankDialog(bank: BankAccountItem, username: String, onDismiss: () -> Uni
                         if (bankName.isNotBlank() && newBal != null && newRate != null) {
                             if (!Constants.IndianBanksList.contains(bankName)) { 
                                 Toast.makeText(context, "Please select a valid bank from the dropdown!", Toast.LENGTH_SHORT).show()
-                                return@RFActionRow 
-                            }
-                            
-                            onDismiss()
-                            Toast.makeText(context, "Updating bank...", Toast.LENGTH_SHORT).show()
-                            
-                            CoroutineScope(Dispatchers.IO).launch {
-                                try {
-                                    val db = FirebaseFirestore.getInstance()
-                                    val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
-                                    if (!userQuery.isEmpty) {
-                                        val userRef = userQuery.documents[0].reference
-                                        val updateMap = hashMapOf<String, Any>(
-                                            "${bank.accountNo}.bank" to bankName,
-                                            "${bank.accountNo}.current bal." to newBal,
-                                            "${bank.accountNo}.intrest % (yr)" to newRate
-                                        )
-                                        userRef.collection("Finances").document("Bank").update(updateMap).await()
-                                        withContext(Dispatchers.Main) { onUpdateSuccess() }
-                                    } else {
-                                        withContext(Dispatchers.Main) { Toast.makeText(context, "Update Failed!", Toast.LENGTH_SHORT).show() }
+                            } else {
+                                onDismiss()
+                                Toast.makeText(context, "Updating bank...", Toast.LENGTH_SHORT).show()
+                                
+                                // 1. INSTANT OPTIMISTIC CACHE UPDATE (UI Fast Load)
+                                val cachedData = CacheManager.getCachedData(context, username)
+                                if (cachedData != null) {
+                                    val updatedList = cachedData.bankList.map { 
+                                        if (it.accountNo == bank.accountNo && it.bankName == bank.bankName) it.copy(bankName = bankName, currentBalance = newBal, interestRate = newRate) else it 
                                     }
-                                } catch (e: Exception) {
-                                    withContext(Dispatchers.Main) { Toast.makeText(context, "Update Failed!", Toast.LENGTH_SHORT).show() }
+                                    CacheManager.updateOptimisticCache(context, username, cachedData.copy(bankList = updatedList))
+                                    onUpdateSuccess() 
+                                }
+                                
+                                // 2. BACKGROUND FIREBASE UPDATE (Searching securely by EXACT Name AND EXACT Account No)
+                                CoroutineScope(Dispatchers.IO).launch {
+                                    try {
+                                        val db = FirebaseFirestore.getInstance()
+                                        val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
+                                        if (!userQuery.isEmpty) {
+                                            val userRef = userQuery.documents[0].reference
+                                            val bankDocRef = userRef.collection("Finances").document("Bank")
+                                            val bankDoc = bankDocRef.get().await()
+                                            
+                                            if (bankDoc.exists()) {
+                                                val data = bankDoc.data ?: emptyMap()
+                                                var targetKey: String? = null
+                                                
+                                                for ((key, rawBank) in data) {
+                                                    if (key != "last_updated" && key != "cash" && rawBank is Map<*, *>) {
+                                                        val dbBankName = rawBank["bank"]?.toString() ?: ""
+                                                        val dbAccNo = rawBank["account no."]?.toString() ?: ""
+                                                        
+                                                        if (dbBankName == bank.bankName && dbAccNo == bank.accountNo) {
+                                                            targetKey = key
+                                                            break
+                                                        }
+                                                    }
+                                                }
+                                                
+                                                if (targetKey != null) {
+                                                    val updateMap = hashMapOf<String, Any>(
+                                                        "$targetKey.bank" to bankName,
+                                                        "$targetKey.current bal." to newBal,
+                                                        "$targetKey.intrest % (yr)" to newRate
+                                                    )
+                                                    bankDocRef.update(updateMap).await()
+                                                }
+                                            }
+                                        }
+                                    } catch (e: Exception) {}
                                 }
                             }
                         } else { Toast.makeText(context, "Please enter valid details", Toast.LENGTH_SHORT).show() }
@@ -267,6 +318,17 @@ fun QuickUpdateCCDialog(cc: CreditCardItem, username: String, onDismiss: () -> U
                             onDismiss()
                             Toast.makeText(context, "Updating card...", Toast.LENGTH_SHORT).show()
                             
+                            // 1. INSTANT OPTIMISTIC CACHE UPDATE
+                            val cachedData = CacheManager.getCachedData(context, username)
+                            if (cachedData != null) {
+                                val updatedList = cachedData.ccList.map { 
+                                    if (it.cardNo == cc.cardNo) it.copy(outstanding = newCalculatedOutstanding) else it 
+                                }
+                                CacheManager.updateOptimisticCache(context, username, cachedData.copy(ccList = updatedList))
+                                onSuccess() 
+                            }
+                            
+                            // 2. BACKGROUND FIREBASE DIRECT PATH UPDATE
                             CoroutineScope(Dispatchers.IO).launch {
                                 try {
                                     val db = FirebaseFirestore.getInstance()
@@ -275,11 +337,8 @@ fun QuickUpdateCCDialog(cc: CreditCardItem, username: String, onDismiss: () -> U
                                         val userRef = userQuery.documents[0].reference
                                         val updateMap = hashMapOf<String, Any>("CC.${cc.cardNo}.outstanding" to newCalculatedOutstanding)
                                         userRef.collection("Finances").document("CC FD").update(updateMap).await()
-                                        withContext(Dispatchers.Main) { onSuccess() }
                                     }
-                                } catch (e: Exception) {
-                                    withContext(Dispatchers.Main) { Toast.makeText(context, "Update Failed!", Toast.LENGTH_SHORT).show() }
-                                }
+                                } catch (e: Exception) {}
                             }
                         } else { Toast.makeText(context, "Enter a valid amount", Toast.LENGTH_SHORT).show() }
                     },
@@ -314,6 +373,15 @@ fun EditCreditCardDialog(cc: CreditCardItem, username: String, onDismiss: () -> 
                         onDismiss()
                         Toast.makeText(context, "Deleting card...", Toast.LENGTH_SHORT).show()
                         
+                        // 1. INSTANT OPTIMISTIC CACHE UPDATE
+                        val cachedData = CacheManager.getCachedData(context, username)
+                        if (cachedData != null) {
+                            val updatedList = cachedData.ccList.filter { it.cardNo != cc.cardNo }
+                            CacheManager.updateOptimisticCache(context, username, cachedData.copy(ccList = updatedList))
+                            onUpdateSuccess() 
+                        }
+                        
+                        // 2. BACKGROUND FIREBASE DIRECT PATH DELETE
                         CoroutineScope(Dispatchers.IO).launch {
                             try {
                                 val db = FirebaseFirestore.getInstance()
@@ -322,11 +390,8 @@ fun EditCreditCardDialog(cc: CreditCardItem, username: String, onDismiss: () -> 
                                     val userRef = userQuery.documents[0].reference
                                     val updates = hashMapOf<String, Any>("CC.${cc.cardNo}" to FieldValue.delete())
                                     userRef.collection("Finances").document("CC FD").update(updates).await()
-                                    withContext(Dispatchers.Main) { onUpdateSuccess() }
                                 }
-                            } catch (e: Exception) {
-                                withContext(Dispatchers.Main) { Toast.makeText(context, "Failed to delete card!", Toast.LENGTH_SHORT).show() }
-                            }
+                            } catch (e: Exception) {}
                         }
                     }, 
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
@@ -369,6 +434,19 @@ fun EditCreditCardDialog(cc: CreditCardItem, username: String, onDismiss: () -> 
                             onDismiss()
                             Toast.makeText(context, "Updating card...", Toast.LENGTH_SHORT).show()
                             
+                            // 1. INSTANT OPTIMISTIC CACHE UPDATE
+                            val cachedData = CacheManager.getCachedData(context, username)
+                            if (cachedData != null) {
+                                val updatedList = cachedData.ccList.map { 
+                                    if (it.cardNo == cc.cardNo) {
+                                        it.copy(limit = newLimit, billingDay = billingDay.toIntOrNull() ?: 0, dueDay = dueDay.toIntOrNull() ?: 0, annualFee = annualFee.toDoubleOrNull() ?: 0.0)
+                                    } else it 
+                                }
+                                CacheManager.updateOptimisticCache(context, username, cachedData.copy(ccList = updatedList))
+                                onUpdateSuccess() 
+                            }
+                            
+                            // 2. BACKGROUND FIREBASE DIRECT PATH UPDATE
                             CoroutineScope(Dispatchers.IO).launch {
                                 try {
                                     val db = FirebaseFirestore.getInstance()
@@ -384,13 +462,10 @@ fun EditCreditCardDialog(cc: CreditCardItem, username: String, onDismiss: () -> 
                                         val updatedAnnFee = annualFee.toDoubleOrNull() ?: 0.0
                                         if (updatedAnnFee > 0.0) { updateMap["CC.${cc.cardNo}.yr fee"] = updatedAnnFee } 
                                         else { updateMap["CC.${cc.cardNo}.yr fee"] = FieldValue.delete() }
-
+                                        
                                         userRef.collection("Finances").document("CC FD").update(updateMap).await()
-                                        withContext(Dispatchers.Main) { onUpdateSuccess() }
                                     }
-                                } catch (e: Exception) {
-                                    withContext(Dispatchers.Main) { Toast.makeText(context, "Update Failed!", Toast.LENGTH_SHORT).show() }
-                                }
+                                } catch (e: Exception) {}
                             }
                         } else { Toast.makeText(context, "Check inputs!", Toast.LENGTH_SHORT).show() }
                     },
@@ -420,6 +495,15 @@ fun EditFDDialog(fd: FDItem, username: String, onDismiss: () -> Unit, onUpdateSu
                         onDismiss()
                         Toast.makeText(context, "Deleting FD...", Toast.LENGTH_SHORT).show()
                         
+                        // 1. INSTANT OPTIMISTIC CACHE UPDATE
+                        val cachedData = CacheManager.getCachedData(context, username)
+                        if (cachedData != null) {
+                            val updatedList = cachedData.fdList.filter { it.accountNo != fd.accountNo }
+                            CacheManager.updateOptimisticCache(context, username, cachedData.copy(fdList = updatedList))
+                            onUpdateSuccess() 
+                        }
+                        
+                        // 2. BACKGROUND FIREBASE DIRECT PATH DELETE
                         CoroutineScope(Dispatchers.IO).launch {
                             try {
                                 val db = FirebaseFirestore.getInstance()
@@ -428,7 +512,6 @@ fun EditFDDialog(fd: FDItem, username: String, onDismiss: () -> Unit, onUpdateSu
                                     val userRef = userQuery.documents[0].reference
                                     val updates = hashMapOf<String, Any>("FD.${fd.accountNo}" to FieldValue.delete())
                                     userRef.collection("Finances").document("CC FD").update(updates).await()
-                                    withContext(Dispatchers.Main) { onUpdateSuccess() }
                                 }
                             } catch (e: Exception) {}
                         }
@@ -549,22 +632,43 @@ fun DeleteExpenseDialog(
                                     "Bank" -> {
                                         if (expense.sourceId.isNotEmpty()) {
                                             val bankDoc = userRef.collection("Finances").document("Bank").get().await()
-                                            val bankData = bankDoc.get(expense.sourceId) as? Map<*, *>
-                                            if (bankData != null) {
-                                                val curBal = (bankData["current bal."] as? Number)?.toDouble() ?: 0.0
-                                                userRef.collection("Finances").document("Bank").update("${expense.sourceId}.current bal.", curBal + refundAmt).await()
+                                            var targetBankKey: String? = null
+                                            val bData = bankDoc.data ?: emptyMap()
+                                            for ((key, rawB) in bData) {
+                                                if (key != "last_updated" && key != "cash" && rawB is Map<*, *>) {
+                                                    if (rawB["account no."]?.toString() == expense.sourceId) {
+                                                        targetBankKey = key
+                                                        break
+                                                    }
+                                                }
+                                            }
+                                            if (targetBankKey != null) {
+                                                val bankDataMap = bankDoc.get(targetBankKey) as? Map<*, *>
+                                                val curBal = (bankDataMap?.get("current bal.") as? Number)?.toDouble() ?: 0.0
+                                                userRef.collection("Finances").document("Bank").update("$targetBankKey.current bal.", curBal + refundAmt).await()
                                             }
                                         }
                                     }
                                     "Credit Card" -> {
                                         if (expense.sourceId.isNotEmpty()) {
                                             val ccDoc = userRef.collection("Finances").document("CC FD").get().await()
-                                            val ccMap = ccDoc.get("CC") as? Map<*, *>
-                                            val ccData = ccMap?.get(expense.sourceId) as? Map<*, *>
-                                            if (ccData != null) {
-                                                val curOut = (ccData["outstanding"] as? Number)?.toDouble() ?: 0.0
+                                            var targetCCKey: String? = null
+                                            val cMap = ccDoc.get("CC") as? Map<*, *>
+                                            if (cMap != null) {
+                                                for ((key, rawC) in cMap) {
+                                                    if (rawC is Map<*, *>) {
+                                                        if (rawC["card no."]?.toString() == expense.sourceId) {
+                                                            targetCCKey = key.toString()
+                                                            break
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            if (targetCCKey != null) {
+                                                val ccDataMap = cMap?.get(targetCCKey) as? Map<*, *>
+                                                val curOut = (ccDataMap?.get("outstanding") as? Number)?.toDouble() ?: 0.0
                                                 val newOut = (curOut - refundAmt).coerceAtLeast(0.0)
-                                                userRef.collection("Finances").document("CC FD").update("CC.${expense.sourceId}.outstanding", newOut).await()
+                                                userRef.collection("Finances").document("CC FD").update("CC.$targetCCKey.outstanding", newOut).await()
                                             }
                                         }
                                     }
@@ -951,22 +1055,43 @@ fun EditExpenseDialog(
                                                 "Bank" -> {
                                                     if (selectedSourceId.isNotEmpty()) {
                                                         val bankDoc = userRef.collection("Finances").document("Bank").get().await()
-                                                        val bankData = bankDoc.get(selectedSourceId) as? Map<*, *>
-                                                        if (bankData != null) {
-                                                            val curBal = (bankData["current bal."] as? Number)?.toDouble() ?: 0.0
-                                                            userRef.collection("Finances").document("Bank").update("${selectedSourceId}.current bal.", curBal - diff).await()
+                                                        var targetBankKey: String? = null
+                                                        val bData = bankDoc.data ?: emptyMap()
+                                                        for ((key, rawB) in bData) {
+                                                            if (key != "last_updated" && key != "cash" && rawB is Map<*, *>) {
+                                                                if (rawB["account no."]?.toString() == selectedSourceId) {
+                                                                    targetBankKey = key
+                                                                    break
+                                                                }
+                                                            }
+                                                        }
+                                                        if (targetBankKey != null) {
+                                                            val bankDataMap = bankDoc.get(targetBankKey) as? Map<*, *>
+                                                            val curBal = (bankDataMap?.get("current bal.") as? Number)?.toDouble() ?: 0.0
+                                                            userRef.collection("Finances").document("Bank").update("$targetBankKey.current bal.", curBal - diff).await()
                                                         }
                                                     }
                                                 }
                                                 "Credit Card" -> {
                                                     if (selectedSourceId.isNotEmpty()) {
                                                         val ccDoc = userRef.collection("Finances").document("CC FD").get().await()
-                                                        val ccMap = ccDoc.get("CC") as? Map<*, *>
-                                                        val ccData = ccMap?.get(selectedSourceId) as? Map<*, *>
-                                                        if (ccData != null) {
-                                                            val curOut = (ccData["outstanding"] as? Number)?.toDouble() ?: 0.0
+                                                        var targetCCKey: String? = null
+                                                        val cMap = ccDoc.get("CC") as? Map<*, *>
+                                                        if (cMap != null) {
+                                                            for ((key, rawC) in cMap) {
+                                                                if (rawC is Map<*, *>) {
+                                                                    if (rawC["card no."]?.toString() == selectedSourceId) {
+                                                                        targetCCKey = key.toString()
+                                                                        break
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                        if (targetCCKey != null) {
+                                                            val ccDataMap = cMap?.get(targetCCKey) as? Map<*, *>
+                                                            val curOut = (ccDataMap?.get("outstanding") as? Number)?.toDouble() ?: 0.0
                                                             val newOut = (curOut + diff).coerceAtLeast(0.0)
-                                                            userRef.collection("Finances").document("CC FD").update("CC.${selectedSourceId}.outstanding", newOut).await()
+                                                            userRef.collection("Finances").document("CC FD").update("CC.$targetCCKey.outstanding", newOut).await()
                                                         }
                                                     }
                                                 }
