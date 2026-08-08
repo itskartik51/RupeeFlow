@@ -43,8 +43,14 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
         getByName("release") {
-            isMinifyEnabled = false
+            // OPTIMIZATION: Unused code aur Faltu XML resources ko hatayega
+            isMinifyEnabled = true
+            isShrinkResources = true
+            
+            // BYPASS: Fake/Corrupted PNG errors ko ignore karne ke liye false rakha hai
             isCrunchPngs = false 
+            
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = signingConfigs.getByName("release")
         }
     }
