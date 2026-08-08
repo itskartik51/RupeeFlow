@@ -4,6 +4,7 @@ import android.content.Context
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
 import com.kartikey.rupeeflow.Cloud_Database.Constants
 import com.kartikey.rupeeflow.UI_Screens.Add.TransactionModel
 import com.kartikey.rupeeflow.UI_Screens.Assets.InvestmentItem
@@ -54,8 +55,7 @@ object CacheManager {
         }
     }
 
-    // ⚡ NEW: Optimistic Cache Update Function
-    // Call this immediately in ViewModel/UI to overwrite local DB for instant updates
+    // ⚡ Optimistic Cache Update Function
     fun updateOptimisticCache(context: Context, username: String, data: AppData) {
         try {
             val masterJson = JSONObject().apply {
@@ -70,7 +70,6 @@ object CacheManager {
                 put("budget_limit", data.budgetLimit)
 
                 val expArray = JSONArray()
-                // transactionList UI me reversed hai (newest first). JSON me wapas oldest first save karna hota hai.
                 data.transactionList.reversed().forEach { tx ->
                     expArray.put(JSONObject().apply {
                         put("date", tx.date)
@@ -93,7 +92,7 @@ object CacheManager {
                 val banksArray = JSONArray()
                 data.bankList.forEach { b ->
                     banksArray.put(JSONObject().apply {
-                        put("firebase_key", b.firebaseKey) // Added Firebase Key
+                        put("firebase_key", b.firebaseKey) 
                         put("bank_name", b.bankName)
                         put("account_no", b.accountNo)
                         put("current_bal", b.currentBalance)
@@ -111,6 +110,7 @@ object CacheManager {
                 val fdArray = JSONArray()
                 data.fdList.forEach { fd ->
                     fdArray.put(JSONObject().apply {
+                        put("firebase_key", fd.firebaseKey)
                         put("bank_name", fd.bankName)
                         put("account_no", fd.accountNo)
                         put("create_date", fd.createDate)
@@ -129,6 +129,7 @@ object CacheManager {
                 val ccArray = JSONArray()
                 data.ccList.forEach { cc ->
                     ccArray.put(JSONObject().apply {
+                        put("firebase_key", cc.firebaseKey) 
                         put("issuer", cc.issuer)
                         put("card_no", cc.cardNo)
                         put("type", cc.type)
@@ -165,10 +166,10 @@ object CacheManager {
                     contriArray.put(JSONObject().apply {
                         put("room_name", cr.roomName)
                         put("room_code", cr.roomCode)
-                        put("passkey", cr.pin) // Fixed: using pin
+                        put("passkey", cr.pin) 
                         put("expenses", JSONArray().apply {
-                            if (cr.lastUpdated.isNotEmpty()) { // Fixed: using lastUpdated
-                                put(JSONObject().apply { put("date", cr.lastUpdated) }) // Fixed: using lastUpdated
+                            if (cr.lastUpdated.isNotEmpty()) { 
+                                put(JSONObject().apply { put("date", cr.lastUpdated) }) 
                             }
                         })
                     })
@@ -176,7 +177,6 @@ object CacheManager {
                 put("contri_rooms", contriArray)
             }
 
-            // Immediately overwrite local preferences
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             prefs.edit().putString("data_$username", masterJson.toString()).apply()
 
@@ -268,7 +268,7 @@ object CacheManager {
                     when (doc.id) {
                         "Bank" -> {
                             val dataMap = doc.data
-                            val updateMap = mutableMapOf<String, Any>()
+                            val updateMap = mutableMapOf<String, Any>() // We use this for set(merge) to avoid dot rules
                             
                             val lastUpdatedTs = dataMap["last_updated"] as? Timestamp
                             val calToday = Calendar.getInstance().apply {
@@ -351,13 +351,18 @@ object CacheManager {
                                     val currentQtrAvg = (qtrAvgMap[qtrStr] as? Number)?.toDouble() ?: curBal
                                     var curYrAvg = (yrAvgMap["cur"] as? Number)?.toDouble() ?: curBal
 
+                                    // 🔥 NESTED MAP APPROACH FOR SAFE DB WRITING 🔥
+                                    val bankSpecificUpdates = mutableMapOf<String, Any>()
+
                                     if (yearShifted) {
                                         val lastYrAvg = (yrAvgMap["cur"] as? Number)?.toDouble() ?: 0.0
                                         val secondLastYrAvg = (yrAvgMap["last"] as? Number)?.toDouble() ?: 0.0
                                         
-                                        updateMap["$key.yr avg.2nd last"] = secondLastYrAvg
-                                        updateMap["$key.yr avg.last"] = lastYrAvg
-                                        updateMap["$key.yr avg.cur"] = curBal
+                                        bankSpecificUpdates["yr avg"] = mapOf(
+                                            "2nd last" to secondLastYrAvg,
+                                            "last" to lastYrAvg,
+                                            "cur" to curBal
+                                        )
                                         curYrAvg = curBal 
                                     }
 
@@ -367,15 +372,19 @@ object CacheManager {
                                     val accruedYr = expYr * (daysPassedYr / 365.0)
 
                                     if (gapDays > 0 || yearShifted) {
-                                        updateMap["$key.exp qtr int"] = expQtr
-                                        updateMap["$key.accrued qtr"] = accruedQtr
-                                        updateMap["$key.exp yr int"] = expYr
-                                        updateMap["$key.accrued yr"] = accruedYr
-                                        updateMap["$key.1d int"] = oneDayInt
+                                        bankSpecificUpdates["exp qtr int"] = expQtr
+                                        bankSpecificUpdates["accrued qtr"] = accruedQtr
+                                        bankSpecificUpdates["exp yr int"] = expYr
+                                        bankSpecificUpdates["accrued yr"] = accruedYr
+                                        bankSpecificUpdates["1d int"] = oneDayInt
+                                    }
+
+                                    if (bankSpecificUpdates.isNotEmpty()) {
+                                        updateMap[key] = bankSpecificUpdates
                                     }
 
                                     val bObj = JSONObject().apply {
-                                        put("firebase_key", key) // Passing actual document key
+                                        put("firebase_key", key) 
                                         put("bank_name", bName)
                                         put("account_no", accNo)
                                         put("current_bal", curBal)
@@ -391,7 +400,8 @@ object CacheManager {
                                 }
                             }
                             if (updateMap.isNotEmpty()) {
-                                doc.reference.update(updateMap).await()
+                                // Masterstroke: Using set with merge prevents Dot/FieldPath issues entirely for maps
+                                doc.reference.set(updateMap, SetOptions.merge()).await()
                             }
                         }
 
@@ -412,6 +422,7 @@ object CacheManager {
                                     val cibilStatus = if (util <= 30.0) "Safe" else "High Risk"
 
                                     val ccObj = JSONObject().apply {
+                                        put("firebase_key", key.toString())
                                         put("issuer", issuer)
                                         put("card_no", cardNo)
                                         put("type", type)
@@ -470,6 +481,7 @@ object CacheManager {
                                     }
 
                                     val fdObj = JSONObject().apply {
+                                        put("firebase_key", key.toString())
                                         put("bank_name", bank)
                                         put("account_no", accNo)
                                         put("create_date", createStr)
@@ -517,7 +529,6 @@ object CacheManager {
                                         val changeRs = item.optString("change_rs").toDoubleOrNull() ?: item.optDouble("change_rs", 0.0)
                                         
                                         if (rawTicker.isNotEmpty() && price > 0) {
-                                            // Automatically maps "NSE:SBIN" to "SBIN" so it connects with Firebase DB effortlessly
                                             val cleanKey = if (rawTicker.contains(":")) rawTicker.substringAfter(":") else rawTicker
                                             liveMap[cleanKey] = Pair(price, changeRs)
                                         }
@@ -531,7 +542,7 @@ object CacheManager {
                         }
                     }
                 } catch (e: Exception) {
-                    e.printStackTrace() // Graceful failure, if offline it will just use buy_price
+                    e.printStackTrace() 
                 }
 
                 // ==========================================
@@ -546,13 +557,12 @@ object CacheManager {
                         val dbName = itemData["name"]?.toString()?.trim()?.uppercase() ?: ""
                         val buyPrice = (itemData["avg"] as? Number)?.toDouble() ?: 0.0
                         
-                        // Map using the clean ticker (e.g. SBIN)
                         val liveData = liveMap[dbName]
                         val currentPrice = liveData?.first ?: buyPrice
                         val oneDayChange = liveData?.second ?: 0.0
                         
                         val invObj = JSONObject().apply {
-                            put("asset_name", dbName) // Ensures only SBIN is saved in app state
+                            put("asset_name", dbName) 
                             put("asset_type", itemData["type"]?.toString() ?: "Stock")
                             put("quantity", (itemData["qnt"] as? Number)?.toDouble() ?: 0.0)
                             put("buy_price", buyPrice)
@@ -589,7 +599,7 @@ object CacheManager {
                     put("banks", banksArray)
                     put("fds", fdArray)
                     put("credit_cards", ccArray)
-                    put("investments", invArray) // Fully synced with live prices
+                    put("investments", invArray) 
                     put("contri_rooms", contriArray)
                 }
 
@@ -686,7 +696,7 @@ object CacheManager {
                 val item = banksArray.getJSONObject(i)
                 fetchedBankList.add(
                     BankAccountItem(
-                        firebaseKey = item.optString("firebase_key", ""), // Using extracted Key
+                        firebaseKey = item.optString("firebase_key", ""), 
                         bankName = item.optString("bank_name", ""), 
                         accountNo = item.optString("account_no", ""), 
                         currentBalance = item.optDouble("current_bal", 0.0), 
@@ -714,7 +724,6 @@ object CacheManager {
         if (fdArray != null) {
             for (i in 0 until fdArray.length()) { 
                 val item = fdArray.getJSONObject(i)
-                // Leaving FD as is, but setup space if key is needed later.
                 fetchedFDList.add(
                     FDItem(
                         bankName = item.optString("bank_name", ""), 
@@ -738,7 +747,6 @@ object CacheManager {
         if (ccArray != null) {
             for (i in 0 until ccArray.length()) { 
                 val item = ccArray.getJSONObject(i)
-                // Leaving CC as is, but setup space if key is needed later.
                 fetchedCCList.add(
                     CreditCardItem(
                         issuer = item.optString("issuer", ""), 
