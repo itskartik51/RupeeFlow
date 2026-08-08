@@ -46,12 +46,6 @@ import java.text.NumberFormat
 import java.util.Calendar
 import java.util.Locale
 
-// HELPER: Indian Rupee formatting
-fun formatRupeeAmount(amount: Double): String {
-    val formatter = NumberFormat.getCurrencyInstance(Locale("en", "IN"))
-    return formatter.format(amount).replace("₹", "").trim()
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BankAccountsScreen(
@@ -317,7 +311,7 @@ fun QuickUpdateDialog(bank: BankAccountItem, username: String, onDismiss: () -> 
                                     onSuccess() 
                                 }
 
-                                // MASTERSTROKE: NO SEARCHING! DIRECT FIREBASE PATH
+                                // MASTERSTROKE: No Loop Searching! Direct Update using firebaseKey
                                 CoroutineScope(Dispatchers.IO).launch {
                                     try {
                                         val db = FirebaseFirestore.getInstance()
