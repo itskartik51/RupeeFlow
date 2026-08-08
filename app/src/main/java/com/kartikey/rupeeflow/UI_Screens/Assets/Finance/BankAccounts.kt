@@ -35,6 +35,7 @@ import androidx.compose.ui.window.DialogProperties
 import com.google.firebase.firestore.FirebaseFirestore
 import com.kartikey.rupeeflow.Cloud_Database.Constants
 import com.kartikey.rupeeflow.UI_Screens.Assets.BankAccountItem
+import com.kartikey.rupeeflow.UI_Screens.CacheManager
 import com.kartikey.rupeeflow.UI_Screens.bounceClick
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -44,6 +45,12 @@ import kotlinx.coroutines.withContext
 import java.text.NumberFormat
 import java.util.Calendar
 import java.util.Locale
+
+// HELPER: Indian Rupee formatting
+fun formatRupeeAmount(amount: Double): String {
+    val formatter = NumberFormat.getCurrencyInstance(Locale("en", "IN"))
+    return formatter.format(amount).replace("₹", "").trim()
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -113,7 +120,6 @@ fun BankDetailCard(bank: BankAccountItem, username: String, onEditClick: (BankAc
         Column(modifier = Modifier.padding(20.dp)) {
             
             Row(verticalAlignment = Alignment.CenterVertically) {
-                
                 Box(
                     modifier = Modifier
                         .size(44.dp)
@@ -253,13 +259,11 @@ fun QuickUpdateDialog(bank: BankAccountItem, username: String, onDismiss: () -> 
                             if (amountEntered != null && amountEntered != 0.0) {
                                 val newCalculatedBalance = bank.currentBalance + amountEntered 
                                 
-                                // PHASE 3: TRUE SPARSE DATA & PRORATED LIVE INJECTOR
                                 val cal = Calendar.getInstance()
                                 val day = cal.get(Calendar.DAY_OF_MONTH)
                                 val month = cal.get(Calendar.MONTH) 
                                 val qtr = (month / 3) + 1
 
-                                // Dynamic Key Generators
                                 val dayKey = if (day == 31) "31" else {
                                     when (day % 6) {
                                         1 -> "01, 07, 13, 19, 25"
@@ -284,7 +288,6 @@ fun QuickUpdateDialog(bank: BankAccountItem, username: String, onDismiss: () -> 
                                 }
                                 val qtrKey = "q$qtr"
 
-                                // Live Math Recalculation
                                 val rateYr = bank.interestRate
                                 val rateQtr = rateYr / 4.0
                                 val oneDayInt = (newCalculatedBalance * (rateYr / 100.0)) / 365.0
@@ -292,33 +295,14 @@ fun QuickUpdateDialog(bank: BankAccountItem, username: String, onDismiss: () -> 
                                 val expQtrInt = newCalculatedBalance * (rateQtr / 100.0)
                                 val expYrInt = newCalculatedBalance * (rateYr / 100.0)
                                 
-                                val todayReset = Calendar.getInstance().apply {
-                                    set(Calendar.HOUR_OF_DAY, 0)
-                                    set(Calendar.MINUTE, 0)
-                                    set(Calendar.SECOND, 0)
-                                    set(Calendar.MILLISECOND, 0)
-                                }
+                                val todayReset = Calendar.getInstance().apply { set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }
 
-                                val startOfQtr = Calendar.getInstance().apply {
-                                    set(Calendar.MONTH, (cal.get(Calendar.MONTH) / 3) * 3)
-                                    set(Calendar.DAY_OF_MONTH, 1)
-                                    set(Calendar.HOUR_OF_DAY, 0)
-                                    set(Calendar.MINUTE, 0)
-                                    set(Calendar.SECOND, 0)
-                                    set(Calendar.MILLISECOND, 0)
-                                }
+                                val startOfQtr = Calendar.getInstance().apply { set(Calendar.MONTH, (cal.get(Calendar.MONTH) / 3) * 3); set(Calendar.DAY_OF_MONTH, 1); set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }
                                 val diffQtr = todayReset.timeInMillis - startOfQtr.timeInMillis
                                 val daysPassedQtr = (diffQtr / (1000 * 60 * 60 * 24)).toInt() + 1
                                 val accruedQtr = expQtrInt * (daysPassedQtr / 90.0)
 
-                                val startOfYear = Calendar.getInstance().apply {
-                                    set(Calendar.MONTH, Calendar.JANUARY)
-                                    set(Calendar.DAY_OF_MONTH, 1)
-                                    set(Calendar.HOUR_OF_DAY, 0)
-                                    set(Calendar.MINUTE, 0)
-                                    set(Calendar.SECOND, 0)
-                                    set(Calendar.MILLISECOND, 0)
-                                }
+                                val startOfYear = Calendar.getInstance().apply { set(Calendar.MONTH, Calendar.JANUARY); set(Calendar.DAY_OF_MONTH, 1); set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }
                                 val diffYr = todayReset.timeInMillis - startOfYear.timeInMillis
                                 val daysPassedYr = (diffYr / (1000 * 60 * 60 * 24)).toInt() + 1
                                 val accruedYr = expYrInt * (daysPassedYr / 365.0)
@@ -326,6 +310,14 @@ fun QuickUpdateDialog(bank: BankAccountItem, username: String, onDismiss: () -> 
                                 onDismiss()
                                 Toast.makeText(context, "Updating balance...", Toast.LENGTH_SHORT).show()
                                 
+                                val cachedData = CacheManager.getCachedData(context, username)
+                                if (cachedData != null) {
+                                    val updatedList = cachedData.bankList.map { if (it.firebaseKey == bank.firebaseKey) it.copy(currentBalance = newCalculatedBalance) else it }
+                                    CacheManager.updateOptimisticCache(context, username, cachedData.copy(bankList = updatedList))
+                                    onSuccess() 
+                                }
+
+                                // MASTERSTROKE: NO SEARCHING! DIRECT FIREBASE PATH
                                 CoroutineScope(Dispatchers.IO).launch {
                                     try {
                                         val db = FirebaseFirestore.getInstance()
@@ -334,59 +326,24 @@ fun QuickUpdateDialog(bank: BankAccountItem, username: String, onDismiss: () -> 
                                         if (!userQuery.isEmpty) {
                                             val userRef = userQuery.documents[0].reference
                                             val bankDocRef = userRef.collection("Finances").document("Bank")
-                                            val bankDoc = bankDocRef.get().await()
                                             
-                                            if (bankDoc.exists()) {
-                                                val data = bankDoc.data ?: emptyMap()
-                                                var targetKey: String? = null
-                                                
-                                                for ((key, rawBank) in data) {
-                                                    if (key != "last_updated" && rawBank is Map<*, *>) {
-                                                        val accNo = rawBank["account no."]?.toString()
-                                                        if (accNo == bank.accountNo) {
-                                                            targetKey = key
-                                                            break
-                                                        }
-                                                    }
-                                                }
-                                                
-                                                if (targetKey != null) {
-                                                    // Hyper-Accurate Update Object
-                                                    val updates = hashMapOf<String, Any>(
-                                                        "$targetKey.current bal." to newCalculatedBalance,
-                                                        "$targetKey.6D bal. Block.$dayKey" to newCalculatedBalance,
-                                                        "$targetKey.6D avg.$avg6dKey" to newCalculatedBalance,
-                                                        "$targetKey.monthly avg.$monthKey" to newCalculatedBalance,
-                                                        "$targetKey.qtr. avg.$qtrKey" to newCalculatedBalance,
-                                                        "$targetKey.yr avg.cur" to newCalculatedBalance,
-                                                        "$targetKey.1d int" to oneDayInt,
-                                                        "$targetKey.exp qtr int" to expQtrInt,
-                                                        "$targetKey.accrued qtr" to accruedQtr,
-                                                        "$targetKey.exp yr int" to expYrInt,
-                                                        "$targetKey.accrued yr" to accruedYr
-                                                    )
-                                                    
-                                                    bankDocRef.update(updates).await()
-                                                    
-                                                    withContext(Dispatchers.Main) {
-                                                        onSuccess() 
-                                                    }
-                                                } else {
-                                                    withContext(Dispatchers.Main) {
-                                                        Toast.makeText(context, "Bank not found in Engine!", Toast.LENGTH_SHORT).show()
-                                                    }
-                                                }
-                                            }
-                                        } else {
-                                            withContext(Dispatchers.Main) {
-                                                Toast.makeText(context, "User Profile Failed!", Toast.LENGTH_SHORT).show()
-                                            }
+                                            val updates = hashMapOf<String, Any>(
+                                                "${bank.firebaseKey}.current bal." to newCalculatedBalance,
+                                                "${bank.firebaseKey}.6D bal. Block.$dayKey" to newCalculatedBalance,
+                                                "${bank.firebaseKey}.6D avg.$avg6dKey" to newCalculatedBalance,
+                                                "${bank.firebaseKey}.monthly avg.$monthKey" to newCalculatedBalance,
+                                                "${bank.firebaseKey}.qtr. avg.$qtrKey" to newCalculatedBalance,
+                                                "${bank.firebaseKey}.yr avg.cur" to newCalculatedBalance,
+                                                "${bank.firebaseKey}.1d int" to oneDayInt,
+                                                "${bank.firebaseKey}.exp qtr int" to expQtrInt,
+                                                "${bank.firebaseKey}.accrued qtr" to accruedQtr,
+                                                "${bank.firebaseKey}.exp yr int" to expYrInt,
+                                                "${bank.firebaseKey}.accrued yr" to accruedYr
+                                            )
+                                            
+                                            bankDocRef.update(updates).await()
                                         }
-                                    } catch (e: Exception) {
-                                        withContext(Dispatchers.Main) {
-                                            Toast.makeText(context, "Network Error", Toast.LENGTH_SHORT).show()
-                                        }
-                                    }
+                                    } catch (e: Exception) {}
                                 }
                             } else {
                                 Toast.makeText(context, "Enter a valid amount", Toast.LENGTH_SHORT).show()
