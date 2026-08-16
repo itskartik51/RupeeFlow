@@ -1,19 +1,20 @@
 package com.kartikey.rupeeflow.UI_Screens
 
+import android.app.Activity
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Email
-import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Phone
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.Cancel
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -22,16 +23,22 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.common.api.ApiException
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
@@ -46,70 +53,190 @@ import java.util.Locale
 
 @Composable
 fun LoginScreen(onLoginSuccess: (String) -> Unit) {
-    var isLoginMode by remember { mutableStateOf(true) }
-    var name by remember { mutableStateOf("") }
-    var mobile by remember { mutableStateOf("") }
-    var username by remember { mutableStateOf("") }
-    var email by remember { mutableStateOf("") } 
-    var password by remember { mutableStateOf("") }
+    var authStep by remember { mutableStateOf(1) } // 1 = Google Button, 2 = Complete Profile
     var statusMessage by remember { mutableStateOf("") }
-    
-    var emailError by remember { mutableStateOf(false) }
+    var isLoading by remember { mutableStateOf(false) }
 
+    // Google Fetched Data
+    var googleEmail by remember { mutableStateOf("") }
+    var googleName by remember { mutableStateOf("") }
+    var googlePhotoUrl by remember { mutableStateOf("") }
+
+    // Form Inputs (New User)
+    var inputName by remember { mutableStateOf("") }
+    var inputUsername by remember { mutableStateOf("") }
+    var inputMobile by remember { mutableStateOf("") }
+    
+    // Username Check States
+    var isCheckingUsername by remember { mutableStateOf(false) }
+    var usernameAvailable by remember { mutableStateOf<Boolean?>(null) } // null = unchecked, true = yes, false = taken
+
+    val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
-    val isLoading = statusMessage == "Processing..."
+    
+    val auth = FirebaseAuth.getInstance()
+    val db = FirebaseFirestore.getInstance()
+
+    val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+        .requestIdToken(stringResource(id = R.string.default_web_client_id))
+        .requestEmail()
+        .build()
+    
+    val googleSignInClient = remember { GoogleSignIn.getClient(context, gso) }
+
+    // Smart Interaction Lock: Back button on Step 2 cancels signup and signs out of Google
+    BackHandler(enabled = authStep == 2) {
+        auth.signOut()
+        googleSignInClient.signOut()
+        authStep = 1
+        statusMessage = "Signup Cancelled."
+    }
+
+    val launcher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+            coroutineScope.launch(Dispatchers.IO) {
+                try {
+                    withContext(Dispatchers.Main) { 
+                        isLoading = true
+                        statusMessage = "Authenticating..." 
+                    }
+                    val account = task.getResult(ApiException::class.java)
+                    val credential = GoogleAuthProvider.getCredential(account.idToken, null)
+                    
+                    auth.signInWithCredential(credential).await()
+                    val firebaseUser = auth.currentUser
+                    
+                    if (firebaseUser != null) {
+                        val userEmail = firebaseUser.email ?: ""
+                        
+                        withContext(Dispatchers.Main) { statusMessage = "Syncing Database..." }
+
+                        val query = db.collection("Users").whereEqualTo("email", userEmail).get().await()
+                        
+                        if (!query.isEmpty) {
+                            // EXISTING USER
+                            val userDoc = query.documents[0]
+                            val savedUsername = userDoc.getString("username") ?: userEmail.substringBefore("@")
+                            withContext(Dispatchers.Main) {
+                                onLoginSuccess(savedUsername)
+                            }
+                        } else {
+                            // NEW USER -> Send to Step 2
+                            withContext(Dispatchers.Main) {
+                                googleEmail = userEmail
+                                googleName = firebaseUser.displayName ?: ""
+                                googlePhotoUrl = firebaseUser.photoUrl?.toString() ?: ""
+                                inputName = googleName
+                                
+                                authStep = 2
+                                isLoading = false
+                                statusMessage = ""
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    withContext(Dispatchers.Main) { 
+                        statusMessage = "Authentication failed: ${e.localizedMessage}" 
+                        isLoading = false
+                    } 
+                }
+            }
+        } else {
+            statusMessage = "Google Sign-In Cancelled."
+            isLoading = false
+        }
+    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .imePadding() 
             .padding(horizontal = 24.dp)
-            .verticalScroll(rememberScrollState()),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .imePadding(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
-        Spacer(modifier = Modifier.height(60.dp))
-
         Image(
             painter = painterResource(id = R.mipmap.ic_launcher),
             contentDescription = "App Logo",
             modifier = Modifier
-                .size(64.dp)
-                .clip(RoundedCornerShape(16.dp))
+                .size(72.dp)
+                .clip(RoundedCornerShape(18.dp))
         )
         
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
-        if (isLoginMode) {
-            Text("RupeeFlow", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onBackground)
-            Spacer(modifier = Modifier.height(4.dp))
-            Text("Personal Finance for Friends & Family", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (authStep == 1) {
+            Text("RupeeFlow", fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onBackground)
+            Spacer(modifier = Modifier.height(6.dp))
+            Text("Personal Finance for Friends & Family", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(modifier = Modifier.height(60.dp))
+
+            if (isLoading) {
+                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary, strokeWidth = 3.dp)
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(statusMessage, color = MaterialTheme.colorScheme.primary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+            } else {
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 6.dp,
+                    shadowElevation = 2.dp,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp)
+                        .bounceClick {
+                            isLoading = true
+                            statusMessage = "Opening Google Portal..."
+                            googleSignInClient.signOut().addOnCompleteListener {
+                                launcher.launch(googleSignInClient.signInIntent)
+                            }
+                        }
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            text = "G",
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color(0xFFDB4437) // Google Red Look
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = "Continue with Google",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+                
+                if (statusMessage.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(statusMessage, color = MaterialTheme.colorScheme.error, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                }
+            }
         } else {
-            Text("Join RupeeFlow", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onBackground)
-            Spacer(modifier = Modifier.height(4.dp))
-            Text("Track expenses, budget, & net worth privately.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
+            // STEP 2: COMPLETE PROFILE FOR NEW USERS
+            Text("Complete Your Profile", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onBackground)
+            Spacer(modifier = Modifier.height(6.dp))
+            Text("Choose a unique identity for RupeeFlow.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            
+            Spacer(modifier = Modifier.height(32.dp))
 
-        Spacer(modifier = Modifier.height(40.dp))
-
-        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
-            Text(
-                text = if (isLoginMode) "Sign In" else "New Profile",
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground
-            )
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        if (!isLoginMode) {
+            // 1. Name Field (Pre-filled, Editable)
             OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                label = { Text("Full Name", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                value = inputName,
+                onValueChange = { inputName = it },
+                label = { Text("Display Name", color = MaterialTheme.colorScheme.onSurfaceVariant) },
                 leadingIcon = { Icon(Icons.Outlined.Person, contentDescription = "Name", tint = MaterialTheme.colorScheme.onSurfaceVariant) },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
@@ -121,19 +248,90 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
                     focusedTextColor = MaterialTheme.colorScheme.onBackground,
                     unfocusedTextColor = MaterialTheme.colorScheme.onBackground
                 ),
-                keyboardOptions = KeyboardOptions(
-                    capitalization = KeyboardCapitalization.Words,
-                    imeAction = ImeAction.Next
-                ),
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Next),
                 keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
             )
-            Spacer(modifier = Modifier.height(12.dp))
             
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // 2. Username Field (Lowercase, No Spaces, Realtime Check)
             OutlinedTextField(
-                value = username,
-                onValueChange = { username = it },
-                label = { Text("Username", color = MaterialTheme.colorScheme.onSurfaceVariant) },
-                leadingIcon = { Icon(Icons.Outlined.Person, contentDescription = "Username", tint = MaterialTheme.colorScheme.onSurfaceVariant) },
+                value = inputUsername,
+                onValueChange = { newValue ->
+                    // Auto-filter: Lowercase and strict no-space
+                    inputUsername = newValue.lowercase().replace(" ", "")
+                    usernameAvailable = null // Reset check state when typing
+                },
+                label = { Text("Unique Username", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                leadingIcon = { 
+                    Icon(
+                        imageVector = Icons.Outlined.Person, 
+                        contentDescription = "Username", 
+                        tint = if (usernameAvailable == true) PrimaryGreenLight else if (usernameAvailable == false) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                    ) 
+                },
+                trailingIcon = {
+                    if (isCheckingUsername) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), color = MaterialTheme.colorScheme.primary, strokeWidth = 2.dp)
+                    } else if (usernameAvailable == true) {
+                        Icon(Icons.Outlined.CheckCircle, contentDescription = "Available", tint = PrimaryGreenLight)
+                    } else if (usernameAvailable == false) {
+                        Icon(Icons.Outlined.Cancel, contentDescription = "Taken", tint = MaterialTheme.colorScheme.error)
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onFocusChanged { focusState ->
+                        // The Magic Check: When user leaves this field
+                        if (!focusState.isFocused && inputUsername.isNotBlank()) {
+                            isCheckingUsername = true
+                            coroutineScope.launch(Dispatchers.IO) {
+                                try {
+                                    val checkQuery = db.collection("Users").whereEqualTo("username", inputUsername).get().await()
+                                    withContext(Dispatchers.Main) {
+                                        usernameAvailable = checkQuery.isEmpty // true if empty (available)
+                                        isCheckingUsername = false
+                                    }
+                                } catch (e: Exception) {
+                                    withContext(Dispatchers.Main) { isCheckingUsername = false }
+                                }
+                            }
+                        }
+                    },
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = if (usernameAvailable == false) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = if (usernameAvailable == false) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.surfaceVariant,
+                    focusedContainerColor = Color.Transparent,
+                    unfocusedContainerColor = Color.Transparent,
+                    focusedTextColor = MaterialTheme.colorScheme.onBackground,
+                    unfocusedTextColor = MaterialTheme.colorScheme.onBackground
+                ),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
+            )
+            
+            // Availability Helper Text
+            if (usernameAvailable == false) {
+                Text("Username already taken! Please try another.", color = MaterialTheme.colorScheme.error, fontSize = 11.sp, modifier = Modifier.align(Alignment.Start).padding(start = 12.dp, top = 2.dp))
+            } else if (usernameAvailable == true) {
+                Text("Username Available!", color = PrimaryGreenLight, fontSize = 11.sp, modifier = Modifier.align(Alignment.Start).padding(start = 12.dp, top = 2.dp))
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // 3. Mobile Number Field (Strict Numeric, 10 Digits)
+            OutlinedTextField(
+                value = inputMobile,
+                onValueChange = { newValue ->
+                    // Strict numeric filter & max length 10
+                    if (newValue.all { it.isDigit() } && newValue.length <= 10) {
+                        inputMobile = newValue
+                    }
+                },
+                label = { Text("Mobile Number", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                prefix = { Text("+91 ", color = MaterialTheme.colorScheme.onBackground, fontWeight = FontWeight.Bold) },
+                leadingIcon = { Icon(Icons.Outlined.Phone, contentDescription = "Mobile", tint = MaterialTheme.colorScheme.onSurfaceVariant) },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 colors = OutlinedTextFieldDefaults.colors(
@@ -144,269 +342,72 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
                     focusedTextColor = MaterialTheme.colorScheme.onBackground,
                     unfocusedTextColor = MaterialTheme.colorScheme.onBackground
                 ),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-                keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = {
+                    keyboardController?.hide()
+                    focusManager.clearFocus()
+                })
             )
-            Spacer(modifier = Modifier.height(12.dp))
 
-            OutlinedTextField(
-                value = email,
-                onValueChange = { 
-                    email = it 
-                    if (emailError) emailError = false
-                },
-                label = { Text(if (emailError) "Invalid Email Format!" else "Email ID", color = if (emailError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant) },
-                isError = emailError,
-                leadingIcon = { Icon(Icons.Outlined.Email, contentDescription = "Email", tint = if (emailError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .onFocusChanged { focusState ->
-                        if (!focusState.isFocused && email.isNotBlank()) {
-                            val emailRegex = "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}".toRegex()
-                            emailError = !email.matches(emailRegex)
-                        }
-                    },
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = if (emailError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                    unfocusedBorderColor = if (emailError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.surfaceVariant,
-                    focusedContainerColor = Color.Transparent,
-                    unfocusedContainerColor = Color.Transparent,
-                    focusedTextColor = MaterialTheme.colorScheme.onBackground,
-                    unfocusedTextColor = MaterialTheme.colorScheme.onBackground
-                ),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
-                keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-        }
-        
-        OutlinedTextField(
-            value = mobile,
-            onValueChange = { input ->
-                if (isLoginMode) {
-                    mobile = input
-                } else {
-                    if (input.all { char -> char.isDigit() } && input.length <= 10) {
-                        mobile = input
-                    }
-                }
-            },
-            label = { Text(if (isLoginMode) "Username or Mobile No." else "Mobile Number", color = MaterialTheme.colorScheme.onSurfaceVariant) },
-            prefix = {
-                if (!isLoginMode) {
-                    Text("+91 ", color = MaterialTheme.colorScheme.onBackground, fontWeight = FontWeight.Bold)
-                }
-            },
-            leadingIcon = { 
-                Icon(
-                    imageVector = if (isLoginMode) Icons.Outlined.Person else Icons.Outlined.Phone, 
-                    contentDescription = "Contact", 
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                ) 
-            },
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant,
-                focusedContainerColor = Color.Transparent,
-                unfocusedContainerColor = Color.Transparent,
-                focusedTextColor = MaterialTheme.colorScheme.onBackground,
-                unfocusedTextColor = MaterialTheme.colorScheme.onBackground
-            ),
-            keyboardOptions = KeyboardOptions(
-                keyboardType = if (isLoginMode) KeyboardType.Text else KeyboardType.Phone,
-                imeAction = ImeAction.Next 
-            ),
-            keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
-        )
-        
-        Spacer(modifier = Modifier.height(12.dp))
-        
-        OutlinedTextField(
-            value = password,
-            onValueChange = { password = it },
-            label = { Text("Password", color = MaterialTheme.colorScheme.onSurfaceVariant) },
-            leadingIcon = { Icon(Icons.Outlined.Lock, contentDescription = "Password", tint = MaterialTheme.colorScheme.onSurfaceVariant) },
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant,
-                focusedContainerColor = Color.Transparent,
-                unfocusedContainerColor = Color.Transparent,
-                focusedTextColor = MaterialTheme.colorScheme.onBackground,
-                unfocusedTextColor = MaterialTheme.colorScheme.onBackground
-            ),
-            visualTransformation = PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(
-                keyboardType = KeyboardType.Password,
-                imeAction = ImeAction.Done 
-            ),
-            keyboardActions = KeyboardActions(onDone = {
-                keyboardController?.hide()
-                focusManager.clearFocus()
-            })
-        )
+            Spacer(modifier = Modifier.height(24.dp))
 
-        if (isLoginMode) {
+            if (statusMessage.isNotEmpty() && !isLoading) {
+                Text(statusMessage, color = MaterialTheme.colorScheme.error, fontSize = 12.sp, modifier = Modifier.align(Alignment.Start))
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            // Create Profile Button
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 4.dp), 
-                contentAlignment = Alignment.CenterStart
-            ) {
-                Text(
-                    text = "Forget Password?",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.clickable { }
-                )
-            }
-        }
-        
-        Spacer(modifier = Modifier.height(8.dp))
+                    .height(52.dp)
+                    .bounceClick {
+                        keyboardController?.hide()
+                        focusManager.clearFocus()
 
-        if (statusMessage.isNotEmpty() && !isLoading) {
-            Text(statusMessage, color = MaterialTheme.colorScheme.error, fontSize = 12.sp, modifier = Modifier.align(Alignment.Start))
-        }
+                        val finalName = inputName.trim() // Trims extra spaces
 
-        Spacer(modifier = Modifier.height(24.dp))
-
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(52.dp)
-                .bounceClick {
-                    keyboardController?.hide()
-                    focusManager.clearFocus()
-
-                    if (!isLoginMode) {
-                        if (name.isBlank() || mobile.isBlank() || username.isBlank() || password.isBlank() || email.isBlank()) {
-                            statusMessage = "All fields including Email are mandatory!"
+                        if (finalName.isBlank() || inputUsername.isBlank() || inputMobile.isBlank()) {
+                            statusMessage = "All fields are mandatory!"
                             return@bounceClick
                         }
-                        if (mobile.length != 10) {
-                            statusMessage = "Mobile number must be exactly 10 digits!"
+                        if (inputMobile.length != 10) {
+                            statusMessage = "Mobile number must be 10 digits!"
                             return@bounceClick
                         }
-                        if (emailError) {
-                            statusMessage = "Please fix the email format!"
+                        if (usernameAvailable == false) {
+                            statusMessage = "Please select an available username."
                             return@bounceClick
                         }
-                    } else {
-                        if (mobile.isBlank() || password.isBlank()) {
-                            statusMessage = "Please enter your credentials."
-                            return@bounceClick
-                        }
-                    }
 
-                    coroutineScope.launch(Dispatchers.IO) {
-                        try {
-                            statusMessage = "Processing..."
-                            val db = FirebaseFirestore.getInstance()
-
-                            if (isLoginMode) {
-                                // ==========================================
-                                // FIRESTORE LOGIN LOGIC
-                                // ==========================================
-                                val inputUserOrMobile = mobile.trim().removePrefix("+91")
-                                val inputPass = password.trim()
-
-                                // 1. Try search by Username
-                                var query = db.collection("Users")
-                                    .whereEqualTo("username", inputUserOrMobile)
-                                    .get()
-                                    .await()
-
-                                // 2. If empty, search by Mobile
-                                if (query.isEmpty) {
-                                    query = db.collection("Users")
-                                        .whereEqualTo("mobile_no_", inputUserOrMobile)
-                                        .get()
-                                        .await()
+                        coroutineScope.launch(Dispatchers.IO) {
+                            try {
+                                withContext(Dispatchers.Main) { 
+                                    isLoading = true
+                                    statusMessage = "Creating Profile..." 
                                 }
 
-                                if (!query.isEmpty) {
-                                    val userDoc = query.documents[0]
-                                    val savedPassword = userDoc.getString("password") ?: ""
-
-                                    if (savedPassword == inputPass) {
-                                        val matchedUsername = userDoc.getString("username") ?: inputUserOrMobile
-                                        withContext(Dispatchers.Main) {
-                                            onLoginSuccess(matchedUsername)
-                                        }
-                                    } else {
-                                        withContext(Dispatchers.Main) {
-                                            statusMessage = "Incorrect password!"
-                                        }
-                                    }
-                                } else {
-                                    withContext(Dispatchers.Main) {
-                                        statusMessage = "User not found!"
-                                    }
-                                }
-
-                            } else {
-                                // ==========================================
-                                // FIRESTORE SIGNUP LOGIC
-                                // ==========================================
-                                val cleanMobile = mobile.trim()
-                                val newUsername = username.trim()
-
-                                // 1. Check if Username already taken
-                                val userCheck = db.collection("Users")
-                                    .whereEqualTo("username", newUsername)
-                                    .get()
-                                    .await()
-
-                                if (!userCheck.isEmpty) {
-                                    withContext(Dispatchers.Main) {
-                                        statusMessage = "Username already taken!"
-                                    }
-                                    return@launch
-                                }
-
-                                // 2. Check if Mobile already registered
-                                val mobileCheck = db.collection("Users")
-                                    .whereEqualTo("mobile_no_", cleanMobile)
-                                    .get()
-                                    .await()
-
-                                if (!mobileCheck.isEmpty) {
-                                    withContext(Dispatchers.Main) {
-                                        statusMessage = "Mobile number already registered!"
-                                    }
-                                    return@launch
-                                }
-
-                                // 3. Auto-increment User ID from System/Metadata
+                                // Fetch Counter and Gen ID
                                 val metaRef = db.collection("System").document("Metadata")
                                 val metaDoc = metaRef.get().await()
                                 var lastCounter = 8L
-
                                 if (metaDoc.exists()) {
-                                    lastCounter = metaDoc.getLong("last_user_id") 
-                                        ?: metaDoc.getLong("counter") 
-                                        ?: 8L
+                                    lastCounter = metaDoc.getLong("last_user_id") ?: metaDoc.getLong("counter") ?: 8L
                                 }
-
                                 val nextCounter = lastCounter + 1
-                                val newUserId = String.format(Locale.US, "%04d", nextCounter) // e.g. "0009"
+                                val newUserId = String.format(Locale.US, "%04d", nextCounter)
 
-                                // Update counter in Metadata
-                                metaRef.set(mapOf("last_user_id" to nextCounter), SetOptions.merge())
+                                // Update Counter
+                                metaRef.set(mapOf("last_user_id" to nextCounter), SetOptions.merge()).await()
 
-                                // 4. Create User Profile Doc
+                                // Build Clean Data (No password field, prfl included)
                                 val userData = hashMapOf(
-                                    "name" to name.trim(),
-                                    "username" to newUsername,
-                                    "mobile_no_" to cleanMobile,
-                                    "email" to email.trim(),
-                                    "password" to password.trim(),
-                                    "dob" to null, // Initialized as null Timestamp equivalent
+                                    "name" to finalName,
+                                    "username" to inputUsername,
+                                    "mobile_no_" to inputMobile,
+                                    "email" to googleEmail,
+                                    "prfl" to googlePhotoUrl, 
+                                    "dob" to null,
                                     "budget_limit" to 0.0,
                                     "created_at" to FieldValue.serverTimestamp()
                                 )
@@ -414,7 +415,7 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
                                 val newUserRef = db.collection("Users").document(newUserId)
                                 newUserRef.set(userData).await()
 
-                                // 5. Seed default Cash Document
+                                // Seed Cash Doc
                                 val cashData = hashMapOf(
                                     "total_cash" to 0.0,
                                     "last_updated" to SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
@@ -422,55 +423,31 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
                                 newUserRef.collection("Finances").document("Cash").set(cashData).await()
 
                                 withContext(Dispatchers.Main) {
-                                    onLoginSuccess(newUsername)
+                                    onLoginSuccess(inputUsername)
+                                }
+                            } catch (e: Exception) {
+                                withContext(Dispatchers.Main) { 
+                                    statusMessage = "Error creating profile: ${e.localizedMessage}" 
+                                    isLoading = false
                                 }
                             }
-
-                        } catch (e: Exception) {
-                            withContext(Dispatchers.Main) { 
-                                statusMessage = "Network/Firestore Error: ${e.localizedMessage ?: "Try again"}" 
-                            } 
                         }
                     }
-                }
                 .clip(RoundedCornerShape(12.dp))
                 .background(MaterialTheme.colorScheme.primary),
-            contentAlignment = Alignment.Center
-        ) { 
-            if (isLoading) {
-                CircularProgressIndicator(color = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(24.dp), strokeWidth = 2.5.dp)
-            } else {
-                Text(
-                    text = if (isLoginMode) "Access My Flow" else "Create & Seed Profile", 
-                    fontSize = 16.sp, 
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimary
-                ) 
+                contentAlignment = Alignment.Center
+            ) { 
+                if (isLoading) {
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(24.dp), strokeWidth = 2.5.dp)
+                } else {
+                    Text(
+                        text = "Create Profile", 
+                        fontSize = 16.sp, 
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    ) 
+                }
             }
         }
-        
-        Spacer(modifier = Modifier.height(32.dp))
-
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.clickable { 
-                isLoginMode = !isLoginMode
-                statusMessage = "" 
-            }
-        ) {
-            Text(
-                text = if (isLoginMode) "Don't have a profile? " else "Already have a profile? ", 
-                color = MaterialTheme.colorScheme.onSurfaceVariant, 
-                fontSize = 14.sp
-            )
-            Text(
-                text = if (isLoginMode) "Create Profile" else "Sign In", 
-                color = MaterialTheme.colorScheme.primary, 
-                fontWeight = FontWeight.Bold, 
-                fontSize = 14.sp
-            )
-        }
-
-        Spacer(modifier = Modifier.height(40.dp)) 
     }
 }
