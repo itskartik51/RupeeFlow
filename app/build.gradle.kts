@@ -81,7 +81,7 @@ dependencies {
     // Biometric Security Lock Library (Fix for BiometricPrompt)
     implementation("androidx.biometric:biometric:1.1.0")
 
-    // UI & Design (Mint/Lavender Theme) 
+    // UI & Design (RupeeFlow Custom Theme) 
     implementation("androidx.compose.ui:ui:1.7.0")
     implementation("androidx.compose.animation:animation:1.7.0") 
     implementation("androidx.compose.material3:material3:1.3.0")
@@ -101,7 +101,7 @@ dependencies {
     implementation(platform("com.google.firebase:firebase-bom:32.7.2"))
     // Firestore Database Dependency
     implementation("com.google.firebase:firebase-firestore")
-    // Google Sign-In & Firebase Auth (ADDED)
+    // Google Sign-In & Firebase Auth
     implementation("com.google.firebase:firebase-auth")
     implementation("com.google.android.gms:play-services-auth:21.0.0")
 
