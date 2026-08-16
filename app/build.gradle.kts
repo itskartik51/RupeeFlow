@@ -101,6 +101,9 @@ dependencies {
     implementation(platform("com.google.firebase:firebase-bom:32.7.2"))
     // Firestore Database Dependency
     implementation("com.google.firebase:firebase-firestore")
+    // Google Sign-In & Firebase Auth (ADDED)
+    implementation("com.google.firebase:firebase-auth")
+    implementation("com.google.android.gms:play-services-auth:21.0.0")
 
     // ==========================================
     // NEW LIBRARIES: QR & SCANNER ENGINE
