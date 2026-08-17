@@ -1,6 +1,7 @@
 package com.kartikey.rupeeflow.UI_Screens
 
 import android.content.Context
+import android.net.Uri
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
@@ -20,6 +21,8 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
+import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
@@ -28,7 +31,7 @@ data class AppData(
     val userFullName: String,
     val userEmail: String,
     val userMobile: String,
-    val userPassword: String,
+    val profilePicUrl: String, // 🚀 NEW: Profile Pic Link
     val userDob: String,
     val thisMonthExpenses: Double,
     val thisYearExpenses: Double,
@@ -45,6 +48,71 @@ data class AppData(
 object CacheManager {
     private const val PREFS_NAME = "RupeeFlow_GlobalCache"
     
+    // ==========================================
+    // 🚀 NEW: PROFILE IMAGE CACHE ENGINE
+    // ==========================================
+    fun getProfilePicFile(context: Context): File {
+        return File(context.cacheDir, "profile_pic.jpg")
+    }
+
+    fun saveCustomProfilePic(context: Context, uri: Uri): Boolean {
+        return try {
+            val inputStream = context.contentResolver.openInputStream(uri)
+            val bitmap = android.graphics.BitmapFactory.decodeStream(inputStream)
+            inputStream?.close()
+            if (bitmap == null) return false
+
+            // Compress to maximum 400px to save extreme storage space
+            val maxDim = 400
+            val scale = maxDim.toFloat() / maxOf(bitmap.width, bitmap.height)
+            val scaledBitmap = if (scale < 1) {
+                android.graphics.Bitmap.createScaledBitmap(bitmap, (bitmap.width * scale).toInt(), (bitmap.height * scale).toInt(), true)
+            } else bitmap
+
+            val file = getProfilePicFile(context)
+            val out = FileOutputStream(file)
+            scaledBitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 70, out)
+            out.flush()
+            out.close()
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    suspend fun downloadAndCacheProfilePic(context: Context, url: String): Boolean {
+        if (url.isBlank()) return false
+        return withContext(Dispatchers.IO) {
+            try {
+                val client = OkHttpClient()
+                val request = Request.Builder().url(url).build()
+                val response = client.newCall(request).execute()
+                val inputStream = response.body?.byteStream()
+                val bitmap = android.graphics.BitmapFactory.decodeStream(inputStream)
+                inputStream?.close()
+
+                if (bitmap != null) {
+                    val maxDim = 400
+                    val scale = maxDim.toFloat() / maxOf(bitmap.width, bitmap.height)
+                    val scaledBitmap = if (scale < 1) {
+                        android.graphics.Bitmap.createScaledBitmap(bitmap, (bitmap.width * scale).toInt(), (bitmap.height * scale).toInt(), true)
+                    } else bitmap
+
+                    val file = getProfilePicFile(context)
+                    val out = FileOutputStream(file)
+                    scaledBitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 70, out)
+                    out.flush()
+                    out.close()
+                    true
+                } else false
+            } catch (e: Exception) {
+                e.printStackTrace()
+                false
+            }
+        }
+    }
+
     fun getCachedData(context: Context, username: String): AppData? {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val cachedJson = prefs.getString("data_$username", null) ?: return null
@@ -55,7 +123,6 @@ object CacheManager {
         }
     }
 
-    // ⚡ Optimistic Cache Update Function
     fun updateOptimisticCache(context: Context, username: String, data: AppData) {
         try {
             val masterJson = JSONObject().apply {
@@ -64,7 +131,7 @@ object CacheManager {
                     put("name", data.userFullName)
                     put("email", data.userEmail)
                     put("mobile", data.userMobile)
-                    put("password", data.userPassword)
+                    put("prfl", data.profilePicUrl)
                     put("dob", data.userDob)
                 })
                 put("budget_limit", data.budgetLimit)
@@ -204,7 +271,7 @@ object CacheManager {
                     put("name", userDoc.getString("name") ?: "")
                     put("email", userDoc.getString("email") ?: "")
                     put("mobile", userDoc.getString("mobile_no_") ?: userDoc.getString("mobile") ?: "")
-                    put("password", userDoc.getString("password") ?: "")
+                    put("prfl", userDoc.getString("prfl") ?: "")
                     
                     val rawDob = userDoc.get("dob")
                     val formattedDob = when (rawDob) {
@@ -268,7 +335,7 @@ object CacheManager {
                     when (doc.id) {
                         "Bank" -> {
                             val dataMap = doc.data
-                            val updateMap = mutableMapOf<String, Any>() // We use this for set(merge) to avoid dot rules
+                            val updateMap = mutableMapOf<String, Any>() 
                             
                             val lastUpdatedTs = dataMap["last_updated"] as? Timestamp
                             val calToday = Calendar.getInstance().apply {
@@ -351,7 +418,6 @@ object CacheManager {
                                     val currentQtrAvg = (qtrAvgMap[qtrStr] as? Number)?.toDouble() ?: curBal
                                     var curYrAvg = (yrAvgMap["cur"] as? Number)?.toDouble() ?: curBal
 
-                                    // 🔥 NESTED MAP APPROACH FOR SAFE DB WRITING 🔥
                                     val bankSpecificUpdates = mutableMapOf<String, Any>()
 
                                     if (yearShifted) {
@@ -400,7 +466,6 @@ object CacheManager {
                                 }
                             }
                             if (updateMap.isNotEmpty()) {
-                                // Masterstroke: Using set with merge prevents Dot/FieldPath issues entirely for maps
                                 doc.reference.set(updateMap, SetOptions.merge()).await()
                             }
                         }
@@ -501,9 +566,6 @@ object CacheManager {
                     }
                 }
 
-                // ==========================================
-                // GLOBAL BACKGROUND FETCH: LIVE MARKET DATA
-                // ==========================================
                 val liveMap = mutableMapOf<String, Pair<Double, Double>>()
                 try {
                     val client = OkHttpClient()
@@ -545,9 +607,6 @@ object CacheManager {
                     e.printStackTrace() 
                 }
 
-                // ==========================================
-                // MERGE FIREBASE WITH LIVE MARKET DATA
-                // ==========================================
                 val investMap = userDoc.get("invest") as? Map<String, Any> ?: emptyMap()
                 val invArray = JSONArray()
                 
@@ -627,7 +686,7 @@ object CacheManager {
         val tempName = profileObj?.optString("name", "") ?: ""
         val tempEmail = profileObj?.optString("email", "") ?: ""
         val tempMobile = profileObj?.optString("mobile", "") ?: ""
-        val tempPass = profileObj?.optString("password", "") ?: ""
+        val tempPrfl = profileObj?.optString("prfl", "") ?: ""
         val tempDob = profileObj?.optString("dob", "") ?: ""
 
         val expensesArray = jsonResponse.optJSONArray("expenses")
@@ -792,6 +851,7 @@ object CacheManager {
             userFullName = tempName,
             userEmail = tempEmail,
             userMobile = tempMobile,
+            profilePicUrl = tempPrfl, // Now fetching profile pic link seamlessly
             userPassword = tempPass,
             userDob = tempDob,
             thisMonthExpenses = tempMonth,
