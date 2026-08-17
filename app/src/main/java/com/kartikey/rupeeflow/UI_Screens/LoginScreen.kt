@@ -103,7 +103,7 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
                 try {
                     withContext(Dispatchers.Main) { 
                         isLoading = true
-                        statusMessage = "Authenticating..." 
+                        statusMessage = "" // Cleared loading message
                     }
                     val account = task.getResult(ApiException::class.java)
                     val credential = GoogleAuthProvider.getCredential(account.idToken, null)
@@ -113,8 +113,6 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
                     
                     if (firebaseUser != null) {
                         val userEmail = firebaseUser.email ?: ""
-                        
-                        withContext(Dispatchers.Main) { statusMessage = "Syncing Database..." }
 
                         val query = db.collection("Users").whereEqualTo("email", userEmail).get().await()
                         
@@ -178,9 +176,8 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
             Spacer(modifier = Modifier.height(60.dp))
 
             if (isLoading) {
+                // Clean loading UI (only spinner)
                 CircularProgressIndicator(color = MaterialTheme.colorScheme.primary, strokeWidth = 3.dp)
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(statusMessage, color = MaterialTheme.colorScheme.primary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
             } else {
                 Surface(
                     shape = RoundedCornerShape(14.dp),
@@ -192,7 +189,7 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
                         .height(56.dp)
                         .bounceClick {
                             isLoading = true
-                            statusMessage = "Opening Google Portal..."
+                            statusMessage = "" // Cleared loading message
                             googleSignInClient.signOut().addOnCompleteListener {
                                 launcher.launch(googleSignInClient.signInIntent)
                             }
@@ -231,11 +228,11 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
             
             Spacer(modifier = Modifier.height(32.dp))
 
-            // 1. Name Field (Pre-filled, Editable)
+            // 1. Name Field (Pre-filled, Editable, Updated Label)
             OutlinedTextField(
                 value = inputName,
                 onValueChange = { inputName = it },
-                label = { Text("Display Name", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                label = { Text("Name", color = MaterialTheme.colorScheme.onSurfaceVariant) },
                 leadingIcon = { Icon(Icons.Outlined.Person, contentDescription = "Name", tint = MaterialTheme.colorScheme.onSurfaceVariant) },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
@@ -253,27 +250,26 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
             
             Spacer(modifier = Modifier.height(12.dp))
 
-            // 2. Username Field (Lowercase, No Spaces, Realtime Check)
+            // 2. Username Field (Lowercase, No Spaces, Realtime Check, Updated Label)
             OutlinedTextField(
                 value = inputUsername,
                 onValueChange = { newValue ->
-                    // Auto-filter: Lowercase and strict no-space
                     inputUsername = newValue.lowercase().replace(" ", "")
                     usernameAvailable = null // Reset check state when typing
                 },
-                label = { Text("Unique Username", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                label = { Text("Username", color = MaterialTheme.colorScheme.onSurfaceVariant) },
                 leadingIcon = { 
                     Icon(
                         imageVector = Icons.Outlined.Person, 
                         contentDescription = "Username", 
-                        tint = if (usernameAvailable == true) PrimaryGreenLight else if (usernameAvailable == false) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                        tint = if (usernameAvailable == true) MaterialTheme.colorScheme.primary else if (usernameAvailable == false) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
                     ) 
                 },
                 trailingIcon = {
                     if (isCheckingUsername) {
                         CircularProgressIndicator(modifier = Modifier.size(16.dp), color = MaterialTheme.colorScheme.primary, strokeWidth = 2.dp)
                     } else if (usernameAvailable == true) {
-                        Icon(Icons.Outlined.CheckCircle, contentDescription = "Available", tint = PrimaryGreenLight)
+                        Icon(Icons.Outlined.CheckCircle, contentDescription = "Available", tint = MaterialTheme.colorScheme.primary)
                     } else if (usernameAvailable == false) {
                         Icon(Icons.Outlined.Cancel, contentDescription = "Taken", tint = MaterialTheme.colorScheme.error)
                     }
@@ -314,7 +310,7 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
             if (usernameAvailable == false) {
                 Text("Username already taken! Please try another.", color = MaterialTheme.colorScheme.error, fontSize = 11.sp, modifier = Modifier.align(Alignment.Start).padding(start = 12.dp, top = 2.dp))
             } else if (usernameAvailable == true) {
-                Text("Username Available!", color = PrimaryGreenLight, fontSize = 11.sp, modifier = Modifier.align(Alignment.Start).padding(start = 12.dp, top = 2.dp))
+                Text("Username Available!", color = MaterialTheme.colorScheme.primary, fontSize = 11.sp, modifier = Modifier.align(Alignment.Start).padding(start = 12.dp, top = 2.dp))
             }
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -364,7 +360,7 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
                         keyboardController?.hide()
                         focusManager.clearFocus()
 
-                        val finalName = inputName.trim() // Trims extra spaces
+                        val finalName = inputName.trim()
 
                         if (finalName.isBlank() || inputUsername.isBlank() || inputMobile.isBlank()) {
                             statusMessage = "All fields are mandatory!"
@@ -383,7 +379,7 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
                             try {
                                 withContext(Dispatchers.Main) { 
                                     isLoading = true
-                                    statusMessage = "Creating Profile..." 
+                                    statusMessage = "" // Cleared loading message
                                 }
 
                                 // Fetch Counter and Gen ID
