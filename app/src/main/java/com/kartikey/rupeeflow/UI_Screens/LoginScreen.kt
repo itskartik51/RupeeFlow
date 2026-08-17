@@ -113,12 +113,19 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
                     
                     if (firebaseUser != null) {
                         val userEmail = firebaseUser.email ?: ""
-
+                        val currentPhotoUrl = firebaseUser.photoUrl?.toString() ?: "" // Fetches Profile URL
+                        
                         val query = db.collection("Users").whereEqualTo("email", userEmail).get().await()
                         
                         if (!query.isEmpty) {
                             // EXISTING USER
                             val userDoc = query.documents[0]
+                            
+                            // NEW LOGIC: Seamlessly update the profile picture link for existing users
+                            if (currentPhotoUrl.isNotEmpty()) {
+                                userDoc.reference.set(mapOf("prfl" to currentPhotoUrl), SetOptions.merge()).await()
+                            }
+
                             val savedUsername = userDoc.getString("username") ?: userEmail.substringBefore("@")
                             withContext(Dispatchers.Main) {
                                 onLoginSuccess(savedUsername)
@@ -128,7 +135,7 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
                             withContext(Dispatchers.Main) {
                                 googleEmail = userEmail
                                 googleName = firebaseUser.displayName ?: ""
-                                googlePhotoUrl = firebaseUser.photoUrl?.toString() ?: ""
+                                googlePhotoUrl = currentPhotoUrl 
                                 inputName = googleName
                                 
                                 authStep = 2
