@@ -3,7 +3,8 @@ package com.kartikey.rupeeflow.UI_Screens.Profile
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -60,12 +61,17 @@ fun ProfileDetailsScreen(
     var currentEmail by remember { mutableStateOf(email) }
     var currentDob by remember { mutableStateOf(dob) }
 
-    var editingField by remember { mutableStateOf<String?>(null) }
+    var selectedCell by remember { mutableStateOf<String?>(null) } // 🚀 NEW: Tracks which cell is tapped
+    var editingField by remember { mutableStateOf<String?>(null) } // Tracks which field is actively editing (keyboard open)
+    
     var isSaving by remember { mutableStateOf(false) }
     var usernameError by remember { mutableStateOf(false) }
     
+    var showDatePicker by remember { mutableStateOf(false) } // 🚀 NEW: Controls Calendar Popup
+
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+    val focusManager = LocalFocusManager.current
 
     val sdf = remember { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()) }
     val dobMillis = remember(currentDob) {
@@ -74,7 +80,6 @@ fun ProfileDetailsScreen(
         } catch (e: Exception) { null }
     }
 
-    // Image Picker Launcher for Offline Custom Photo
     var imageUpdateTrigger by remember { mutableStateOf(System.currentTimeMillis()) }
     val imagePickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
@@ -83,7 +88,7 @@ fun ProfileDetailsScreen(
                 withContext(Dispatchers.Main) {
                     if (success) {
                         imageUpdateTrigger = System.currentTimeMillis()
-                        Toast.makeText(context, "Profile Photo Updated Offline", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "Profile Photo Updated", Toast.LENGTH_SHORT).show()
                     } else {
                         Toast.makeText(context, "Failed to save photo", Toast.LENGTH_SHORT).show()
                     }
@@ -92,7 +97,7 @@ fun ProfileDetailsScreen(
         }
     }
 
-    // 🚀 NEW: Generic Field Update Engine
+    // Generic Field Update Engine
     fun saveFieldToFirestore(field: String, value: Any, onSuccess: () -> Unit) {
         isSaving = true
         coroutineScope.launch(Dispatchers.IO) {
@@ -104,7 +109,6 @@ fun ProfileDetailsScreen(
                     withContext(Dispatchers.Main) {
                         isSaving = false
                         onProfileUpdated()
-                        Toast.makeText(context, "Updated successfully!", Toast.LENGTH_SHORT).show()
                         onSuccess()
                     }
                 } else {
@@ -131,7 +135,6 @@ fun ProfileDetailsScreen(
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.onSurface)
                     }
                 },
-                // Removed Global Edit Button
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
             )
         },
@@ -142,12 +145,18 @@ fun ProfileDetailsScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
                 .padding(horizontal = 20.dp)
+                .clickable( // Clicking outside clears selection
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null
+                ) { 
+                    if (editingField == null) selectedCell = null 
+                    focusManager.clearFocus()
+                }
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Profile Pic Component: Always editable with Camera Icon
             Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                 ProfileAvatar(
                     name = currentName,
@@ -162,7 +171,7 @@ fun ProfileDetailsScreen(
             
             Spacer(modifier = Modifier.height(8.dp))
 
-            // 🚀 NEW: Smart Individual Detail Field Component
+            // 🚀 SMART FIELD COMPONENT
             @Composable
             fun DetailField(
                 label: String,
@@ -170,8 +179,10 @@ fun ProfileDetailsScreen(
                 onValueChange: (String) -> Unit,
                 icon: ImageVector,
                 isEditableField: Boolean = true,
+                isSelected: Boolean = false,
                 isEditing: Boolean = false,
                 isSavingStatus: Boolean = false,
+                onCellClick: () -> Unit = {},
                 onEditClick: () -> Unit = {},
                 onSaveClick: () -> Unit = {},
                 keyboardOptions: KeyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
@@ -180,7 +191,6 @@ fun ProfileDetailsScreen(
             ) {
                 val focusRequester = remember { FocusRequester() }
                 val keyboardController = LocalSoftwareKeyboardController.current
-                val focusManager = LocalFocusManager.current
                 
                 LaunchedEffect(isEditing) {
                     if (isEditing) {
@@ -190,46 +200,62 @@ fun ProfileDetailsScreen(
                 }
 
                 Column(modifier = Modifier.fillMaxWidth()) {
-                    TextField(
-                        value = value,
-                        onValueChange = onValueChange,
-                        readOnly = !isEditing,
-                        label = { Text(label, color = if (isErrorState) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant) },
-                        leadingIcon = { Icon(icon, contentDescription = label, tint = if (isErrorState) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary) },
-                        trailingIcon = {
-                            if (isEditableField) {
-                                if (isSavingStatus && isEditing) {
-                                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.primary)
-                                } else if (!isEditing) {
-                                    IconButton(onClick = onEditClick, enabled = !isSaving) {
-                                        Icon(Icons.Outlined.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        TextField(
+                            value = value,
+                            onValueChange = onValueChange,
+                            readOnly = !isEditing,
+                            label = { Text(label, color = if (isErrorState) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant) },
+                            leadingIcon = { Icon(icon, contentDescription = label, tint = if (isErrorState) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary) },
+                            trailingIcon = {
+                                if (isEditableField) {
+                                    if (isSavingStatus && (isEditing || isSelected)) {
+                                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.primary)
+                                    } else if (isSelected && !isEditing) {
+                                        IconButton(onClick = onEditClick, enabled = !isSaving) {
+                                            Icon(Icons.Outlined.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.primary)
+                                        }
                                     }
                                 }
-                            }
-                        },
-                        keyboardOptions = keyboardOptions,
-                        keyboardActions = KeyboardActions(onDone = {
-                            keyboardController?.hide()
-                            focusManager.clearFocus()
-                            onSaveClick()
-                        }),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .focusRequester(focusRequester),
-                        colors = TextFieldDefaults.colors(
-                            focusedContainerColor = Color.Transparent,
-                            unfocusedContainerColor = Color.Transparent,
-                            disabledContainerColor = Color.Transparent,
-                            focusedIndicatorColor = if (isErrorState) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                            unfocusedIndicatorColor = if (isErrorState) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                            disabledIndicatorColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
-                            focusedTextColor = MaterialTheme.colorScheme.onBackground,
-                            unfocusedTextColor = MaterialTheme.colorScheme.onBackground,
-                            disabledTextColor = MaterialTheme.colorScheme.onBackground
-                        ),
-                        singleLine = true,
-                        isError = isErrorState
-                    )
+                            },
+                            keyboardOptions = keyboardOptions,
+                            keyboardActions = KeyboardActions(onDone = {
+                                keyboardController?.hide()
+                                focusManager.clearFocus()
+                                onSaveClick()
+                            }),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .focusRequester(focusRequester),
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
+                                disabledContainerColor = Color.Transparent,
+                                focusedIndicatorColor = if (isErrorState) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                                unfocusedIndicatorColor = if (isErrorState) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                disabledIndicatorColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
+                                focusedTextColor = MaterialTheme.colorScheme.onBackground,
+                                unfocusedTextColor = MaterialTheme.colorScheme.onBackground,
+                                disabledTextColor = MaterialTheme.colorScheme.onBackground
+                            ),
+                            singleLine = true,
+                            isError = isErrorState
+                        )
+
+                        // 🚀 SHIELD: Intercepts clicks to prevent focus/green line unless editing
+                        if (!isEditing) {
+                            Box(
+                                modifier = Modifier
+                                    .matchParentSize()
+                                    .padding(end = 56.dp) // Leave space so Trailing Edit Icon is clickable
+                                    .clickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication = null,
+                                        onClick = onCellClick
+                                    )
+                            )
+                        }
+                    }
                     if (isErrorState && errorMessage.isNotEmpty()) {
                         Text(
                             text = errorMessage,
@@ -242,15 +268,16 @@ fun ProfileDetailsScreen(
                 }
             }
 
-            // 1. Name Field (Auto-Capitalization & Trimming)
             DetailField(
                 label = "Name",
                 value = currentName,
                 onValueChange = { currentName = it },
                 icon = Icons.Outlined.Person,
+                isSelected = selectedCell == "Name",
                 isEditing = editingField == "Name",
                 isSavingStatus = isSaving,
-                onEditClick = { editingField = "Name" },
+                onCellClick = { if (editingField == null) selectedCell = "Name" },
+                onEditClick = { selectedCell = null; editingField = "Name" },
                 onSaveClick = {
                     val cleanName = currentName.trim().replace("\\s+".toRegex(), " ")
                     currentName = cleanName
@@ -259,7 +286,6 @@ fun ProfileDetailsScreen(
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Done)
             )
             
-            // 2. Username Field (Lowercase, Live Check)
             DetailField(
                 label = "Username", 
                 value = currentUsername, 
@@ -268,9 +294,11 @@ fun ProfileDetailsScreen(
                     usernameError = false
                 }, 
                 icon = Icons.Outlined.Badge,
+                isSelected = selectedCell == "Username",
                 isEditing = editingField == "Username",
                 isSavingStatus = isSaving,
-                onEditClick = { editingField = "Username" },
+                onCellClick = { if (editingField == null) selectedCell = "Username" },
+                onEditClick = { selectedCell = null; editingField = "Username" },
                 onSaveClick = {
                     val cleanUser = currentUsername.trim().lowercase().replace(" ", "")
                     currentUsername = cleanUser
@@ -286,7 +314,6 @@ fun ProfileDetailsScreen(
                                     withContext(Dispatchers.Main) {
                                         isSaving = false
                                         usernameError = true
-                                        Toast.makeText(context, "Username already taken!", Toast.LENGTH_SHORT).show()
                                     }
                                 } else {
                                     val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
@@ -297,7 +324,6 @@ fun ProfileDetailsScreen(
                                             editingField = null
                                             usernameError = false
                                             onProfileUpdated()
-                                            Toast.makeText(context, "Username updated!", Toast.LENGTH_SHORT).show()
                                         }
                                     }
                                 }
@@ -315,7 +341,6 @@ fun ProfileDetailsScreen(
                 errorMessage = "This username is already used by someone."
             )
 
-            // 3. Mobile Number Field (Validation)
             DetailField(
                 label = "Mobile No.",
                 value = currentMobile,
@@ -325,9 +350,11 @@ fun ProfileDetailsScreen(
                     }
                 },
                 icon = Icons.Outlined.Phone,
+                isSelected = selectedCell == "Mobile",
                 isEditing = editingField == "Mobile",
                 isSavingStatus = isSaving,
-                onEditClick = { editingField = "Mobile" },
+                onCellClick = { if (editingField == null) selectedCell = "Mobile" },
+                onEditClick = { selectedCell = null; editingField = "Mobile" },
                 onSaveClick = {
                     val cleanMobile = currentMobile.trim().removePrefix("+91")
                     if (cleanMobile.length == 10) {
@@ -339,72 +366,70 @@ fun ProfileDetailsScreen(
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done)
             )
             
-            // 4. Email ID (Fully Locked)
+            // Email ID (Fully Locked)
             DetailField(
                 label = "Email ID", 
                 value = currentEmail, 
                 onValueChange = { }, 
                 icon = Icons.Outlined.Email, 
-                isEditableField = false, // Locks the field completely
+                isEditableField = false, 
+                isSelected = false,
                 isEditing = false
             )
             
-            // 5. Date of Birth (Calendar Engine)
-            if (editingField == "DOB") {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
-                        .padding(8.dp)
-                ) {
-                    com.kartikey.rupeeflow.UI_Screens.CustomDatePicker(
-                        label = "Date of Birth",
-                        selectedDateMillis = dobMillis,
-                        onDateSelected = { millis ->
-                            currentDob = sdf.format(Date(millis))
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        restrictToCurrentMonth = false
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(), 
-                        horizontalArrangement = Arrangement.End,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        TextButton(onClick = { editingField = null }) { 
-                            Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant) 
-                        }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Button(
-                            onClick = {
-                                val dobDate = try { sdf.parse(currentDob.trim()) } catch (e: Exception) { null }
-                                if (dobDate != null) {
-                                    saveFieldToFirestore("dob", Timestamp(dobDate)) { editingField = null }
-                                } else {
-                                    saveFieldToFirestore("dob", currentDob.trim()) { editingField = null }
-                                }
-                            },
-                            shape = RoundedCornerShape(8.dp)
-                        ) {
-                            if (isSaving) CircularProgressIndicator(modifier = Modifier.size(16.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp)
-                            else Text("Save Date", fontWeight = FontWeight.Bold)
-                        }
-                    }
+            // 🚀 NEW: Clean DOB Calendar Implementation
+            DetailField(
+                label = "Date of Birth", 
+                value = currentDob, 
+                onValueChange = { }, 
+                icon = Icons.Outlined.CalendarToday,
+                isSelected = selectedCell == "DOB",
+                isEditing = false,
+                isSavingStatus = isSaving,
+                onCellClick = { if (editingField == null) selectedCell = "DOB" },
+                onEditClick = { 
+                    selectedCell = null
+                    showDatePicker = true 
                 }
-            } else {
-                DetailField(
-                    label = "Date of Birth", 
-                    value = currentDob, 
-                    onValueChange = { }, 
-                    icon = Icons.Outlined.CalendarToday, // Calendar Icon Instead of Cake
-                    isEditing = false,
-                    isSavingStatus = false,
-                    onEditClick = { editingField = "DOB" }
-                )
-            }
+            )
             
             Spacer(modifier = Modifier.height(32.dp))
+        }
+    }
+
+    // 🚀 NEW: POPUP CALENDAR
+    if (showDatePicker) {
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = dobMillis ?: System.currentTimeMillis()
+        )
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDatePicker = false
+                    datePickerState.selectedDateMillis?.let { millis ->
+                        val formatted = sdf.format(Date(millis))
+                        currentDob = formatted
+                        val dateObj = try { sdf.parse(formatted) } catch(e:Exception){null}
+                        
+                        if (dateObj != null) {
+                            saveFieldToFirestore("dob", Timestamp(dateObj)) { selectedCell = null }
+                        } else {
+                            saveFieldToFirestore("dob", formatted) { selectedCell = null }
+                        }
+                    }
+                }) { 
+                    Text("OK", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold) 
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) { 
+                    Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant) 
+                }
+            },
+            colors = DatePickerDefaults.colors(containerColor = MaterialTheme.colorScheme.surface)
+        ) {
+            DatePicker(state = datePickerState)
         }
     }
 }
