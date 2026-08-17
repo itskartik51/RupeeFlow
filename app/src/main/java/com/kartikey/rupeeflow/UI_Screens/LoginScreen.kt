@@ -1,6 +1,8 @@
 package com.kartikey.rupeeflow.UI_Screens
 
 import android.app.Activity
+import android.content.pm.PackageManager
+import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -32,6 +34,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.android.gms.auth.api.signin.GoogleSignIn
@@ -47,9 +50,36 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
+import java.security.MessageDigest
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+
+// INTERNAL FUNCTION: To extract exact physical SHA-1 of the installed APK
+fun getAppSHA1(context: android.content.Context): String {
+    try {
+        val md = MessageDigest.getInstance("SHA-1")
+        if (Build.VERSION.SDK_INT >= 28) {
+            val info = context.packageManager.getPackageInfo(context.packageName, PackageManager.GET_SIGNING_CERTIFICATES)
+            val signatures = info.signingInfo?.apkContentsSigners
+            if (!signatures.isNullOrEmpty()) {
+                md.update(signatures[0].toByteArray())
+                return md.digest().joinToString(":") { String.format("%02X", it) }
+            }
+        } else {
+            @Suppress("DEPRECATION")
+            val info = context.packageManager.getPackageInfo(context.packageName, PackageManager.GET_SIGNATURES)
+            val signatures = info.signatures
+            if (!signatures.isNullOrEmpty()) {
+                md.update(signatures[0].toByteArray())
+                return md.digest().joinToString(":") { String.format("%02X", it) }
+            }
+        }
+    } catch (e: Exception) {
+        return "Error: ${e.message}"
+    }
+    return "SHA-1 Not Found"
+}
 
 @Composable
 fun LoginScreen(onLoginSuccess: (String) -> Unit) {
@@ -85,6 +115,9 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
         .build()
     
     val googleSignInClient = remember { GoogleSignIn.getClient(context, gso) }
+    
+    // Fetch real SHA-1 to display for debugging
+    val realSha1 = remember { getAppSHA1(context) }
 
     // Smart Interaction Lock: Back button on Step 2 cancels signup and signs out of Google
     BackHandler(enabled = authStep == 2) {
@@ -203,7 +236,6 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.Center
                     ) {
-                        // NEW: Google PNG Logo integrated here
                         Image(
                             painter = painterResource(id = R.drawable.ic_google),
                             contentDescription = "Google Logo",
@@ -223,6 +255,18 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(statusMessage, color = MaterialTheme.colorScheme.error, fontSize = 12.sp, fontWeight = FontWeight.Medium)
                 }
+
+                // SECURITY DIAGNOSTIC TOOL: Displays the true SHA-1 dynamically
+                Spacer(modifier = Modifier.height(40.dp))
+                Text("Your App's Real SHA-1 Key:", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    text = realSha1, 
+                    fontSize = 10.sp, 
+                    color = MaterialTheme.colorScheme.error, 
+                    fontWeight = FontWeight.Bold, 
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(top = 4.dp, start = 12.dp, end = 12.dp)
+                )
             }
         } else {
             // STEP 2: COMPLETE PROFILE FOR NEW USERS
