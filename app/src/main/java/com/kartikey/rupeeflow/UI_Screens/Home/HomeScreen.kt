@@ -5,21 +5,17 @@ import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -34,10 +30,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.SetOptions
-import com.kartikey.rupeeflow.Cloud_Database.Constants
 import com.kartikey.rupeeflow.R
 import com.kartikey.rupeeflow.UI_Screens.bounceClick 
+import com.kartikey.rupeeflow.UI_Screens.Profile.ProfileAvatar // 🚀 NEW: Import Profile Avatar
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
@@ -49,6 +44,7 @@ import java.util.Locale
 fun HomeDashboardDesign(
     username: String, 
     userFullName: String, 
+    profilePicUrl: String, // 🚀 NEW
     paddingValues: PaddingValues, 
     thisMonthExpenses: Double, 
     thisYearExpenses: Double, 
@@ -114,18 +110,14 @@ fun HomeDashboardDesign(
                     Text("Hi, $username", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
                 }
                 
-                val displayLetter = if (userFullName.isNotBlank()) userFullName.take(1).uppercase() else username.take(1).uppercase()
-                
-                Box(
-                    modifier = Modifier
-                        .size(42.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primaryContainer)
-                        .bounceClick { onAvatarClick() }, 
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(displayLetter, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                }
+                // 🚀 NEW: Replaced basic letter with Smart Universal Avatar
+                ProfileAvatar(
+                    name = userFullName.ifBlank { username },
+                    profilePicUrl = profilePicUrl,
+                    size = 42.dp,
+                    fontSize = 18.sp,
+                    onClick = onAvatarClick
+                )
             }
         }
 
