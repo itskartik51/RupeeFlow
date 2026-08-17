@@ -8,12 +8,11 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.Crossfade
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -46,7 +45,7 @@ fun ProfileScreen(
     name: String, 
     email: String,
     mobile: String,
-    profilePicUrl: String, // 🚀 NEW
+    profilePicUrl: String, 
     dob: String, 
     paddingValues: PaddingValues, 
     themeMode: Int,                     
@@ -93,7 +92,7 @@ fun ProfileScreen(
                     name = name,
                     email = email,
                     mobile = mobile,
-                    profilePicUrl = profilePicUrl, // Fixed arg
+                    profilePicUrl = profilePicUrl, 
                     dob = dob,
                     onBackClick = { currentProfileView = "Main" },
                     onProfileUpdated = { onProfileRefresh() }
@@ -187,7 +186,6 @@ private fun ProfileMainContent(
         val displayUsername = username.ifBlank { "N/A" }
         val displayMobile = mobile.ifBlank { "N/A" }
 
-        // 🚀 NEW: Smart Profile Avatar Component
         ProfileAvatar(
             name = displayName,
             profilePicUrl = profilePicUrl,
@@ -446,9 +444,7 @@ private fun ProfileMainContent(
     }
 }
 
-// ==========================================
-// 🚀 NEW: UNIVERSAL PROFILE AVATAR COMPONENT
-// ==========================================
+// 🚀 FIXED: UNIVERSAL PROFILE AVATAR WITH CUT-OUT DESIGN
 @Composable
 fun ProfileAvatar(
     name: String,
@@ -458,13 +454,12 @@ fun ProfileAvatar(
     onClick: () -> Unit = {},
     isEditable: Boolean = false,
     onEditClick: () -> Unit = {},
-    forceUpdateTrigger: Long = 0L // Helps force reload when image changes offline
+    forceUpdateTrigger: Long = 0L 
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val profileFile = remember { com.kartikey.rupeeflow.UI_Screens.CacheManager.getProfilePicFile(context) }
     
-    // Auto-detects if file exists and when it was last modified
     var lastModified by remember(forceUpdateTrigger) { mutableStateOf(profileFile.lastModified()) }
     var fileExists by remember(lastModified) { mutableStateOf(profileFile.exists()) }
 
@@ -475,7 +470,6 @@ fun ProfileAvatar(
         }
     }
 
-    // Auto-download from Google Link if cache is cleared and link exists
     LaunchedEffect(profilePicUrl, fileExists) {
         if (!fileExists && profilePicUrl.isNotBlank()) {
             coroutineScope.launch {
@@ -487,41 +481,52 @@ fun ProfileAvatar(
         }
     }
 
-    Box(
-        modifier = Modifier
-            .size(size)
-            .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.primaryContainer)
-            .bounceClick { if (isEditable) onEditClick() else onClick() },
-        contentAlignment = Alignment.Center
-    ) {
-        if (fileExists) {
-            coil.compose.AsyncImage(
-                model = coil.request.ImageRequest.Builder(context)
-                    .data(profileFile)
-                    .memoryCacheKey(lastModified.toString()) // Forces coil to reload only if image is new
-                    .diskCacheKey(lastModified.toString())
-                    .build(),
-                contentDescription = "Profile Picture",
-                modifier = Modifier.fillMaxSize(),
-                contentScale = androidx.compose.ui.layout.ContentScale.Crop
-            )
-        } else {
-            val displayLetter = if (name.isNotBlank()) name.take(1).uppercase() else "?"
-            Text(displayLetter, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, fontSize = fontSize)
+    Box(modifier = Modifier.size(size)) {
+        // Main Avatar Circle (Static if Editable, Bouncy if Not)
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primaryContainer)
+                .then(if (!isEditable) Modifier.bounceClick { onClick() } else Modifier),
+            contentAlignment = Alignment.Center
+        ) {
+            if (fileExists) {
+                coil.compose.AsyncImage(
+                    model = coil.request.ImageRequest.Builder(context)
+                        .data(profileFile)
+                        .memoryCacheKey(lastModified.toString()) 
+                        .diskCacheKey(lastModified.toString())
+                        .build(),
+                    contentDescription = "Profile Picture",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                )
+            } else {
+                val displayLetter = if (name.isNotBlank()) name.take(1).uppercase() else "?"
+                Text(displayLetter, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, fontSize = fontSize)
+            }
         }
         
+        // 🚀 SMART CUT-OUT CAMERA ICON
         if (isEditable) {
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .size(size * 0.32f)
-                    .offset(x = (-2).dp, y = (-2).dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary),
+                    .offset(x = 4.dp, y = 4.dp) // Slight offset for perfect overlap
+                    .size(size * 0.35f)
+                    .background(MaterialTheme.colorScheme.background, CircleShape) // The gap/cut-out matching screen background
+                    .padding(4.dp) // Gap thickness
+                    .background(MaterialTheme.colorScheme.primary, CircleShape)
+                    .bounceClick { onEditClick() }, // Only camera is bouncy
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Default.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(size * 0.18f))
+                Icon(
+                    imageVector = Icons.Default.PhotoCamera, 
+                    contentDescription = "Edit Photo", 
+                    tint = MaterialTheme.colorScheme.onPrimary, 
+                    modifier = Modifier.size(size * 0.18f)
+                )
             }
         }
     }
