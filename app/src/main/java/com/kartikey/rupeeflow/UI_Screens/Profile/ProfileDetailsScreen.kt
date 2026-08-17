@@ -3,12 +3,12 @@ package com.kartikey.rupeeflow.UI_Screens.Profile
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -23,6 +23,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
@@ -198,6 +199,18 @@ fun ProfileDetailsScreen(
                     }
                 }
 
+                // 🚀 FIX: Replaced AnimatedVisibility with scale/alpha states to fix Context Scope Error
+                val iconScale by animateFloatAsState(
+                    targetValue = if (isSelected && !isEditing) 1f else 0.5f,
+                    animationSpec = if (isSelected && !isEditing) spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow) else tween(150),
+                    label = "iconScale"
+                )
+                val iconAlpha by animateFloatAsState(
+                    targetValue = if (isSelected && !isEditing) 1f else 0f,
+                    animationSpec = tween(if (isSelected && !isEditing) 200 else 150),
+                    label = "iconAlpha"
+                )
+
                 Column(modifier = Modifier.fillMaxWidth()) {
                     Box(modifier = Modifier.fillMaxWidth()) {
                         TextField(
@@ -210,16 +223,17 @@ fun ProfileDetailsScreen(
                                 if (isEditableField) {
                                     if (isSavingStatus && (isEditing || isSelected)) {
                                         CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.primary)
-                                    } else {
-                                        // 🚀 SMART POP ANIMATION FOR EDIT ICON
-                                        AnimatedVisibility(
-                                            visible = isSelected && !isEditing,
-                                            enter = fadeIn(tween(200)) + scaleIn(spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow), initialScale = 0.5f),
-                                            exit = fadeOut(tween(150)) + scaleOut(tween(150), targetScale = 0.8f)
-                                        ) {
-                                            IconButton(onClick = onEditClick, enabled = !isSaving) {
-                                                Icon(Icons.Outlined.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.primary)
+                                    } else if (iconAlpha > 0.01f) { // Only render if visible
+                                        IconButton(
+                                            onClick = onEditClick, 
+                                            enabled = !isSaving,
+                                            modifier = Modifier.graphicsLayer {
+                                                scaleX = iconScale
+                                                scaleY = iconScale
+                                                alpha = iconAlpha
                                             }
+                                        ) {
+                                            Icon(Icons.Outlined.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.primary)
                                         }
                                     }
                                 }
@@ -390,7 +404,6 @@ fun ProfileDetailsScreen(
                 onCellClick = { focusManager.clearFocus() }
             )
             
-            // 🚀 PERFECT DOB CALENDAR LOGIC
             if (editingField == "DOB") {
                 CustomDatePicker(
                     label = "Date of Birth",
