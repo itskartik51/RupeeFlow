@@ -15,6 +15,9 @@ android {
         targetSdk = 34
         versionCode = 8
         versionName = "1.00.008"
+        
+        // OPTIMIZATION: Removes 80+ unused languages (Spanish, French, etc.) added by Firebase/Google Play Services
+        resourceConfigurations += listOf("en", "hi")
     }
 
     signingConfigs {
