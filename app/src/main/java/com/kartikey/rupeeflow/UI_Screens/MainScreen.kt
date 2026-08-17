@@ -70,7 +70,7 @@ fun MainScreen(
     var userFullName by remember { mutableStateOf("") } 
     var userEmail by remember { mutableStateOf("") } 
     var userMobile by remember { mutableStateOf("") }
-    var userPassword by remember { mutableStateOf("") }
+    var profilePicUrl by remember { mutableStateOf("") } // 🚀 NEW
     var userDob by remember { mutableStateOf("") }
 
     var thisMonthExpenses by remember { mutableDoubleStateOf(0.0) }
@@ -92,10 +92,9 @@ fun MainScreen(
     var refreshTrigger by remember { mutableIntStateOf(0) }
     var forceFetchNext by remember { mutableStateOf(false) } 
     
-    var isUpdateAvailable by remember { mutableStateOf(false) } // NAYA: Global Update State
+    var isUpdateAvailable by remember { mutableStateOf(false) } 
 
     LaunchedEffect(Unit) {
-        // App khulte hi background mein check karega
         isUpdateAvailable = checkIsUpdateAvailable(context)
     }
 
@@ -132,7 +131,7 @@ fun MainScreen(
             userFullName = cachedData.userFullName
             userEmail = cachedData.userEmail
             userMobile = cachedData.userMobile
-            userPassword = cachedData.userPassword
+            profilePicUrl = cachedData.profilePicUrl // 🚀 NEW
             userDob = cachedData.userDob
             thisMonthExpenses = cachedData.thisMonthExpenses
             thisYearExpenses = cachedData.thisYearExpenses
@@ -153,7 +152,7 @@ fun MainScreen(
                     userFullName = freshData.userFullName
                     userEmail = freshData.userEmail
                     userMobile = freshData.userMobile
-                    userPassword = freshData.userPassword
+                    profilePicUrl = freshData.profilePicUrl // 🚀 NEW
                     userDob = freshData.userDob
                     thisMonthExpenses = freshData.thisMonthExpenses
                     thisYearExpenses = freshData.thisYearExpenses
@@ -232,7 +231,6 @@ fun MainScreen(
                         selected = selectedTab == 4, 
                         onClick = { selectedTab = 4; showExpenseHistory = false; showContriScreen = false }, 
                         icon = { 
-                            // NAYA: Profile Icon with Green Badge
                             Box {
                                 Icon(Icons.Outlined.Person, contentDescription = "Profile")
                                 if (isUpdateAvailable) {
@@ -286,7 +284,9 @@ fun MainScreen(
                             val totalBank = bankList.sumOf { it.currentBalance }
                             
                             HomeDashboardDesign(
-                                username = username, userFullName = userFullName, paddingValues = paddingValues, 
+                                username = username, userFullName = userFullName, 
+                                profilePicUrl = profilePicUrl, // 🚀 NEW
+                                paddingValues = paddingValues, 
                                 thisMonthExpenses = thisMonthExpenses, thisYearExpenses = thisYearExpenses, budgetLimit = budgetLimit,
                                 isLoadingExpenses = isLoadingExpenses, dNavState = dNavState, dBackPresses = dBackPresses, 
                                 onLogout = onLogout, onRefreshExpenses = { refreshTrigger++ },
@@ -308,9 +308,10 @@ fun MainScreen(
                         3 -> AnalyticsScreen(paddingValues = paddingValues)
                         4 -> ProfileScreen(
                             username = username, name = userFullName, email = userEmail, mobile = userMobile, 
-                            password = userPassword, dob = userDob, paddingValues = paddingValues, 
+                            profilePicUrl = profilePicUrl, // 🚀 NEW
+                            dob = userDob, paddingValues = paddingValues, 
                             themeMode = themeMode, onThemeChange = onThemeChange, 
-                            isUpdateAvailable = isUpdateAvailable, // NAYA: Passing to Profile
+                            isUpdateAvailable = isUpdateAvailable,
                             onLogout = onLogout, onProfileRefresh = { refreshTrigger++ },
                             startInDetails = openProfileDetails, onResetDetailsState = { openProfileDetails = false }
                         )
