@@ -3,6 +3,8 @@ package com.kartikey.rupeeflow.UI_Screens.Profile
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
@@ -208,9 +210,16 @@ fun ProfileDetailsScreen(
                                 if (isEditableField) {
                                     if (isSavingStatus && (isEditing || isSelected)) {
                                         CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.primary)
-                                    } else if (isSelected && !isEditing) {
-                                        IconButton(onClick = onEditClick, enabled = !isSaving) {
-                                            Icon(Icons.Outlined.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.primary)
+                                    } else {
+                                        // 🚀 SMART POP ANIMATION FOR EDIT ICON
+                                        AnimatedVisibility(
+                                            visible = isSelected && !isEditing,
+                                            enter = fadeIn(tween(200)) + scaleIn(spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow), initialScale = 0.5f),
+                                            exit = fadeOut(tween(150)) + scaleOut(tween(150), targetScale = 0.8f)
+                                        ) {
+                                            IconButton(onClick = onEditClick, enabled = !isSaving) {
+                                                Icon(Icons.Outlined.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.primary)
+                                            }
                                         }
                                     }
                                 }
@@ -370,7 +379,6 @@ fun ProfileDetailsScreen(
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done)
             )
             
-            // Email ID (Fully Locked)
             DetailField(
                 label = "Email ID", 
                 value = currentEmail, 
@@ -378,10 +386,11 @@ fun ProfileDetailsScreen(
                 icon = Icons.Outlined.Email, 
                 isEditableField = false, 
                 isSelected = false,
-                isEditing = false
+                isEditing = false,
+                onCellClick = { focusManager.clearFocus() }
             )
             
-            // 🚀 LINKED: CustomDatePicker script integration
+            // 🚀 PERFECT DOB CALENDAR LOGIC
             if (editingField == "DOB") {
                 CustomDatePicker(
                     label = "Date of Birth",
