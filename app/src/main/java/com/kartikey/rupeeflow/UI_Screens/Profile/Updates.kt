@@ -28,7 +28,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -55,6 +54,22 @@ data class UpdateInfo(
 )
 
 suspend fun checkIsUpdateAvailable(context: Context): Boolean = withContext(Dispatchers.IO) {
+    // ==========================================
+    // 🚀 NEW: AUTO-CLEANUP ENGINE (Runs on Boot)
+    // ==========================================
+    try {
+        val sharedPrefs = context.getSharedPreferences("RupeeFlow_Updates", Context.MODE_PRIVATE)
+        val oldDownloadId = sharedPrefs.getLong("last_update_download_id", -1L)
+        if (oldDownloadId != -1L) {
+            val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+            dm.remove(oldDownloadId) // Magic line: deletes APK file + clears download history
+            sharedPrefs.edit().remove("last_update_download_id").apply()
+        }
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+
+    // Checking for updates...
     try {
         val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
         val currentVersionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) packageInfo.longVersionCode.toInt() else packageInfo.versionCode
@@ -120,8 +135,7 @@ fun AppUpdateRow(isUpdateAvailableBadge: Boolean) {
 
             withContext(Dispatchers.IO) {
                 try {
-                    // UX Delay: Added to prevent UI animation flickering
-                    delay(600) 
+                    delay(600) // UX Delay
                     
                     val request = Request.Builder()
                         .url("https://raw.githubusercontent.com/itskartik51/RupeeFlow/main/Updates/version.json")
@@ -262,6 +276,12 @@ fun AppUpdateRow(isUpdateAvailableBadge: Boolean) {
                                                 .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
                                             
                                             val downloadId = downloadManager.enqueue(request)
+                                            
+                                            // 🚀 NEW: Save ID to trigger Auto-Cleanup on next App Boot
+                                            context.getSharedPreferences("RupeeFlow_Updates", Context.MODE_PRIVATE)
+                                                .edit()
+                                                .putLong("last_update_download_id", downloadId)
+                                                .apply()
                                             
                                             coroutineScope.launch(Dispatchers.IO) {
                                                 var isDownloading = true
