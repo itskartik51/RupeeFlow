@@ -1,6 +1,8 @@
 package com.kartikey.rupeeflow.UI_Screens.Profile
 
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -10,14 +12,13 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.firebase.firestore.FirebaseFirestore
@@ -39,7 +40,7 @@ fun ProfileDetailsScreen(
     name: String,
     email: String,
     mobile: String,
-    password: String,
+    profilePicUrl: String, // 🚀 NEW
     dob: String,
     onBackClick: () -> Unit,
     onProfileUpdated: () -> Unit
@@ -49,11 +50,9 @@ fun ProfileDetailsScreen(
     var currentName by remember { mutableStateOf(name) }
     var currentUsername by remember { mutableStateOf(username) }
     var currentMobile by remember { mutableStateOf(mobile) }
-    var currentPassword by remember { mutableStateOf(password) }
     var currentEmail by remember { mutableStateOf(email) }
     var currentDob by remember { mutableStateOf(dob) }
 
-    var passwordVisible by remember { mutableStateOf(false) }
     var usernameError by remember { mutableStateOf(false) }
     
     val context = LocalContext.current
@@ -65,18 +64,34 @@ fun ProfileDetailsScreen(
         } catch (e: Exception) { null }
     }
 
+    // 🚀 NEW: Image Picker Launcher for Offline Custom Photo
+    var imageUpdateTrigger by remember { mutableStateOf(System.currentTimeMillis()) }
+    val imagePickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) {
+            CoroutineScope(Dispatchers.IO).launch {
+                val success = com.kartikey.rupeeflow.UI_Screens.CacheManager.saveCustomProfilePic(context, uri)
+                withContext(Dispatchers.Main) {
+                    if (success) {
+                        imageUpdateTrigger = System.currentTimeMillis()
+                        Toast.makeText(context, "Profile Photo Updated Offline", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(context, "Failed to save photo", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Profile Details", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
                 navigationIcon = {
-                    // Applied Premium Bounce Here
                     IconButton(onClick = onBackClick, modifier = Modifier.bounceClick()) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.onSurface)
                     }
                 },
                 actions = {
-                    // Applied Premium Bounce Here
                     IconButton(
                         modifier = Modifier.bounceClick(),
                         onClick = { 
@@ -88,7 +103,6 @@ fun ProfileDetailsScreen(
                                     try {
                                         val db = FirebaseFirestore.getInstance()
                                         
-                                        // 1. If username changed, verify it's not already taken
                                         if (currentUsername.trim() != username) {
                                             val duplicateCheck = db.collection("Users")
                                                 .whereEqualTo("username", currentUsername.trim())
@@ -105,7 +119,6 @@ fun ProfileDetailsScreen(
                                             }
                                         }
 
-                                        // 2. Fetch User Document
                                         val userQuery = db.collection("Users")
                                             .whereEqualTo("username", username)
                                             .get()
@@ -113,21 +126,18 @@ fun ProfileDetailsScreen(
                                             
                                         if (!userQuery.isEmpty) {
                                             val userRef = userQuery.documents[0].reference
-                                            
                                             val cleanMobile = currentMobile.trim().removePrefix("+91")
                                             
-                                            // Convert Date String to Timestamp
                                             val dobDate = try {
                                                 if (currentDob.isNotBlank()) sdf.parse(currentDob.trim()) else null
                                             } catch (e: Exception) { null }
                                             
-                                            // 3. Update Firestore Data
+                                            // Password removed from here
                                             val updates = hashMapOf<String, Any>(
                                                 "name" to currentName.trim(),
                                                 "username" to currentUsername.trim(),
                                                 "mobile_no_" to cleanMobile,
-                                                "email" to currentEmail.trim(),
-                                                "password" to currentPassword.trim()
+                                                "email" to currentEmail.trim()
                                             )
                                             
                                             if (dobDate != null) {
@@ -182,6 +192,21 @@ fun ProfileDetailsScreen(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // 🚀 NEW: Profile Pic Component with Edit capability
+            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                ProfileAvatar(
+                    name = currentName,
+                    profilePicUrl = profilePicUrl,
+                    size = 110.dp,
+                    fontSize = 42.sp,
+                    isEditable = isEditing,
+                    onEditClick = { imagePickerLauncher.launch("image/*") },
+                    forceUpdateTrigger = imageUpdateTrigger
+                )
+            }
+            
             Spacer(modifier = Modifier.height(8.dp))
 
             @Composable
@@ -191,7 +216,6 @@ fun ProfileDetailsScreen(
                 onValueChange: (String) -> Unit,
                 icon: ImageVector,
                 keyboardType: KeyboardType = KeyboardType.Text,
-                isPassword: Boolean = false,
                 isErrorState: Boolean = false 
             ) {
                 TextField(
@@ -200,15 +224,6 @@ fun ProfileDetailsScreen(
                     readOnly = !isEditing,
                     label = { Text(label, color = if (isErrorState) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant) },
                     leadingIcon = { Icon(icon, contentDescription = label, tint = if (isErrorState) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary) },
-                    trailingIcon = {
-                        if (isPassword) {
-                            val image = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff
-                            IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                                Icon(imageVector = image, contentDescription = "Toggle Password", tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        }
-                    },
-                    visualTransformation = if (isPassword && !passwordVisible) PasswordVisualTransformation() else VisualTransformation.None,
                     keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
                     modifier = Modifier.fillMaxWidth(),
                     colors = TextFieldDefaults.colors(
@@ -252,7 +267,7 @@ fun ProfileDetailsScreen(
             }
 
             DetailField("Mobile No.", currentMobile, { currentMobile = it }, Icons.Outlined.Phone, KeyboardType.Phone)
-            DetailField("Password", currentPassword, { currentPassword = it }, Icons.Outlined.Lock, isPassword = true)
+            // Password Field Removed Completely
             DetailField("Email ID", currentEmail, { currentEmail = it }, Icons.Outlined.Email, KeyboardType.Email)
             
             if (isEditing) {
