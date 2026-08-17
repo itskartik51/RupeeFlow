@@ -7,7 +7,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -20,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FirebaseFirestore
+import com.kartikey.rupeeflow.UI_Screens.CustomDatePicker
 import com.kartikey.rupeeflow.UI_Screens.bounceClick
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -61,13 +62,11 @@ fun ProfileDetailsScreen(
     var currentEmail by remember { mutableStateOf(email) }
     var currentDob by remember { mutableStateOf(dob) }
 
-    var selectedCell by remember { mutableStateOf<String?>(null) } // 🚀 NEW: Tracks which cell is tapped
-    var editingField by remember { mutableStateOf<String?>(null) } // Tracks which field is actively editing (keyboard open)
+    var selectedCell by remember { mutableStateOf<String?>(null) } 
+    var editingField by remember { mutableStateOf<String?>(null) } 
     
     var isSaving by remember { mutableStateOf(false) }
     var usernameError by remember { mutableStateOf(false) }
-    
-    var showDatePicker by remember { mutableStateOf(false) } // 🚀 NEW: Controls Calendar Popup
 
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -97,7 +96,6 @@ fun ProfileDetailsScreen(
         }
     }
 
-    // Generic Field Update Engine
     fun saveFieldToFirestore(field: String, value: Any, onSuccess: () -> Unit) {
         isSaving = true
         coroutineScope.launch(Dispatchers.IO) {
@@ -145,7 +143,7 @@ fun ProfileDetailsScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
                 .padding(horizontal = 20.dp)
-                .clickable( // Clicking outside clears selection
+                .clickable( 
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null
                 ) { 
@@ -171,7 +169,6 @@ fun ProfileDetailsScreen(
             
             Spacer(modifier = Modifier.height(8.dp))
 
-            // 🚀 SMART FIELD COMPONENT
             @Composable
             fun DetailField(
                 label: String,
@@ -226,7 +223,12 @@ fun ProfileDetailsScreen(
                             }),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .focusRequester(focusRequester),
+                                .focusRequester(focusRequester)
+                                .onFocusChanged { state ->
+                                    if (state.isFocused && !isEditing) {
+                                        focusManager.clearFocus()
+                                    }
+                                },
                             colors = TextFieldDefaults.colors(
                                 focusedContainerColor = Color.Transparent,
                                 unfocusedContainerColor = Color.Transparent,
@@ -242,16 +244,18 @@ fun ProfileDetailsScreen(
                             isError = isErrorState
                         )
 
-                        // 🚀 SHIELD: Intercepts clicks to prevent focus/green line unless editing
                         if (!isEditing) {
                             Box(
                                 modifier = Modifier
                                     .matchParentSize()
-                                    .padding(end = 56.dp) // Leave space so Trailing Edit Icon is clickable
+                                    .then(if (isEditableField) Modifier.padding(end = 56.dp) else Modifier)
                                     .clickable(
                                         interactionSource = remember { MutableInteractionSource() },
                                         indication = null,
-                                        onClick = onCellClick
+                                        onClick = { 
+                                            if (isEditableField) onCellClick() 
+                                            else focusManager.clearFocus() 
+                                        }
                                     )
                             )
                         }
@@ -377,59 +381,49 @@ fun ProfileDetailsScreen(
                 isEditing = false
             )
             
-            // 🚀 NEW: Clean DOB Calendar Implementation
-            DetailField(
-                label = "Date of Birth", 
-                value = currentDob, 
-                onValueChange = { }, 
-                icon = Icons.Outlined.CalendarToday,
-                isSelected = selectedCell == "DOB",
-                isEditing = false,
-                isSavingStatus = isSaving,
-                onCellClick = { if (editingField == null) selectedCell = "DOB" },
-                onEditClick = { 
-                    selectedCell = null
-                    showDatePicker = true 
-                }
-            )
-            
-            Spacer(modifier = Modifier.height(32.dp))
-        }
-    }
-
-    // 🚀 NEW: POPUP CALENDAR
-    if (showDatePicker) {
-        val datePickerState = rememberDatePickerState(
-            initialSelectedDateMillis = dobMillis ?: System.currentTimeMillis()
-        )
-        DatePickerDialog(
-            onDismissRequest = { showDatePicker = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    showDatePicker = false
-                    datePickerState.selectedDateMillis?.let { millis ->
+            // 🚀 LINKED: CustomDatePicker script integration
+            if (editingField == "DOB") {
+                CustomDatePicker(
+                    label = "Date of Birth",
+                    selectedDateMillis = dobMillis,
+                    onDateSelected = { millis ->
                         val formatted = sdf.format(Date(millis))
                         currentDob = formatted
-                        val dateObj = try { sdf.parse(formatted) } catch(e:Exception){null}
+                        val dateObj = try { sdf.parse(formatted) } catch(e: Exception) { null }
                         
                         if (dateObj != null) {
-                            saveFieldToFirestore("dob", Timestamp(dateObj)) { selectedCell = null }
+                            saveFieldToFirestore("dob", Timestamp(dateObj)) { 
+                                selectedCell = null
+                                editingField = null 
+                            }
                         } else {
-                            saveFieldToFirestore("dob", formatted) { selectedCell = null }
+                            saveFieldToFirestore("dob", formatted) { 
+                                selectedCell = null
+                                editingField = null 
+                            }
                         }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    restrictToCurrentMonth = false
+                )
+            } else {
+                DetailField(
+                    label = "Date of Birth", 
+                    value = currentDob, 
+                    onValueChange = { }, 
+                    icon = Icons.Outlined.CalendarToday,
+                    isSelected = selectedCell == "DOB",
+                    isEditing = false,
+                    isSavingStatus = isSaving,
+                    onCellClick = { if (editingField == null) selectedCell = "DOB" },
+                    onEditClick = { 
+                        selectedCell = null
+                        editingField = "DOB" 
                     }
-                }) { 
-                    Text("OK", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold) 
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDatePicker = false }) { 
-                    Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant) 
-                }
-            },
-            colors = DatePickerDefaults.colors(containerColor = MaterialTheme.colorScheme.surface)
-        ) {
-            DatePicker(state = datePickerState)
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(32.dp))
         }
     }
 }
