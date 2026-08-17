@@ -31,7 +31,7 @@ data class AppData(
     val userFullName: String,
     val userEmail: String,
     val userMobile: String,
-    val profilePicUrl: String, // 🚀 NEW: Profile Pic Link
+    val profilePicUrl: String, 
     val userDob: String,
     val thisMonthExpenses: Double,
     val thisYearExpenses: Double,
@@ -48,9 +48,6 @@ data class AppData(
 object CacheManager {
     private const val PREFS_NAME = "RupeeFlow_GlobalCache"
     
-    // ==========================================
-    // 🚀 NEW: PROFILE IMAGE CACHE ENGINE
-    // ==========================================
     fun getProfilePicFile(context: Context): File {
         return File(context.cacheDir, "profile_pic.jpg")
     }
@@ -62,7 +59,6 @@ object CacheManager {
             inputStream?.close()
             if (bitmap == null) return false
 
-            // Compress to maximum 400px to save extreme storage space
             val maxDim = 400
             val scale = maxDim.toFloat() / maxOf(bitmap.width, bitmap.height)
             val scaledBitmap = if (scale < 1) {
@@ -851,8 +847,7 @@ object CacheManager {
             userFullName = tempName,
             userEmail = tempEmail,
             userMobile = tempMobile,
-            profilePicUrl = tempPrfl, // Now fetching profile pic link seamlessly
-            userPassword = tempPass,
+            profilePicUrl = tempPrfl, 
             userDob = tempDob,
             thisMonthExpenses = tempMonth,
             thisYearExpenses = tempYear,
