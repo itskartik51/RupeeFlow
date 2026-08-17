@@ -91,7 +91,7 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
         auth.signOut()
         googleSignInClient.signOut()
         authStep = 1
-        statusMessage = "Signup Cancelled."
+        statusMessage = "" // Removed "Signup Cancelled" text
     }
 
     val launcher = rememberLauncherForActivityResult(
@@ -103,7 +103,7 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
                 try {
                     withContext(Dispatchers.Main) { 
                         isLoading = true
-                        statusMessage = "" // Cleared loading message
+                        statusMessage = "" 
                     }
                     val account = task.getResult(ApiException::class.java)
                     val credential = GoogleAuthProvider.getCredential(account.idToken, null)
@@ -113,20 +113,18 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
                     
                     if (firebaseUser != null) {
                         val userEmail = firebaseUser.email ?: ""
-                        val currentPhotoUrl = firebaseUser.photoUrl?.toString() ?: "" // Fetches Profile URL
-                        
+                        val fetchedPhotoUrl = firebaseUser.photoUrl?.toString() ?: ""
+
                         val query = db.collection("Users").whereEqualTo("email", userEmail).get().await()
                         
                         if (!query.isEmpty) {
                             // EXISTING USER
                             val userDoc = query.documents[0]
-                            
-                            // NEW LOGIC: Seamlessly update the profile picture link for existing users
-                            if (currentPhotoUrl.isNotEmpty()) {
-                                userDoc.reference.set(mapOf("prfl" to currentPhotoUrl), SetOptions.merge()).await()
-                            }
-
                             val savedUsername = userDoc.getString("username") ?: userEmail.substringBefore("@")
+                            
+                            // 🚀 UPDATE: Silently update the latest profile photo link for existing users
+                            userDoc.reference.update("prfl", fetchedPhotoUrl).await()
+
                             withContext(Dispatchers.Main) {
                                 onLoginSuccess(savedUsername)
                             }
@@ -135,7 +133,7 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
                             withContext(Dispatchers.Main) {
                                 googleEmail = userEmail
                                 googleName = firebaseUser.displayName ?: ""
-                                googlePhotoUrl = currentPhotoUrl 
+                                googlePhotoUrl = fetchedPhotoUrl
                                 inputName = googleName
                                 
                                 authStep = 2
@@ -152,7 +150,7 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
                 }
             }
         } else {
-            statusMessage = "Google Sign-In Cancelled."
+            statusMessage = "" // Removed "Google Sign-In Cancelled" text
             isLoading = false
         }
     }
