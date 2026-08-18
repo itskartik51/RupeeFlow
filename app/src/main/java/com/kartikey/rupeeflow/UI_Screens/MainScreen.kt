@@ -314,6 +314,7 @@ fun MainScreen(
                                 paddingValues = paddingValues, 
                                 todayExpenses = todayExpenses, 
                                 thisMonthExpenses = thisMonthExpenses, thisYearExpenses = thisYearExpenses, budgetLimit = budgetLimit,
+                                transactionList = transactionList, // 🚀 NEW DATA PASSED HERE
                                 isLoadingExpenses = isLoadingExpenses, dNavState = dNavState, dBackPresses = dBackPresses, 
                                 onLogout = onLogout, onRefreshExpenses = { refreshTrigger++ },
                                 onExpenseCardClick = { showExpenseHistory = true }, onContriClick = { showContriScreen = true },
@@ -402,8 +403,6 @@ fun Modifier.bounceClick(
         .pointerInput(Unit) { 
             awaitPointerEventScope {
                 while (true) {
-                    // 🚀 FIX: The magic line that fixes event propagation (bubbling)!
-                    // requireUnconsumed = true forces the parent to ignore the touch if a child (like a button) already took it.
                     val down = awaitFirstDown(requireUnconsumed = true) 
                     isPressed = true
                     waitForUpOrCancellation()
