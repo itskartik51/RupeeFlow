@@ -28,6 +28,7 @@ import java.util.Locale
 
 @Composable
 fun ExpenseSummaryCard(
+    todayExpenses: Double, // 🚀 NEW: Added Today's expenses
     thisMonthExpenses: Double,
     thisYearExpenses: Double,
     budgetLimit: Double,
@@ -38,8 +39,19 @@ fun ExpenseSummaryCard(
     var selectedPeriod by remember { mutableStateOf("Month") }
     var expanded by remember { mutableStateOf(false) }
 
-    val currentAmount = if (selectedPeriod == "Month") thisMonthExpenses else thisYearExpenses
-    val currentBudget = if (selectedPeriod == "Month") budgetLimit else budgetLimit * 12
+    val currentAmount = when (selectedPeriod) {
+        "Today" -> todayExpenses
+        "Month" -> thisMonthExpenses
+        "Year" -> thisYearExpenses
+        else -> thisMonthExpenses
+    }
+    
+    val currentBudget = when (selectedPeriod) {
+        "Today" -> budgetLimit / 30 // Approximate daily budget limit
+        "Month" -> budgetLimit
+        "Year" -> budgetLimit * 12
+        else -> budgetLimit
+    }
     
     val progressRatio = if (currentBudget > 0) (currentAmount / currentBudget).toFloat().coerceIn(0f, 1f) else 0f
     val percentUsed = if (currentBudget > 0) ((currentAmount / currentBudget) * 100) else 0.0
@@ -64,7 +76,7 @@ fun ExpenseSummaryCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .bounceClick(),
+            .bounceClick { onExpenseCardClick() }, // 🚀 FIX: Card now consumes its own click so inner clicks don't bounce the whole card
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = RoundedCornerShape(20.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp) 
@@ -113,6 +125,10 @@ fun ExpenseSummaryCard(
                         modifier = Modifier.background(MaterialTheme.colorScheme.surface)
                     ) {
                         DropdownMenuItem(
+                            text = { Text("Today", color = MaterialTheme.colorScheme.onSurface) },
+                            onClick = { selectedPeriod = "Today"; expanded = false }
+                        )
+                        DropdownMenuItem(
                             text = { Text("Month", color = MaterialTheme.colorScheme.onSurface) },
                             onClick = { selectedPeriod = "Month"; expanded = false }
                         )
@@ -147,7 +163,7 @@ fun ExpenseSummaryCard(
                         .size(28.dp) 
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .bounceClick { onRefreshExpenses() },
+                        .bounceClick { onRefreshExpenses() }, // 🚀 FIX: Independent bounce
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -205,7 +221,7 @@ fun ExpenseSummaryCard(
                 Box(
                     modifier = Modifier
                         .height(34.dp)
-                        .bounceClick { onExpenseCardClick() }
+                        .bounceClick { onExpenseCardClick() } // 🚀 FIX: Independent bounce
                         .clip(RoundedCornerShape(50))
                         .background(MaterialTheme.colorScheme.primary),
                     contentAlignment = Alignment.Center
