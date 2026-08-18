@@ -70,9 +70,10 @@ fun MainScreen(
     var userFullName by remember { mutableStateOf("") } 
     var userEmail by remember { mutableStateOf("") } 
     var userMobile by remember { mutableStateOf("") }
-    var profilePicUrl by remember { mutableStateOf("") } // 🚀 NEW
+    var profilePicUrl by remember { mutableStateOf("") } 
     var userDob by remember { mutableStateOf("") }
 
+    var todayExpenses by remember { mutableDoubleStateOf(0.0) } // 🚀 FIX: Added state variable
     var thisMonthExpenses by remember { mutableDoubleStateOf(0.0) }
     var thisYearExpenses by remember { mutableDoubleStateOf(0.0) }
     var isLoadingExpenses by remember { mutableStateOf(true) }
@@ -131,8 +132,9 @@ fun MainScreen(
             userFullName = cachedData.userFullName
             userEmail = cachedData.userEmail
             userMobile = cachedData.userMobile
-            profilePicUrl = cachedData.profilePicUrl // 🚀 NEW
+            profilePicUrl = cachedData.profilePicUrl 
             userDob = cachedData.userDob
+            todayExpenses = cachedData.todayExpenses // 🚀 FIX: Update from cache
             thisMonthExpenses = cachedData.thisMonthExpenses
             thisYearExpenses = cachedData.thisYearExpenses
             budgetLimit = cachedData.budgetLimit
@@ -152,8 +154,9 @@ fun MainScreen(
                     userFullName = freshData.userFullName
                     userEmail = freshData.userEmail
                     userMobile = freshData.userMobile
-                    profilePicUrl = freshData.profilePicUrl // 🚀 NEW
+                    profilePicUrl = freshData.profilePicUrl 
                     userDob = freshData.userDob
+                    todayExpenses = freshData.todayExpenses // 🚀 FIX: Update from fresh fetch
                     thisMonthExpenses = freshData.thisMonthExpenses
                     thisYearExpenses = freshData.thisYearExpenses
                     budgetLimit = freshData.budgetLimit
@@ -285,8 +288,9 @@ fun MainScreen(
                             
                             HomeDashboardDesign(
                                 username = username, userFullName = userFullName, 
-                                profilePicUrl = profilePicUrl, // 🚀 NEW
+                                profilePicUrl = profilePicUrl, 
                                 paddingValues = paddingValues, 
+                                todayExpenses = todayExpenses, // 🚀 FIX: Passed to HomeDashboardDesign
                                 thisMonthExpenses = thisMonthExpenses, thisYearExpenses = thisYearExpenses, budgetLimit = budgetLimit,
                                 isLoadingExpenses = isLoadingExpenses, dNavState = dNavState, dBackPresses = dBackPresses, 
                                 onLogout = onLogout, onRefreshExpenses = { refreshTrigger++ },
@@ -308,7 +312,7 @@ fun MainScreen(
                         3 -> AnalyticsScreen(paddingValues = paddingValues)
                         4 -> ProfileScreen(
                             username = username, name = userFullName, email = userEmail, mobile = userMobile, 
-                            profilePicUrl = profilePicUrl, // 🚀 NEW
+                            profilePicUrl = profilePicUrl, 
                             dob = userDob, paddingValues = paddingValues, 
                             themeMode = themeMode, onThemeChange = onThemeChange, 
                             isUpdateAvailable = isUpdateAvailable,
