@@ -179,7 +179,7 @@ fun MainScreen(
             bottomBar = {
                 NavigationBar(
                     modifier = Modifier.height(65.dp),
-                    containerColor = MaterialTheme.colorScheme.background, // Match background to merge seamlessly
+                    containerColor = MaterialTheme.colorScheme.background,
                     tonalElevation = 0.dp
                 ) {
                     val isHomeSelected = selectedTab == 0 && !showExpenseHistory && !showContriScreen
@@ -191,7 +191,7 @@ fun MainScreen(
                             Icon(
                                 imageVector = if (isHomeSelected) Icons.Filled.Home else Icons.Outlined.Home, 
                                 contentDescription = "Home",
-                                modifier = Modifier.size(28.dp) // Increased size
+                                modifier = Modifier.size(28.dp) 
                             ) 
                         }, 
                         colors = NavigationBarItemDefaults.colors(
@@ -210,7 +210,7 @@ fun MainScreen(
                             Icon(
                                 imageVector = if (isAssetsSelected) Icons.Filled.AccountBalanceWallet else Icons.Outlined.AccountBalanceWallet, 
                                 contentDescription = "Assets",
-                                modifier = Modifier.size(28.dp) // Increased size
+                                modifier = Modifier.size(28.dp) 
                             ) 
                         }, 
                         colors = NavigationBarItemDefaults.colors(
@@ -224,7 +224,7 @@ fun MainScreen(
                         modifier = Modifier.bounceClick(),
                         selected = false, 
                         onClick = { showAddMenu = !showAddMenu }, 
-                        icon = { Spacer(modifier = Modifier.size(42.dp)) }, // Sized to match AddScreen button
+                        icon = { Spacer(modifier = Modifier.size(42.dp)) }, 
                         colors = NavigationBarItemDefaults.colors(
                             indicatorColor = Color.Transparent
                         )
@@ -239,7 +239,7 @@ fun MainScreen(
                             Icon(
                                 imageVector = if (isAnalyticsSelected) Icons.Filled.PieChart else Icons.Outlined.PieChart, 
                                 contentDescription = "Analytics",
-                                modifier = Modifier.size(28.dp) // Increased size
+                                modifier = Modifier.size(28.dp) 
                             ) 
                         }, 
                         colors = NavigationBarItemDefaults.colors(
@@ -259,7 +259,7 @@ fun MainScreen(
                                 Icon(
                                     imageVector = if (isProfileSelected) Icons.Filled.Person else Icons.Outlined.Person, 
                                     contentDescription = "Profile",
-                                    modifier = Modifier.size(28.dp) // Increased size
+                                    modifier = Modifier.size(28.dp) 
                                 )
                                 if (isUpdateAvailable) {
                                     Box(
@@ -402,7 +402,9 @@ fun Modifier.bounceClick(
         .pointerInput(Unit) { 
             awaitPointerEventScope {
                 while (true) {
-                    awaitFirstDown(false)
+                    // 🚀 FIX: The magic line that fixes event propagation (bubbling)!
+                    // requireUnconsumed = true forces the parent to ignore the touch if a child (like a button) already took it.
+                    val down = awaitFirstDown(requireUnconsumed = true) 
                     isPressed = true
                     waitForUpOrCancellation()
                     isPressed = false
