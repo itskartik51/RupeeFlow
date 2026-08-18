@@ -33,6 +33,7 @@ data class AppData(
     val userMobile: String,
     val profilePicUrl: String, 
     val userDob: String,
+    val todayExpenses: Double, // Added Today
     val thisMonthExpenses: Double,
     val thisYearExpenses: Double,
     val budgetLimit: Double,
@@ -675,6 +676,7 @@ object CacheManager {
         val jsonResponse = JSONObject(responseData)
         
         val cal = Calendar.getInstance()
+        val currD = cal.get(Calendar.DAY_OF_MONTH)
         val currM = cal.get(Calendar.MONTH) + 1
         val currY = cal.get(Calendar.YEAR)
 
@@ -687,13 +689,18 @@ object CacheManager {
 
         val expensesArray = jsonResponse.optJSONArray("expenses")
         var tempTotal = 0.0
+        var tempToday = 0.0 // Added for optimistic calculation
         var tempMonth = 0.0
         var tempYear = 0.0
         val tempHistory = mutableListOf<TransactionModel>()
 
         if (expensesArray != null && expensesArray.length() > 0) {
+            val currDayStr = String.format(Locale.US, "%02d", currD)
             val currMonthStr = String.format(Locale.US, "%02d", currM)
             val currYearStr = currY.toString()
+            
+            val todayPrefixSlash = "$currDayStr/$currMonthStr/$currYearStr"
+            val todayPrefixDash = "$currYearStr-$currMonthStr-$currDayStr" 
             
             for (i in 0 until expensesArray.length()) {
                 val item = expensesArray.getJSONObject(i)
@@ -716,6 +723,11 @@ object CacheManager {
                         )
                     )
                     
+                    // Optimistic check for Today's expenses
+                    if (rawDate.startsWith(todayPrefixSlash) || rawDate.startsWith(todayPrefixDash)) {
+                        tempToday += amt
+                    }
+
                     if (rawDate.contains(currYearStr)) {
                         tempYear += amt
                         if (rawDate.contains("-$currMonthStr-") || rawDate.contains("/$currMonthStr/") || rawDate.startsWith("$currMonthStr-") || rawDate.startsWith("$currMonthStr/")) {
@@ -849,6 +861,7 @@ object CacheManager {
             userMobile = tempMobile,
             profilePicUrl = tempPrfl, 
             userDob = tempDob,
+            todayExpenses = tempToday, // Included in return payload
             thisMonthExpenses = tempMonth,
             thisYearExpenses = tempYear,
             budgetLimit = fetchedBudgetLimit,
