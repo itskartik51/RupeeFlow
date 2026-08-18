@@ -127,7 +127,7 @@ fun SpendingTrackerCard(
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             
-            // 🚀 Minimalist Header (Total & Dates in a SINGLE ROW)
+            // Minimalist Header (Total & Dates in a SINGLE ROW)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -153,22 +153,27 @@ fun SpendingTrackerCard(
             // Master Component: Graph Lines + Bars + Y/X Axis combined precisely
             Box(modifier = Modifier.fillMaxWidth()) {
                 
-                // 1. Subtle Background Grid Lines (Height adjusted to 80.dp)
-                Column(modifier = Modifier.height(80.dp), verticalArrangement = Arrangement.SpaceBetween) {
+                // 1. Subtle Background Grid Lines
+                Column(
+                    modifier = Modifier
+                        .height(80.dp)
+                        .padding(end = 36.dp), // 🚀 FIX: Padding ensures lines stop exactly before the numbers start
+                    verticalArrangement = Arrangement.SpaceBetween
+                ) {
                     HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
                     HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
                     HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
                 }
                 
-                // 2. Y-Axis Numbers (Right aligned, Height 80.dp)
+                // 2. Y-Axis Numbers (Right aligned, perfectly centered with lines)
                 Column(
                     modifier = Modifier.height(80.dp).align(Alignment.TopEnd),
                     verticalArrangement = Arrangement.SpaceBetween,
                     horizontalAlignment = Alignment.End
                 ) {
-                    Text(text = formatYAxis(topValue), fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.offset(y = (-6).dp))
-                    Text(text = formatYAxis(midValue), fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.offset(y = (-6).dp))
-                    Text(text = "", fontSize = 10.sp) // Space holder for baseline
+                    Text(text = formatYAxis(topValue), fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.offset(y = (-6).dp)) // Top aligned with line
+                    Text(text = formatYAxis(midValue), fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.offset(y = 0.dp)) // Mid perfectly centered
+                    Text(text = "0", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.offset(y = 6.dp)) // 🚀 FIX: Bottom '0' aligned with bottom line
                 }
                 
                 // 3. Graph Bars & X-Axis Texts (Sun-Sat)
@@ -184,7 +189,7 @@ fun SpendingTrackerCard(
                         val textOpacity = if (isToday) 1f else 0.5f
                         
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            // Bar Component (Height adjusted to 80.dp)
+                            // Bar Component
                             Box(
                                 modifier = Modifier.height(80.dp),
                                 contentAlignment = Alignment.BottomCenter
