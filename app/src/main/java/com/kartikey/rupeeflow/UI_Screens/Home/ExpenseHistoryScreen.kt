@@ -15,6 +15,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -135,7 +136,7 @@ fun ExpenseHistoryScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .background(MaterialTheme.colorScheme.surfaceVariant) 
+                                .background(MaterialTheme.colorScheme.surface) // 🚀 FIX: Kam greyish (darker native theme color)
                                 .padding(horizontal = 16.dp, vertical = 20.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
@@ -143,7 +144,7 @@ fun ExpenseHistoryScreen(
                             Text(
                                 text = monthYear,
                                 fontWeight = FontWeight.ExtraBold,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = MaterialTheme.colorScheme.onSurface,
                                 fontSize = 24.sp 
                             )
                             Text(
@@ -221,7 +222,7 @@ fun TransactionFlatItem(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface)
+            .background(Color.Transparent) // 🚀 FIX: Zyada dark (Adopts the darkest background color)
             .clickable { expanded = !expanded }
     ) {
         Row(
