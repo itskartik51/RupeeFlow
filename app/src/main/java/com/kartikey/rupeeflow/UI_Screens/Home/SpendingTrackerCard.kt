@@ -65,7 +65,7 @@ fun SpendingTrackerCard(
 ) {
     var weekOffset by remember { mutableIntStateOf(0) }
     
-    // 🚀 Start Animation trigger for first load
+    // Start Animation trigger for first load
     var startAnimation by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         startAnimation = true
@@ -166,7 +166,7 @@ fun SpendingTrackerCard(
                 Column(
                     modifier = Modifier
                         .height(80.dp)
-                        .padding(end = 36.dp), // Padding ensures lines stop exactly before the numbers start
+                        .padding(end = 36.dp),
                     verticalArrangement = Arrangement.SpaceBetween
                 ) {
                     HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
@@ -174,11 +174,14 @@ fun SpendingTrackerCard(
                     HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
                 }
                 
-                // 2. Y-Axis Numbers (Right aligned, perfectly centered with lines)
+                // 2. Y-Axis Numbers (Perfectly centered in the 36.dp space)
                 Column(
-                    modifier = Modifier.height(80.dp).align(Alignment.TopEnd),
+                    modifier = Modifier
+                        .height(80.dp)
+                        .width(36.dp) // 🚀 FIX: Fixed width matching the graph's end padding
+                        .align(Alignment.TopEnd),
                     verticalArrangement = Arrangement.SpaceBetween,
-                    horizontalAlignment = Alignment.End
+                    horizontalAlignment = Alignment.CenterHorizontally // 🚀 FIX: Centered horizontally instead of End
                 ) {
                     Text(text = formatYAxis(topValue), fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.offset(y = (-6).dp)) 
                     Text(text = formatYAxis(midValue), fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.offset(y = 0.dp)) 
@@ -193,10 +196,10 @@ fun SpendingTrackerCard(
                 ) {
                     val dayLabels = listOf("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
                     for (i in 0..6) {
-                        // 🚀 Calculate Target Ratio
+                        // Calculate Target Ratio
                         val targetRatio = if (startAnimation) (dailyTotals[i] / topValue).toFloat().coerceIn(0f, 1f) else 0f
                         
-                        // 🚀 Apply Smooth Animation
+                        // Apply Smooth Animation
                         val animatedRatio by animateFloatAsState(
                             targetValue = targetRatio,
                             animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing),
