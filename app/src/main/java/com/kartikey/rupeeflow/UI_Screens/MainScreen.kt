@@ -73,7 +73,7 @@ fun MainScreen(
     var profilePicUrl by remember { mutableStateOf("") } 
     var userDob by remember { mutableStateOf("") }
 
-    var todayExpenses by remember { mutableDoubleStateOf(0.0) } // 🚀 FIX: Added state variable
+    var todayExpenses by remember { mutableDoubleStateOf(0.0) } 
     var thisMonthExpenses by remember { mutableDoubleStateOf(0.0) }
     var thisYearExpenses by remember { mutableDoubleStateOf(0.0) }
     var isLoadingExpenses by remember { mutableStateOf(true) }
@@ -134,7 +134,7 @@ fun MainScreen(
             userMobile = cachedData.userMobile
             profilePicUrl = cachedData.profilePicUrl 
             userDob = cachedData.userDob
-            todayExpenses = cachedData.todayExpenses // 🚀 FIX: Update from cache
+            todayExpenses = cachedData.todayExpenses 
             thisMonthExpenses = cachedData.thisMonthExpenses
             thisYearExpenses = cachedData.thisYearExpenses
             budgetLimit = cachedData.budgetLimit
@@ -156,7 +156,7 @@ fun MainScreen(
                     userMobile = freshData.userMobile
                     profilePicUrl = freshData.profilePicUrl 
                     userDob = freshData.userDob
-                    todayExpenses = freshData.todayExpenses // 🚀 FIX: Update from fresh fetch
+                    todayExpenses = freshData.todayExpenses 
                     thisMonthExpenses = freshData.thisMonthExpenses
                     thisYearExpenses = freshData.thisYearExpenses
                     budgetLimit = freshData.budgetLimit
@@ -178,64 +178,85 @@ fun MainScreen(
             containerColor = MaterialTheme.colorScheme.background,
             bottomBar = {
                 NavigationBar(
+                    modifier = Modifier.height(65.dp), // 🚀 FIX: Instagram-style compact height
                     containerColor = MaterialTheme.colorScheme.surface, 
                     tonalElevation = 0.dp
                 ) {
+                    val isHomeSelected = selectedTab == 0 && !showExpenseHistory && !showContriScreen
                     NavigationBarItem(
                         modifier = Modifier.bounceClick(),
-                        selected = selectedTab == 0 && !showExpenseHistory && !showContriScreen, 
+                        selected = isHomeSelected, 
                         onClick = { selectedTab = 0; showExpenseHistory = false; showContriScreen = false }, 
-                        icon = { Icon(Icons.Outlined.Home, contentDescription = "Home") }, 
-                        label = { Text("Home") }, 
+                        icon = { 
+                            Icon(
+                                imageVector = if (isHomeSelected) Icons.Filled.Home else Icons.Outlined.Home, 
+                                contentDescription = "Home"
+                            ) 
+                        }, 
                         colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = MaterialTheme.colorScheme.primary, 
-                            indicatorColor = MaterialTheme.colorScheme.primaryContainer,
-                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            selectedTextColor = MaterialTheme.colorScheme.primary
+                            selectedIconColor = MaterialTheme.colorScheme.onSurface, 
+                            indicatorColor = Color.Transparent, // 🚀 FIX: Removed green pill background
+                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     )
+                    
+                    val isAssetsSelected = selectedTab == 1
                     NavigationBarItem(
                         modifier = Modifier.bounceClick(),
-                        selected = selectedTab == 1, 
+                        selected = isAssetsSelected, 
                         onClick = { if (selectedTab == 1) assetsCurrentView = "Main"; selectedTab = 1; showExpenseHistory = false; showContriScreen = false }, 
-                        icon = { Icon(Icons.Outlined.AccountBalanceWallet, contentDescription = "Assets") }, 
-                        label = { Text("Assets") }, 
+                        icon = { 
+                            Icon(
+                                imageVector = if (isAssetsSelected) Icons.Filled.AccountBalanceWallet else Icons.Outlined.AccountBalanceWallet, 
+                                contentDescription = "Assets"
+                            ) 
+                        }, 
                         colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = MaterialTheme.colorScheme.primary, 
-                            indicatorColor = MaterialTheme.colorScheme.primaryContainer,
-                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            selectedTextColor = MaterialTheme.colorScheme.primary
+                            selectedIconColor = MaterialTheme.colorScheme.onSurface, 
+                            indicatorColor = Color.Transparent,
+                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     )
+                    
                     NavigationBarItem(
                         modifier = Modifier.bounceClick(),
                         selected = false, 
                         onClick = { showAddMenu = !showAddMenu }, 
-                        icon = { Spacer(modifier = Modifier.size(48.dp)) }
-                    )
-                    NavigationBarItem(
-                        modifier = Modifier.bounceClick(),
-                        selected = selectedTab == 3, 
-                        onClick = { selectedTab = 3; showExpenseHistory = false; showContriScreen = false }, 
-                        icon = { Icon(Icons.Outlined.PieChart, contentDescription = "Analytics") }, 
-                        label = { Text("Analytics") }, 
+                        icon = { Spacer(modifier = Modifier.size(38.dp)) }, // 🚀 FIX: Reduced size for proportion
                         colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = MaterialTheme.colorScheme.primary, 
-                            indicatorColor = MaterialTheme.colorScheme.primaryContainer,
-                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            selectedTextColor = MaterialTheme.colorScheme.primary
+                            indicatorColor = Color.Transparent
                         )
                     )
+                    
+                    val isAnalyticsSelected = selectedTab == 3
                     NavigationBarItem(
                         modifier = Modifier.bounceClick(),
-                        selected = selectedTab == 4, 
+                        selected = isAnalyticsSelected, 
+                        onClick = { selectedTab = 3; showExpenseHistory = false; showContriScreen = false }, 
+                        icon = { 
+                            Icon(
+                                imageVector = if (isAnalyticsSelected) Icons.Filled.PieChart else Icons.Outlined.PieChart, 
+                                contentDescription = "Analytics"
+                            ) 
+                        }, 
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = MaterialTheme.colorScheme.onSurface, 
+                            indicatorColor = Color.Transparent,
+                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    )
+                    
+                    val isProfileSelected = selectedTab == 4
+                    NavigationBarItem(
+                        modifier = Modifier.bounceClick(),
+                        selected = isProfileSelected, 
                         onClick = { selectedTab = 4; showExpenseHistory = false; showContriScreen = false }, 
                         icon = { 
                             Box {
-                                Icon(Icons.Outlined.Person, contentDescription = "Profile")
+                                Icon(
+                                    imageVector = if (isProfileSelected) Icons.Filled.Person else Icons.Outlined.Person, 
+                                    contentDescription = "Profile"
+                                )
                                 if (isUpdateAvailable) {
                                     Box(
                                         modifier = Modifier
@@ -247,13 +268,10 @@ fun MainScreen(
                                 }
                             }
                         }, 
-                        label = { Text("Profile") }, 
                         colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = MaterialTheme.colorScheme.primary, 
-                            indicatorColor = MaterialTheme.colorScheme.primaryContainer,
-                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            selectedTextColor = MaterialTheme.colorScheme.primary
+                            selectedIconColor = MaterialTheme.colorScheme.onSurface, 
+                            indicatorColor = Color.Transparent,
+                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     )
                 }
@@ -290,7 +308,7 @@ fun MainScreen(
                                 username = username, userFullName = userFullName, 
                                 profilePicUrl = profilePicUrl, 
                                 paddingValues = paddingValues, 
-                                todayExpenses = todayExpenses, // 🚀 FIX: Passed to HomeDashboardDesign
+                                todayExpenses = todayExpenses, 
                                 thisMonthExpenses = thisMonthExpenses, thisYearExpenses = thisYearExpenses, budgetLimit = budgetLimit,
                                 isLoadingExpenses = isLoadingExpenses, dNavState = dNavState, dBackPresses = dBackPresses, 
                                 onLogout = onLogout, onRefreshExpenses = { refreshTrigger++ },
