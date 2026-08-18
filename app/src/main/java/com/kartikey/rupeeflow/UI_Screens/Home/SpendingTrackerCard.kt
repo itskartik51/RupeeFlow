@@ -1,5 +1,8 @@
 package com.kartikey.rupeeflow.UI_Screens.Home
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -61,6 +64,12 @@ fun SpendingTrackerCard(
     modifier: Modifier = Modifier
 ) {
     var weekOffset by remember { mutableIntStateOf(0) }
+    
+    // 🚀 Start Animation trigger for first load
+    var startAnimation by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        startAnimation = true
+    }
     
     // Date Calculations
     val calendar = Calendar.getInstance().apply { firstDayOfWeek = Calendar.SUNDAY }
@@ -184,7 +193,16 @@ fun SpendingTrackerCard(
                 ) {
                     val dayLabels = listOf("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
                     for (i in 0..6) {
-                        val ratio = (dailyTotals[i] / topValue).toFloat().coerceIn(0f, 1f)
+                        // 🚀 Calculate Target Ratio
+                        val targetRatio = if (startAnimation) (dailyTotals[i] / topValue).toFloat().coerceIn(0f, 1f) else 0f
+                        
+                        // 🚀 Apply Smooth Animation
+                        val animatedRatio by animateFloatAsState(
+                            targetValue = targetRatio,
+                            animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing),
+                            label = "barHeightAnim_$i"
+                        )
+                        
                         val isToday = (weekOffset == 0 && (i + 1) == currentDayOfWeek)
                         val textOpacity = if (isToday) 1f else 0.5f
                         
@@ -194,17 +212,17 @@ fun SpendingTrackerCard(
                                 modifier = Modifier.height(80.dp),
                                 contentAlignment = Alignment.BottomCenter
                             ) {
-                                if (ratio > 0f) {
+                                if (animatedRatio > 0f) {
                                     Box(
                                         modifier = Modifier
                                             .width(16.dp)
-                                            .fillMaxHeight(ratio)
+                                            .fillMaxHeight(animatedRatio)
                                             .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
                                     )
                                 }
                             }
                             
-                            // 🚀 FIX: Small tick line connecting the bottom line to the day label (Authentic Graph look)
+                            // Small tick line connecting the bottom line to the day label
                             Box(
                                 modifier = Modifier
                                     .width(1.dp)
