@@ -50,7 +50,7 @@ fun HomeDashboardDesign(
     thisMonthExpenses: Double, 
     thisYearExpenses: Double, 
     budgetLimit: Double,
-    transactionList: List<com.kartikey.rupeeflow.UI_Screens.Add.TransactionModel>, // 🚀 NEW: Data received
+    transactionList: List<com.kartikey.rupeeflow.UI_Screens.Add.TransactionModel>,
     isLoadingExpenses: Boolean,
     dNavState: String, 
     dBackPresses: Int, 
@@ -188,9 +188,9 @@ fun HomeDashboardDesign(
                     onClick = { showBudgetDialog = true }
                 )
             }
-            Spacer(modifier = Modifier.height(24.dp))
             
-            // 🚀 NEW: Passed Data to Child Component
+            Spacer(modifier = Modifier.height(16.dp)) // 🚀 FIX: Reduced from 24.dp to 16.dp to match upper section distance
+            
             SpendingTrackerCard(transactions = transactionList) 
             
             Spacer(modifier = Modifier.height(16.dp))
