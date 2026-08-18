@@ -46,10 +46,11 @@ fun HomeDashboardDesign(
     userFullName: String, 
     profilePicUrl: String, 
     paddingValues: PaddingValues, 
-    todayExpenses: Double, // 🚀 NEW: Passed Today's expenses
+    todayExpenses: Double, 
     thisMonthExpenses: Double, 
     thisYearExpenses: Double, 
     budgetLimit: Double,
+    transactionList: List<com.kartikey.rupeeflow.UI_Screens.Add.TransactionModel>, // 🚀 NEW: Data received
     isLoadingExpenses: Boolean,
     dNavState: String, 
     dBackPresses: Int, 
@@ -130,7 +131,7 @@ fun HomeDashboardDesign(
             Spacer(modifier = Modifier.height(12.dp))
             
             ExpenseSummaryCard(
-                todayExpenses = todayExpenses, // 🚀 NEW: Passed to child
+                todayExpenses = todayExpenses, 
                 thisMonthExpenses = thisMonthExpenses, 
                 thisYearExpenses = thisYearExpenses, 
                 budgetLimit = budgetLimit,
@@ -189,13 +190,14 @@ fun HomeDashboardDesign(
             }
             Spacer(modifier = Modifier.height(24.dp))
             
-            SpendingTrackerCard() 
+            // 🚀 NEW: Passed Data to Child Component
+            SpendingTrackerCard(transactions = transactionList) 
             
             Spacer(modifier = Modifier.height(16.dp))
             
             ReminderBanner()
             
-            Spacer(modifier = Modifier.height(30.dp)) // 🚀 FIX: Removed Recent Transactions and Logout entirely
+            Spacer(modifier = Modifier.height(30.dp)) 
         }
     }
 
