@@ -15,7 +15,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -28,7 +27,7 @@ import java.util.Locale
 
 @Composable
 fun ExpenseSummaryCard(
-    todayExpenses: Double, // 🚀 NEW: Added Today's expenses
+    todayExpenses: Double, 
     thisMonthExpenses: Double,
     thisYearExpenses: Double,
     budgetLimit: Double,
@@ -47,7 +46,7 @@ fun ExpenseSummaryCard(
     }
     
     val currentBudget = when (selectedPeriod) {
-        "Today" -> budgetLimit / 30 // Approximate daily budget limit
+        "Today" -> budgetLimit / 30 
         "Month" -> budgetLimit
         "Year" -> budgetLimit * 12
         else -> budgetLimit
@@ -76,7 +75,7 @@ fun ExpenseSummaryCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .bounceClick { onExpenseCardClick() }, // 🚀 FIX: Card now consumes its own click so inner clicks don't bounce the whole card
+            .bounceClick(), // 🚀 FIX: Card will only bounce visually, it will NOT open history anymore
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = RoundedCornerShape(20.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp) 
@@ -163,7 +162,7 @@ fun ExpenseSummaryCard(
                         .size(28.dp) 
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .bounceClick { onRefreshExpenses() }, // 🚀 FIX: Independent bounce
+                        .bounceClick { onRefreshExpenses() }, 
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -221,7 +220,7 @@ fun ExpenseSummaryCard(
                 Box(
                     modifier = Modifier
                         .height(34.dp)
-                        .bounceClick { onExpenseCardClick() } // 🚀 FIX: Independent bounce
+                        .bounceClick { onExpenseCardClick() } // 🚀 FIX: Only tapping THIS button will open History
                         .clip(RoundedCornerShape(50))
                         .background(MaterialTheme.colorScheme.primary),
                     contentAlignment = Alignment.Center
