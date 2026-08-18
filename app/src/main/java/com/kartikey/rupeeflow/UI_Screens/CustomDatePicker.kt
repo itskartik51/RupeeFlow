@@ -59,10 +59,23 @@ fun CustomDatePicker(
         }
     }
 
+    // 🚀 FIX: Convert Local Time to UTC Time so DatePicker doesn't jump 1 day back
+    val adjustedInitialMillis = remember(selectedDateMillis) {
+        selectedDateMillis?.let {
+            val tz = TimeZone.getDefault()
+            it + tz.getOffset(it) // Adding timezone offset (e.g., +5:30 for IST)
+        }
+    }
+
     val datePickerState = rememberDatePickerState(
-        initialSelectedDateMillis = selectedDateMillis,
+        initialSelectedDateMillis = adjustedInitialMillis,
         selectableDates = selectableDates
     )
+
+    // Ensures state updates correctly if date is changed from outside
+    LaunchedEffect(adjustedInitialMillis) {
+        datePickerState.selectedDateMillis = adjustedInitialMillis
+    }
 
     val displayDate = if (selectedDateMillis != null) {
         SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(selectedDateMillis))
@@ -96,7 +109,12 @@ fun CustomDatePicker(
             onDismissRequest = { showDialog = false },
             confirmButton = {
                 TextButton(onClick = {
-                    datePickerState.selectedDateMillis?.let { onDateSelected(it) }
+                    datePickerState.selectedDateMillis?.let { utcMillis ->
+                        // 🚀 FIX: Convert UTC Time back to Local Time before returning it to App
+                        val tz = TimeZone.getDefault()
+                        val localMillis = utcMillis - tz.getOffset(utcMillis)
+                        onDateSelected(localMillis)
+                    }
                     showDialog = false
                 }) {
                     Text("OK", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
