@@ -66,7 +66,7 @@ fun AddScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(bottom = 90.dp), 
+                .padding(bottom = 75.dp), // Menu slightly lowered to align with new button height
             contentAlignment = Alignment.BottomCenter
         ) {
             AnimatedVisibility(
@@ -117,8 +117,8 @@ fun AddScreen(
         Box(
             modifier = Modifier
                 .windowInsetsPadding(WindowInsets.navigationBars)
-                .padding(bottom = 16.dp)
-                .size(48.dp)
+                .padding(bottom = 11.dp) // Perfect vertical center for 65.dp height bottom bar ( (65-42)/2 = ~11.5 )
+                .size(42.dp) // Sleek reduced size
                 .bounceClick { onToggleMenu() }
                 .clip(RoundedCornerShape(14.dp))
                 .background(MaterialTheme.colorScheme.primary),
