@@ -157,7 +157,7 @@ fun SpendingTrackerCard(
                 Column(
                     modifier = Modifier
                         .height(80.dp)
-                        .padding(end = 36.dp), // 🚀 FIX: Padding ensures lines stop exactly before the numbers start
+                        .padding(end = 36.dp), // Padding ensures lines stop exactly before the numbers start
                     verticalArrangement = Arrangement.SpaceBetween
                 ) {
                     HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
@@ -171,9 +171,9 @@ fun SpendingTrackerCard(
                     verticalArrangement = Arrangement.SpaceBetween,
                     horizontalAlignment = Alignment.End
                 ) {
-                    Text(text = formatYAxis(topValue), fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.offset(y = (-6).dp)) // Top aligned with line
-                    Text(text = formatYAxis(midValue), fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.offset(y = 0.dp)) // Mid perfectly centered
-                    Text(text = "0", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.offset(y = 6.dp)) // 🚀 FIX: Bottom '0' aligned with bottom line
+                    Text(text = formatYAxis(topValue), fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.offset(y = (-6).dp)) 
+                    Text(text = formatYAxis(midValue), fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.offset(y = 0.dp)) 
+                    Text(text = "0", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.offset(y = 6.dp)) 
                 }
                 
                 // 3. Graph Bars & X-Axis Texts (Sun-Sat)
@@ -203,7 +203,17 @@ fun SpendingTrackerCard(
                                     )
                                 }
                             }
-                            Spacer(modifier = Modifier.height(8.dp))
+                            
+                            // 🚀 FIX: Small tick line connecting the bottom line to the day label (Authentic Graph look)
+                            Box(
+                                modifier = Modifier
+                                    .width(1.dp)
+                                    .height(4.dp)
+                                    .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f))
+                            )
+                            
+                            Spacer(modifier = Modifier.height(4.dp))
+                            
                             // Day Component
                             Text(
                                 text = dayLabels[i],
