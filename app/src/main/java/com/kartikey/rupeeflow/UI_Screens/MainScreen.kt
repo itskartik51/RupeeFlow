@@ -178,8 +178,8 @@ fun MainScreen(
             containerColor = MaterialTheme.colorScheme.background,
             bottomBar = {
                 NavigationBar(
-                    modifier = Modifier.height(65.dp), // 🚀 FIX: Instagram-style compact height
-                    containerColor = MaterialTheme.colorScheme.surface, 
+                    modifier = Modifier.height(65.dp),
+                    containerColor = MaterialTheme.colorScheme.background, // Match background to merge seamlessly
                     tonalElevation = 0.dp
                 ) {
                     val isHomeSelected = selectedTab == 0 && !showExpenseHistory && !showContriScreen
@@ -190,12 +190,13 @@ fun MainScreen(
                         icon = { 
                             Icon(
                                 imageVector = if (isHomeSelected) Icons.Filled.Home else Icons.Outlined.Home, 
-                                contentDescription = "Home"
+                                contentDescription = "Home",
+                                modifier = Modifier.size(28.dp) // Increased size
                             ) 
                         }, 
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = MaterialTheme.colorScheme.onSurface, 
-                            indicatorColor = Color.Transparent, // 🚀 FIX: Removed green pill background
+                            indicatorColor = Color.Transparent, 
                             unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     )
@@ -208,7 +209,8 @@ fun MainScreen(
                         icon = { 
                             Icon(
                                 imageVector = if (isAssetsSelected) Icons.Filled.AccountBalanceWallet else Icons.Outlined.AccountBalanceWallet, 
-                                contentDescription = "Assets"
+                                contentDescription = "Assets",
+                                modifier = Modifier.size(28.dp) // Increased size
                             ) 
                         }, 
                         colors = NavigationBarItemDefaults.colors(
@@ -222,7 +224,7 @@ fun MainScreen(
                         modifier = Modifier.bounceClick(),
                         selected = false, 
                         onClick = { showAddMenu = !showAddMenu }, 
-                        icon = { Spacer(modifier = Modifier.size(38.dp)) }, // 🚀 FIX: Reduced size for proportion
+                        icon = { Spacer(modifier = Modifier.size(42.dp)) }, // Sized to match AddScreen button
                         colors = NavigationBarItemDefaults.colors(
                             indicatorColor = Color.Transparent
                         )
@@ -236,7 +238,8 @@ fun MainScreen(
                         icon = { 
                             Icon(
                                 imageVector = if (isAnalyticsSelected) Icons.Filled.PieChart else Icons.Outlined.PieChart, 
-                                contentDescription = "Analytics"
+                                contentDescription = "Analytics",
+                                modifier = Modifier.size(28.dp) // Increased size
                             ) 
                         }, 
                         colors = NavigationBarItemDefaults.colors(
@@ -255,7 +258,8 @@ fun MainScreen(
                             Box {
                                 Icon(
                                     imageVector = if (isProfileSelected) Icons.Filled.Person else Icons.Outlined.Person, 
-                                    contentDescription = "Profile"
+                                    contentDescription = "Profile",
+                                    modifier = Modifier.size(28.dp) // Increased size
                                 )
                                 if (isUpdateAvailable) {
                                     Box(
