@@ -1,6 +1,6 @@
 {
-  "latest_version_code": 9,
-  "latest_version_name": "v1.00.009",
+  "latest_version_code": 10,
+  "latest_version_name": "v1.00.010",
   "release_notes": "Automated update deployment via GitHub Actions.",
   "apk_url": "https://raw.githubusercontent.com/itskartik51/RupeeFlow/main/Updates/RupeeFlow_Update.apk"
 }
