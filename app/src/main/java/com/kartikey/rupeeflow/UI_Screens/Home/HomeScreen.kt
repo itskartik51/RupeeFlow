@@ -32,7 +32,7 @@ import androidx.compose.ui.window.DialogProperties
 import com.google.firebase.firestore.FirebaseFirestore
 import com.kartikey.rupeeflow.R
 import com.kartikey.rupeeflow.UI_Screens.bounceClick 
-import com.kartikey.rupeeflow.UI_Screens.Profile.ProfileAvatar // 🚀 NEW: Import Profile Avatar
+import com.kartikey.rupeeflow.UI_Screens.Profile.ProfileAvatar 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
@@ -44,8 +44,9 @@ import java.util.Locale
 fun HomeDashboardDesign(
     username: String, 
     userFullName: String, 
-    profilePicUrl: String, // 🚀 NEW
+    profilePicUrl: String, 
     paddingValues: PaddingValues, 
+    todayExpenses: Double, // 🚀 NEW: Passed Today's expenses
     thisMonthExpenses: Double, 
     thisYearExpenses: Double, 
     budgetLimit: Double,
@@ -110,7 +111,6 @@ fun HomeDashboardDesign(
                     Text("Hi, $username", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
                 }
                 
-                // 🚀 NEW: Replaced basic letter with Smart Universal Avatar
                 ProfileAvatar(
                     name = userFullName.ifBlank { username },
                     profilePicUrl = profilePicUrl,
@@ -130,6 +130,7 @@ fun HomeDashboardDesign(
             Spacer(modifier = Modifier.height(12.dp))
             
             ExpenseSummaryCard(
+                todayExpenses = todayExpenses, // 🚀 NEW: Passed to child
                 thisMonthExpenses = thisMonthExpenses, 
                 thisYearExpenses = thisYearExpenses, 
                 budgetLimit = budgetLimit,
@@ -194,13 +195,7 @@ fun HomeDashboardDesign(
             
             ReminderBanner()
             
-            Spacer(modifier = Modifier.height(24.dp))
-            
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text("Recent Transactions", fontWeight = FontWeight.ExtraBold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface)
-                TextButton(onClick = onLogout) { Text("Logout", color = MaterialTheme.colorScheme.error) }
-            }
-            Spacer(modifier = Modifier.height(60.dp)) 
+            Spacer(modifier = Modifier.height(30.dp)) // 🚀 FIX: Removed Recent Transactions and Logout entirely
         }
     }
 
@@ -314,7 +309,6 @@ fun BudgetDialog(
                                         if (!userQuery.isEmpty) {
                                             val userRef = userQuery.documents[0].reference
                                             
-                                            // 1. Single Clean Update in root document
                                             userRef.update("budget_limit", limitVal).await()
                                             
                                             withContext(Dispatchers.Main) {
