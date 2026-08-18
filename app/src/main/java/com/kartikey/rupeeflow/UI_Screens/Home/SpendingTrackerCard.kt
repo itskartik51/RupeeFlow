@@ -10,9 +10,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kartikey.rupeeflow.UI_Screens.Add.TransactionModel
@@ -33,7 +31,7 @@ fun formatYAxis(value: Double): String {
 }
 
 fun getRoundedTop(maxVal: Double): Double {
-    if (maxVal <= 0) return 1000.0 // 🚀 Fallback scale if expenses are ₹0
+    if (maxVal <= 0) return 1000.0 // Fallback scale if expenses are ₹0
     val magnitude = 10.0.pow(floor(log10(maxVal)))
     val normalized = maxVal / magnitude
     val roundedNormal = when {
@@ -111,7 +109,7 @@ fun SpendingTrackerCard(
         }
     }
     
-    // 🚀 Edge Cases Logic (Opacity & Boundaries)
+    // Edge Cases Logic (Opacity & Boundaries)
     val canGoBack = weekOffset > -4 && (startOfWeekMillis > oldestMillis)
     val canGoForward = weekOffset < 0
     
@@ -128,19 +126,8 @@ fun SpendingTrackerCard(
         modifier = modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            // Analytics Header
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(text = "Spending Tracker", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface)
-                Text(text = "VIEW ANALYTICS", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-            }
             
-            Spacer(modifier = Modifier.height(20.dp))
-            
-            // 🚀 Middle Minimalist Header (Total & Dates)
+            // 🚀 Minimalist Header (Total & Dates in a SINGLE ROW)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -150,9 +137,10 @@ fun SpendingTrackerCard(
                     Icon(Icons.Default.ChevronLeft, contentDescription = "Back", tint = MaterialTheme.colorScheme.onSurface.copy(alpha = if (canGoBack) 1f else 0.3f))
                 }
                 
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(text = totalStr, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface)
-                    Text(text = dateRangeStr, fontWeight = FontWeight.Medium, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(text = totalStr, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurface)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(text = dateRangeStr, fontWeight = FontWeight.Medium, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 
                 IconButton(onClick = { if (canGoForward) weekOffset++ }, enabled = canGoForward, modifier = Modifier.size(32.dp)) {
@@ -160,21 +148,21 @@ fun SpendingTrackerCard(
                 }
             }
             
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(16.dp))
             
-            // 🚀 Master Component: Graph Lines + Bars + Y/X Axis combined precisely
+            // Master Component: Graph Lines + Bars + Y/X Axis combined precisely
             Box(modifier = Modifier.fillMaxWidth()) {
                 
-                // 1. Subtle Background Grid Lines
-                Column(modifier = Modifier.height(100.dp), verticalArrangement = Arrangement.SpaceBetween) {
+                // 1. Subtle Background Grid Lines (Height adjusted to 80.dp)
+                Column(modifier = Modifier.height(80.dp), verticalArrangement = Arrangement.SpaceBetween) {
                     HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
                     HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
                     HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
                 }
                 
-                // 2. Y-Axis Numbers (Right aligned)
+                // 2. Y-Axis Numbers (Right aligned, Height 80.dp)
                 Column(
-                    modifier = Modifier.height(100.dp).align(Alignment.TopEnd),
+                    modifier = Modifier.height(80.dp).align(Alignment.TopEnd),
                     verticalArrangement = Arrangement.SpaceBetween,
                     horizontalAlignment = Alignment.End
                 ) {
@@ -196,9 +184,9 @@ fun SpendingTrackerCard(
                         val textOpacity = if (isToday) 1f else 0.5f
                         
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            // Bar Component
+                            // Bar Component (Height adjusted to 80.dp)
                             Box(
-                                modifier = Modifier.height(100.dp),
+                                modifier = Modifier.height(80.dp),
                                 contentAlignment = Alignment.BottomCenter
                             ) {
                                 if (ratio > 0f) {
@@ -222,7 +210,7 @@ fun SpendingTrackerCard(
                     }
                 }
             }
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(4.dp))
         }
     }
 }
