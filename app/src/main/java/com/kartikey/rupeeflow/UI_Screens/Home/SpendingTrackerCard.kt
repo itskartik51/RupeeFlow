@@ -20,10 +20,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Fill
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
@@ -138,7 +136,6 @@ fun SpendingTrackerCard(
     val calendar = Calendar.getInstance().apply { firstDayOfWeek = Calendar.SUNDAY }
     val currentDayOfWeek = calendar.get(Calendar.DAY_OF_WEEK) 
     
-    // Calculate Smart Bounds (Up to 5 weeks max)
     val maxAvailableWeeks = remember(transactions) {
         var oldestMillis = Long.MAX_VALUE
         transactions.forEach { tx ->
@@ -167,7 +164,6 @@ fun SpendingTrackerCard(
         pageCount = { maxAvailableWeeks }
     )
     
-    // 🚀 FIX 1: Ensure it immediately jumps to the Current Week when data loads
     LaunchedEffect(maxAvailableWeeks) {
         if (maxAvailableWeeks > 0) {
             pagerState.scrollToPage(maxAvailableWeeks - 1)
@@ -253,7 +249,6 @@ fun SpendingTrackerCard(
                     Text(text = "0", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.offset(y = 6.dp)) 
                 }
                 
-                // 🚀 FIX 2: HorizontalPager now works seamlessly because blocking manual gestures are removed
                 HorizontalPager(
                     state = pagerState,
                     modifier = Modifier
@@ -286,7 +281,7 @@ fun SpendingTrackerCard(
                                     while (event.changes.any { it.pressed }) {
                                         val change = event.changes.first()
                                         if (sectionWidth > 0) touchedBarIndex = (change.position.x / sectionWidth).toInt().coerceIn(0, 6)
-                                        change.consume() // Consume only during scrub, keeps native swipe free
+                                        change.consume()
                                         event = awaitPointerEvent()
                                     }
                                     isScrubbing = false
@@ -348,17 +343,17 @@ fun SpendingTrackerCard(
                                     if (isTouched) {
                                         Canvas(modifier = Modifier.fillMaxSize()) {
                                             val barTopY = size.height * (1f - animatedRatio)
+                                            val whiteDottedColor = dynamicTooltipBg.copy(alpha = 0.6f) // 🚀 White dotted line logic
                                             
-                                            // Dotted Line now draws from absolute top (0f) to bottom
+                                            // 🚀 Line directly connects top of the graph (where capsule is) to the dot
                                             drawLine(
-                                                color = primaryColor,
+                                                color = whiteDottedColor,
                                                 start = Offset(size.width / 2f, 0f), 
-                                                end = Offset(size.width / 2f, size.height),
+                                                end = Offset(size.width / 2f, barTopY),
                                                 strokeWidth = 1.5.dp.toPx(),
                                                 pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 10f), 0f) 
                                             )
                                             
-                                            // Halo and Dot
                                             drawCircle(
                                                 color = primaryColor.copy(alpha = 0.3f),
                                                 radius = 10.dp.toPx(),
@@ -395,13 +390,13 @@ fun SpendingTrackerCard(
                         }
                     }
                 }
-                
-                // 🚀 FIX 3: MASTER OVERLAY TOOLTIP
-                // Positioned outside the row so it stays perfectly horizontal at the top
+
+                // 🚀 FIX: PERFECTLY ALIGNED MASTER OVERLAY (NO JUMPING, NO TAIL)
                 if (isScrubbing && touchedBarIndex in 0..6) {
                     val density = LocalDensity.current
-                    val sectionWidthDp = with(density) { (rowWidthPx / 7f).toDp() }
-                    val centerXDp = sectionWidthDp * touchedBarIndex + (sectionWidthDp / 2)
+                    val sectionWidthPx = rowWidthPx / 7f
+                    val centerXPx = (touchedBarIndex * sectionWidthPx) + (sectionWidthPx / 2f)
+                    val centerXDp = with(density) { centerXPx.toDp() }
                     
                     val primaryColor = MaterialTheme.colorScheme.primary
                     val dynamicTooltipBg = MaterialTheme.colorScheme.onSurface 
@@ -418,46 +413,32 @@ fun SpendingTrackerCard(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(end = 36.dp)
+                            .padding(end = 36.dp) // Exact padding match as Pager, ensures coordinates sync
                     ) {
                         Box(
                             modifier = Modifier
-                                .offset(x = centerXDp, y = (-24).dp)
+                                .offset(x = centerXDp, y = (-12).dp) // Exactly on top of the graph line
+                                .width(0.dp) // Zero width acts as a perfect mathematical anchor
                                 .wrapContentSize(unbounded = true)
                                 .zIndex(100f),
-                            contentAlignment = Alignment.BottomCenter
+                            contentAlignment = Alignment.Center // Centers the row precisely on the anchor
                         ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                
-                                // Shift capsule horizontally at edges, keep tail centered
-                                val capsuleShift = when (touchedBarIndex) {
-                                    0 -> 28.dp 
-                                    6 -> (-28).dp
-                                    else -> 0.dp
-                                }
-                                
-                                Row(
-                                    modifier = Modifier
-                                        .offset(x = capsuleShift) 
-                                        .background(dynamicTooltipBg, RoundedCornerShape(8.dp))
-                                        .padding(horizontal = 12.dp, vertical = 6.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(text = amtStr, color = dullGreenText, fontWeight = FontWeight.ExtraBold, fontSize = 13.sp)
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(text = "on $dateStr", color = dynamicTooltipText, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                                }
-                                
-                                // Triangle Tail exactly on the dotted line
-                                Canvas(modifier = Modifier.size(width = 12.dp, height = 6.dp)) {
-                                    val path = Path().apply {
-                                        moveTo(0f, 0f)
-                                        lineTo(size.width, 0f)
-                                        lineTo(size.width / 2f, size.height)
-                                        close()
-                                    }
-                                    drawPath(path, color = dynamicTooltipBg)
-                                }
+                            val capsuleShift = when (touchedBarIndex) {
+                                0 -> 28.dp 
+                                6 -> (-28).dp
+                                else -> 0.dp
+                            }
+                            
+                            Row(
+                                modifier = Modifier
+                                    .offset(x = capsuleShift) 
+                                    .background(dynamicTooltipBg, RoundedCornerShape(8.dp))
+                                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(text = amtStr, color = dullGreenText, fontWeight = FontWeight.ExtraBold, fontSize = 13.sp)
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(text = "on $dateStr", color = dynamicTooltipText, fontSize = 13.sp, fontWeight = FontWeight.Medium)
                             }
                         }
                     }
