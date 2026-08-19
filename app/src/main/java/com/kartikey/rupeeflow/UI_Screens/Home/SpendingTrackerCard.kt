@@ -139,7 +139,7 @@ fun SpendingTrackerCard(
     val formatRupee = java.text.NumberFormat.getCurrencyInstance(Locale("en", "IN")).apply { maximumFractionDigits = 0 }
     val totalStr = formatRupee.format(weekTotal).replace("-₹", "-₹ ")
 
-    // 🚀 Interaction State Variables
+    // Interaction State Variables
     var touchedBarIndex by remember { mutableIntStateOf(-1) }
     var rowWidthPx by remember { mutableFloatStateOf(1f) }
 
@@ -210,7 +210,7 @@ fun SpendingTrackerCard(
                         .padding(end = 36.dp)
                         .onGloballyPositioned { rowWidthPx = it.size.width.toFloat() } // Track width for touch events
                         .pointerInput(Unit) {
-                            // 🚀 Smart Touch Event Engine (Slides over bars without breaking scroll)
+                            // Smart Touch Event Engine (Slides over bars without breaking scroll)
                             awaitPointerEventScope {
                                 while (true) {
                                     val event = awaitFirstDown(requireUnconsumed = false)
@@ -260,7 +260,7 @@ fun SpendingTrackerCard(
                         
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             
-                            // 🚀 Bar Component + Canvas Micro-Visuals + Tooltip Popup
+                            // Bar Component + Canvas Micro-Visuals + Tooltip Popup
                             Box(
                                 modifier = Modifier
                                     .height(80.dp)
@@ -292,7 +292,7 @@ fun SpendingTrackerCard(
                                             start = Offset(size.width / 2f, barTopY),
                                             end = Offset(size.width / 2f, size.height),
                                             strokeWidth = 1.5.dp.toPx(),
-                                            pathEffect = PathEffect.dashPath(floatArrayOf(12f, 10f), 0f)
+                                            pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 10f), 0f) // 🚀 FIX: Updated to dashPathEffect
                                         )
                                         
                                         // Hollow Dot
