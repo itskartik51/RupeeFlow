@@ -2,6 +2,7 @@ package com.kartikey.rupeeflow.UI_Screens.Home
 
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -191,7 +192,6 @@ fun SpendingTrackerCard(
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             
-            // Header with arrows
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -218,12 +218,10 @@ fun SpendingTrackerCard(
                 }
             }
             
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(36.dp))
             
-            // Master Component: Graph Engine
             Box(modifier = Modifier.fillMaxWidth()) {
                 
-                // Static Grid Lines
                 Column(
                     modifier = Modifier
                         .height(80.dp)
@@ -235,7 +233,6 @@ fun SpendingTrackerCard(
                     HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
                 }
                 
-                // Static Y-Axis
                 Column(
                     modifier = Modifier
                         .height(80.dp)
@@ -258,7 +255,6 @@ fun SpendingTrackerCard(
                         .pointerInput(Unit) {
                             awaitEachGesture {
                                 val down = awaitFirstDown(requireUnconsumed = false)
-                                
                                 val triggerScrub = withTimeoutOrNull(200L) {
                                     var isSwipe = false
                                     do {
@@ -294,151 +290,143 @@ fun SpendingTrackerCard(
                     val pageOffset = pageIndex - (maxAvailableWeeks - 1)
                     val pageData = remember(transactions, pageOffset) { getWeekData(transactions, pageOffset) }
                     
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.Bottom
-                    ) {
-                        val dayLabels = listOf("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
+                    Box(modifier = Modifier.fillMaxWidth()) {
                         
-                        for (i in 0..6) {
-                            val targetRatio = if (startAnimation) (pageData.dailyTotals[i] / pageData.topValue).toFloat().coerceIn(0f, 1f) else 0f
-                            val animatedRatio by animateFloatAsState(
-                                targetValue = targetRatio,
-                                animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing),
-                                label = "barHeightAnim_$i"
-                            )
+                        // --- LAYER 1: BARS & DOTTED LINES ---
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.Bottom
+                        ) {
+                            val dayLabels = listOf("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
                             
-                            val isToday = (pageOffset == 0 && (i + 1) == currentDayOfWeek)
-                            val isTouched = touchedBarIndex == i && isScrubbing && pagerState.currentPage == pageIndex
-                            val isAnyTouched = touchedBarIndex != -1 && isScrubbing && pagerState.currentPage == pageIndex
+                            for (i in 0..6) {
+                                val targetRatio = if (startAnimation) (pageData.dailyTotals[i] / pageData.topValue).toFloat().coerceIn(0f, 1f) else 0f
+                                val animatedRatio by animateFloatAsState(
+                                    targetValue = targetRatio,
+                                    animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing),
+                                    label = "barHeightAnim_$i"
+                                )
+                                
+                                val isToday = (pageOffset == 0 && (i + 1) == currentDayOfWeek)
+                                val isTouched = touchedBarIndex == i && isScrubbing && pagerState.currentPage == pageIndex
+                                val isAnyTouched = touchedBarIndex != -1 && isScrubbing && pagerState.currentPage == pageIndex
+                                
+                                val barAlpha = if (isAnyTouched && !isTouched) 0.3f else 1f
+                                val textOpacity = if (isAnyTouched && !isTouched) 0.3f else if (isToday || isTouched) 1f else 0.5f
+                                
+                                val primaryColor = MaterialTheme.colorScheme.primary
+                                val dynamicTooltipBg = MaterialTheme.colorScheme.onSurface 
+                                
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    
+                                    Box(
+                                        modifier = Modifier
+                                            .height(80.dp)
+                                            .width(20.dp),
+                                        contentAlignment = Alignment.BottomCenter
+                                    ) {
+                                        
+                                        if (animatedRatio > 0f) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .width(16.dp)
+                                                    .fillMaxHeight(animatedRatio)
+                                                    .background(
+                                                        color = primaryColor.copy(alpha = barAlpha),
+                                                        shape = RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp)
+                                                    )
+                                            )
+                                        }
+                                        
+                                        if (isTouched) {
+                                            Canvas(modifier = Modifier.fillMaxSize()) {
+                                                val barTopY = size.height * (1f - animatedRatio)
+                                                
+                                                // 🚀 FIX: Dotted Line Starts Exactly from the bottom of Capsule (-40.dp) down to the bottom
+                                                drawLine(
+                                                    color = dynamicTooltipBg.copy(alpha = 0.9f), // Strong White/Gray for contrast
+                                                    start = Offset(size.width / 2f, -40.dp.toPx()), 
+                                                    end = Offset(size.width / 2f, size.height),
+                                                    strokeWidth = 1.5.dp.toPx(),
+                                                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 10f), 0f) 
+                                                )
+                                                
+                                                drawCircle(
+                                                    color = primaryColor.copy(alpha = 0.3f),
+                                                    radius = 10.dp.toPx(),
+                                                    center = Offset(size.width / 2f, barTopY),
+                                                    style = Fill
+                                                )
+                                                
+                                                drawCircle(
+                                                    color = dynamicTooltipBg,
+                                                    radius = 4.dp.toPx(),
+                                                    center = Offset(size.width / 2f, barTopY),
+                                                    style = Fill
+                                                )
+                                            }
+                                        }
+                                    }
+                                    
+                                    Box(
+                                        modifier = Modifier
+                                            .width(1.dp)
+                                            .height(4.dp)
+                                            .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f))
+                                    )
+                                    
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    
+                                    Text(
+                                        text = dayLabels[i],
+                                        fontSize = 11.sp,
+                                        fontWeight = if (isToday || isTouched) FontWeight.ExtraBold else FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = textOpacity)
+                                    )
+                                }
+                            }
+                        }
+
+                        // --- LAYER 2: THE CLAMPED CAPSULE (TOOLTIP) OVERLAY ---
+                        if (isScrubbing && touchedBarIndex in 0..6 && pagerState.currentPage == pageIndex) {
+                            var tooltipWidthPx by remember { mutableFloatStateOf(0f) }
+                            val density = LocalDensity.current
                             
-                            val barAlpha = if (isAnyTouched && !isTouched) 0.3f else 1f
-                            val textOpacity = if (isAnyTouched && !isTouched) 0.3f else if (isToday || isTouched) 1f else 0.5f
+                            val sectionWidthPx = rowWidthPx / 7f
+                            val barCenterXPx = (sectionWidthPx * touchedBarIndex) + (sectionWidthPx / 2f)
+                            
+                            // Prevents moving out of left (0) or right edges
+                            val clampedXPx = (barCenterXPx - (tooltipWidthPx / 2f)).coerceIn(0f, maxOf(0f, rowWidthPx - tooltipWidthPx))
+                            val clampedXDp = with(density) { clampedXPx.toDp() }
                             
                             val primaryColor = MaterialTheme.colorScheme.primary
                             val dynamicTooltipBg = MaterialTheme.colorScheme.onSurface 
+                            val dynamicTooltipText = MaterialTheme.colorScheme.surface 
+                            val dullGreenText = primaryColor.copy(alpha = 0.8f)
                             
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                
-                                Box(
-                                    modifier = Modifier
-                                        .height(80.dp)
-                                        .width(20.dp),
-                                    contentAlignment = Alignment.BottomCenter
-                                ) {
-                                    
-                                    if (animatedRatio > 0f) {
-                                        Box(
-                                            modifier = Modifier
-                                                .width(16.dp)
-                                                .fillMaxHeight(animatedRatio)
-                                                .background(
-                                                    color = primaryColor.copy(alpha = barAlpha),
-                                                    shape = RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp)
-                                                )
-                                        )
-                                    }
-                                    
-                                    if (isTouched) {
-                                        Canvas(modifier = Modifier.fillMaxSize()) {
-                                            val barTopY = size.height * (1f - animatedRatio)
-                                            val whiteDottedColor = dynamicTooltipBg.copy(alpha = 0.6f) // 🚀 White dotted line logic
-                                            
-                                            // 🚀 Line directly connects top of the graph (where capsule is) to the dot
-                                            drawLine(
-                                                color = whiteDottedColor,
-                                                start = Offset(size.width / 2f, 0f), 
-                                                end = Offset(size.width / 2f, barTopY),
-                                                strokeWidth = 1.5.dp.toPx(),
-                                                pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 10f), 0f) 
-                                            )
-                                            
-                                            drawCircle(
-                                                color = primaryColor.copy(alpha = 0.3f),
-                                                radius = 10.dp.toPx(),
-                                                center = Offset(size.width / 2f, barTopY),
-                                                style = Fill
-                                            )
-                                            
-                                            drawCircle(
-                                                color = dynamicTooltipBg,
-                                                radius = 4.dp.toPx(),
-                                                center = Offset(size.width / 2f, barTopY),
-                                                style = Fill
-                                            )
-                                        }
-                                    }
-                                }
-                                
-                                Box(
-                                    modifier = Modifier
-                                        .width(1.dp)
-                                        .height(4.dp)
-                                        .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f))
-                                )
-                                
-                                Spacer(modifier = Modifier.height(4.dp))
-                                
-                                Text(
-                                    text = dayLabels[i],
-                                    fontSize = 11.sp,
-                                    fontWeight = if (isToday || isTouched) FontWeight.ExtraBold else FontWeight.Medium,
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = textOpacity)
-                                )
+                            val touchedDateCal = Calendar.getInstance().apply { 
+                                timeInMillis = pageData.startMillis
+                                add(Calendar.DAY_OF_YEAR, touchedBarIndex)
                             }
-                        }
-                    }
-                }
-
-                // 🚀 FIX: PERFECTLY ALIGNED MASTER OVERLAY (NO JUMPING, NO TAIL)
-                if (isScrubbing && touchedBarIndex in 0..6) {
-                    val density = LocalDensity.current
-                    val sectionWidthPx = rowWidthPx / 7f
-                    val centerXPx = (touchedBarIndex * sectionWidthPx) + (sectionWidthPx / 2f)
-                    val centerXDp = with(density) { centerXPx.toDp() }
-                    
-                    val primaryColor = MaterialTheme.colorScheme.primary
-                    val dynamicTooltipBg = MaterialTheme.colorScheme.onSurface 
-                    val dynamicTooltipText = MaterialTheme.colorScheme.surface 
-                    val dullGreenText = primaryColor.copy(alpha = 0.8f)
-                    
-                    val touchedDateCal = Calendar.getInstance().apply { 
-                        timeInMillis = headerData.startMillis
-                        add(Calendar.DAY_OF_YEAR, touchedBarIndex)
-                    }
-                    val dateStr = SimpleDateFormat("EEE d", Locale.getDefault()).format(touchedDateCal.time)
-                    val amtStr = formatRupee.format(headerData.dailyTotals[touchedBarIndex]).replace("-₹", "-₹ ")
-                    
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(end = 36.dp) // Exact padding match as Pager, ensures coordinates sync
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .offset(x = centerXDp, y = (-12).dp) // Exactly on top of the graph line
-                                .width(0.dp) // Zero width acts as a perfect mathematical anchor
-                                .wrapContentSize(unbounded = true)
-                                .zIndex(100f),
-                            contentAlignment = Alignment.Center // Centers the row precisely on the anchor
-                        ) {
-                            val capsuleShift = when (touchedBarIndex) {
-                                0 -> 28.dp 
-                                6 -> (-28).dp
-                                else -> 0.dp
-                            }
+                            val dateStr = SimpleDateFormat("EEE d", Locale.getDefault()).format(touchedDateCal.time)
+                            val amtStr = formatRupee.format(pageData.dailyTotals[touchedBarIndex]).replace("-₹", "-₹ ")
                             
-                            Row(
+                            // 🚀 FIX: Capsule is hard-offset to -40.dp (completely above the graph)
+                            // Tail removed, pure pill shape.
+                            Box(
                                 modifier = Modifier
-                                    .offset(x = capsuleShift) 
-                                    .background(dynamicTooltipBg, RoundedCornerShape(8.dp))
-                                    .padding(horizontal = 12.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                                    .offset(x = clampedXDp, y = (-40).dp)
+                                    .onGloballyPositioned { tooltipWidthPx = it.size.width.toFloat() }
+                                    .background(dynamicTooltipBg, RoundedCornerShape(50)) 
+                                    .padding(horizontal = 12.dp, vertical = 6.dp)
+                                    .zIndex(100f)
                             ) {
-                                Text(text = amtStr, color = dullGreenText, fontWeight = FontWeight.ExtraBold, fontSize = 13.sp)
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(text = "on $dateStr", color = dynamicTooltipText, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(text = amtStr, color = dullGreenText, fontWeight = FontWeight.ExtraBold, fontSize = 13.sp)
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(text = "on $dateStr", color = dynamicTooltipText, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                                }
                             }
                         }
                     }
