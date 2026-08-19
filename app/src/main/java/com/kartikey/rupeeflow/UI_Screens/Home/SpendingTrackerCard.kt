@@ -161,7 +161,8 @@ fun SpendingTrackerCard(
         pageCount = { maxAvailableWeeks }
     )
     
-    var triggerVerticalAnim by remember { mutableIntStateOf(1) }
+    // Counter to trigger vertical grow animation strictly on button clicks and initial load
+    var triggerVerticalAnim by remember { mutableIntStateOf(0) }
     
     LaunchedEffect(maxAvailableWeeks) {
         if (maxAvailableWeeks > 0) {
@@ -308,16 +309,17 @@ fun SpendingTrackerCard(
                     val pageOffset = pageIndex - (maxAvailableWeeks - 1)
                     val pageData = remember(transactions, pageOffset) { getWeekData(transactions, pageOffset) }
                     
-                    val barGrowth = remember(pageIndex) { Animatable(0f) }
-                    LaunchedEffect(triggerVerticalAnim, pagerState.currentPage) {
-                        if (pagerState.currentPage == pageIndex) {
+                    // Starts at 1f so swiped pages are fully visible with zero animation during swipe
+                    val barGrowth = remember(pageIndex) { Animatable(1f) }
+                    
+                    // Strictly triggers animation only when triggerVerticalAnim increments on button click / first load
+                    LaunchedEffect(triggerVerticalAnim) {
+                        if (triggerVerticalAnim > 0 && pagerState.currentPage == pageIndex) {
                             barGrowth.snapTo(0f)
                             barGrowth.animateTo(
                                 targetValue = 1f,
                                 animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing)
                             )
-                        } else {
-                            barGrowth.snapTo(1f)
                         }
                     }
                     
