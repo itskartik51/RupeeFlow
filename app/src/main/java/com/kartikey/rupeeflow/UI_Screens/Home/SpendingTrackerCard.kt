@@ -3,10 +3,12 @@ package com.kartikey.rupeeflow.UI_Screens.Home
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -129,6 +131,7 @@ fun SpendingTrackerCard(
     transactions: List<TransactionModel>,
     modifier: Modifier = Modifier
 ) {
+    val isDark = isSystemInDarkTheme()
     val coroutineScope = rememberCoroutineScope()
     val calendar = Calendar.getInstance().apply { firstDayOfWeek = Calendar.SUNDAY }
     val currentDayOfWeek = calendar.get(Calendar.DAY_OF_WEEK) 
@@ -161,7 +164,7 @@ fun SpendingTrackerCard(
         pageCount = { maxAvailableWeeks }
     )
     
-    // Counter to trigger vertical grow animation strictly on button clicks and initial load
+    // Counter strictly triggers vertical grow animation on button clicks and initial load
     var triggerVerticalAnim by remember { mutableIntStateOf(0) }
     
     LaunchedEffect(maxAvailableWeeks) {
@@ -309,7 +312,7 @@ fun SpendingTrackerCard(
                     val pageOffset = pageIndex - (maxAvailableWeeks - 1)
                     val pageData = remember(transactions, pageOffset) { getWeekData(transactions, pageOffset) }
                     
-                    // Starts at 1f so swiped pages are fully visible with zero animation during swipe
+                    // Starts at 1f so swiped pages remain fully visible with zero animation during swipe
                     val barGrowth = remember(pageIndex) { Animatable(1f) }
                     
                     // Strictly triggers animation only when triggerVerticalAnim increments on button click / first load
@@ -387,13 +390,18 @@ fun SpendingTrackerCard(
                     }
                 }
 
-                // Master Overlay Layer
+                // Master Overlay Layer (Theme-Adaptive Elevated Capsule)
                 if (isScrubbing && touchedBarIndex in 0..6) {
                     val density = LocalDensity.current
                     val primaryColor = MaterialTheme.colorScheme.primary
-                    val dynamicTooltipBg = MaterialTheme.colorScheme.onSurface 
-                    val dynamicTooltipText = MaterialTheme.colorScheme.surface 
-                    val dullGreenText = primaryColor.copy(alpha = 0.8f)
+                    
+                    // High-contrast theme-adaptive color tokens
+                    val pillBg = if (isDark) Color(0xFF262626) else Color(0xFFFFFFFF)
+                    val pillBorder = if (isDark) Color(0xFF404040) else Color(0xFFE5E7EB)
+                    val amtTextColor = if (isDark) Color(0xFF4ADE80) else Color(0xFF047857) // Bright Mint in Dark / Deep Emerald in Light
+                    val dateTextColor = if (isDark) Color(0xFFE5E7EB) else Color(0xFF4B5563)
+                    val lineColor = if (isDark) Color.White.copy(alpha = 0.65f) else Color.Black.copy(alpha = 0.5f)
+                    val dotColor = if (isDark) Color.White else Color(0xFF1E293B)
                     
                     val sectionWidthPx = rowWidthPx / 7f
                     val centerXPx = (sectionWidthPx * touchedBarIndex) + (sectionWidthPx / 2f)
@@ -409,7 +417,7 @@ fun SpendingTrackerCard(
                         val barTopY = size.height * (1f - ratio)
                         
                         drawLine(
-                            color = dynamicTooltipBg.copy(alpha = 0.9f),
+                            color = lineColor,
                             start = Offset(centerXPx, -16.dp.toPx()), 
                             end = Offset(centerXPx, barTopY),
                             strokeWidth = 1.5.dp.toPx(),
@@ -417,14 +425,14 @@ fun SpendingTrackerCard(
                         )
                         
                         drawCircle(
-                            color = primaryColor.copy(alpha = 0.3f),
+                            color = primaryColor.copy(alpha = if (isDark) 0.35f else 0.25f),
                             radius = 10.dp.toPx(),
                             center = Offset(centerXPx, barTopY),
                             style = Fill
                         )
                         
                         drawCircle(
-                            color = dynamicTooltipBg,
+                            color = dotColor,
                             radius = 4.dp.toPx(),
                             center = Offset(centerXPx, barTopY),
                             style = Fill
@@ -447,17 +455,32 @@ fun SpendingTrackerCard(
                             .fillMaxWidth()
                             .zIndex(100f)
                     ) {
-                        Box(
+                        Surface(
+                            shape = RoundedCornerShape(50),
+                            color = pillBg,
+                            shadowElevation = if (isDark) 2.dp else 4.dp,
+                            border = BorderStroke(1.dp, pillBorder),
                             modifier = Modifier
                                 .offset(x = clampedXDp, y = (-42).dp)
                                 .onGloballyPositioned { tooltipWidthPx = it.size.width.toFloat() }
-                                .background(dynamicTooltipBg, RoundedCornerShape(50))
-                                .padding(horizontal = 12.dp, vertical = 6.dp)
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(text = amtStr, color = dullGreenText, fontWeight = FontWeight.ExtraBold, fontSize = 13.sp)
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = amtStr, 
+                                    color = amtTextColor, 
+                                    fontWeight = FontWeight.ExtraBold, 
+                                    fontSize = 13.sp
+                                )
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Text(text = "on $dateStr", color = dynamicTooltipText, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                                Text(
+                                    text = "on $dateStr", 
+                                    color = dateTextColor, 
+                                    fontSize = 13.sp, 
+                                    fontWeight = FontWeight.Medium
+                                )
                             }
                         }
                     }
