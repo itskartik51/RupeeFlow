@@ -1,6 +1,9 @@
 package com.kartikey.rupeeflow.UI_Screens.Home
 
-import androidx.compose.animation.core.*
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -14,7 +17,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -60,17 +62,6 @@ fun ExpenseSummaryCard(
         targetValue = if (isLoaded) progressRatio else 0f,
         animationSpec = tween(durationMillis = 750, easing = FastOutSlowInEasing),
         label = "budgetLineAnimation"
-    )
-
-    val infiniteTransition = rememberInfiniteTransition(label = "refreshAnim")
-    val angle by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "spinAnim"
     )
 
     fun formatNumber(amount: Double): String {
@@ -165,17 +156,29 @@ fun ExpenseSummaryCard(
                         .size(28.dp) 
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .bounceClick { onRefreshExpenses() }, 
+                        .bounceClick { if (!isLoadingExpenses) onRefreshExpenses() }, 
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Refresh, 
-                        contentDescription = "Refresh", 
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier
-                            .size(18.dp) 
-                            .rotate(if (isLoadingExpenses) angle else 0f)
-                    )
+                    Crossfade(
+                        targetState = isLoadingExpenses,
+                        animationSpec = tween(durationMillis = 250),
+                        label = "refreshCrossfade"
+                    ) { loading ->
+                        if (loading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(14.dp),
+                                strokeWidth = 1.5.dp,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Outlined.Refresh, 
+                                contentDescription = "Refresh", 
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
                 }
             }
             
