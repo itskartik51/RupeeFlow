@@ -1,11 +1,14 @@
 package com.kartikey.rupeeflow.UI_Screens.Home
 
+import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -76,7 +79,10 @@ fun SpendingTrackerCard(
 ) {
     var weekOffset by remember { mutableIntStateOf(0) }
     
+    // UI states
     var startAnimation by remember { mutableStateOf(false) }
+    var hasUserSwipedWeek by remember { mutableStateOf(false) } // To disable animation on swipe/click
+    
     LaunchedEffect(Unit) {
         startAnimation = true
     }
@@ -137,6 +143,7 @@ fun SpendingTrackerCard(
 
     var touchedBarIndex by remember { mutableIntStateOf(-1) }
     var rowWidthPx by remember { mutableFloatStateOf(1f) }
+    var isScrubbing by remember { mutableStateOf(false) }
 
     Card(
         shape = RoundedCornerShape(16.dp),
@@ -146,12 +153,21 @@ fun SpendingTrackerCard(
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             
+            // Header with arrows
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = { if (canGoBack) weekOffset-- }, enabled = canGoBack, modifier = Modifier.size(32.dp)) {
+                IconButton(
+                    onClick = { 
+                        if (canGoBack) {
+                            hasUserSwipedWeek = true
+                            weekOffset--
+                        } 
+                    }, 
+                    enabled = canGoBack, modifier = Modifier.size(32.dp)
+                ) {
                     Icon(Icons.Default.ChevronLeft, contentDescription = "Back", tint = MaterialTheme.colorScheme.onSurface.copy(alpha = if (canGoBack) 1f else 0.3f))
                 }
                 
@@ -161,13 +177,22 @@ fun SpendingTrackerCard(
                     Text(text = dateRangeStr, fontWeight = FontWeight.Medium, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 
-                IconButton(onClick = { if (canGoForward) weekOffset++ }, enabled = canGoForward, modifier = Modifier.size(32.dp)) {
+                IconButton(
+                    onClick = { 
+                        if (canGoForward) {
+                            hasUserSwipedWeek = true
+                            weekOffset++ 
+                        }
+                    }, 
+                    enabled = canGoForward, modifier = Modifier.size(32.dp)
+                ) {
                     Icon(Icons.Default.ChevronRight, contentDescription = "Next", tint = MaterialTheme.colorScheme.onSurface.copy(alpha = if (canGoForward) 1f else 0.3f))
                 }
             }
             
             Spacer(modifier = Modifier.height(16.dp))
             
+            // Master Component: Graph Engine
             Box(modifier = Modifier.fillMaxWidth()) {
                 
                 Column(
@@ -199,38 +224,66 @@ fun SpendingTrackerCard(
                         .fillMaxWidth()
                         .padding(end = 36.dp)
                         .onGloballyPositioned { rowWidthPx = it.size.width.toFloat() }
+                        // 1. Scrub (Hold & Drag) Gesture
                         .pointerInput(Unit) {
-                            awaitPointerEventScope {
-                                while (true) {
-                                    val event = awaitFirstDown(requireUnconsumed = false)
+                            detectDragGesturesAfterLongPress(
+                                onDragStart = { offset ->
+                                    isScrubbing = true
                                     val sectionWidth = rowWidthPx / 7f
-                                    if (sectionWidth > 0) {
-                                        touchedBarIndex = (event.position.x / sectionWidth).toInt().coerceIn(0, 6)
+                                    if (sectionWidth > 0) touchedBarIndex = (offset.x / sectionWidth).toInt().coerceIn(0, 6)
+                                },
+                                onDrag = { change, _ ->
+                                    if (isScrubbing) {
+                                        val sectionWidth = rowWidthPx / 7f
+                                        if (sectionWidth > 0) touchedBarIndex = (change.position.x / sectionWidth).toInt().coerceIn(0, 6)
                                     }
-                                    
-                                    do {
-                                        val nextEvent = awaitPointerEvent()
-                                        nextEvent.changes.firstOrNull()?.let { change ->
-                                            if (change.pressed && sectionWidth > 0) {
-                                                touchedBarIndex = (change.position.x / sectionWidth).toInt().coerceIn(0, 6)
-                                            }
-                                        }
-                                    } while (nextEvent.changes.any { it.pressed })
-                                    
+                                },
+                                onDragEnd = {
+                                    isScrubbing = false
+                                    touchedBarIndex = -1
+                                },
+                                onDragCancel = {
+                                    isScrubbing = false
                                     touchedBarIndex = -1
                                 }
-                            }
+                            )
+                        }
+                        // 2. Swipe (Quick Pan) Gesture for Week Change
+                        .pointerInput(Unit) {
+                            var dragAmountX = 0f
+                            detectHorizontalDragGestures(
+                                onDragStart = { dragAmountX = 0f },
+                                onHorizontalDrag = { _, dragAmountChange ->
+                                    if (!isScrubbing) {
+                                        dragAmountX += dragAmountChange
+                                    }
+                                },
+                                onDragEnd = {
+                                    if (!isScrubbing) {
+                                        if (dragAmountX > 40f && canGoBack) {
+                                            hasUserSwipedWeek = true
+                                            weekOffset-- // Swipe Right -> Prev week
+                                        } else if (dragAmountX < -40f && canGoForward) {
+                                            hasUserSwipedWeek = true
+                                            weekOffset++ // Swipe Left -> Next week
+                                        }
+                                    }
+                                }
+                            )
                         },
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.Bottom
                 ) {
                     val dayLabels = listOf("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
                     
+                    // Decide animation spec: Animate on first load, snap instantly on week change
+                    val animSpec: AnimationSpec<Float> = if (hasUserSwipedWeek) snap() else tween(durationMillis = 500, easing = FastOutSlowInEasing)
+                    
                     for (i in 0..6) {
                         val targetRatio = if (startAnimation) (dailyTotals[i] / topValue).toFloat().coerceIn(0f, 1f) else 0f
                         val animatedRatio by animateFloatAsState(
                             targetValue = targetRatio,
-                            animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing),
+                            animationSpec = animSpec,
                             label = "barHeightAnim_$i"
                         )
                         
@@ -244,6 +297,7 @@ fun SpendingTrackerCard(
                         val primaryColor = MaterialTheme.colorScheme.primary
                         val dynamicTooltipBg = MaterialTheme.colorScheme.onSurface 
                         val dynamicTooltipText = MaterialTheme.colorScheme.surface 
+                        val dullGreenText = primaryColor.copy(alpha = 0.8f) // 🚀 Premium Dull Green color for popup amount
                         
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             
@@ -270,7 +324,7 @@ fun SpendingTrackerCard(
                                     Canvas(modifier = Modifier.fillMaxSize()) {
                                         val barTopY = size.height * (1f - animatedRatio)
                                         
-                                        // 🚀 EXACT COMPOSE API FIX: PathEffect.dashPathEffect
+                                        // Vertical Dotted Line
                                         drawLine(
                                             color = primaryColor,
                                             start = Offset(size.width / 2f, barTopY),
@@ -279,6 +333,7 @@ fun SpendingTrackerCard(
                                             pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 10f), 0f) 
                                         )
                                         
+                                        // Halo Effect
                                         drawCircle(
                                             color = primaryColor.copy(alpha = 0.3f),
                                             radius = 10.dp.toPx(),
@@ -286,6 +341,7 @@ fun SpendingTrackerCard(
                                             style = Fill
                                         )
                                         
+                                        // Solid Center Dot (adapts to theme)
                                         drawCircle(
                                             color = dynamicTooltipBg,
                                             radius = 4.dp.toPx(),
@@ -325,7 +381,7 @@ fun SpendingTrackerCard(
                                                     .padding(horizontal = 12.dp, vertical = 6.dp),
                                                 verticalAlignment = Alignment.CenterVertically
                                             ) {
-                                                Text(text = amtStr, color = primaryColor, fontWeight = FontWeight.ExtraBold, fontSize = 13.sp)
+                                                Text(text = amtStr, color = dullGreenText, fontWeight = FontWeight.ExtraBold, fontSize = 13.sp)
                                                 Spacer(modifier = Modifier.width(4.dp))
                                                 Text(text = "on $dateStr", color = dynamicTooltipText, fontSize = 13.sp, fontWeight = FontWeight.Medium)
                                             }
