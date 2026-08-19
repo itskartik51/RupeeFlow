@@ -18,9 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Fill
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.font.FontWeight
@@ -45,7 +43,7 @@ fun formatYAxis(value: Double): String {
 }
 
 fun getRoundedTop(maxVal: Double): Double {
-    if (maxVal <= 0) return 1000.0 // Fallback scale if expenses are ₹0
+    if (maxVal <= 0) return 1000.0 
     val magnitude = 10.0.pow(floor(log10(maxVal)))
     val normalized = maxVal / magnitude
     val roundedNormal = when {
@@ -76,13 +74,11 @@ fun SpendingTrackerCard(
 ) {
     var weekOffset by remember { mutableIntStateOf(0) }
     
-    // Start Animation trigger for first load
     var startAnimation by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         startAnimation = true
     }
     
-    // Date Calculations
     val calendar = Calendar.getInstance().apply { firstDayOfWeek = Calendar.SUNDAY }
     val currentDayOfWeek = calendar.get(Calendar.DAY_OF_WEEK) 
     
@@ -108,7 +104,6 @@ fun SpendingTrackerCard(
     
     val dateRangeStr = if (startMonthStr == endMonthStr) "$startDay–$endDay $startMonthStr" else "$startDay $startMonthStr – $endDay $endMonthStr"
     
-    // Transaction matching and logic
     var oldestMillis = Long.MAX_VALUE
     val dailyTotals = DoubleArray(7) { 0.0 }
     var weekTotal = 0.0
@@ -120,7 +115,7 @@ fun SpendingTrackerCard(
         
         if (txMillis in startOfWeekMillis..endOfWeekMillis) {
             val txCal = Calendar.getInstance().apply { timeInMillis = txMillis }
-            val dayIndex = txCal.get(Calendar.DAY_OF_WEEK) - 1 // Sun=0... Sat=6
+            val dayIndex = txCal.get(Calendar.DAY_OF_WEEK) - 1 
             if (dayIndex in 0..6) {
                 dailyTotals[dayIndex] += tx.amount
                 weekTotal += tx.amount
@@ -129,7 +124,6 @@ fun SpendingTrackerCard(
         }
     }
     
-    // Edge Cases Logic (Opacity & Boundaries)
     val canGoBack = weekOffset > -4 && (startOfWeekMillis > oldestMillis)
     val canGoForward = weekOffset < 0
     
@@ -139,7 +133,6 @@ fun SpendingTrackerCard(
     val formatRupee = java.text.NumberFormat.getCurrencyInstance(Locale("en", "IN")).apply { maximumFractionDigits = 0 }
     val totalStr = formatRupee.format(weekTotal).replace("-₹", "-₹ ")
 
-    // Interaction State Variables
     var touchedBarIndex by remember { mutableIntStateOf(-1) }
     var rowWidthPx by remember { mutableFloatStateOf(1f) }
 
@@ -151,7 +144,6 @@ fun SpendingTrackerCard(
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             
-            // Minimalist Header
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -174,10 +166,8 @@ fun SpendingTrackerCard(
             
             Spacer(modifier = Modifier.height(16.dp))
             
-            // Master Component: Graph
             Box(modifier = Modifier.fillMaxWidth()) {
                 
-                // Subtle Background Grid Lines
                 Column(
                     modifier = Modifier
                         .height(80.dp)
@@ -189,7 +179,6 @@ fun SpendingTrackerCard(
                     HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
                 }
                 
-                // Y-Axis Numbers
                 Column(
                     modifier = Modifier
                         .height(80.dp)
@@ -203,14 +192,12 @@ fun SpendingTrackerCard(
                     Text(text = "0", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.offset(y = 6.dp)) 
                 }
                 
-                // Graph Bars & X-Axis Texts (Sun-Sat)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(end = 36.dp)
-                        .onGloballyPositioned { rowWidthPx = it.size.width.toFloat() } // Track width for touch events
+                        .onGloballyPositioned { rowWidthPx = it.size.width.toFloat() }
                         .pointerInput(Unit) {
-                            // Smart Touch Event Engine (Slides over bars without breaking scroll)
                             awaitPointerEventScope {
                                 while (true) {
                                     val event = awaitFirstDown(requireUnconsumed = false)
@@ -228,7 +215,6 @@ fun SpendingTrackerCard(
                                         }
                                     } while (nextEvent.changes.any { it.pressed })
                                     
-                                    // Touch clear
                                     touchedBarIndex = -1
                                 }
                             }
@@ -250,25 +236,24 @@ fun SpendingTrackerCard(
                         val isTouched = touchedBarIndex == i
                         val isAnyTouched = touchedBarIndex != -1
                         
-                        // Opacity Logic
                         val barAlpha = if (isAnyTouched && !isTouched) 0.3f else 1f
                         val textOpacity = if (isAnyTouched && !isTouched) 0.3f else if (isToday || isTouched) 1f else 0.5f
                         
                         val primaryColor = MaterialTheme.colorScheme.primary
-                        val tooltipBg = MaterialTheme.colorScheme.surfaceVariant
-                        val dotInsideColor = MaterialTheme.colorScheme.surface
+                        
+                        // 🚀 DYNAMIC THEME COLORS APPLIED HERE
+                        val dynamicTooltipBg = MaterialTheme.colorScheme.onSurface // White in Dark Mode, Black/Dark Gray in Light Mode
+                        val dynamicTooltipText = MaterialTheme.colorScheme.surface // Dark Gray in Dark Mode, White in Light Mode
                         
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             
-                            // Bar Component + Canvas Micro-Visuals + Tooltip Popup
                             Box(
                                 modifier = Modifier
                                     .height(80.dp)
-                                    .width(20.dp), // Width given to capture touch safely around bar
+                                    .width(20.dp),
                                 contentAlignment = Alignment.BottomCenter
                             ) {
                                 
-                                // 1. Solid Bar
                                 if (animatedRatio > 0f) {
                                     Box(
                                         modifier = Modifier
@@ -281,37 +266,35 @@ fun SpendingTrackerCard(
                                     )
                                 }
                                 
-                                // 2. Micro-Visuals (Dotted Line & Hollow Dot)
                                 if (isTouched) {
                                     Canvas(modifier = Modifier.fillMaxSize()) {
                                         val barTopY = size.height * (1f - animatedRatio)
                                         
-                                        // Vertical Dotted Line
                                         drawLine(
                                             color = primaryColor,
                                             start = Offset(size.width / 2f, barTopY),
                                             end = Offset(size.width / 2f, size.height),
                                             strokeWidth = 1.5.dp.toPx(),
-                                            pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 10f), 0f) // 🚀 FIX: Updated to dashPathEffect
+                                            pathEffect = androidx.compose.ui.graphics.PathEffect.dashPath(floatArrayOf(12f, 10f), 0f)
                                         )
                                         
-                                        // Hollow Dot
                                         drawCircle(
-                                            color = dotInsideColor,
-                                            radius = 5.dp.toPx(),
+                                            color = primaryColor.copy(alpha = 0.3f),
+                                            radius = 10.dp.toPx(),
                                             center = Offset(size.width / 2f, barTopY),
                                             style = Fill
                                         )
+                                        
+                                        // 🚀 Flips color based on theme
                                         drawCircle(
-                                            color = primaryColor,
-                                            radius = 5.dp.toPx(),
+                                            color = dynamicTooltipBg,
+                                            radius = 4.dp.toPx(),
                                             center = Offset(size.width / 2f, barTopY),
-                                            style = Stroke(width = 2.dp.toPx())
+                                            style = Fill
                                         )
                                     }
                                 }
                                 
-                                // 3. Capsular Tooltip
                                 if (isTouched) {
                                     val touchedDateCal = Calendar.getInstance().apply { 
                                         timeInMillis = startOfWeekMillis
@@ -322,33 +305,33 @@ fun SpendingTrackerCard(
                                     
                                     Box(
                                         modifier = Modifier
-                                            .offset(y = (-((animatedRatio * 80) + 12)).dp) // Offset above the dot
-                                            .zIndex(100f),
+                                            .offset(y = (-((animatedRatio * 80) + 16)).dp)
+                                            .zIndex(100f)
+                                            .wrapContentSize(unbounded = true),
                                         contentAlignment = Alignment.BottomCenter
                                     ) {
                                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                             
-                                            // Edge-case Shift: Prevents tooltip from cutting at screen edges
                                             val xShift = when (i) {
                                                 0 -> 24.dp
                                                 6 -> (-24).dp
                                                 else -> 0.dp
                                             }
                                             
-                                            // Capsule Body
+                                            // 🚀 Flips background based on theme
                                             Row(
                                                 modifier = Modifier
                                                     .offset(x = xShift) 
-                                                    .background(tooltipBg, RoundedCornerShape(50)) // Capsule Shape
-                                                    .padding(horizontal = 14.dp, vertical = 6.dp),
+                                                    .background(dynamicTooltipBg, RoundedCornerShape(8.dp))
+                                                    .padding(horizontal = 12.dp, vertical = 6.dp),
                                                 verticalAlignment = Alignment.CenterVertically
                                             ) {
-                                                Text(text = amtStr, color = primaryColor, fontWeight = FontWeight.ExtraBold, fontSize = 12.sp)
+                                                Text(text = amtStr, color = primaryColor, fontWeight = FontWeight.ExtraBold, fontSize = 13.sp)
                                                 Spacer(modifier = Modifier.width(4.dp))
-                                                Text(text = "on $dateStr", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                                // 🚀 Flips text color based on theme
+                                                Text(text = "on $dateStr", color = dynamicTooltipText, fontSize = 13.sp, fontWeight = FontWeight.Medium)
                                             }
                                             
-                                            // Tooltip Tail (Triangle pointing to the dot)
                                             Canvas(modifier = Modifier.size(width = 12.dp, height = 6.dp)) {
                                                 val path = Path().apply {
                                                     moveTo(0f, 0f)
@@ -356,14 +339,14 @@ fun SpendingTrackerCard(
                                                     lineTo(size.width / 2f, size.height)
                                                     close()
                                                 }
-                                                drawPath(path, color = tooltipBg)
+                                                // 🚀 Flips tail color based on theme
+                                                drawPath(path, color = dynamicTooltipBg)
                                             }
                                         }
                                     }
                                 }
                             }
                             
-                            // Bottom Tick Line
                             Box(
                                 modifier = Modifier
                                     .width(1.dp)
@@ -373,7 +356,6 @@ fun SpendingTrackerCard(
                             
                             Spacer(modifier = Modifier.height(4.dp))
                             
-                            // Day Label
                             Text(
                                 text = dayLabels[i],
                                 fontSize = 11.sp,
