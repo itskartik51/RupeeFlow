@@ -219,14 +219,16 @@ fun SpendingTrackerCard(
                 }
             }
             
-            Spacer(modifier = Modifier.height(36.dp))
+            // 🚀 Tumhare logic ke hisaab se Spacer ki height kam karke sirf 8.dp kar di
+            Spacer(modifier = Modifier.height(8.dp))
             
-            // Graph Container
+            // Graph Container (Includes safe 40.dp space for capsule)
             Box(modifier = Modifier.fillMaxWidth()) {
                 
                 // Static Grid Lines
                 Column(
                     modifier = Modifier
+                        .padding(top = 40.dp) // Shifted down to give capsule safe space
                         .height(80.dp)
                         .padding(end = 36.dp),
                     verticalArrangement = Arrangement.SpaceBetween
@@ -239,6 +241,7 @@ fun SpendingTrackerCard(
                 // Static Y-Axis
                 Column(
                     modifier = Modifier
+                        .padding(top = 40.dp) // Shifted down
                         .height(80.dp)
                         .width(36.dp)
                         .align(Alignment.TopEnd),
@@ -297,10 +300,11 @@ fun SpendingTrackerCard(
                     
                     Box(modifier = Modifier.fillMaxWidth()) {
                         
-                        // --- LAYER 1: BARS ONLY (No Popups/Lines inside) ---
+                        // --- LAYER 1: BARS ---
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            // 🚀 FIX: Arrangement hata kar weight(1f) laga diya taaki mathematical centering ekdum pixel-perfect ho
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 40.dp), // Shifted down 40dp for safe space
                             verticalAlignment = Alignment.Bottom
                         ) {
                             val dayLabels = listOf("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
@@ -322,7 +326,6 @@ fun SpendingTrackerCard(
                                 
                                 val primaryColor = MaterialTheme.colorScheme.primary
                                 
-                                // 🚀 Weight(1f) taaki 1/7th exact division ho
                                 Box(
                                     modifier = Modifier.weight(1f),
                                     contentAlignment = Alignment.BottomCenter
@@ -385,14 +388,16 @@ fun SpendingTrackerCard(
                             Canvas(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(80.dp)
+                                    .height(120.dp) // 40dp (padding) + 80dp (bars)
                             ) {
-                                val barTopY = size.height * (1f - ratio)
+                                val topPaddingPx = 40.dp.toPx()
+                                val barMaxHeightPx = 80.dp.toPx()
+                                val barTopY = topPaddingPx + (barMaxHeightPx * (1f - ratio))
                                 
-                                // Dotted Line from safely behind capsule (-16.dp) down to exactly top of candle
+                                // Dotted Line from middle of the top 40dp space down to the candle
                                 drawLine(
                                     color = dynamicTooltipBg.copy(alpha = 0.9f),
-                                    start = Offset(centerXPx, -16.dp.toPx()), 
+                                    start = Offset(centerXPx, 20.dp.toPx()), 
                                     end = Offset(centerXPx, barTopY),
                                     strokeWidth = 1.5.dp.toPx(),
                                     pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 10f), 0f) 
@@ -415,7 +420,7 @@ fun SpendingTrackerCard(
                                 )
                             }
 
-                            // 🚀 LAYER 2B: Floating Clamped Capsule
+                            // 🚀 LAYER 2B: Floating Capsule inside the Safe Zone
                             var tooltipWidthPx by remember { mutableFloatStateOf(0f) }
                             val clampedXPx = (centerXPx - (tooltipWidthPx / 2f)).coerceIn(0f, maxOf(0f, rowWidthPx - tooltipWidthPx))
                             val clampedXDp = with(density) { clampedXPx.toDp() }
@@ -432,9 +437,9 @@ fun SpendingTrackerCard(
                             ) {
                                 Box(
                                     modifier = Modifier
-                                        .offset(x = clampedXDp, y = (-38).dp) // Slides cleanly above the graph
+                                        .offset(x = clampedXDp, y = 4.dp) // 🚀 Fits perfectly in the 40dp top space without clipping
                                         .onGloballyPositioned { tooltipWidthPx = it.size.width.toFloat() }
-                                        .background(dynamicTooltipBg, RoundedCornerShape(50)) // Tail Removed
+                                        .background(dynamicTooltipBg, RoundedCornerShape(50)) 
                                         .padding(horizontal = 12.dp, vertical = 6.dp)
                                         .zIndex(100f)
                                 ) {
