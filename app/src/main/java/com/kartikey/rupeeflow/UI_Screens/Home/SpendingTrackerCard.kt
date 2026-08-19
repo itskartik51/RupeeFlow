@@ -26,6 +26,7 @@ import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -162,11 +163,17 @@ fun SpendingTrackerCard(
     }
     
     val pagerState = rememberPagerState(
-        initialPage = maxAvailableWeeks - 1, 
+        initialPage = if (maxAvailableWeeks > 0) maxAvailableWeeks - 1 else 0, 
         pageCount = { maxAvailableWeeks }
     )
     
-    // Header gets active page data dynamically
+    // 🚀 FIX 1: Ensure it immediately jumps to the Current Week when data loads
+    LaunchedEffect(maxAvailableWeeks) {
+        if (maxAvailableWeeks > 0) {
+            pagerState.scrollToPage(maxAvailableWeeks - 1)
+        }
+    }
+    
     val currentDisplayOffset = pagerState.currentPage - (maxAvailableWeeks - 1)
     val headerData = remember(transactions, currentDisplayOffset) { getWeekData(transactions, currentDisplayOffset) }
     
@@ -217,7 +224,7 @@ fun SpendingTrackerCard(
             
             Spacer(modifier = Modifier.height(16.dp))
             
-            // Master Component: Graph with Authentic Slide
+            // Master Component: Graph Engine
             Box(modifier = Modifier.fillMaxWidth()) {
                 
                 // Static Grid Lines
@@ -246,14 +253,13 @@ fun SpendingTrackerCard(
                     Text(text = "0", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.offset(y = 6.dp)) 
                 }
                 
-                // Horizontal Slide Pager
+                // 🚀 FIX 2: HorizontalPager now works seamlessly because blocking manual gestures are removed
                 HorizontalPager(
                     state = pagerState,
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(end = 36.dp)
                         .onGloballyPositioned { rowWidthPx = it.size.width.toFloat() }
-                        // 🚀 Custom 200ms Fast-Hold Engine
                         .pointerInput(Unit) {
                             awaitEachGesture {
                                 val down = awaitFirstDown(requireUnconsumed = false)
@@ -269,7 +275,7 @@ fun SpendingTrackerCard(
                                         }
                                     } while (event.changes.any { it.pressed })
                                     !isSwipe
-                                } ?: true // If null, 200ms timed out naturally -> Start Scrubbing!
+                                } ?: true
 
                                 if (triggerScrub) {
                                     isScrubbing = true
@@ -280,7 +286,7 @@ fun SpendingTrackerCard(
                                     while (event.changes.any { it.pressed }) {
                                         val change = event.changes.first()
                                         if (sectionWidth > 0) touchedBarIndex = (change.position.x / sectionWidth).toInt().coerceIn(0, 6)
-                                        change.consume() // Prevents Pager from stealing the swipe during scrub
+                                        change.consume() // Consume only during scrub, keeps native swipe free
                                         event = awaitPointerEvent()
                                     }
                                     isScrubbing = false
@@ -309,7 +315,6 @@ fun SpendingTrackerCard(
                             )
                             
                             val isToday = (pageOffset == 0 && (i + 1) == currentDayOfWeek)
-                            // Only show popup on the Active Page
                             val isTouched = touchedBarIndex == i && isScrubbing && pagerState.currentPage == pageIndex
                             val isAnyTouched = touchedBarIndex != -1 && isScrubbing && pagerState.currentPage == pageIndex
                             
@@ -318,8 +323,6 @@ fun SpendingTrackerCard(
                             
                             val primaryColor = MaterialTheme.colorScheme.primary
                             val dynamicTooltipBg = MaterialTheme.colorScheme.onSurface 
-                            val dynamicTooltipText = MaterialTheme.colorScheme.surface 
-                            val dullGreenText = primaryColor.copy(alpha = 0.8f) 
                             
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 
@@ -346,14 +349,16 @@ fun SpendingTrackerCard(
                                         Canvas(modifier = Modifier.fillMaxSize()) {
                                             val barTopY = size.height * (1f - animatedRatio)
                                             
+                                            // Dotted Line now draws from absolute top (0f) to bottom
                                             drawLine(
                                                 color = primaryColor,
-                                                start = Offset(size.width / 2f, barTopY),
+                                                start = Offset(size.width / 2f, 0f), 
                                                 end = Offset(size.width / 2f, size.height),
                                                 strokeWidth = 1.5.dp.toPx(),
                                                 pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 10f), 0f) 
                                             )
                                             
+                                            // Halo and Dot
                                             drawCircle(
                                                 color = primaryColor.copy(alpha = 0.3f),
                                                 radius = 10.dp.toPx(),
@@ -367,54 +372,6 @@ fun SpendingTrackerCard(
                                                 center = Offset(size.width / 2f, barTopY),
                                                 style = Fill
                                             )
-                                        }
-                                    }
-                                    
-                                    if (isTouched) {
-                                        val touchedDateCal = Calendar.getInstance().apply { 
-                                            timeInMillis = pageData.startMillis
-                                            add(Calendar.DAY_OF_YEAR, i)
-                                        }
-                                        val dateStr = SimpleDateFormat("EEE d", Locale.getDefault()).format(touchedDateCal.time)
-                                        val amtStr = formatRupee.format(pageData.dailyTotals[i]).replace("-₹", "-₹ ")
-                                        
-                                        Box(
-                                            modifier = Modifier
-                                                .offset(y = (-((animatedRatio * 80) + 16)).dp)
-                                                .zIndex(100f)
-                                                .wrapContentSize(unbounded = true),
-                                            contentAlignment = Alignment.BottomCenter
-                                        ) {
-                                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                                
-                                                val xShift = when (i) {
-                                                    0 -> 24.dp
-                                                    6 -> (-24).dp
-                                                    else -> 0.dp
-                                                }
-                                                
-                                                Row(
-                                                    modifier = Modifier
-                                                        .offset(x = xShift) 
-                                                        .background(dynamicTooltipBg, RoundedCornerShape(8.dp))
-                                                        .padding(horizontal = 12.dp, vertical = 6.dp),
-                                                    verticalAlignment = Alignment.CenterVertically
-                                                ) {
-                                                    Text(text = amtStr, color = dullGreenText, fontWeight = FontWeight.ExtraBold, fontSize = 13.sp)
-                                                    Spacer(modifier = Modifier.width(4.dp))
-                                                    Text(text = "on $dateStr", color = dynamicTooltipText, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                                                }
-                                                
-                                                Canvas(modifier = Modifier.size(width = 12.dp, height = 6.dp)) {
-                                                    val path = Path().apply {
-                                                        moveTo(0f, 0f)
-                                                        lineTo(size.width, 0f)
-                                                        lineTo(size.width / 2f, size.height)
-                                                        close()
-                                                    }
-                                                    drawPath(path, color = dynamicTooltipBg)
-                                                }
-                                            }
                                         }
                                     }
                                 }
@@ -434,6 +391,73 @@ fun SpendingTrackerCard(
                                     fontWeight = if (isToday || isTouched) FontWeight.ExtraBold else FontWeight.Medium,
                                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = textOpacity)
                                 )
+                            }
+                        }
+                    }
+                }
+                
+                // 🚀 FIX 3: MASTER OVERLAY TOOLTIP
+                // Positioned outside the row so it stays perfectly horizontal at the top
+                if (isScrubbing && touchedBarIndex in 0..6) {
+                    val density = LocalDensity.current
+                    val sectionWidthDp = with(density) { (rowWidthPx / 7f).toDp() }
+                    val centerXDp = sectionWidthDp * touchedBarIndex + (sectionWidthDp / 2)
+                    
+                    val primaryColor = MaterialTheme.colorScheme.primary
+                    val dynamicTooltipBg = MaterialTheme.colorScheme.onSurface 
+                    val dynamicTooltipText = MaterialTheme.colorScheme.surface 
+                    val dullGreenText = primaryColor.copy(alpha = 0.8f)
+                    
+                    val touchedDateCal = Calendar.getInstance().apply { 
+                        timeInMillis = headerData.startMillis
+                        add(Calendar.DAY_OF_YEAR, touchedBarIndex)
+                    }
+                    val dateStr = SimpleDateFormat("EEE d", Locale.getDefault()).format(touchedDateCal.time)
+                    val amtStr = formatRupee.format(headerData.dailyTotals[touchedBarIndex]).replace("-₹", "-₹ ")
+                    
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(end = 36.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .offset(x = centerXDp, y = (-24).dp)
+                                .wrapContentSize(unbounded = true)
+                                .zIndex(100f),
+                            contentAlignment = Alignment.BottomCenter
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                
+                                // Shift capsule horizontally at edges, keep tail centered
+                                val capsuleShift = when (touchedBarIndex) {
+                                    0 -> 28.dp 
+                                    6 -> (-28).dp
+                                    else -> 0.dp
+                                }
+                                
+                                Row(
+                                    modifier = Modifier
+                                        .offset(x = capsuleShift) 
+                                        .background(dynamicTooltipBg, RoundedCornerShape(8.dp))
+                                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(text = amtStr, color = dullGreenText, fontWeight = FontWeight.ExtraBold, fontSize = 13.sp)
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(text = "on $dateStr", color = dynamicTooltipText, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                                }
+                                
+                                // Triangle Tail exactly on the dotted line
+                                Canvas(modifier = Modifier.size(width = 12.dp, height = 6.dp)) {
+                                    val path = Path().apply {
+                                        moveTo(0f, 0f)
+                                        lineTo(size.width, 0f)
+                                        lineTo(size.width / 2f, size.height)
+                                        close()
+                                    }
+                                    drawPath(path, color = dynamicTooltipBg)
+                                }
                             }
                         }
                     }
