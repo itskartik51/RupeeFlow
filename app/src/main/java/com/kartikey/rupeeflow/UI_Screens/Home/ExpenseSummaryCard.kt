@@ -27,7 +27,7 @@ import java.util.Locale
 
 @Composable
 fun ExpenseSummaryCard(
-    todayExpenses: Double, 
+    todayExpenses: Double = 0.0, 
     thisMonthExpenses: Double,
     thisYearExpenses: Double,
     budgetLimit: Double,
@@ -39,14 +39,12 @@ fun ExpenseSummaryCard(
     var expanded by remember { mutableStateOf(false) }
 
     val currentAmount = when (selectedPeriod) {
-        "Today" -> todayExpenses
         "Month" -> thisMonthExpenses
         "Year" -> thisYearExpenses
         else -> thisMonthExpenses
     }
     
     val currentBudget = when (selectedPeriod) {
-        "Today" -> budgetLimit / 30 
         "Month" -> budgetLimit
         "Year" -> budgetLimit * 12
         else -> budgetLimit
@@ -54,6 +52,15 @@ fun ExpenseSummaryCard(
     
     val progressRatio = if (currentBudget > 0) (currentAmount / currentBudget).toFloat().coerceIn(0f, 1f) else 0f
     val percentUsed = if (currentBudget > 0) ((currentAmount / currentBudget) * 100) else 0.0
+
+    var isLoaded by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { isLoaded = true }
+
+    val animatedProgressRatio by animateFloatAsState(
+        targetValue = if (isLoaded) progressRatio else 0f,
+        animationSpec = tween(durationMillis = 750, easing = FastOutSlowInEasing),
+        label = "budgetLineAnimation"
+    )
 
     val infiniteTransition = rememberInfiniteTransition(label = "refreshAnim")
     val angle by infiniteTransition.animateFloat(
@@ -75,7 +82,7 @@ fun ExpenseSummaryCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .bounceClick(), // 🚀 FIX: Card will only bounce visually, it will NOT open history anymore
+            .bounceClick(), 
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = RoundedCornerShape(20.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp) 
@@ -123,10 +130,6 @@ fun ExpenseSummaryCard(
                         onDismissRequest = { expanded = false },
                         modifier = Modifier.background(MaterialTheme.colorScheme.surface)
                     ) {
-                        DropdownMenuItem(
-                            text = { Text("Today", color = MaterialTheme.colorScheme.onSurface) },
-                            onClick = { selectedPeriod = "Today"; expanded = false }
-                        )
                         DropdownMenuItem(
                             text = { Text("Month", color = MaterialTheme.colorScheme.onSurface) },
                             onClick = { selectedPeriod = "Month"; expanded = false }
@@ -178,49 +181,56 @@ fun ExpenseSummaryCard(
             
             Spacer(modifier = Modifier.height(14.dp)) 
             
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(8.dp) 
-                    .clip(RoundedCornerShape(50))
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth(progressRatio)
-                        .fillMaxHeight()
-                        .clip(RoundedCornerShape(50))
-                        .background(MaterialTheme.colorScheme.primary)
-                )
-            }
-            
-            Spacer(modifier = Modifier.height(6.dp))
-            
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(text = "₹0", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                Text(
-                    text = "${String.format(Locale.US, "%.1f", percentUsed)}% used", 
-                    color = MaterialTheme.colorScheme.onSurfaceVariant, 
-                    fontSize = 12.sp, 
-                    fontWeight = FontWeight.Bold
-                )
-                Text(text = "₹${formatNumber(currentBudget)}", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-            }
-            
-            Spacer(modifier = Modifier.height(14.dp)) 
-            
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
-            ) {
+                Column(
+                    modifier = Modifier.weight(0.65f)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(8.dp) 
+                            .clip(RoundedCornerShape(50))
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                    ) {
+                        if (animatedProgressRatio > 0f) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth(animatedProgressRatio)
+                                    .fillMaxHeight()
+                                    .clip(RoundedCornerShape(50))
+                                    .background(MaterialTheme.colorScheme.primary)
+                            )
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.height(6.dp))
+                    
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(text = "₹0", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                        Text(
+                            text = "${String.format(Locale.US, "%.1f", percentUsed)}% used", 
+                            color = MaterialTheme.colorScheme.onSurfaceVariant, 
+                            fontSize = 11.sp, 
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(text = "₹${formatNumber(currentBudget)}", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                    }
+                }
+                
+                Spacer(modifier = Modifier.weight(0.05f))
+                
                 Box(
                     modifier = Modifier
+                        .weight(0.30f)
                         .height(34.dp)
-                        .bounceClick { onExpenseCardClick() } // 🚀 FIX: Only tapping THIS button will open History
+                        .bounceClick { onExpenseCardClick() }
                         .clip(RoundedCornerShape(50))
                         .background(MaterialTheme.colorScheme.primary),
                     contentAlignment = Alignment.Center
@@ -229,8 +239,7 @@ fun ExpenseSummaryCard(
                         text = "View History", 
                         color = MaterialTheme.colorScheme.onPrimary, 
                         fontWeight = FontWeight.Bold, 
-                        fontSize = 12.sp,
-                        modifier = Modifier.padding(horizontal = 16.dp)
+                        fontSize = 12.sp
                     )
                 }
             }
