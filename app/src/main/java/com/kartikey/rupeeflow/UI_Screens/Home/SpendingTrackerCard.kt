@@ -1,7 +1,7 @@
 package com.kartikey.rupeeflow.UI_Screens.Home
 
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -129,9 +129,6 @@ fun SpendingTrackerCard(
     transactions: List<TransactionModel>,
     modifier: Modifier = Modifier
 ) {
-    var startAnimation by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { startAnimation = true }
-    
     val coroutineScope = rememberCoroutineScope()
     val calendar = Calendar.getInstance().apply { firstDayOfWeek = Calendar.SUNDAY }
     val currentDayOfWeek = calendar.get(Calendar.DAY_OF_WEEK) 
@@ -164,9 +161,12 @@ fun SpendingTrackerCard(
         pageCount = { maxAvailableWeeks }
     )
     
+    var triggerVerticalAnim by remember { mutableIntStateOf(1) }
+    
     LaunchedEffect(maxAvailableWeeks) {
         if (maxAvailableWeeks > 0) {
             pagerState.scrollToPage(maxAvailableWeeks - 1)
+            triggerVerticalAnim++
         }
     }
     
@@ -198,7 +198,14 @@ fun SpendingTrackerCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(
-                    onClick = { if (canGoBack) coroutineScope.launch { pagerState.animateScrollToPage(pagerState.currentPage - 1) } }, 
+                    onClick = { 
+                        if (canGoBack) {
+                            coroutineScope.launch { 
+                                pagerState.scrollToPage(pagerState.currentPage - 1)
+                                triggerVerticalAnim++
+                            } 
+                        }
+                    }, 
                     enabled = canGoBack, modifier = Modifier.size(32.dp)
                 ) {
                     Icon(Icons.Default.ChevronLeft, contentDescription = "Back", tint = MaterialTheme.colorScheme.onSurface.copy(alpha = if (canGoBack) 1f else 0.3f))
@@ -211,14 +218,20 @@ fun SpendingTrackerCard(
                 }
                 
                 IconButton(
-                    onClick = { if (canGoForward) coroutineScope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) } }, 
+                    onClick = { 
+                        if (canGoForward) {
+                            coroutineScope.launch { 
+                                pagerState.scrollToPage(pagerState.currentPage + 1)
+                                triggerVerticalAnim++
+                            } 
+                        }
+                    }, 
                     enabled = canGoForward, modifier = Modifier.size(32.dp)
                 ) {
                     Icon(Icons.Default.ChevronRight, contentDescription = "Next", tint = MaterialTheme.colorScheme.onSurface.copy(alpha = if (canGoForward) 1f else 0.3f))
                 }
             }
             
-            // Reverted back to compact natural spacing
             Spacer(modifier = Modifier.height(16.dp))
             
             // Graph Container
@@ -295,6 +308,19 @@ fun SpendingTrackerCard(
                     val pageOffset = pageIndex - (maxAvailableWeeks - 1)
                     val pageData = remember(transactions, pageOffset) { getWeekData(transactions, pageOffset) }
                     
+                    val barGrowth = remember(pageIndex) { Animatable(0f) }
+                    LaunchedEffect(triggerVerticalAnim, pagerState.currentPage) {
+                        if (pagerState.currentPage == pageIndex) {
+                            barGrowth.snapTo(0f)
+                            barGrowth.animateTo(
+                                targetValue = 1f,
+                                animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing)
+                            )
+                        } else {
+                            barGrowth.snapTo(1f)
+                        }
+                    }
+                    
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.Bottom
@@ -302,12 +328,8 @@ fun SpendingTrackerCard(
                         val dayLabels = listOf("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
                         
                         for (i in 0..6) {
-                            val targetRatio = if (startAnimation) (pageData.dailyTotals[i] / pageData.topValue).toFloat().coerceIn(0f, 1f) else 0f
-                            val animatedRatio by animateFloatAsState(
-                                targetValue = targetRatio,
-                                animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing),
-                                label = "barHeightAnim_$i"
-                            )
+                            val targetRatio = (pageData.dailyTotals[i] / pageData.topValue).toFloat().coerceIn(0f, 1f)
+                            val currentBarRatio = targetRatio * barGrowth.value
                             
                             val isToday = (pageOffset == 0 && (i + 1) == currentDayOfWeek)
                             val isTouched = touchedBarIndex == i && isScrubbing && pagerState.currentPage == pageIndex
@@ -329,11 +351,11 @@ fun SpendingTrackerCard(
                                             .width(20.dp),
                                         contentAlignment = Alignment.BottomCenter
                                     ) {
-                                        if (animatedRatio > 0f) {
+                                        if (currentBarRatio > 0f) {
                                             Box(
                                                 modifier = Modifier
                                                     .width(16.dp)
-                                                    .fillMaxHeight(animatedRatio)
+                                                    .fillMaxHeight(currentBarRatio)
                                                     .background(
                                                         color = primaryColor.copy(alpha = barAlpha),
                                                         shape = RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp)
@@ -363,7 +385,7 @@ fun SpendingTrackerCard(
                     }
                 }
 
-                // Master Overlay Layer (Unclipped floating capsule & precise dotted line)
+                // Master Overlay Layer
                 if (isScrubbing && touchedBarIndex in 0..6) {
                     val density = LocalDensity.current
                     val primaryColor = MaterialTheme.colorScheme.primary
@@ -376,7 +398,6 @@ fun SpendingTrackerCard(
                     
                     val ratio = (headerData.dailyTotals[touchedBarIndex] / headerData.topValue).toFloat().coerceIn(0f, 1f)
                     
-                    // Connected Dotted Line & Candle Peak Dot
                     Canvas(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -385,7 +406,6 @@ fun SpendingTrackerCard(
                     ) {
                         val barTopY = size.height * (1f - ratio)
                         
-                        // Starts right at the bottom edge of the floating capsule (-16dp)
                         drawLine(
                             color = dynamicTooltipBg.copy(alpha = 0.9f),
                             start = Offset(centerXPx, -16.dp.toPx()), 
@@ -394,7 +414,6 @@ fun SpendingTrackerCard(
                             pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 10f), 0f) 
                         )
                         
-                        // Halo exactly on candle top
                         drawCircle(
                             color = primaryColor.copy(alpha = 0.3f),
                             radius = 10.dp.toPx(),
@@ -402,7 +421,6 @@ fun SpendingTrackerCard(
                             style = Fill
                         )
                         
-                        // Solid Center Dot
                         drawCircle(
                             color = dynamicTooltipBg,
                             radius = 4.dp.toPx(),
@@ -411,7 +429,6 @@ fun SpendingTrackerCard(
                         )
                     }
 
-                    // Floating Pill Capsule (Overlaps header cleanly, clamped inside card)
                     var tooltipWidthPx by remember { mutableFloatStateOf(0f) }
                     val clampedXPx = (centerXPx - (tooltipWidthPx / 2f)).coerceIn(0f, maxOf(0f, rowWidthPx - tooltipWidthPx))
                     val clampedXDp = with(density) { clampedXPx.toDp() }
