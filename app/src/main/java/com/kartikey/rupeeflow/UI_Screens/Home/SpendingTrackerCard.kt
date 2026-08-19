@@ -3,7 +3,9 @@ package com.kartikey.rupeeflow.UI_Screens.Home
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -13,9 +15,18 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Fill
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import com.kartikey.rupeeflow.UI_Screens.Add.TransactionModel
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -128,6 +139,10 @@ fun SpendingTrackerCard(
     val formatRupee = java.text.NumberFormat.getCurrencyInstance(Locale("en", "IN")).apply { maximumFractionDigits = 0 }
     val totalStr = formatRupee.format(weekTotal).replace("-₹", "-₹ ")
 
+    // 🚀 Interaction State Variables
+    var touchedBarIndex by remember { mutableIntStateOf(-1) }
+    var rowWidthPx by remember { mutableFloatStateOf(1f) }
+
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -136,7 +151,7 @@ fun SpendingTrackerCard(
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             
-            // Minimalist Header (Total & Dates in a SINGLE ROW)
+            // Minimalist Header
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -159,10 +174,10 @@ fun SpendingTrackerCard(
             
             Spacer(modifier = Modifier.height(16.dp))
             
-            // Master Component: Graph Lines + Bars + Y/X Axis combined precisely
+            // Master Component: Graph
             Box(modifier = Modifier.fillMaxWidth()) {
                 
-                // 1. Subtle Background Grid Lines
+                // Subtle Background Grid Lines
                 Column(
                     modifier = Modifier
                         .height(80.dp)
@@ -174,32 +189,57 @@ fun SpendingTrackerCard(
                     HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
                 }
                 
-                // 2. Y-Axis Numbers (Perfectly centered in the 36.dp space)
+                // Y-Axis Numbers
                 Column(
                     modifier = Modifier
                         .height(80.dp)
-                        .width(36.dp) // 🚀 FIX: Fixed width matching the graph's end padding
+                        .width(36.dp)
                         .align(Alignment.TopEnd),
                     verticalArrangement = Arrangement.SpaceBetween,
-                    horizontalAlignment = Alignment.CenterHorizontally // 🚀 FIX: Centered horizontally instead of End
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(text = formatYAxis(topValue), fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.offset(y = (-6).dp)) 
                     Text(text = formatYAxis(midValue), fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.offset(y = 0.dp)) 
                     Text(text = "0", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.offset(y = 6.dp)) 
                 }
                 
-                // 3. Graph Bars & X-Axis Texts (Sun-Sat)
+                // Graph Bars & X-Axis Texts (Sun-Sat)
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(end = 36.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(end = 36.dp)
+                        .onGloballyPositioned { rowWidthPx = it.size.width.toFloat() } // Track width for touch events
+                        .pointerInput(Unit) {
+                            // 🚀 Smart Touch Event Engine (Slides over bars without breaking scroll)
+                            awaitPointerEventScope {
+                                while (true) {
+                                    val event = awaitFirstDown(requireUnconsumed = false)
+                                    val sectionWidth = rowWidthPx / 7f
+                                    if (sectionWidth > 0) {
+                                        touchedBarIndex = (event.position.x / sectionWidth).toInt().coerceIn(0, 6)
+                                    }
+                                    
+                                    do {
+                                        val nextEvent = awaitPointerEvent()
+                                        nextEvent.changes.firstOrNull()?.let { change ->
+                                            if (change.pressed && sectionWidth > 0) {
+                                                touchedBarIndex = (change.position.x / sectionWidth).toInt().coerceIn(0, 6)
+                                            }
+                                        }
+                                    } while (nextEvent.changes.any { it.pressed })
+                                    
+                                    // Touch clear
+                                    touchedBarIndex = -1
+                                }
+                            }
+                        },
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.Bottom
                 ) {
                     val dayLabels = listOf("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
+                    
                     for (i in 0..6) {
-                        // Calculate Target Ratio
                         val targetRatio = if (startAnimation) (dailyTotals[i] / topValue).toFloat().coerceIn(0f, 1f) else 0f
-                        
-                        // Apply Smooth Animation
                         val animatedRatio by animateFloatAsState(
                             targetValue = targetRatio,
                             animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing),
@@ -207,25 +247,123 @@ fun SpendingTrackerCard(
                         )
                         
                         val isToday = (weekOffset == 0 && (i + 1) == currentDayOfWeek)
-                        val textOpacity = if (isToday) 1f else 0.5f
+                        val isTouched = touchedBarIndex == i
+                        val isAnyTouched = touchedBarIndex != -1
+                        
+                        // Opacity Logic
+                        val barAlpha = if (isAnyTouched && !isTouched) 0.3f else 1f
+                        val textOpacity = if (isAnyTouched && !isTouched) 0.3f else if (isToday || isTouched) 1f else 0.5f
+                        
+                        val primaryColor = MaterialTheme.colorScheme.primary
+                        val tooltipBg = MaterialTheme.colorScheme.surfaceVariant
+                        val dotInsideColor = MaterialTheme.colorScheme.surface
                         
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            // Bar Component
+                            
+                            // 🚀 Bar Component + Canvas Micro-Visuals + Tooltip Popup
                             Box(
-                                modifier = Modifier.height(80.dp),
+                                modifier = Modifier
+                                    .height(80.dp)
+                                    .width(20.dp), // Width given to capture touch safely around bar
                                 contentAlignment = Alignment.BottomCenter
                             ) {
+                                
+                                // 1. Solid Bar
                                 if (animatedRatio > 0f) {
                                     Box(
                                         modifier = Modifier
                                             .width(16.dp)
                                             .fillMaxHeight(animatedRatio)
-                                            .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
+                                            .background(
+                                                color = primaryColor.copy(alpha = barAlpha),
+                                                shape = RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp)
+                                            )
                                     )
+                                }
+                                
+                                // 2. Micro-Visuals (Dotted Line & Hollow Dot)
+                                if (isTouched) {
+                                    Canvas(modifier = Modifier.fillMaxSize()) {
+                                        val barTopY = size.height * (1f - animatedRatio)
+                                        
+                                        // Vertical Dotted Line
+                                        drawLine(
+                                            color = primaryColor,
+                                            start = Offset(size.width / 2f, barTopY),
+                                            end = Offset(size.width / 2f, size.height),
+                                            strokeWidth = 1.5.dp.toPx(),
+                                            pathEffect = PathEffect.dashPath(floatArrayOf(12f, 10f), 0f)
+                                        )
+                                        
+                                        // Hollow Dot
+                                        drawCircle(
+                                            color = dotInsideColor,
+                                            radius = 5.dp.toPx(),
+                                            center = Offset(size.width / 2f, barTopY),
+                                            style = Fill
+                                        )
+                                        drawCircle(
+                                            color = primaryColor,
+                                            radius = 5.dp.toPx(),
+                                            center = Offset(size.width / 2f, barTopY),
+                                            style = Stroke(width = 2.dp.toPx())
+                                        )
+                                    }
+                                }
+                                
+                                // 3. Capsular Tooltip
+                                if (isTouched) {
+                                    val touchedDateCal = Calendar.getInstance().apply { 
+                                        timeInMillis = startOfWeekMillis
+                                        add(Calendar.DAY_OF_YEAR, i)
+                                    }
+                                    val dateStr = SimpleDateFormat("EEE d", Locale.getDefault()).format(touchedDateCal.time)
+                                    val amtStr = formatRupee.format(dailyTotals[i]).replace("-₹", "-₹ ")
+                                    
+                                    Box(
+                                        modifier = Modifier
+                                            .offset(y = (-((animatedRatio * 80) + 12)).dp) // Offset above the dot
+                                            .zIndex(100f),
+                                        contentAlignment = Alignment.BottomCenter
+                                    ) {
+                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                            
+                                            // Edge-case Shift: Prevents tooltip from cutting at screen edges
+                                            val xShift = when (i) {
+                                                0 -> 24.dp
+                                                6 -> (-24).dp
+                                                else -> 0.dp
+                                            }
+                                            
+                                            // Capsule Body
+                                            Row(
+                                                modifier = Modifier
+                                                    .offset(x = xShift) 
+                                                    .background(tooltipBg, RoundedCornerShape(50)) // Capsule Shape
+                                                    .padding(horizontal = 14.dp, vertical = 6.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(text = amtStr, color = primaryColor, fontWeight = FontWeight.ExtraBold, fontSize = 12.sp)
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text(text = "on $dateStr", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                            }
+                                            
+                                            // Tooltip Tail (Triangle pointing to the dot)
+                                            Canvas(modifier = Modifier.size(width = 12.dp, height = 6.dp)) {
+                                                val path = Path().apply {
+                                                    moveTo(0f, 0f)
+                                                    lineTo(size.width, 0f)
+                                                    lineTo(size.width / 2f, size.height)
+                                                    close()
+                                                }
+                                                drawPath(path, color = tooltipBg)
+                                            }
+                                        }
+                                    }
                                 }
                             }
                             
-                            // Small tick line connecting the bottom line to the day label
+                            // Bottom Tick Line
                             Box(
                                 modifier = Modifier
                                     .width(1.dp)
@@ -235,11 +373,11 @@ fun SpendingTrackerCard(
                             
                             Spacer(modifier = Modifier.height(4.dp))
                             
-                            // Day Component
+                            // Day Label
                             Text(
                                 text = dayLabels[i],
                                 fontSize = 11.sp,
-                                fontWeight = if (isToday) FontWeight.ExtraBold else FontWeight.Medium,
+                                fontWeight = if (isToday || isTouched) FontWeight.ExtraBold else FontWeight.Medium,
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = textOpacity)
                             )
                         }
