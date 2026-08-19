@@ -18,7 +18,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Fill
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.font.FontWeight
@@ -240,10 +242,8 @@ fun SpendingTrackerCard(
                         val textOpacity = if (isAnyTouched && !isTouched) 0.3f else if (isToday || isTouched) 1f else 0.5f
                         
                         val primaryColor = MaterialTheme.colorScheme.primary
-                        
-                        // 🚀 DYNAMIC THEME COLORS APPLIED HERE
-                        val dynamicTooltipBg = MaterialTheme.colorScheme.onSurface // White in Dark Mode, Black/Dark Gray in Light Mode
-                        val dynamicTooltipText = MaterialTheme.colorScheme.surface // Dark Gray in Dark Mode, White in Light Mode
+                        val dynamicTooltipBg = MaterialTheme.colorScheme.onSurface 
+                        val dynamicTooltipText = MaterialTheme.colorScheme.surface 
                         
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             
@@ -270,12 +270,13 @@ fun SpendingTrackerCard(
                                     Canvas(modifier = Modifier.fillMaxSize()) {
                                         val barTopY = size.height * (1f - animatedRatio)
                                         
+                                        // 🚀 EXACT COMPOSE API FIX: PathEffect.dashPathEffect
                                         drawLine(
                                             color = primaryColor,
                                             start = Offset(size.width / 2f, barTopY),
                                             end = Offset(size.width / 2f, size.height),
                                             strokeWidth = 1.5.dp.toPx(),
-                                            pathEffect = androidx.compose.ui.graphics.PathEffect.dashPath(floatArrayOf(12f, 10f), 0f)
+                                            pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 10f), 0f) 
                                         )
                                         
                                         drawCircle(
@@ -285,7 +286,6 @@ fun SpendingTrackerCard(
                                             style = Fill
                                         )
                                         
-                                        // 🚀 Flips color based on theme
                                         drawCircle(
                                             color = dynamicTooltipBg,
                                             radius = 4.dp.toPx(),
@@ -318,7 +318,6 @@ fun SpendingTrackerCard(
                                                 else -> 0.dp
                                             }
                                             
-                                            // 🚀 Flips background based on theme
                                             Row(
                                                 modifier = Modifier
                                                     .offset(x = xShift) 
@@ -328,7 +327,6 @@ fun SpendingTrackerCard(
                                             ) {
                                                 Text(text = amtStr, color = primaryColor, fontWeight = FontWeight.ExtraBold, fontSize = 13.sp)
                                                 Spacer(modifier = Modifier.width(4.dp))
-                                                // 🚀 Flips text color based on theme
                                                 Text(text = "on $dateStr", color = dynamicTooltipText, fontSize = 13.sp, fontWeight = FontWeight.Medium)
                                             }
                                             
@@ -339,7 +337,6 @@ fun SpendingTrackerCard(
                                                     lineTo(size.width / 2f, size.height)
                                                     close()
                                                 }
-                                                // 🚀 Flips tail color based on theme
                                                 drawPath(path, color = dynamicTooltipBg)
                                             }
                                         }
