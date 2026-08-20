@@ -52,7 +52,6 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
-// HELPER: To update Budget Collection automatically
 suspend fun updateBudgetUsage(userRef: DocumentReference, diff: Double) {
     val budgetDocRef = userRef.collection("Finances").document("Budget")
     val budgetDoc = budgetDocRef.get().await()
@@ -78,7 +77,6 @@ suspend fun updateBudgetUsage(userRef: DocumentReference, diff: Double) {
     }
 }
 
-// HELPER: Refund Money to Cash / Bank / CC
 suspend fun refundFinanceSource(userRef: DocumentReference, sourceType: String, sourceId: String, amount: Double) {
     if (amount <= 0) return
     when (sourceType) {
@@ -210,7 +208,6 @@ suspend fun refundFinanceSource(userRef: DocumentReference, sourceType: String, 
     }
 }
 
-// HELPER: Deduct Money from Cash / Bank / CC
 suspend fun deductFinanceSource(userRef: DocumentReference, sourceType: String, sourceId: String, amount: Double) {
     if (amount <= 0) return
     when (sourceType) {
@@ -823,6 +820,9 @@ fun DeleteExpenseDialog(
                         )
                     }
                     
+                    // ⚡ Trigger UI Instant Recompose ⚡
+                    onSuccess()
+
                     // ⚡ 2. FIRESTORE BACKGROUND DELETE & REFUND ⚡
                     CoroutineScope(Dispatchers.IO).launch {
                         try {
@@ -873,12 +873,8 @@ fun DeleteExpenseDialog(
                                 // REFUND FINANCE SOURCE
                                 refundFinanceSource(userRef, expense.sourceType, expense.sourceId, expense.amount)
                                 updateBudgetUsage(userRef, -expense.amount)
-                                
-                                withContext(Dispatchers.Main) { onSuccess() }
                             }
-                        } catch (e: Exception) {
-                            withContext(Dispatchers.Main) { onSuccess() }
-                        }
+                        } catch (e: Exception) {}
                     }
                 }, 
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
@@ -1235,6 +1231,9 @@ fun EditExpenseDialog(
                                 )
                             }
                             
+                            // ⚡ Trigger UI Instant Recompose ⚡
+                            onSuccess()
+
                             // ⚡ 2. FIRESTORE TWO-WAY LEDGER BACKGROUND SYNC ⚡
                             CoroutineScope(Dispatchers.IO).launch {
                                 try {
@@ -1341,12 +1340,8 @@ fun EditExpenseDialog(
                                         if (diff != 0.0) {
                                             updateBudgetUsage(userRef, diff)
                                         }
-
-                                        withContext(Dispatchers.Main) { onSuccess() }
                                     }
-                                } catch (e: Exception) {
-                                    withContext(Dispatchers.Main) { onSuccess() }
-                                }
+                                } catch (e: Exception) {}
                             }
                         } else { Toast.makeText(context, "Fill required fields!", Toast.LENGTH_SHORT).show() }
                     },
