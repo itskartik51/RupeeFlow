@@ -51,7 +51,6 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
-// HELPER: To update Budget Collection automatically
 suspend fun updateBudgetUsage(userRef: DocumentReference, diff: Double) {
     val budgetDocRef = userRef.collection("Finances").document("Budget")
     val budgetDoc = budgetDocRef.get().await()
@@ -109,7 +108,6 @@ fun EditBankDialog(bank: BankAccountItem, username: String, onDismiss: () -> Uni
                         onDismiss()
                         Toast.makeText(context, "Deleting bank...", Toast.LENGTH_SHORT).show()
                         
-                        // INSTANT OPTIMISTIC CACHE UPDATE
                         val cachedData = CacheManager.getCachedData(context, username)
                         if (cachedData != null) {
                             val updatedList = cachedData.bankList.filter { it.firebaseKey != bank.firebaseKey }
@@ -117,7 +115,6 @@ fun EditBankDialog(bank: BankAccountItem, username: String, onDismiss: () -> Uni
                             onUpdateSuccess() 
                         }
                         
-                        // BACKGROUND FIREBASE DIRECT PATH DELETE
                         CoroutineScope(Dispatchers.IO).launch {
                             try {
                                 val db = FirebaseFirestore.getInstance()
@@ -125,8 +122,6 @@ fun EditBankDialog(bank: BankAccountItem, username: String, onDismiss: () -> Uni
                                 if (!userQuery.isEmpty) {
                                     val userRef = userQuery.documents[0].reference
                                     val bankDocRef = userRef.collection("Finances").document("Bank")
-                                    
-                                    // 🔥 Using FieldPath.of for clean deletion of the entire bank node 🔥
                                     bankDocRef.update(com.google.firebase.firestore.FieldPath.of(bank.firebaseKey), FieldValue.delete()).await()
                                 }
                             } catch (e: Exception) {}
@@ -198,7 +193,6 @@ fun EditBankDialog(bank: BankAccountItem, username: String, onDismiss: () -> Uni
                             onDismiss()
                             Toast.makeText(context, "Updating bank...", Toast.LENGTH_SHORT).show()
                             
-                            // INSTANT OPTIMISTIC CACHE UPDATE
                             val cachedData = CacheManager.getCachedData(context, username)
                             if (cachedData != null) {
                                 val updatedList = cachedData.bankList.map { 
@@ -208,7 +202,6 @@ fun EditBankDialog(bank: BankAccountItem, username: String, onDismiss: () -> Uni
                                 onUpdateSuccess() 
                             }
                             
-                            // 🔥 BACKGROUND FIREBASE DIRECT PATH UPDATE (USING FIELDPATH) 🔥
                             CoroutineScope(Dispatchers.IO).launch {
                                 try {
                                     val db = FirebaseFirestore.getInstance()
@@ -275,7 +268,6 @@ fun QuickUpdateCCDialog(cc: CreditCardItem, username: String, onDismiss: () -> U
                             onDismiss()
                             Toast.makeText(context, "Updating card...", Toast.LENGTH_SHORT).show()
                             
-                            // INSTANT OPTIMISTIC CACHE UPDATE
                             val cachedData = CacheManager.getCachedData(context, username)
                             if (cachedData != null) {
                                 val updatedList = cachedData.ccList.map { 
@@ -546,15 +538,15 @@ fun DeleteExpenseDialog(
                                 if (docSnap.exists()) {
                                     val dataMap = docSnap.data ?: emptyMap()
                                     for ((key, value) in dataMap) {
-                                        if (value is Map<*, *>) {
-                                            val dbDate = value["date"]
+                                        if (key != "000_total" && value is Map<*, *>) {
+                                            val dbDate = value["dt"]
                                             val dbDateStr = when (dbDate) {
                                                 is Timestamp -> SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(dbDate.toDate())
                                                 is String -> dbDate.toString().split(" ")[0]
                                                 else -> ""
                                             }
-                                            val dbAmount = (value["amount"] as? Number)?.toDouble() ?: 0.0
-                                            val dbCategory = value["category"]?.toString() ?: ""
+                                            val dbAmount = (value["amnt"] as? Number)?.toDouble() ?: 0.0
+                                            val dbCategory = value["cat"]?.toString() ?: ""
                                             
                                             val amountMatch = Math.abs(dbAmount - expense.amount) < 0.01
                                             
@@ -612,7 +604,6 @@ fun DeleteExpenseDialog(
                                                 
                                                 val newCalculatedBalance = curBal + refundAmt
                                                 
-                                                // ⚡ PRORATED AVERAGES FIX INJECTED ⚡
                                                 val cal = Calendar.getInstance()
                                                 val day = cal.get(Calendar.DAY_OF_MONTH)
                                                 val month = cal.get(Calendar.MONTH)
@@ -990,15 +981,15 @@ fun EditExpenseDialog(
                                         if (oldDocSnap.exists()) {
                                             val dataMap = oldDocSnap.data ?: emptyMap()
                                             for ((key, value) in dataMap) {
-                                                if (value is Map<*, *>) {
-                                                    val dbDate = value["date"]
+                                                if (key != "000_total" && value is Map<*, *>) {
+                                                    val dbDate = value["dt"]
                                                     val dbDateStr = when (dbDate) {
                                                         is Timestamp -> SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(dbDate.toDate())
                                                         is String -> dbDate.toString().split(" ")[0]
                                                         else -> ""
                                                     }
-                                                    val dbAmount = (value["amount"] as? Number)?.toDouble() ?: 0.0
-                                                    val dbCategory = value["category"]?.toString() ?: ""
+                                                    val dbAmount = (value["amnt"] as? Number)?.toDouble() ?: 0.0
+                                                    val dbCategory = value["cat"]?.toString() ?: ""
                                                     
                                                     val amountMatch = Math.abs(dbAmount - expense.amount) < 0.01
 
@@ -1016,23 +1007,18 @@ fun EditExpenseDialog(
                                         }
 
                                         val expData = hashMapOf<String, Any>(
-                                            "date" to Timestamp(Date(expenseDateMillis)),
-                                            "amount" to newAmt,
-                                            "category" to finalCategory,
-                                            "detail_1" to remark1,
-                                            "detail_2" to remark2,
-                                            "payment_detail" to paymentDetailStr
+                                            "dt" to Timestamp(Date(expenseDateMillis)),
+                                            "amnt" to newAmt,
+                                            "cat" to finalCategory,
+                                            "det1" to remark1,
+                                            "det2" to remark2,
+                                            "pay" to paymentDetailStr
                                         )
 
                                         if (oldDocId == newDocId) {
-                                            val seqNumber = targetKey.substringBefore("_")
-                                            val newKey = "${seqNumber}_${finalCategory}"
-                                            
-                                            val updates = hashMapOf<String, Any>()
-                                            if (newKey != targetKey) {
-                                                updates[targetKey] = FieldValue.delete()
-                                            }
-                                            updates[newKey] = expData
+                                            val updates = hashMapOf<String, Any>(
+                                                targetKey to expData
+                                            )
                                             if (diff != 0.0) {
                                                 updates["000_total"] = FieldValue.increment(diff)
                                             }
@@ -1051,18 +1037,17 @@ fun EditExpenseDialog(
                                             
                                             if (newDocSnap.exists()) {
                                                 val dataMap = newDocSnap.data ?: emptyMap()
-                                                val seqKeys = dataMap.keys.filter { it.matches(Regex("^\\d{3}_.*")) }
+                                                val seqKeys = dataMap.keys.filter { it.matches(Regex("^\\d{3}$")) && it != "000_total" }
                                                 if (seqKeys.isNotEmpty()) {
-                                                    val maxSeq = seqKeys.maxOf { it.substring(0, 3).toInt() }
+                                                    val maxSeq = seqKeys.maxOf { it.toInt() }
                                                     nextSeq = maxSeq + 1
                                                 }
                                             }
                                             val formattedSeq = String.format(Locale.US, "%03d", nextSeq)
-                                            val newKey = "${formattedSeq}_${finalCategory}"
                                             
                                             newDocRef.set(
                                                 mapOf(
-                                                    newKey to expData,
+                                                    formattedSeq to expData,
                                                     "000_total" to FieldValue.increment(newAmt)
                                                 ), SetOptions.merge()
                                             ).await()
@@ -1103,7 +1088,6 @@ fun EditExpenseDialog(
                                                             
                                                             val newCalculatedBalance = curBal - diff
                                                             
-                                                            // ⚡ PRORATED AVERAGES FIX INJECTED ⚡
                                                             val cal = Calendar.getInstance()
                                                             val day = cal.get(Calendar.DAY_OF_MONTH)
                                                             val month = cal.get(Calendar.MONTH)
