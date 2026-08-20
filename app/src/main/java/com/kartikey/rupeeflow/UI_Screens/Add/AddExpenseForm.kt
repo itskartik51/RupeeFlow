@@ -67,10 +67,15 @@ fun AddExpenseForm(
 ) {
     val categories = listOf(
         "Food" to Icons.Outlined.Restaurant,
+        "Groceries" to Icons.Outlined.LocalGroceryStore,
         "Transport" to Icons.Outlined.DirectionsCar,
+        "Fuel" to Icons.Outlined.LocalGasStation,
         "Shopping" to Icons.Outlined.ShoppingBag,
         "Bills" to Icons.Outlined.Receipt,
-        "Fuel" to Icons.Outlined.LocalGasStation,
+        "Rent" to Icons.Outlined.Home,
+        "EMI" to Icons.Outlined.AccountBalanceWallet,
+        "Subscription" to Icons.Outlined.Subscriptions,
+        "Gift" to Icons.Outlined.CardGiftcard,
         "Personal Care" to Icons.Outlined.Spa,
         "Health" to Icons.Outlined.MedicalServices,
         "Education" to Icons.Outlined.School,
