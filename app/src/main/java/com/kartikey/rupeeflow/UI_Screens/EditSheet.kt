@@ -717,12 +717,29 @@ fun EditExpenseDialog(
     onDismiss: () -> Unit,
     onSuccess: () -> Unit
 ) {
-    val categories = listOf("Food", "Transport", "Shopping", "Bills", "Custom")
+    val categories = listOf(
+        "Food" to Icons.Outlined.Restaurant,
+        "Groceries" to Icons.Outlined.LocalGroceryStore,
+        "Transport" to Icons.Outlined.DirectionsCar,
+        "Fuel" to Icons.Outlined.LocalGasStation,
+        "Shopping" to Icons.Outlined.ShoppingBag,
+        "Bills" to Icons.Outlined.Receipt,
+        "Rent" to Icons.Outlined.Home,
+        "EMI" to Icons.Outlined.AccountBalanceWallet,
+        "Subscription" to Icons.Outlined.Subscriptions,
+        "Gift" to Icons.Outlined.CardGiftcard,
+        "Personal Care" to Icons.Outlined.Spa,
+        "Health" to Icons.Outlined.MedicalServices,
+        "Education" to Icons.Outlined.School,
+        "Entertainment" to Icons.Outlined.SportsEsports,
+        "Custom" to Icons.Outlined.Edit
+    )
+    val categoryNames = categories.map { it.first }
     val paymentModes = listOf("Cash", "UPI", "NEFT", "Credit Card", "Debit Card", "Net Banking")
     
-    var categoryText by remember { mutableStateOf(if (categories.contains(expense.category)) expense.category else "Custom") }
-    var customCategoryText by remember { mutableStateOf(if (!categories.contains(expense.category)) expense.category else "") }
-    var isCustomCategory by remember { mutableStateOf(!categories.contains(expense.category)) }
+    var categoryText by remember { mutableStateOf(if (categoryNames.contains(expense.category)) expense.category else "Custom") }
+    var customCategoryText by remember { mutableStateOf(if (!categoryNames.contains(expense.category)) expense.category else "") }
+    var isCustomCategory by remember { mutableStateOf(!categoryNames.contains(expense.category)) }
     
     var remark1 by remember { mutableStateOf(expense.remark1) }
     var remark2 by remember { mutableStateOf(expense.remark2) }
@@ -785,9 +802,20 @@ fun EditExpenseDialog(
                         modifier = Modifier.fillMaxWidth().menuAnchor()
                     )
                     ExposedDropdownMenu(expanded = catExpanded, onDismissRequest = { catExpanded = false }, modifier = Modifier.background(MaterialTheme.colorScheme.surface)) {
-                        categories.forEach { name -> 
+                        categories.forEach { (name, icon) -> 
                             DropdownMenuItem(
-                                text = { Text(name, color = MaterialTheme.colorScheme.onSurface) }, 
+                                text = {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = icon,
+                                            contentDescription = name,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Text(name, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface)
+                                    }
+                                }, 
                                 onClick = { 
                                     categoryText = name
                                     isCustomCategory = (name == "Custom")
