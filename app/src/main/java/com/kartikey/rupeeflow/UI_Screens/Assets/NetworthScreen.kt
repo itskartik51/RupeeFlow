@@ -1,7 +1,12 @@
 package com.kartikey.rupeeflow.UI_Screens.Assets
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -13,6 +18,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -34,6 +40,17 @@ fun NetworthCard(
     onClick: () -> Unit = {}
 ) {
     var isVisible by remember { mutableStateOf(true) }
+
+    val infiniteTransition = rememberInfiniteTransition(label = "networthRefreshAnim")
+    val rotateAngle by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "spinAngle"
+    )
 
     Card(
         modifier = Modifier
@@ -74,28 +91,23 @@ fun NetworthCard(
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier
                             .size(20.dp)
+                            .rotate(if (isLoading) rotateAngle else 0f)
                             .clickable { onRefresh() }
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
             // --- MIDDLE ROW: Main Amount ---
-            if (isLoading) {
-                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary, modifier = Modifier.size(28.dp))
-            } else {
-                Text(
-                    text = if (isVisible) formatRupeeAmount(networthAmount) else "••••••••",
-                    fontWeight = FontWeight.ExtraBold,
-                    fontSize = 32.sp,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-            }
+            Text(
+                text = if (isVisible) formatRupeeAmount(networthAmount) else "••••••••",
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 32.sp,
+                color = MaterialTheme.colorScheme.onSurface
+            )
 
-            Spacer(modifier = Modifier.height(20.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
             // --- BOTTOM ROW: Returns ---
             Row(
