@@ -18,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -31,6 +32,7 @@ import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.CashItem
 import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.CreditCardItem
 import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.FDItem
 import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.formatRupeeAmount
+import com.kartikey.rupeeflow.UI_Screens.CacheManager
 import com.kartikey.rupeeflow.UI_Screens.bounceClick
 
 data class InvestmentItem(
@@ -43,7 +45,7 @@ data class InvestmentItem(
 )
 
 data class BankAccountItem(
-    val firebaseKey: String = "", // MASTERSTROKE: To hold exact Firebase Document Key
+    val firebaseKey: String = "",
     val bankName: String,
     val accountNo: String,
     val currentBalance: Double,
@@ -55,10 +57,6 @@ data class BankAccountItem(
     val accruedYrInt: Double,
     val oneDayInt: Double
 )
-
-// Re-defining CreditCardItem and FDItem here if they need the key. 
-// Assuming they are defined in their respective files, but if they are mapped here, update them.
-// Note: As per your original code, CC and FD items were fetched from CacheManager which expected them to exist.
 
 @Composable
 fun AssetsScreen(
@@ -77,15 +75,39 @@ fun AssetsScreen(
     onEditCCClick: (CreditCardItem) -> Unit,
     onEditFDClick: (FDItem) -> Unit
 ) { 
+    val context = LocalContext.current
+
     if (currentView == "Main") {
-        // App-level On-the-fly Calculations (Zero API Calls)
         val totalBank = bankList.sumOf { it.currentBalance }
         val totalCash = cashData.amount
         val totalFD = fdList.sumOf { it.accruedValue }
         val totalCC = ccList.sumOf { it.outstanding }
         val totalInv = investmentList.sumOf { it.quantity * it.currentPrice }
+        val totalInvestedBase = investmentList.sumOf { it.quantity * it.avgBuyPrice }
         
         val networthAmount = totalBank + totalCash + totalFD + totalInv - totalCC
+
+        // 1D Return Calculation (Stocks Live Change + Bank Daily Interest + FD Daily Accrual)
+        val inv1DChange = investmentList.sumOf { it.quantity * it.oneDayChangePrice }
+        val bank1DEarn = bankList.sumOf { it.oneDayInt }
+        val fd1DEarn = fdList.sumOf { it.oneDayInt }
+        val oneDayReturnAmount = inv1DChange + bank1DEarn + fd1DEarn
+        val oneDayReturnPercent = if (networthAmount > 0) (oneDayReturnAmount / networthAmount) * 100.0 else 0.0
+
+        // Total Return Calculation (Investments Profit/Loss + FD Accrued Interest + Bank Accrued Yearly Interest)
+        val invTotalProfit = totalInv - totalInvestedBase
+        val fdTotalProfit = fdList.sumOf { it.accruedInt }
+        val bankTotalEarned = bankList.sumOf { it.accruedYrInt }
+        val totalReturnAmount = invTotalProfit + fdTotalProfit + bankTotalEarned
+        val totalCapitalBase = totalInvestedBase + fdList.sumOf { it.investedAmt } + totalBank + totalCash
+        val totalReturnPercent = if (totalCapitalBase > 0) (totalReturnAmount / totalCapitalBase) * 100.0 else 0.0
+
+        // Auto-sync current 10-day slot into networth history
+        LaunchedEffect(networthAmount) {
+            if (networthAmount > 0.0) {
+                CacheManager.syncNetworthSlot(context, username, networthAmount)
+            }
+        }
 
         Column(
             modifier = Modifier
@@ -96,9 +118,14 @@ fun AssetsScreen(
                 .padding(16.dp)
         ) {
             NetworthCard(
-                networthAmount = networthAmount, 
+                networthAmount = networthAmount,
+                oneDayReturnAmount = oneDayReturnAmount,
+                oneDayReturnPercent = oneDayReturnPercent,
+                totalReturnAmount = totalReturnAmount,
+                totalReturnPercent = totalReturnPercent,
                 isLoading = isLoading, 
-                onClick = { onRefreshClick() }
+                onRefresh = onRefreshClick,
+                onClick = onRefreshClick
             )
             Spacer(modifier = Modifier.height(24.dp))
             
@@ -292,23 +319,6 @@ fun FinanceGridCard(
             } else {
                 Text(text = addText, color = iconColor, fontSize = 14.sp, fontWeight = FontWeight.Bold)
             }
-        }
-    }
-}
-
-@Composable
-fun NetworthCard(networthAmount: Double, isLoading: Boolean, onClick: () -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth().bounceClick { onClick() }, 
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), 
-        elevation = CardDefaults.cardElevation(2.dp), 
-        shape = RoundedCornerShape(16.dp)
-    ) {
-        Column(modifier = Modifier.padding(20.dp)) {
-            Text("NET WORTH", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-            Spacer(modifier = Modifier.height(8.dp))
-            if (isLoading) CircularProgressIndicator(modifier = Modifier.size(24.dp), color = MaterialTheme.colorScheme.primary)
-            else Text(formatRupeeAmount(networthAmount), fontSize = 32.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onSurface)
         }
     }
 }
