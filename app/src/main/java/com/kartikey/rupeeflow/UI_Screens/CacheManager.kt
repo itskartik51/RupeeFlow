@@ -14,10 +14,12 @@ import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.CashItem
 import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.CreditCardItem
 import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.FDItem
 import com.kartikey.rupeeflow.UI_Screens.Home.ContriRoomModel
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -28,6 +30,7 @@ import java.io.File
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.Calendar
+import java.util.Date
 import java.util.Locale
 
 data class AppData(
@@ -46,13 +49,13 @@ data class AppData(
     val cashData: CashItem,
     val fdList: List<FDItem>,
     val ccList: List<CreditCardItem>,
-    val contriRoomsList: List<ContriRoomModel>
+    val contriRoomsList: List<ContriRoomModel>,
+    val networthHistory: Map<String, List<Double>> = emptyMap()
 )
 
 object CacheManager {
     private const val PREFS_NAME = "RupeeFlow_GlobalCache"
     
-    // ⚡ Reactive Live State Flow for Zero-Latency UI Updates ⚡
     private val _appDataState = MutableStateFlow<AppData?>(null)
     val appDataState: StateFlow<AppData?> = _appDataState.asStateFlow()
 
@@ -133,7 +136,6 @@ object CacheManager {
 
     fun updateOptimisticCache(context: Context, username: String, data: AppData) {
         try {
-            // ⚡ Emit Instant Memory Update to all observing Composables ⚡
             _appDataState.value = data
 
             val masterJson = JSONObject().apply {
@@ -253,6 +255,14 @@ object CacheManager {
                     })
                 }
                 put("contri_rooms", contriArray)
+
+                val ntworthObj = JSONObject()
+                data.networthHistory.forEach { (mKey, slotList) ->
+                    val arr = JSONArray()
+                    slotList.forEach { arr.put(it) }
+                    ntworthObj.put(mKey, arr)
+                }
+                put("ntworth", ntworthObj)
             }
 
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -260,6 +270,53 @@ object CacheManager {
 
         } catch (e: Exception) {
             e.printStackTrace()
+        }
+    }
+
+    fun syncNetworthSlot(context: Context, username: String, currentNetworth: Double) {
+        if (currentNetworth <= 0.0) return
+        val cached = getCachedData(context, username) ?: return
+        
+        val cal = Calendar.getInstance()
+        val day = cal.get(Calendar.DAY_OF_MONTH)
+        val monthKey = SimpleDateFormat("yy-MM", Locale.getDefault()).format(cal.time)
+        
+        val slotIndex = when {
+            day <= 10 -> 0
+            day <= 20 -> 1
+            else -> 2
+        }
+
+        val historyMap = cached.networthHistory.toMutableMap()
+        val existingSlots = historyMap[monthKey]?.toMutableList() ?: mutableListOf(0.0, 0.0, 0.0)
+        
+        while (existingSlots.size < 3) {
+            existingSlots.add(0.0)
+        }
+
+        existingSlots[slotIndex] = currentNetworth
+        historyMap[monthKey] = existingSlots
+
+        // Enforce 6-Month Rolling Window
+        if (historyMap.size > 6) {
+            val sortedKeys = historyMap.keys.sorted()
+            val keysToRemove = sortedKeys.take(historyMap.size - 6)
+            keysToRemove.forEach { historyMap.remove(it) }
+        }
+
+        val updatedData = cached.copy(networthHistory = historyMap)
+        updateOptimisticCache(context, username, updatedData)
+
+        // Silent Firestore Sync
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val db = FirebaseFirestore.getInstance()
+                val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
+                if (!userQuery.isEmpty) {
+                    val userRef = userQuery.documents[0].reference
+                    userRef.set(mapOf("ntworth" to historyMap), SetOptions.merge()).await()
+                }
+            } catch (e: Exception) {}
         }
     }
 
@@ -300,7 +357,6 @@ object CacheManager {
 
                 for (doc in expensesDocs) {
                     val dataMap = doc.data
-                    
                     for ((key, value) in dataMap) {
                         if (key != "000_total" && value is Map<*, *>) {
                             val expObj = JSONObject()
@@ -483,7 +539,6 @@ object CacheManager {
 
                         "CC FD" -> {
                             val dataMap = doc.data
-                            
                             val ccMap = dataMap["CC"] as? Map<*, *>
                             ccMap?.forEach { (key, rawCc) ->
                                 if (rawCc is Map<*, *>) {
@@ -660,6 +715,16 @@ object CacheManager {
                     }
                 }
 
+                val ntworthObj = JSONObject()
+                val rawNtworth = userDoc.get("ntworth") as? Map<*, *> ?: emptyMap<Any, Any>()
+                rawNtworth.forEach { (k, v) ->
+                    if (v is List<*>) {
+                        val arr = JSONArray()
+                        v.forEach { num -> arr.put((num as? Number)?.toDouble() ?: 0.0) }
+                        ntworthObj.put(k.toString(), arr)
+                    }
+                }
+
                 val masterJson = JSONObject().apply {
                     put("status", "success")
                     put("profile", profileObj)
@@ -671,6 +736,7 @@ object CacheManager {
                     put("credit_cards", ccArray)
                     put("investments", invArray) 
                     put("contri_rooms", contriArray)
+                    put("ntworth", ntworthObj)
                 }
 
                 val responseData = masterJson.toString()
@@ -870,6 +936,23 @@ object CacheManager {
 
         val fetchedBudgetLimit = jsonResponse.optDouble("budget_limit", 0.0)
         
+        val ntworthMap = mutableMapOf<String, List<Double>>()
+        val ntworthObj = jsonResponse.optJSONObject("ntworth")
+        if (ntworthObj != null) {
+            val keys = ntworthObj.keys()
+            while (keys.hasNext()) {
+                val k = keys.next()
+                val arr = ntworthObj.optJSONArray(k)
+                if (arr != null) {
+                    val list = mutableListOf<Double>()
+                    for (i in 0 until arr.length()) {
+                        list.add(arr.optDouble(i, 0.0))
+                    }
+                    ntworthMap[k] = list
+                }
+            }
+        }
+        
         return AppData(
             userFullName = tempName,
             userEmail = tempEmail,
@@ -886,7 +969,8 @@ object CacheManager {
             cashData = fetchedCash,
             fdList = fetchedFDList,
             ccList = fetchedCCList,
-            contriRoomsList = fetchedContriRooms
+            contriRoomsList = fetchedContriRooms,
+            networthHistory = ntworthMap
         )
     }
 }
