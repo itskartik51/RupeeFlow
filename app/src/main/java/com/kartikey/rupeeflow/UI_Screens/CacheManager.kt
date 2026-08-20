@@ -15,6 +15,9 @@ import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.CreditCardItem
 import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.FDItem
 import com.kartikey.rupeeflow.UI_Screens.Home.ContriRoomModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -49,6 +52,10 @@ data class AppData(
 object CacheManager {
     private const val PREFS_NAME = "RupeeFlow_GlobalCache"
     
+    // ⚡ Reactive Live State Flow for Zero-Latency UI Updates ⚡
+    private val _appDataState = MutableStateFlow<AppData?>(null)
+    val appDataState: StateFlow<AppData?> = _appDataState.asStateFlow()
+
     fun getProfilePicFile(context: Context): File {
         return File(context.cacheDir, "profile_pic.jpg")
     }
@@ -114,7 +121,11 @@ object CacheManager {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val cachedJson = prefs.getString("data_$username", null) ?: return null
         return try {
-            parseJsonToAppData(cachedJson)
+            val parsed = parseJsonToAppData(cachedJson)
+            if (_appDataState.value == null) {
+                _appDataState.value = parsed
+            }
+            parsed
         } catch (e: Exception) {
             null
         }
@@ -122,6 +133,9 @@ object CacheManager {
 
     fun updateOptimisticCache(context: Context, username: String, data: AppData) {
         try {
+            // ⚡ Emit Instant Memory Update to all observing Composables ⚡
+            _appDataState.value = data
+
             val masterJson = JSONObject().apply {
                 put("status", "success")
                 put("profile", JSONObject().apply {
@@ -664,7 +678,9 @@ object CacheManager {
                 val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                 prefs.edit().putString("data_$username", responseData).apply()
 
-                return@withContext parseJsonToAppData(responseData)
+                val finalParsed = parseJsonToAppData(responseData)
+                _appDataState.value = finalParsed
+                return@withContext finalParsed
 
             } catch (e: Exception) {
                 null
