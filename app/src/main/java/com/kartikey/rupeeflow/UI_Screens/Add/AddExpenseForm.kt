@@ -27,6 +27,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.firebase.Timestamp
+import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
@@ -34,13 +35,16 @@ import com.kartikey.rupeeflow.Cloud_Database.Constants
 import com.kartikey.rupeeflow.UI_Screens.Assets.BankAccountItem
 import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.CashItem
 import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.CreditCardItem
+import com.kartikey.rupeeflow.UI_Screens.CacheManager
 import com.kartikey.rupeeflow.UI_Screens.CustomDatePicker
 import com.kartikey.rupeeflow.UI_Screens.bounceClick
+import com.kartikey.rupeeflow.UI_Screens.updateBudgetUsage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
@@ -598,6 +602,40 @@ fun AddExpenseForm(
                         onExpenseAdded(newEntry)
                         onDismiss() 
 
+                        // ⚡ 1. INSTANT OPTIMISTIC CACHE UPDATE ⚡
+                        val cachedData = CacheManager.getCachedData(context, username)
+                        if (cachedData != null) {
+                            val updatedBanks = cachedData.bankList.map {
+                                if (actualSourceType == "Bank" && it.accountNo == actualSourceId) {
+                                    it.copy(currentBalance = (it.currentBalance - expenseAmt).coerceAtLeast(0.0))
+                                } else it
+                            }
+                            val updatedCCs = cachedData.ccList.map {
+                                if (actualSourceType == "Credit Card" && it.cardNo == actualSourceId) {
+                                    it.copy(outstanding = it.outstanding + expenseAmt)
+                                } else it
+                            }
+                            val updatedCash = if (actualSourceType == "Cash") {
+                                cachedData.cashData.copy(amount = (cachedData.cashData.amount - expenseAmt).coerceAtLeast(0.0))
+                            } else cachedData.cashData
+
+                            val updatedTxList = listOf(newEntry) + cachedData.transactionList
+                            CacheManager.updateOptimisticCache(
+                                context,
+                                username,
+                                cachedData.copy(
+                                    bankList = updatedBanks,
+                                    ccList = updatedCCs,
+                                    cashData = updatedCash,
+                                    transactionList = updatedTxList,
+                                    todayExpenses = cachedData.todayExpenses + expenseAmt,
+                                    thisMonthExpenses = cachedData.thisMonthExpenses + expenseAmt,
+                                    thisYearExpenses = cachedData.thisYearExpenses + expenseAmt
+                                )
+                            )
+                        }
+
+                        // ⚡ 2. FIRESTORE BACKGROUND SYNC ⚡
                         CoroutineScope(Dispatchers.IO).launch {
                             try {
                                 val db = FirebaseFirestore.getInstance()
@@ -641,70 +679,139 @@ fun AddExpenseForm(
                                     
                                     expensesDocRef.set(updateMap, SetOptions.merge()).await()
 
-                                    // BALANCE DEDUCTION LOGIC
+                                    // BALANCE DEDUCTION / CC OUTSTANDING SYNC
                                     if (expenseAmt > 0) {
                                         when (actualSourceType) {
                                             "Cash" -> {
-                                                val cashDoc = userRef.collection("Finances").document("Cash").get().await()
-                                                val cur = cashDoc.getDouble("total_cash") ?: 0.0
+                                                val bankDoc = userRef.collection("Finances").document("Bank").get().await()
+                                                var cur = 0.0
+                                                if (bankDoc.exists()) {
+                                                    val cashMap = bankDoc.get("cash") as? Map<*, *>
+                                                    cur = (cashMap?.get("amnt") as? Number)?.toDouble() ?: 0.0
+                                                }
                                                 val newCash = (cur - expenseAmt).coerceAtLeast(0.0)
-                                                userRef.collection("Finances").document("Cash").update("total_cash", newCash).await()
+                                                userRef.collection("Finances").document("Bank").update(
+                                                    FieldPath.of("cash", "amnt"), newCash
+                                                ).await()
                                             }
                                             "Bank" -> {
                                                 if (actualSourceId.isNotEmpty()) {
-                                                    val bankDoc = userRef.collection("Finances").document("Banking_Data").get().await()
-                                                    val bankData = bankDoc.get(actualSourceId) as? Map<*, *>
-                                                    if (bankData != null) {
-                                                        val curBal = (bankData["current_bal"] as? Number)?.toDouble() ?: 0.0
-                                                        val newBal = (curBal - expenseAmt).coerceAtLeast(0.0)
-                                                        userRef.collection("Finances").document("Banking_Data").update("${actualSourceId}.current_bal", newBal).await()
+                                                    val bankDoc = userRef.collection("Finances").document("Bank").get().await()
+                                                    var targetBankKey: String? = null
+                                                    val bData = bankDoc.data ?: emptyMap()
+                                                    
+                                                    for ((key, rawB) in bData) {
+                                                        if (key != "last_updated" && key != "cash" && rawB is Map<*, *>) {
+                                                            if (rawB["account no."]?.toString() == actualSourceId) {
+                                                                targetBankKey = key
+                                                                break
+                                                            }
+                                                        }
+                                                    }
+                                                    
+                                                    if (targetBankKey != null) {
+                                                        val bankDataMap = bankDoc.get(targetBankKey) as? Map<*, *>
+                                                        val curBal = (bankDataMap?.get("current bal.") as? Number)?.toDouble() ?: 0.0
+                                                        val rateYr = (bankDataMap?.get("intrest % (yr)") as? Number)?.toDouble() ?: 0.0
+                                                        
+                                                        val newCalculatedBalance = (curBal - expenseAmt).coerceAtLeast(0.0)
+                                                        
+                                                        val cal = Calendar.getInstance()
+                                                        val day = cal.get(Calendar.DAY_OF_MONTH)
+                                                        val month = cal.get(Calendar.MONTH)
+                                                        val qtr = (month / 3) + 1
+
+                                                        val dayKey = if (day == 31) "31" else {
+                                                            when (day % 6) {
+                                                                1 -> "01, 07, 13, 19, 25"
+                                                                2 -> "02, 08, 14, 20, 26"
+                                                                3 -> "03, 09, 15, 21, 27"
+                                                                4 -> "04, 10, 16, 22, 28"
+                                                                5 -> "05, 11, 17, 23, 29"
+                                                                else -> "06, 12, 18, 24, 30"
+                                                            }
+                                                        }
+                                                        val avg6dKey = when {
+                                                            day <= 6 -> "01-06"
+                                                            day <= 12 -> "07-12"
+                                                            day <= 18 -> "13-18"
+                                                            day <= 24 -> "19-24"
+                                                            else -> "25-31"
+                                                        }
+                                                        val monthKey = when (month) {
+                                                            0, 3, 6, 9 -> "jan, april, july, oct"
+                                                            1, 4, 7, 10 -> "feb, may, aug, nov"
+                                                            else -> "march, june, sep, dec"
+                                                        }
+                                                        val qtrKey = "q$qtr"
+
+                                                        val rateQtr = rateYr / 4.0
+                                                        val oneDayInt = (newCalculatedBalance * (rateYr / 100.0)) / 365.0
+                                                        val expQtrInt = newCalculatedBalance * (rateQtr / 100.0)
+                                                        val expYrInt = newCalculatedBalance * (rateYr / 100.0)
+
+                                                        val todayReset = Calendar.getInstance().apply { set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }
+                                                        val startOfQtr = Calendar.getInstance().apply { set(Calendar.MONTH, (cal.get(Calendar.MONTH) / 3) * 3); set(Calendar.DAY_OF_MONTH, 1); set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }
+                                                        val diffQtr = todayReset.timeInMillis - startOfQtr.timeInMillis
+                                                        val daysPassedQtr = (diffQtr / (1000 * 60 * 60 * 24)).toInt() + 1
+                                                        val accruedQtr = expQtrInt * (daysPassedQtr / 90.0)
+
+                                                        val startOfYear = Calendar.getInstance().apply { set(Calendar.MONTH, Calendar.JANUARY); set(Calendar.DAY_OF_MONTH, 1); set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }
+                                                        val diffYr = todayReset.timeInMillis - startOfYear.timeInMillis
+                                                        val daysPassedYr = (diffYr / (1000 * 60 * 60 * 24)).toInt() + 1
+                                                        val accruedYr = expYrInt * (daysPassedYr / 365.0)
+
+                                                        userRef.collection("Finances").document("Bank").update(
+                                                            FieldPath.of(targetBankKey, "current bal."), newCalculatedBalance,
+                                                            FieldPath.of(targetBankKey, "6D bal. Block", dayKey), newCalculatedBalance,
+                                                            FieldPath.of(targetBankKey, "6D avg.", avg6dKey), newCalculatedBalance,
+                                                            FieldPath.of(targetBankKey, "monthly avg.", monthKey), newCalculatedBalance,
+                                                            FieldPath.of(targetBankKey, "qtr. avg.", qtrKey), newCalculatedBalance,
+                                                            FieldPath.of(targetBankKey, "yr avg", "cur"), newCalculatedBalance,
+                                                            FieldPath.of(targetBankKey, "1d int"), oneDayInt,
+                                                            FieldPath.of(targetBankKey, "exp qtr int"), expQtrInt,
+                                                            FieldPath.of(targetBankKey, "accrued qtr"), accruedQtr,
+                                                            FieldPath.of(targetBankKey, "exp yr int"), expYrInt,
+                                                            FieldPath.of(targetBankKey, "accrued yr"), accruedYr
+                                                        ).await()
                                                     }
                                                 }
                                             }
                                             "Credit Card" -> {
                                                 if (actualSourceId.isNotEmpty()) {
-                                                    val ccDoc = userRef.collection("Finances").document("Credit_Cards").get().await()
-                                                    val ccData = ccDoc.get(actualSourceId) as? Map<*, *>
-                                                    if (ccData != null) {
-                                                        val curOut = (ccData["outstanding"] as? Number)?.toDouble() ?: 0.0
-                                                        val limit = (ccData["limit"] as? Number)?.toDouble() ?: 0.0
+                                                    val ccDoc = userRef.collection("Finances").document("CC FD").get().await()
+                                                    var targetCCKey: String? = null
+                                                    val cMap = ccDoc.get("CC") as? Map<*, *>
+                                                    if (cMap != null) {
+                                                        for ((key, rawC) in cMap) {
+                                                            if (rawC is Map<*, *>) {
+                                                                if (rawC["card no."]?.toString() == actualSourceId) {
+                                                                    targetCCKey = key.toString()
+                                                                    break
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                    if (targetCCKey != null) {
+                                                        val ccDataMap = cMap?.get(targetCCKey) as? Map<*, *>
+                                                        val curOut = (ccDataMap?.get("outstanding") as? Number)?.toDouble() ?: 0.0
+                                                        val limit = (ccDataMap?.get("limit") as? Number)?.toDouble() ?: 0.0
                                                         val newOut = curOut + expenseAmt
-                                                        val avail = limit - newOut
+                                                        val avail = (limit - newOut).coerceAtLeast(0.0)
                                                         val util = if (limit > 0) (newOut / limit) * 100.0 else 0.0
                                                         
-                                                        userRef.collection("Finances").document("Credit_Cards").update(
-                                                            mapOf(
-                                                                "${actualSourceId}.outstanding" to newOut,
-                                                                "${actualSourceId}.available" to avail,
-                                                                "${actualSourceId}.utilization" to util
-                                                            )
+                                                        userRef.collection("Finances").document("CC FD").update(
+                                                            FieldPath.of("CC", targetCCKey, "outstanding"), newOut,
+                                                            FieldPath.of("CC", targetCCKey, "available"), avail,
+                                                            FieldPath.of("CC", targetCCKey, "utilization"), util
                                                         ).await()
                                                     }
                                                 }
                                             }
                                         }
 
-                                        // UPDATE BUDGET STRING FORMAT
-                                        val budgetDocRef = userRef.collection("Finances").document("Budget")
-                                        val budgetDoc = budgetDocRef.get().await()
-                                        if (budgetDoc.exists()) {
-                                            val limitVal = userQuery.documents[0].getDouble("budget_limit") ?: 0.0
-                                            val usedStr = budgetDoc.getString("used") ?: "0"
-                                            val currentUsed = usedStr.substringBefore(" ").toDoubleOrNull() ?: 0.0
-                                            val newUsed = (currentUsed + expenseAmt).coerceAtLeast(0.0)
-                                            val usedPct = if (limitVal > 0) (newUsed / limitVal) * 100 else 0.0
-                                            val availAmtCalc = maxOf(0.0, limitVal - newUsed)
-                                            val availPctStr = if (limitVal > 0) (availAmtCalc / limitVal) * 100 else 0.0
-                                            
-                                            val formatVal = { amt: Double, pct: Double ->
-                                                "${amt.toInt()} (${String.format(Locale.US, "%.1f", pct)}%)"
-                                            }
-                                            
-                                            budgetDocRef.set(hashMapOf(
-                                                "used" to formatVal(newUsed, usedPct),
-                                                "available" to formatVal(availAmtCalc, availPctStr)
-                                            ), SetOptions.merge()).await()
-                                        }
+                                        // UPDATE BUDGET
+                                        updateBudgetUsage(userRef, expenseAmt)
                                     }
                                 }
                             } catch (e: Exception) { }
