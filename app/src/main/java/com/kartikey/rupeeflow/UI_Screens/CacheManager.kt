@@ -33,6 +33,13 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
+data class NetworthDataPoint(
+    val monthKey: String, // e.g. "26-08"
+    val slotIndex: Int,   // 0, 1, 2
+    val label: String,    // e.g. "01-10 Aug", "11-20 Aug", "21-End Aug"
+    val amount: Double
+)
+
 data class AppData(
     val userFullName: String,
     val userEmail: String,
@@ -56,6 +63,7 @@ data class AppData(
 object CacheManager {
     private const val PREFS_NAME = "RupeeFlow_GlobalCache"
     
+    // ⚡ Reactive Live State Flow for Zero-Latency UI Updates ⚡
     private val _appDataState = MutableStateFlow<AppData?>(null)
     val appDataState: StateFlow<AppData?> = _appDataState.asStateFlow()
 
@@ -256,6 +264,7 @@ object CacheManager {
                 }
                 put("contri_rooms", contriArray)
 
+                // Save Net Worth History map into master JSON
                 val ntworthObj = JSONObject()
                 data.networthHistory.forEach { (mKey, slotList) ->
                     val arr = JSONArray()
@@ -273,6 +282,35 @@ object CacheManager {
         }
     }
 
+    // ⚡ READ HELPER: Get Sorted Net Worth Timeline for UI / Graphs ⚡
+    fun getTimelineNetworth(context: Context, username: String): List<NetworthDataPoint> {
+        val appData = getCachedData(context, username) ?: return emptyList()
+        val timelineList = mutableListOf<NetworthDataPoint>()
+
+        val monthNameFormat = SimpleDateFormat("MMM", Locale.getDefault())
+        val parseFormat = SimpleDateFormat("yy-MM", Locale.getDefault())
+
+        val sortedMonths = appData.networthHistory.keys.sorted() // Chronological order
+        for (mKey in sortedMonths) {
+            val slots = appData.networthHistory[mKey] ?: continue
+            val monthDate = try { parseFormat.parse(mKey) } catch (e: Exception) { null }
+            val mName = if (monthDate != null) monthNameFormat.format(monthDate) else mKey
+
+            slots.forEachIndexed { index, amount ->
+                if (amount > 0.0) {
+                    val label = when (index) {
+                        0 -> "01-10 $mName"
+                        1 -> "11-20 $mName"
+                        else -> "21-End $mName"
+                    }
+                    timelineList.add(NetworthDataPoint(mKey, index, label, amount))
+                }
+            }
+        }
+        return timelineList
+    }
+
+    // ⚡ WRITE & SYNC: Live slot update for 10-day period with 6-month retention ⚡
     fun syncNetworthSlot(context: Context, username: String, currentNetworth: Double) {
         if (currentNetworth <= 0.0) return
         val cached = getCachedData(context, username) ?: return
@@ -297,7 +335,7 @@ object CacheManager {
         existingSlots[slotIndex] = currentNetworth
         historyMap[monthKey] = existingSlots
 
-        // Enforce 6-Month Rolling Window
+        // Enforce 6-Month Rolling Window (Auto-prune oldest if months > 6)
         if (historyMap.size > 6) {
             val sortedKeys = historyMap.keys.sorted()
             val keysToRemove = sortedKeys.take(historyMap.size - 6)
@@ -715,6 +753,7 @@ object CacheManager {
                     }
                 }
 
+                // Parse Net Worth map from Firestore User Document
                 val ntworthObj = JSONObject()
                 val rawNtworth = userDoc.get("ntworth") as? Map<*, *> ?: emptyMap<Any, Any>()
                 rawNtworth.forEach { (k, v) ->
@@ -936,6 +975,7 @@ object CacheManager {
 
         val fetchedBudgetLimit = jsonResponse.optDouble("budget_limit", 0.0)
         
+        // Read historical Net Worth map from JSON
         val ntworthMap = mutableMapOf<String, List<Double>>()
         val ntworthObj = jsonResponse.optJSONObject("ntworth")
         if (ntworthObj != null) {
