@@ -17,6 +17,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.formatRupeeAmount
+import com.kartikey.rupeeflow.UI_Screens.bounceClick
 import kotlin.math.abs
 
 @Composable
@@ -30,15 +32,16 @@ fun NetworthCard(
     onRefresh: () -> Unit = {},
     onClick: () -> Unit = {}
 ) {
-    // Visibility state for the Eye icon
     var isVisible by remember { mutableStateOf(true) }
 
     Card(
-        modifier = Modifier.fillMaxWidth().clickable { onClick() },
-        colors = CardDefaults.cardColors(containerColor = Color.White), // White Theme
+        modifier = Modifier
+            .fillMaxWidth()
+            .bounceClick { onClick() },
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(2.dp),
-        border = BorderStroke(1.dp, Color(0xFFEEEEEE))
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
 
@@ -49,9 +52,9 @@ fun NetworthCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Net Worth",
-                    color = Color.DarkGray,
-                    fontSize = 14.sp,
+                    text = "NET WORTH",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.Bold
                 )
 
@@ -59,37 +62,39 @@ fun NetworthCard(
                     Icon(
                         imageVector = if (isVisible) Icons.Outlined.Visibility else Icons.Outlined.VisibilityOff,
                         contentDescription = "Toggle Visibility",
-                        tint = Color.Gray,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier
-                            .size(22.dp)
+                            .size(20.dp)
                             .clickable { isVisible = !isVisible }
                     )
                     Icon(
                         imageVector = Icons.Outlined.Refresh,
                         contentDescription = "Refresh Data",
-                        tint = Color.Gray,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier
-                            .size(22.dp)
+                            .size(20.dp)
                             .clickable { onRefresh() }
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
             // --- MIDDLE ROW: Main Amount ---
             if (isLoading) {
-                CircularProgressIndicator(color = Color(0xFF2E7D32), modifier = Modifier.size(32.dp))
+                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary, modifier = Modifier.size(28.dp))
             } else {
                 Text(
-                    text = if (isVisible) "₹${String.format("%,.2f", networthAmount)}" else "• • • • • • •",
+                    text = if (isVisible) formatRupeeAmount(networthAmount) else "••••••••",
                     fontWeight = FontWeight.ExtraBold,
-                    fontSize = 36.sp,
-                    color = Color.Black
+                    fontSize = 32.sp,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(20.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            Spacer(modifier = Modifier.height(16.dp))
 
             // --- BOTTOM ROW: Returns ---
             Row(
@@ -98,29 +103,29 @@ fun NetworthCard(
                 verticalAlignment = Alignment.Bottom
             ) {
                 // Left Column (1D returns)
-                Column {
+                Column(horizontalAlignment = Alignment.Start) {
                     Text(
-                        text = "1D returns",
-                        color = Color.Gray,
-                        fontSize = 12.sp,
+                        text = "1D Returns",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.Medium
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     
                     val is1DPos = oneDayReturnAmount >= 0
-                    val color1D = if (is1DPos) Color(0xFF00C853) else Color(0xFFD32F2F)
+                    val color1D = if (is1DPos) Color(0xFF388E3C) else Color(0xFFD32F2F)
                     val sign1D = if (is1DPos) "+" else "-"
-                    val formattedAmt1D = String.format("%,.2f", abs(oneDayReturnAmount))
-                    val formattedPct1D = String.format("%.2f", abs(oneDayReturnPercent))
+                    val formattedAmt1D = formatRupeeAmount(abs(oneDayReturnAmount))
+                    val formattedPct1D = String.format(Locale.US, "%.2f", abs(oneDayReturnPercent))
                     
                     Text(
                         text = if (isVisible) {
-                            "$sign1D₹$formattedAmt1D ($formattedPct1D%)"
+                            "$sign1D$formattedAmt1D ($formattedPct1D%)"
                         } else {
-                            "• • • • ($formattedPct1D%)"
+                            "•••• ($formattedPct1D%)"
                         },
                         color = color1D,
-                        fontSize = 14.sp,
+                        fontSize = 13.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
@@ -128,27 +133,27 @@ fun NetworthCard(
                 // Right Column (Total returns)
                 Column(horizontalAlignment = Alignment.End) {
                     Text(
-                        text = "Total returns",
-                        color = Color.Gray,
-                        fontSize = 12.sp,
+                        text = "Total Returns",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.Medium
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     
                     val isTotalPos = totalReturnAmount >= 0
-                    val colorTotal = if (isTotalPos) Color(0xFF00C853) else Color(0xFFD32F2F)
+                    val colorTotal = if (isTotalPos) Color(0xFF388E3C) else Color(0xFFD32F2F)
                     val signTotal = if (isTotalPos) "+" else "-"
-                    val formattedAmtTotal = String.format("%,.2f", abs(totalReturnAmount))
-                    val formattedPctTotal = String.format("%.2f", abs(totalReturnPercent))
+                    val formattedAmtTotal = formatRupeeAmount(abs(totalReturnAmount))
+                    val formattedPctTotal = String.format(Locale.US, "%.2f", abs(totalReturnPercent))
 
                     Text(
                         text = if (isVisible) {
-                            "$signTotal₹$formattedAmtTotal ($formattedPctTotal%)"
+                            "$signTotal$formattedAmtTotal ($formattedPctTotal%)"
                         } else {
-                            "• • • • ($formattedPctTotal%)"
+                            "•••• ($formattedPctTotal%)"
                         },
                         color = colorTotal,
-                        fontSize = 14.sp,
+                        fontSize = 13.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
