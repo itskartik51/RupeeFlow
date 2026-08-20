@@ -33,7 +33,7 @@ data class AppData(
     val userMobile: String,
     val profilePicUrl: String, 
     val userDob: String,
-    val todayExpenses: Double, // Added Today
+    val todayExpenses: Double,
     val thisMonthExpenses: Double,
     val thisYearExpenses: Double,
     val budgetLimit: Double,
@@ -288,22 +288,22 @@ object CacheManager {
                     val dataMap = doc.data
                     
                     for ((key, value) in dataMap) {
-                        if (value is Map<*, *>) {
+                        if (key != "000_total" && value is Map<*, *>) {
                             val expObj = JSONObject()
-                            val rawDate = value["date"]
+                            val rawDate = value["dt"]
                             val dateStr = when (rawDate) {
                                 is Timestamp -> SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(rawDate.toDate())
-                                is String -> rawDate.toString()
+                                is String -> rawDate
                                 else -> ""
                             }
 
                             expObj.put("date", dateStr)
-                            expObj.put("amount", (value["amount"] as? Number)?.toDouble() ?: 0.0)
-                            expObj.put("category", value["category"]?.toString() ?: "")
-                            expObj.put("detail1", value["detail_1"]?.toString() ?: value["detail1"]?.toString() ?: "")
-                            expObj.put("detail2", value["detail_2"]?.toString() ?: value["detail2"]?.toString() ?: "")
+                            expObj.put("amount", (value["amnt"] as? Number)?.toDouble() ?: 0.0)
+                            expObj.put("category", value["cat"]?.toString() ?: "")
+                            expObj.put("detail1", value["det1"]?.toString() ?: "")
+                            expObj.put("detail2", value["det2"]?.toString() ?: "")
                             
-                            val paymentDetail = value["payment_detail"]?.toString() ?: ""
+                            val paymentDetail = value["pay"]?.toString() ?: ""
                             val splitPayment = paymentDetail.split("|").map { it.trim() }
                             
                             expObj.put("mode", if (splitPayment.isNotEmpty()) splitPayment[0] else "")
@@ -689,7 +689,7 @@ object CacheManager {
 
         val expensesArray = jsonResponse.optJSONArray("expenses")
         var tempTotal = 0.0
-        var tempToday = 0.0 // Added for optimistic calculation
+        var tempToday = 0.0
         var tempMonth = 0.0
         var tempYear = 0.0
         val tempHistory = mutableListOf<TransactionModel>()
@@ -723,7 +723,6 @@ object CacheManager {
                         )
                     )
                     
-                    // Optimistic check for Today's expenses
                     if (rawDate.startsWith(todayPrefixSlash) || rawDate.startsWith(todayPrefixDash)) {
                         tempToday += amt
                     }
@@ -861,7 +860,7 @@ object CacheManager {
             userMobile = tempMobile,
             profilePicUrl = tempPrfl, 
             userDob = tempDob,
-            todayExpenses = tempToday, // Included in return payload
+            todayExpenses = tempToday,
             thisMonthExpenses = tempMonth,
             thisYearExpenses = tempYear,
             budgetLimit = fetchedBudgetLimit,
