@@ -275,7 +275,6 @@ fun AddExpenseForm(
                             .widthIn(min = 140.dp)
                     ) {
                         paymentModes.forEach { (name, icon) ->
-                            
                             val isAvailable = when (name) {
                                 "Cash" -> hasCash
                                 "Credit Card" -> hasCC
@@ -602,9 +601,6 @@ fun AddExpenseForm(
                                     val userRef = userQuery.documents[0].reference
                                     val paymentDetailStr = "$actualMode | $actualSourceType | $actualSourceId"
 
-                                    // ==========================================
-                                    // FIXED: Using Underscore instead of Dot
-                                    // ==========================================
                                     val dateForDoc = SimpleDateFormat("yyyy_MM", Locale.getDefault()).format(Date(expenseDateMillis))
                                     val expensesDocRef = userRef.collection("Expenses").document(dateForDoc)
                                     
@@ -614,33 +610,31 @@ fun AddExpenseForm(
                                     if (expenseDocSnap.exists()) {
                                         val dataMap = expenseDocSnap.data
                                         if (dataMap != null) {
-                                            val seqKeys = dataMap.keys.filter { it.matches(Regex("^\\d{3}_.*")) }
+                                            val seqKeys = dataMap.keys.filter { it.matches(Regex("^\\d{3}$")) && it != "000_total" }
                                             if (seqKeys.isNotEmpty()) {
-                                                val maxSeq = seqKeys.maxOf { it.substring(0, 3).toInt() }
+                                                val maxSeq = seqKeys.maxOf { it.toInt() }
                                                 nextSeq = maxSeq + 1
                                             }
                                         }
                                     }
                                     
                                     val formattedSeq = String.format(Locale.US, "%03d", nextSeq)
-                                    val fieldKey = "${formattedSeq}_${finalCategory}"
                                     
                                     val expData = hashMapOf<String, Any>(
-                                        "date" to Timestamp(Date(expenseDateMillis)),
-                                        "amount" to expenseAmt,
-                                        "category" to finalCategory,
-                                        "detail_1" to remark1,
-                                        "detail_2" to remark2,
-                                        "payment_detail" to paymentDetailStr
+                                        "dt" to Timestamp(Date(expenseDateMillis)),
+                                        "amnt" to expenseAmt,
+                                        "cat" to finalCategory,
+                                        "det1" to remark1,
+                                        "det2" to remark2,
+                                        "pay" to paymentDetailStr
                                     )
                                     
                                     val updateMap = hashMapOf<String, Any>(
-                                        fieldKey to expData,
+                                        formattedSeq to expData,
                                         "000_total" to FieldValue.increment(expenseAmt)
                                     )
                                     
                                     expensesDocRef.set(updateMap, SetOptions.merge()).await()
-                                    // ==========================================
 
                                     // BALANCE DEDUCTION LOGIC
                                     if (expenseAmt > 0) {
