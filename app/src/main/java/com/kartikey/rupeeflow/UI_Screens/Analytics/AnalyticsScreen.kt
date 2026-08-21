@@ -21,7 +21,7 @@ fun AnalyticsScreen(paddingValues: PaddingValues) {
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         // --- CARD 1: Spending Breakdown Donut Chart ---
-        ExpGraphCard()[cite: 2]
+        ExpGraphCard()
 
         // --- CARD 2: Net Worth Area Wave Chart ---
         NtwGraphCard()
