@@ -1,12 +1,16 @@
 package com.kartikey.rupeeflow.UI_Screens.Add
 
 import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -47,79 +51,70 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
     var buyPrice by remember { mutableStateOf("") }
     
     var typeExpanded by remember { mutableStateOf(false) }
-    var searchExpanded by remember { mutableStateOf(false) }
     
     var searchResults by remember { mutableStateOf<List<SearchRow>>(emptyList()) }
     var isSearching by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
 
-    // ⚡ Fast Unofficial Broker API Engine (1-Call System) ⚡
+    // ⚡ Robust Search Engine (Groww API Primary + Multi-key Fallback) ⚡
     LaunchedEffect(assetName, assetType) {
         if (assetName.isBlank() || selectedSymbol.isNotEmpty() || assetType.isEmpty()) {
             searchResults = emptyList()
-            searchExpanded = false
             return@LaunchedEffect
         }
         
-        delay(500) // Debounce delay
+        delay(400) // Fast debounce
         isSearching = true
         
         withContext(Dispatchers.IO) {
             try {
                 val client = OkHttpClient()
-                // Fake Browser Identity
                 val userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
                 
-                // ⚡ Strict Category Filter Engine ⚡
-                val validQuoteTypes = when (assetType) {
+                // Target category mapping
+                val targetTypes = when (assetType) {
                     "Mutual Fund" -> listOf("MF", "MUTUAL_FUND", "MUTUALFUND")
                     "ETF" -> listOf("ETF")
-                    "Bond" -> listOf("BOND", "SGB", "STOCK") // SGBs trade as equities
+                    "Bond" -> listOf("BOND", "SGB", "STOCK", "EQUITY")
                     else -> listOf("STOCK", "EQUITY")
                 }
 
-                // Groww Public Guest Search API Endpoint
-                val request = Request.Builder()
-                    .url("https://groww.in/v1/api/search/v1/derived/entity?app=false&entityType=ALL&page=0&query=${assetName.replace(" ", "%20")}&size=20")
+                // 1. Primary Attempt: Groww Native Entity Search
+                val growwUrl = "https://groww.in/v1/api/search/v1/derived/entity?app=false&entityType=ALL&page=0&query=${assetName.replace(" ", "%20")}&size=20"
+                val growwRequest = Request.Builder()
+                    .url(growwUrl)
                     .header("User-Agent", userAgent)
                     .header("Accept", "application/json")
                     .get()
                     .build()
                     
-                val response = client.newCall(request).execute()
+                val response = client.newCall(growwRequest).execute()
                 val responseData = response.body?.string() ?: ""
-                
+                val parsedList = mutableListOf<SearchRow>()
+
                 if (response.isSuccessful && responseData.isNotEmpty()) {
                     val jsonResponse = JSONObject(responseData)
-                    
-                    // Defensively look for standard array keys
-                    val contentArr = jsonResponse.optJSONArray("content") ?: jsonResponse.optJSONArray("data")
-                    
-                    val parsedResults = mutableListOf<SearchRow>()
+                    val contentArr = jsonResponse.optJSONArray("content") 
+                        ?: jsonResponse.optJSONObject("data")?.optJSONArray("content")
+                        ?: jsonResponse.optJSONArray("data")
                     
                     if (contentArr != null) {
                         for (i in 0 until contentArr.length()) {
                             val item = contentArr.getJSONObject(i)
+                            val qType = item.optString("entity_type", item.optString("type", "")).uppercase(Locale.getDefault())
                             
-                            val qType = item.optString("entity_type", "").uppercase(Locale.getDefault())
-                            
-                            // ⚡ Filter Logic: Is item matching our selected Dropdown Category? ⚡
-                            if (validQuoteTypes.any { qType.contains(it) }) {
+                            if (targetTypes.any { qType.contains(it) } || qType.isEmpty()) {
+                                val rawSym = item.optString("search_id", item.optString("nse_scrip_code", item.optString("bse_scrip_code", "")))
+                                val fullName = item.optString("title", item.optString("scheme_name", item.optString("name", "")))
+                                val livePrice = item.optDouble("live_price", item.optDouble("nav", item.optDouble("current_price", 0.0)))
                                 
-                                val rawSym = item.optString("search_id", item.optString("nse_scrip_code", ""))
-                                val fullName = item.optString("title", item.optString("scheme_name", ""))
-                                
-                                // Groww sometimes sends live price in nested objects or direct
-                                val livePrice = item.optDouble("live_price", item.optDouble("nav", 0.0))
-                                
-                                if (rawSym.isNotEmpty() || fullName.isNotEmpty()) {
-                                    val cleanSymbol = rawSym.replace(".NS", "").replace(".BO", "").ifEmpty { fullName.take(8).uppercase() }
-                                    
-                                    parsedResults.add(
+                                if (rawSym.isNotBlank() || fullName.isNotBlank()) {
+                                    val cleanSymbol = rawSym.replace(".NS", "").replace(".BO", "").ifEmpty { fullName.take(10).uppercase() }
+                                    parsedList.add(
                                         SearchRow(
                                             cleanSymbol = cleanSymbol,
-                                            rawSymbol = rawSym,
+                                            rawSymbol = rawSym.ifEmpty { cleanSymbol },
                                             fullName = fullName,
                                             livePrice = livePrice
                                         )
@@ -128,20 +123,44 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                             }
                         }
                     }
+                }
+
+                // 2. Secondary Fallback: If primary list is empty, hit Yahoo Search
+                if (parsedList.isEmpty()) {
+                    val yahooUrl = "https://query2.finance.yahoo.com/v1/finance/search?q=${assetName.replace(" ", "%20")}&quotesCount=15"
+                    val yahooReq = Request.Builder()
+                        .url(yahooUrl)
+                        .header("User-Agent", userAgent)
+                        .get()
+                        .build()
+                    val yResp = client.newCall(yahooReq).execute()
+                    val yData = yResp.body?.string() ?: ""
                     
-                    withContext(Dispatchers.Main) {
-                        // Broker APIs natively return sorted lists based on relevance/market cap
-                        searchResults = parsedResults
-                        isSearching = false
-                        if (parsedResults.isNotEmpty()) {
-                            searchExpanded = true
+                    if (yResp.isSuccessful && yData.isNotEmpty()) {
+                        val yQuotes = JSONObject(yData).optJSONArray("quotes")
+                        if (yQuotes != null) {
+                            for (i in 0 until yQuotes.length()) {
+                                val q = yQuotes.getJSONObject(i)
+                                val sym = q.optString("symbol", "")
+                                if (sym.endsWith(".NS") || sym.endsWith(".BO")) {
+                                    val name = q.optString("longname", q.optString("shortname", ""))
+                                    val clean = sym.replace(".NS", "").replace(".BO", "")
+                                    parsedList.add(SearchRow(cleanSymbol = clean, rawSymbol = sym, fullName = name, livePrice = 0.0))
+                                }
+                            }
                         }
                     }
-                } else {
-                    withContext(Dispatchers.Main) { isSearching = false }
+                }
+
+                withContext(Dispatchers.Main) {
+                    searchResults = parsedList
+                    isSearching = false
                 }
             } catch (e: Exception) {
-                withContext(Dispatchers.Main) { isSearching = false }
+                withContext(Dispatchers.Main) { 
+                    searchResults = emptyList()
+                    isSearching = false 
+                }
             }
         }
     }
@@ -191,6 +210,7 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                                 sheetTicker = ""
                                 quantity = ""
                                 buyPrice = ""
+                                searchResults = emptyList()
                                 typeExpanded = false
                             }
                         )
@@ -198,97 +218,99 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                 }
             }
 
-            // ⚡ Conditional UI (Only visible when Type is selected) ⚡
+            // ⚡ Conditional Form UI ⚡
             if (assetType.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(20.dp))
                 HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                 Spacer(modifier = Modifier.height(16.dp))
 
-                ExposedDropdownMenuBox(
-                    expanded = searchExpanded,
-                    onExpandedChange = { 
-                        if (searchResults.isNotEmpty() && assetName.isNotEmpty()) {
-                            searchExpanded = it 
-                        }
-                    }
-                ) {
-                    OutlinedTextField(
-                        value = assetName,
-                        onValueChange = { 
-                            assetName = it 
-                            selectedSymbol = "" 
-                            sheetTicker = ""
-                            searchExpanded = it.isNotEmpty()
-                        },
-                        label = { Text("Search $assetType Name") },
-                        modifier = Modifier.fillMaxWidth().menuAnchor(),
-                        singleLine = true,
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary, unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), focusedTextColor = MaterialTheme.colorScheme.onSurface, unfocusedTextColor = MaterialTheme.colorScheme.onSurface),
-                        trailingIcon = { 
-                            if (isSearching) {
-                                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.primary)
-                            } else {
-                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = searchExpanded) 
+                // --- SEARCH BAR ---
+                OutlinedTextField(
+                    value = assetName,
+                    onValueChange = { 
+                        assetName = it 
+                        selectedSymbol = "" 
+                        sheetTicker = ""
+                    },
+                    label = { Text("Search $assetType Name") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary, 
+                        unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), 
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface, 
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                    ),
+                    trailingIcon = { 
+                        if (isSearching) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.primary)
+                        } else if (assetName.isNotEmpty()) {
+                            IconButton(onClick = { 
+                                assetName = ""
+                                selectedSymbol = ""
+                                sheetTicker = ""
+                                searchResults = emptyList()
+                            }) {
+                                Icon(Icons.Default.Close, contentDescription = "Clear", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
                             }
                         }
-                    )
-                    
-                    if (assetName.isNotEmpty() && searchResults.isNotEmpty() && selectedSymbol.isEmpty()) {
-                        ExposedDropdownMenu(
-                            expanded = searchExpanded,
-                            onDismissRequest = { searchExpanded = false },
-                            modifier = Modifier
-                                .background(MaterialTheme.colorScheme.surface)
-                                .heightIn(max = 260.dp) // Strict Height to prevent Keyboard overlap
-                        ) {
-                            searchResults.forEach { row ->
-                                DropdownMenuItem(
-                                    text = { 
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            // --- Left Side: Symbol + Truncated Name ---
-                                            Column(modifier = Modifier.weight(0.65f)) {
-                                                Text(text = row.cleanSymbol, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface)
-                                                
-                                                if (row.fullName.isNotBlank() && !row.fullName.equals(row.cleanSymbol, ignoreCase = true)) {
-                                                    Spacer(modifier = Modifier.height(2.dp))
-                                                    val cleanBracketName = if (row.fullName.length > 22) "${row.fullName.take(20)}..." else row.fullName
-                                                    Text(text = "($cleanBracketName)", fontSize = 11.5.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                                }
-                                            }
+                    }
+                )
+
+                // ⚡ INLINE SEARCH SUGGESTIONS (Zero Keyboard Overlap Bug) ⚡
+                if (assetName.isNotEmpty() && searchResults.isNotEmpty() && selectedSymbol.isEmpty()) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 240.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.15f))
+                    ) {
+                        Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                            searchResults.forEachIndexed { index, row ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            val prefix = if (row.rawSymbol.endsWith(".NS")) "NSE:" else if (row.rawSymbol.endsWith(".BO")) "BOM:" else "NSE:"
+                                            assetName = row.cleanSymbol 
+                                            selectedSymbol = row.cleanSymbol
+                                            sheetTicker = prefix + row.cleanSymbol
                                             
-                                            // --- Right Side: Live Price (with fallback handler) ---
-                                            Text(
-                                                text = if (row.livePrice > 0.0) "₹ ${String.format(Locale.US, "%.2f", row.livePrice)}" else "-",
-                                                fontWeight = FontWeight.ExtraBold,
-                                                fontSize = 14.sp,
-                                                color = MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier.weight(0.35f),
-                                                textAlign = TextAlign.End
-                                            )
+                                            if (row.livePrice > 0.0) {
+                                                buyPrice = String.format(Locale.US, "%.2f", row.livePrice)
+                                            }
+                                            searchResults = emptyList()
                                         }
-                                    },
-                                    onClick = {
-                                        val prefix = if (row.rawSymbol.endsWith(".NS")) "NSE:" else if (row.rawSymbol.endsWith(".BO")) "BOM:" else "NSE:"
+                                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(0.7f)) {
+                                        Text(text = row.cleanSymbol, fontWeight = FontWeight.Bold, fontSize = 14.5.sp, color = MaterialTheme.colorScheme.onSurface)
                                         
-                                        assetName = row.cleanSymbol 
-                                        selectedSymbol = row.cleanSymbol
-                                        sheetTicker = prefix + row.cleanSymbol
-                                        
-                                        // Auto-fill price only if successfully fetched
-                                        if (row.livePrice > 0.0) {
-                                            buyPrice = String.format(Locale.US, "%.2f", row.livePrice)
-                                        } else {
-                                            buyPrice = ""
+                                        if (row.fullName.isNotBlank() && !row.fullName.equals(row.cleanSymbol, ignoreCase = true)) {
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            val cleanBracketName = if (row.fullName.length > 24) "${row.fullName.take(22)}..." else row.fullName
+                                            Text(text = "($cleanBracketName)", fontSize = 11.5.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                         }
-                                        
-                                        searchExpanded = false
                                     }
-                                )
+                                    
+                                    Text(
+                                        text = if (row.livePrice > 0.0) "₹ ${String.format(Locale.US, "%.2f", row.livePrice)}" else "-",
+                                        fontWeight = FontWeight.ExtraBold,
+                                        fontSize = 13.5.sp,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.weight(0.3f),
+                                        textAlign = TextAlign.End
+                                    )
+                                }
+                                if (index < searchResults.size - 1) {
+                                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.08f))
+                                }
                             }
                         }
                     }
@@ -296,7 +318,7 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // ⚡ Dynamic Labels & Math Physics depending on Asset Type ⚡
+                // --- QUANTITY & BUY PRICE INPUTS ---
                 val isMutualFund = assetType == "Mutual Fund"
                 val qtyLabel = if (isMutualFund) "Total Units" else "Quantity"
                 val priceLabel = if (isMutualFund) "Average NAV" else "Buy Price"
@@ -306,9 +328,9 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                         value = quantity, 
                         onValueChange = { 
                             if (isMutualFund) {
-                                quantity = it // Allows Decimals for MFs
+                                quantity = it // Allows Decimals
                             } else {
-                                if (it.all { char -> char.isDigit() }) quantity = it // Integers only for Stocks/Bonds/ETFs
+                                if (it.all { char -> char.isDigit() }) quantity = it // Integers only
                             }
                         },
                         label = { Text(qtyLabel) },
@@ -344,13 +366,13 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
 
                 Spacer(modifier = Modifier.height(24.dp))
 
+                // --- SAVE BUTTON ---
                 Button(
                     onClick = {
                         val qty = quantity.toDoubleOrNull() ?: 0.0
                         val price = buyPrice.toDoubleOrNull() ?: 0.0
                         
                         if (selectedSymbol.isNotBlank() && qty > 0 && price > 0) {
-                            
                             onInvestmentAdded()
                             onDismiss() 
                             
@@ -364,7 +386,6 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                                         val userRef = userDoc.reference
                                         
                                         val investMap = userDoc.get("invest") as? Map<String, Any> ?: emptyMap()
-                                        
                                         val maxKey = investMap.keys.mapNotNull { it.toIntOrNull() }.maxOrNull() ?: 0
                                         val newKey = String.format(Locale.US, "%03d", maxKey + 1)
                                         
@@ -388,11 +409,10 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                                         put("action", "addTicker")
                                         put("ticker", sheetTicker) 
                                         put("name", assetName)
-                                        put("type", assetType) 
+                                        put("type", assetType)
                                     }.toString()
                                     
                                     val requestBody = jsonPayload.toRequestBody("application/json; charset=utf-8".toMediaTypeOrNull())
-                                    
                                     val request = Request.Builder()
                                         .url(Constants.GOOGLE_SHEET_API_URL)
                                         .post(requestBody)
