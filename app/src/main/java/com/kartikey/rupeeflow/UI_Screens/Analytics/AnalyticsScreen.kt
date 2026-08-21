@@ -1,25 +1,28 @@
 package com.kartikey.rupeeflow.UI_Screens.Analytics
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.Text
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 
 @Composable
 fun AnalyticsScreen(paddingValues: PaddingValues) {
-    Box(
-        modifier = Modifier.fillMaxSize().padding(paddingValues),
-        contentAlignment = Alignment.Center
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .padding(paddingValues)
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("Analytics & Charts", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFF1565C0))
-            Spacer(modifier = Modifier.height(8.dp))
-            Text("Spending Graphs Coming Soon...", color = Color.Gray, fontSize = 14.sp)
-        }
+        // --- CARD 1: Spending Breakdown Donut Chart ---
+        ExpGraphCard()
+
+        // (Future Analytics Cards jaise Net Worth Timeline Graph yahan stack honge)
     }
 }
