@@ -1,10 +1,7 @@
 package com.kartikey.rupeeflow.UI_Screens.Analytics
 
-import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
@@ -34,6 +31,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
 import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.formatRupeeAmount
 import com.kartikey.rupeeflow.UI_Screens.CacheManager
 import java.text.SimpleDateFormat
@@ -41,6 +40,7 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import kotlin.math.atan2
+import kotlin.math.sqrt
 
 data class CategorySpendItem(
     val category: String,
@@ -83,9 +83,9 @@ fun ExpGraphCard(modifier: Modifier = Modifier) {
 
     var selectedCategoryName by remember { mutableStateOf<String?>(null) }
     val emptyRingColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-    val centerInteractionSource = remember { MutableInteractionSource() }
+    val noRippleInteractionSource = remember { MutableInteractionSource() }
 
-    // ⚡ Real-Time Filter Aggregation with Dynamic Palette Cycling ⚡
+    // ⚡ Real-Time Filter Aggregation (Sorted by Highest Spend First) ⚡
     val (filteredCategories, grandTotal) = remember(transactions, selectedFilter) {
         val now = Calendar.getInstance()
         val currDayStr = String.format(Locale.US, "%02d", now.get(Calendar.DAY_OF_MONTH))
@@ -131,6 +131,7 @@ fun ExpGraphCard(modifier: Modifier = Modifier) {
         val total = grouped.values.sum()
         var currentAngle = -90f
 
+        // Highest spend sorted to the top
         val list = grouped.entries.sortedByDescending { it.value }.mapIndexed { index, entry ->
             val pct = if (total > 0) (entry.value / total) * 100.0 else 0.0
             val sweep = ((pct / 100.0) * 360.0).toFloat()
@@ -163,102 +164,111 @@ fun ExpGraphCard(modifier: Modifier = Modifier) {
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .animateContentSize(),
+            .clickable(
+                interactionSource = noRippleInteractionSource,
+                indication = null
+            ) {
+                // Card-wide Tap-Outside Reset for selected slice
+                selectedCategoryName = null
+            },
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(2.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
     ) {
-        Column(modifier = Modifier.padding(top = 16.dp, start = 16.dp, end = 16.dp, bottom = 18.dp)) {
+        Column(modifier = Modifier.padding(top = 16.dp, start = 16.dp, end = 16.dp, bottom = 16.dp)) {
 
-            // --- TOP ROW: Title & Animated Morphing Capsule Filter ---
+            // --- TOP ROW: Title & Floating Capsule Dropdown Anchor ---
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text = "SPENDING BREAKDOWN",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(top = 8.dp)
+                    fontWeight = FontWeight.Bold
                 )
 
-                // ⚡ Theme-Adaptive Morphing Capsule Dropdown ⚡
-                Box(
-                    modifier = Modifier
-                        .width(132.dp)
-                        .animateContentSize(animationSpec = spring(stiffness = Spring.StiffnessMediumLow))
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(MaterialTheme.colorScheme.surface)
-                        .border(
-                            BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
-                            RoundedCornerShape(16.dp)
+                // ⚡ Floating Capsule Filter (Zero Layout Shift) ⚡
+                Box {
+                    Row(
+                        modifier = Modifier
+                            .width(132.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(MaterialTheme.colorScheme.surface)
+                            .border(
+                                BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
+                                RoundedCornerShape(16.dp)
+                            )
+                            .clickable { isCapsuleExpanded = true }
+                            .padding(horizontal = 12.dp, vertical = 7.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = selectedFilter,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
-                ) {
-                    if (!isCapsuleExpanded) {
-                        // Collapsed Capsule View
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { isCapsuleExpanded = true }
-                                .padding(horizontal = 12.dp, vertical = 7.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                        Icon(
+                            imageVector = Icons.Outlined.KeyboardArrowDown,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+
+                    if (isCapsuleExpanded) {
+                        Popup(
+                            alignment = Alignment.TopEnd,
+                            onDismissRequest = { isCapsuleExpanded = false },
+                            properties = PopupProperties(focusable = true)
                         ) {
-                            Text(
-                                text = selectedFilter,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Icon(
-                                imageVector = Icons.Outlined.KeyboardArrowDown,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
-                    } else {
-                        // Extended Capsule View
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp)
-                        ) {
-                            filterOptions.forEach { option ->
-                                val isSelected = selectedFilter == option
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable {
-                                            selectedFilter = option
-                                            selectedCategoryName = null
-                                            isCapsuleExpanded = false
+                            Surface(
+                                modifier = Modifier.width(132.dp),
+                                shape = RoundedCornerShape(16.dp),
+                                color = MaterialTheme.colorScheme.surface,
+                                shadowElevation = 8.dp,
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f))
+                            ) {
+                                Column(modifier = Modifier.padding(vertical = 4.dp)) {
+                                    filterOptions.forEach { option ->
+                                        val isSelected = selectedFilter == option
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clickable {
+                                                    selectedFilter = option
+                                                    selectedCategoryName = null
+                                                    isCapsuleExpanded = false
+                                                }
+                                                .background(if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f) else Color.Transparent)
+                                                .padding(horizontal = 12.dp, vertical = 7.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = option,
+                                                fontSize = 11.sp,
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            if (option == selectedFilter) {
+                                                Icon(
+                                                    imageVector = Icons.Outlined.KeyboardArrowUp,
+                                                    contentDescription = null,
+                                                    tint = MaterialTheme.colorScheme.primary,
+                                                    modifier = Modifier.size(14.dp)
+                                                )
+                                            }
                                         }
-                                        .background(if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f) else Color.Transparent)
-                                        .padding(horizontal = 12.dp, vertical = 7.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = option,
-                                        fontSize = 11.sp,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    if (option == selectedFilter) {
-                                        Icon(
-                                            imageVector = Icons.Outlined.KeyboardArrowUp,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.size(14.dp)
-                                        )
                                     }
                                 }
                             }
@@ -267,20 +277,20 @@ fun ExpGraphCard(modifier: Modifier = Modifier) {
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
-            // --- DONUT GRAPH SECTION ---
+            // --- GRAPH & RIGHT LEGEND SECTION ---
             if (filteredCategories.isEmpty() || grandTotal <= 0.0) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(200.dp),
+                        .height(180.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Canvas(modifier = Modifier.size(175.dp)) {
+                    Canvas(modifier = Modifier.size(155.dp)) {
                         drawCircle(
                             color = emptyRingColor,
-                            style = Stroke(width = 24.dp.toPx())
+                            style = Stroke(width = 22.dp.toPx())
                         )
                     }
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -291,111 +301,187 @@ fun ExpGraphCard(modifier: Modifier = Modifier) {
             } else {
                 val activeCategory = filteredCategories.find { it.category == selectedCategoryName }
 
-                Box(
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(200.dp),
-                    contentAlignment = Alignment.Center
+                        .height(180.dp),
+                    verticalAlignment = Alignment.Bottom
                 ) {
-                    Canvas(
+                    // --- LEFT: 55% Donut Chart ---
+                    Box(
                         modifier = Modifier
-                            .size(175.dp)
-                            .pointerInput(filteredCategories) {
-                                detectTapGestures { tapOffset ->
-                                    val center = Offset(size.width / 2f, size.height / 2f)
-                                    val dx = tapOffset.x - center.x
-                                    val dy = tapOffset.y - center.y
-                                    val touchAngle = (Math.toDegrees(atan2(dy.toDouble(), dx.toDouble())).toFloat() + 360f) % 360f
-                                    val normalizedTouch = (touchAngle + 90f) % 360f
-
-                                    var cumulative = 0f
-                                    var matched: String? = null
-                                    for (item in filteredCategories) {
-                                        if (normalizedTouch >= cumulative && normalizedTouch <= cumulative + item.sweepAngle) {
-                                            matched = item.category
-                                            break
-                                        }
-                                        cumulative += item.sweepAngle
-                                    }
-
-                                    selectedCategoryName = if (selectedCategoryName == matched) null else matched
-                                }
-                            }
+                            .weight(0.55f)
+                            .fillMaxHeight(),
+                        contentAlignment = Alignment.Center
                     ) {
-                        val strokeWidth = 24.dp.toPx()
-                        val diameter = size.minDimension - strokeWidth
-                        val topLeft = Offset(strokeWidth / 2f, strokeWidth / 2f)
-                        val arcSize = Size(diameter, diameter)
+                        Canvas(
+                            modifier = Modifier
+                                .size(155.dp)
+                                .pointerInput(filteredCategories) {
+                                    detectTapGestures { tapOffset ->
+                                        val center = Offset(size.width / 2f, size.height / 2f)
+                                        val dx = tapOffset.x - center.x
+                                        val dy = tapOffset.y - center.y
+                                        val dist = sqrt((dx * dx + dy * dy).toDouble()).toFloat()
 
-                        filteredCategories.forEach { item ->
-                            val isSelected = item.category == selectedCategoryName
-                            val currentStroke = if (isSelected) strokeWidth + 5.dp.toPx() else strokeWidth
+                                        val strokeWidthPx = 22.dp.toPx()
+                                        val outerRadiusPx = size.minDimension / 2f
+                                        val innerRadiusPx = outerRadiusPx - strokeWidthPx
 
-                            drawArc(
-                                color = item.color,
-                                startAngle = item.startAngle,
-                                sweepAngle = item.sweepAngle * animationProgress.value,
-                                useCenter = false,
-                                topLeft = topLeft,
-                                size = arcSize,
-                                style = Stroke(width = currentStroke, cap = StrokeCap.Butt)
-                            )
+                                        if (dist in (innerRadiusPx - 10.dp.toPx())..(outerRadiusPx + 10.dp.toPx())) {
+                                            val touchAngle = (Math.toDegrees(atan2(dy.toDouble(), dx.toDouble())).toFloat() + 360f) % 360f
+                                            val normalizedTouch = (touchAngle + 90f) % 360f
+
+                                            var cumulative = 0f
+                                            var matched: String? = null
+                                            for (item in filteredCategories) {
+                                                if (normalizedTouch >= cumulative && normalizedTouch <= cumulative + item.sweepAngle) {
+                                                    matched = item.category
+                                                    break
+                                                }
+                                                cumulative += item.sweepAngle
+                                            }
+
+                                            selectedCategoryName = if (selectedCategoryName == matched) null else matched
+                                        } else {
+                                            selectedCategoryName = null
+                                        }
+                                    }
+                                }
+                        ) {
+                            val strokeWidth = 22.dp.toPx()
+                            val diameter = size.minDimension - strokeWidth
+                            val topLeft = Offset(strokeWidth / 2f, strokeWidth / 2f)
+                            val arcSize = Size(diameter, diameter)
+
+                            filteredCategories.forEach { item ->
+                                val isSelected = item.category == selectedCategoryName
+                                val currentStroke = if (isSelected) strokeWidth + 5.dp.toPx() else strokeWidth
+
+                                drawArc(
+                                    color = item.color,
+                                    startAngle = item.startAngle,
+                                    sweepAngle = item.sweepAngle * animationProgress.value,
+                                    useCenter = false,
+                                    topLeft = topLeft,
+                                    size = arcSize,
+                                    style = Stroke(width = currentStroke, cap = StrokeCap.Butt)
+                                )
+                            }
+                        }
+
+                        // Center Text
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier
+                                .padding(horizontal = 14.dp)
+                                .clickable(
+                                    interactionSource = noRippleInteractionSource,
+                                    indication = null
+                                ) {
+                                    selectedCategoryName = null
+                                }
+                        ) {
+                            if (activeCategory != null) {
+                                Text(
+                                    text = activeCategory.category,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = activeCategory.color,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = formatRupeeAmount(activeCategory.totalAmount),
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "${String.format(Locale.US, "%.1f", activeCategory.percentage)}%",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            } else {
+                                Text(
+                                    text = "Total Spent",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = formatRupeeAmount(grandTotal),
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = selectedFilter,
+                                    fontSize = 9.5.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                     }
 
-                    // Dynamic Center Info (Ripple-Free Clean Tap)
+                    // --- 5% GAP ---
+                    Spacer(modifier = Modifier.weight(0.05f))
+
+                    // --- RIGHT: Compact Bottom-Aligned Legends (Strict Straight Line) ---
                     Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier
-                            .padding(horizontal = 20.dp)
-                            .clickable(
-                                interactionSource = centerInteractionSource,
-                                indication = null
-                            ) {
-                                selectedCategoryName = null
-                            }
+                            .weight(0.40f)
+                            .fillMaxHeight(),
+                        verticalArrangement = Arrangement.Bottom,
+                        horizontalAlignment = Alignment.Start
                     ) {
-                        if (activeCategory != null) {
+                        val legendItems = filteredCategories.take(5)
+                        legendItems.forEach { item ->
+                            val isSelected = item.category == selectedCategoryName
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(if (isSelected) item.color.copy(alpha = 0.15f) else Color.Transparent)
+                                    .clickable(
+                                        interactionSource = noRippleInteractionSource,
+                                        indication = null
+                                    ) {
+                                        selectedCategoryName = if (isSelected) null else item.category
+                                    }
+                                    .padding(vertical = 2.5.dp, horizontal = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Start
+                            ) {
+                                // Strictly vertically aligned micro square
+                                Box(
+                                    modifier = Modifier
+                                        .size(6.5.dp)
+                                        .background(item.color, RoundedCornerShape(1.5.dp))
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = item.category,
+                                    fontSize = 9.5.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (isSelected) item.color else MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+
+                        if (filteredCategories.size > 5) {
                             Text(
-                                text = activeCategory.category,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = activeCategory.color,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = formatRupeeAmount(activeCategory.totalAmount),
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = "${String.format(Locale.US, "%.1f", activeCategory.percentage)}%",
-                                fontSize = 11.sp,
+                                text = "+${filteredCategories.size - 5} more",
+                                fontSize = 8.5.sp,
                                 fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        } else {
-                            Text(
-                                text = "Total Spent",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = formatRupeeAmount(grandTotal),
-                                fontSize = 20.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = selectedFilter,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(start = 12.5.dp, top = 2.dp)
                             )
                         }
                     }
