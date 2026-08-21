@@ -83,24 +83,8 @@ fun AssetsScreen(
         val totalFD = fdList.sumOf { it.accruedValue }
         val totalCC = ccList.sumOf { it.outstanding }
         val totalInv = investmentList.sumOf { it.quantity * it.currentPrice }
-        val totalInvestedBase = investmentList.sumOf { it.quantity * it.avgBuyPrice }
         
         val networthAmount = totalBank + totalCash + totalFD + totalInv - totalCC
-
-        // 1D Return Calculation (Stocks Live Change + Bank Daily Interest + FD Daily Accrual)
-        val inv1DChange = investmentList.sumOf { it.quantity * it.oneDayChangePrice }
-        val bank1DEarn = bankList.sumOf { it.oneDayInt }
-        val fd1DEarn = fdList.sumOf { it.oneDayInt }
-        val oneDayReturnAmount = inv1DChange + bank1DEarn + fd1DEarn
-        val oneDayReturnPercent = if (networthAmount > 0) (oneDayReturnAmount / networthAmount) * 100.0 else 0.0
-
-        // Total Return Calculation (Investments Profit/Loss + FD Accrued Interest + Bank Accrued Yearly Interest)
-        val invTotalProfit = totalInv - totalInvestedBase
-        val fdTotalProfit = fdList.sumOf { it.accruedInt }
-        val bankTotalEarned = bankList.sumOf { it.accruedYrInt }
-        val totalReturnAmount = invTotalProfit + fdTotalProfit + bankTotalEarned
-        val totalCapitalBase = totalInvestedBase + fdList.sumOf { it.investedAmt } + totalBank + totalCash
-        val totalReturnPercent = if (totalCapitalBase > 0) (totalReturnAmount / totalCapitalBase) * 100.0 else 0.0
 
         // Auto-sync current 10-day slot into networth history
         LaunchedEffect(networthAmount) {
@@ -119,10 +103,6 @@ fun AssetsScreen(
         ) {
             NetworthCard(
                 networthAmount = networthAmount,
-                oneDayReturnAmount = oneDayReturnAmount,
-                oneDayReturnPercent = oneDayReturnPercent,
-                totalReturnAmount = totalReturnAmount,
-                totalReturnPercent = totalReturnPercent,
                 isLoading = isLoading, 
                 onRefresh = onRefreshClick,
                 onClick = onRefreshClick
