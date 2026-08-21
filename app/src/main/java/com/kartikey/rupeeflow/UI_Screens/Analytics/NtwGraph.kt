@@ -51,18 +51,18 @@ private fun formatCompactRupee(amount: Double): String {
 
 @Composable
 fun NtwGraphCard(modifier: Modifier = Modifier) {
-    val appDataState by CacheManager.appDataState.collectAsState()[cite: 1]
+    val appDataState by CacheManager.appDataState.collectAsState()
     val appData = appDataState
 
     // ⚡ Calculate Current Live Net Worth ⚡
     val currentNetworth = remember(appData) {
         if (appData == null) 0.0
         else {
-            val cash = appData.cashData.amount[cite: 1]
-            val banks = appData.bankList.sumOf { it.currentBalance }[cite: 1]
-            val fds = appData.fdList.sumOf { it.accruedValue }[cite: 1]
-            val investments = appData.investmentList.sumOf { it.quantity * it.currentPrice }[cite: 1]
-            val ccDebt = appData.ccList.sumOf { it.outstanding }[cite: 1]
+            val cash = appData.cashData.amount
+            val banks = appData.bankList.sumOf { it.currentBalance }
+            val fds = appData.fdList.sumOf { it.accruedValue }
+            val investments = appData.investmentList.sumOf { it.quantity * it.currentPrice }
+            val ccDebt = appData.ccList.sumOf { it.outstanding }
             (cash + banks + fds + investments) - ccDebt
         }
     }
@@ -73,7 +73,7 @@ fun NtwGraphCard(modifier: Modifier = Modifier) {
         val monthNameFormat = SimpleDateFormat("MMM", Locale.getDefault())
         val parseFormat = SimpleDateFormat("yy-MM", Locale.getDefault())
 
-        val history = appData?.networthHistory ?: emptyMap()[cite: 1]
+        val history: Map<String, List<Double>> = appData?.networthHistory ?: emptyMap()
         val sortedKeys = history.keys.sorted()
 
         for (mKey in sortedKeys) {
@@ -88,7 +88,7 @@ fun NtwGraphCard(modifier: Modifier = Modifier) {
                         1 -> "11-20 $mName"
                         else -> "21-End $mName"
                     }
-                    list.add(NetworthDataPoint(mKey, index, label, amount))[cite: 1]
+                    list.add(NetworthDataPoint(mKey, index, label, amount))
                 }
             }
         }
@@ -98,9 +98,9 @@ fun NtwGraphCard(modifier: Modifier = Modifier) {
             val cal = Calendar.getInstance()
             val currMonth = monthNameFormat.format(cal.time)
             val currKey = SimpleDateFormat("yy-MM", Locale.getDefault()).format(cal.time)
-            list.add(NetworthDataPoint(currKey, 0, "01-10 $currMonth", currentNetworth))[cite: 1]
-            list.add(NetworthDataPoint(currKey, 1, "11-20 $currMonth", currentNetworth))[cite: 1]
-            list.add(NetworthDataPoint(currKey, 2, "21-End $currMonth", currentNetworth))[cite: 1]
+            list.add(NetworthDataPoint(currKey, 0, "01-10 $currMonth", currentNetworth))
+            list.add(NetworthDataPoint(currKey, 1, "11-20 $currMonth", currentNetworth))
+            list.add(NetworthDataPoint(currKey, 2, "21-End $currMonth", currentNetworth))
         }
         list
     }
@@ -218,7 +218,7 @@ fun NtwGraphCard(modifier: Modifier = Modifier) {
                         }
                         .pointerInput(timelineData) {
                             detectDragGestures(
-                                onDragEnd = { /* retain selection or clear */ },
+                                onDragEnd = { },
                                 onDragCancel = { selectedPointIndex = null },
                                 onDrag = { change, _ ->
                                     val yAxisLabelWidth = 52.dp.toPx()
@@ -331,7 +331,6 @@ fun NtwGraphCard(modifier: Modifier = Modifier) {
                     val targetPoint = points.getOrNull(activeIndex)
 
                     if (targetPoint != null) {
-                        // Dashed horizontal reference line crossing the dot
                         drawLine(
                             color = lineColor.copy(alpha = 0.40f),
                             start = Offset(0f, targetPoint.y),
