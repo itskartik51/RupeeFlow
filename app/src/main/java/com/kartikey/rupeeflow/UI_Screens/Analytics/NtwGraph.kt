@@ -189,7 +189,6 @@ fun NtwGraphCard(modifier: Modifier = Modifier) {
             // --- HEADER: Net Worth Title & Amount ---
             val activePoint = selectedPointIndex?.let { activeTimelinePoints.getOrNull(it) }
             val displayAmount = activePoint?.amount ?: currentNetworth
-            val displayLabel = activePoint?.label ?: "Current"
 
             Text(
                 text = "NET WORTH",
@@ -205,14 +204,16 @@ fun NtwGraphCard(modifier: Modifier = Modifier) {
                     fontWeight = FontWeight.ExtraBold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "($displayLabel)",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = if (activePoint != null) lineColor else MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(bottom = 2.dp)
-                )
+                if (activePoint != null) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "(${activePoint.label})",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = lineColor,
+                        modifier = Modifier.padding(bottom = 2.dp)
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(14.dp))
