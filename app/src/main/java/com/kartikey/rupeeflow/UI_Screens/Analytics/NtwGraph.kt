@@ -26,8 +26,6 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.formatRupeeAmount
@@ -37,10 +35,6 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import kotlin.math.abs
-import kotlin.math.floor
-import kotlin.math.log10
-import kotlin.math.pow
-import kotlin.math.round
 
 private data class NetworthSlotPoint(
     val globalSlotIndex: Int, // 0 to 17 (6 Months * 3 Slots)
@@ -48,7 +42,7 @@ private data class NetworthSlotPoint(
     val amount: Double
 )
 
-// Compact currency formatter for Right Y-Axis markers (e.g. ₹1.5L, ₹75K)
+// Compact currency formatter for Right Y-Axis markers (e.g. ₹1.5L, ₹50K)
 private fun formatCompactRupee(amount: Double): String {
     val absVal = abs(amount)
     val sign = if (amount < 0) "-" else ""
@@ -118,7 +112,7 @@ fun NtwGraphCard(modifier: Modifier = Modifier) {
             }
         }
 
-        // Fallback: Pin current net worth to current month's active slot if no historical records
+        // Fallback: If no historical slots found, pin current net worth to current month's slot
         if (list.isEmpty()) {
             val cal = Calendar.getInstance()
             val day = cal.get(Calendar.DAY_OF_MONTH)
@@ -140,30 +134,23 @@ fun NtwGraphCard(modifier: Modifier = Modifier) {
         list.sortedBy { it.globalSlotIndex }
     }
 
-    // ⚡ Nice-Stepped Round Number Gridline Physics (Solution 1) ⚡
+    // ⚡ Dynamic Min-Max Scaling Engine with 15% Buffer ⚡
     val (yMin, yMax, yMid) = remember(activeTimelinePoints, currentNetworth) {
         val values = activeTimelinePoints.map { it.amount }
         val minVal = values.minOrNull() ?: currentNetworth
         val maxVal = values.maxOrNull() ?: currentNetworth
-        val span = maxVal - minVal
+        val range = maxVal - minVal
 
-        val rawStep = if (span > 0) (span / 2.0) else (currentNetworth * 0.05).coerceAtLeast(100.0)
-        val mag = 10.0.pow(floor(log10(rawStep.coerceAtLeast(1.0))))
-        val norm = rawStep / mag
-        val niceStep = when {
-            norm <= 1.0 -> 1.0 * mag
-            norm <= 2.0 -> 2.0 * mag
-            norm <= 5.0 -> 5.0 * mag
-            else -> 10.0 * mag
+        if (range <= 0.0001) {
+            val fallbackMin = if (maxVal != 0.0) maxVal * 0.95 else -100.0
+            val fallbackMax = if (maxVal != 0.0) maxVal * 1.05 else 100.0
+            Triple(fallbackMin, fallbackMax, (fallbackMin + fallbackMax) / 2.0)
+        } else {
+            val padding = range * 0.15
+            val calculatedMin = minVal - padding
+            val calculatedMax = maxVal + padding
+            Triple(calculatedMin, calculatedMax, (calculatedMin + calculatedMax) / 2.0)
         }
-
-        val centerVal = if (span > 0) (minVal + maxVal) / 2.0 else currentNetworth
-        val midIndex = round(centerVal / niceStep)
-        val calculatedMid = midIndex * niceStep
-        val calculatedMin = calculatedMid - niceStep
-        val calculatedMax = calculatedMid + niceStep
-
-        Triple(calculatedMin, calculatedMax, calculatedMid)
     }
 
     var selectedPointIndex by remember { mutableStateOf<Int?>(null) }
@@ -199,54 +186,39 @@ fun NtwGraphCard(modifier: Modifier = Modifier) {
     ) {
         Column(modifier = Modifier.padding(top = 16.dp, start = 16.dp, end = 16.dp, bottom = 14.dp)) {
 
-            // --- TOP HEADER ROW: Left Title & Right-Aligned Leftward Expanding Amount ---
+            // --- HEADER: Net Worth Title & Amount ---
             val activePoint = selectedPointIndex?.let { activeTimelinePoints.getOrNull(it) }
             val displayAmount = activePoint?.amount ?: currentNetworth
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            Text(
+                text = "NET WORTH",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Row(verticalAlignment = Alignment.Bottom) {
                 Text(
-                    text = "NET WORTH",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(0.50f, fill = false)
+                    text = formatRupeeAmount(displayAmount),
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
-
-                // Right Amount Container (Leftward Growth with max 50% width ceiling)
-                Column(
-                    horizontalAlignment = Alignment.End,
-                    modifier = Modifier.weight(0.50f, fill = false)
-                ) {
+                if (activePoint != null) {
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = formatRupeeAmount(displayAmount),
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        textAlign = TextAlign.End
+                        text = "(${activePoint.label})",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = lineColor,
+                        modifier = Modifier.padding(bottom = 2.dp)
                     )
-                    if (activePoint != null) {
-                        Text(
-                            text = activePoint.label,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = lineColor,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            textAlign = TextAlign.End
-                        )
-                    }
                 }
             }
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // --- GRAPH CANVAS: 6 Months X-Axis + Nice Stepped Gridlines + Zero Right Gap ---
+            // --- GRAPH CANVAS: 6 Months X-Axis + Zero Right Gap + Precise Wave Start ---
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -266,6 +238,7 @@ fun NtwGraphCard(modifier: Modifier = Modifier) {
                                     val labelMaxWidth = maxOf(topLayout.size.width, midLayout.size.width, botLayout.size.width).toFloat()
                                     val chartWidth = size.width - labelMaxWidth - 6.dp.toPx()
 
+                                    // Find closest recorded point to touch
                                     var closestIdx = -1
                                     var minDistance = Float.MAX_VALUE
                                     activeTimelinePoints.forEachIndexed { index, point ->
@@ -309,11 +282,13 @@ fun NtwGraphCard(modifier: Modifier = Modifier) {
                             )
                         }
                 ) {
+                    // Pre-measure right labels to eliminate all dead margin on the right
                     val topLayout = textMeasurer.measure(formatCompactRupee(yMax), TextStyle(fontSize = 9.sp, fontWeight = FontWeight.Medium, color = labelColor))
                     val midLayout = textMeasurer.measure(formatCompactRupee(yMid), TextStyle(fontSize = 9.sp, fontWeight = FontWeight.Medium, color = labelColor))
                     val botLayout = textMeasurer.measure(formatCompactRupee(yMin), TextStyle(fontSize = 9.sp, fontWeight = FontWeight.Medium, color = labelColor))
                     val labelMaxWidth = maxOf(topLayout.size.width, midLayout.size.width, botLayout.size.width).toFloat()
 
+                    // Chart occupies all remaining width with zero right-side waste
                     val chartWidth = size.width - labelMaxWidth - 6.dp.toPx()
                     val bottomXAxisHeight = 18.dp.toPx()
                     val chartHeight = size.height - bottomXAxisHeight
@@ -325,7 +300,7 @@ fun NtwGraphCard(modifier: Modifier = Modifier) {
                         return chartHeight - (normalized * chartHeight)
                     }
 
-                    // --- 1. Draw 3 Dashed Stepped Gridlines & Right Labels ---
+                    // --- 1. Draw 3 Dashed Gridlines & Right-Aligned Labels (Zero Right Gap) ---
                     val dashedEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
                     val gridLevels = listOf(
                         Pair(yMax, topLayout),
@@ -343,13 +318,14 @@ fun NtwGraphCard(modifier: Modifier = Modifier) {
                             pathEffect = dashedEffect
                         )
 
+                        // Draw label pushed directly against the right boundary
                         drawText(
                             textLayoutResult = layout,
                             topLeft = Offset(size.width - layout.size.width, yPos - (layout.size.height / 2f))
                         )
                     }
 
-                    // --- 2. Calculate Screen Coordinates on 18-Slot Grid ---
+                    // --- 2. Calculate Screen Coordinates (Mapped strictly to 18-Slot Grid) ---
                     val totalGridSlots = 17f
                     val screenPoints = activeTimelinePoints.map { point ->
                         val x = (point.globalSlotIndex / totalGridSlots) * chartWidth
@@ -357,7 +333,7 @@ fun NtwGraphCard(modifier: Modifier = Modifier) {
                         Offset(x, y)
                     }
 
-                    // --- 3. Render Area & Spline Wave ---
+                    // --- 3. Render Area & Spline Wave (Starts strictly at first recorded point) ---
                     if (screenPoints.size >= 2) {
                         val strokePath = Path()
                         val fillPath = Path()
@@ -379,6 +355,7 @@ fun NtwGraphCard(modifier: Modifier = Modifier) {
                         fillPath.lineTo(screenPoints.last().x, chartHeight)
                         fillPath.close()
 
+                        // Gradient Under-fill
                         val underFillBrush = Brush.verticalGradient(
                             colors = listOf(
                                 lineColor.copy(alpha = 0.35f * animProgress.value),
@@ -390,6 +367,7 @@ fun NtwGraphCard(modifier: Modifier = Modifier) {
                         )
                         drawPath(path = fillPath, brush = underFillBrush)
 
+                        // Wave Stroke Line
                         drawPath(
                             path = strokePath,
                             color = lineColor.copy(alpha = animProgress.value),
@@ -410,6 +388,7 @@ fun NtwGraphCard(modifier: Modifier = Modifier) {
                             pathEffect = dashedEffect
                         )
 
+                        // Glowing Outer & Inner Dot
                         drawCircle(
                             color = lineColor.copy(alpha = 0.25f),
                             radius = 7.dp.toPx(),
@@ -440,8 +419,8 @@ fun NtwGraphCard(modifier: Modifier = Modifier) {
                             )
                         )
                         val textX = when (idx) {
-                            0 -> 0f
-                            5 -> (chartWidth - mLayout.size.width)
+                            0 -> 0f // Leftmost alignment
+                            5 -> (chartWidth - mLayout.size.width) // Rightmost alignment
                             else -> (xPos - (mLayout.size.width / 2f)).coerceIn(0f, chartWidth - mLayout.size.width)
                         }
                         drawText(
