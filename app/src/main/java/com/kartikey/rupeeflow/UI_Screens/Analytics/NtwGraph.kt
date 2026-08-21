@@ -89,21 +89,43 @@ fun NtwGraphCard(modifier: Modifier = Modifier) {
         Pair(keys, names)
     }
 
-    // ⚡ Map Real Recorded Data to the 18-Slot Grid (No Fake Zeros) ⚡
+    // ⚡ Map Real Recorded Data to the 18-Slot Grid with Dynamic Accurate Dates ⚡
     val activeTimelinePoints = remember(appData, currentNetworth, monthKeys, monthDisplayNames) {
         val list = mutableListOf<NetworthSlotPoint>()
         val history: Map<String, List<Double>> = appData?.networthHistory ?: emptyMap()
+
+        val now = Calendar.getInstance()
+        val currentMonthKey = SimpleDateFormat("yy-MM", Locale.getDefault()).format(now.time)
+        val currentDay = now.get(Calendar.DAY_OF_MONTH)
+        val currentSlotIndex = when {
+            currentDay <= 10 -> 0
+            currentDay <= 20 -> 1
+            else -> 2
+        }
+
+        val parseFormat = SimpleDateFormat("yy-MM", Locale.getDefault())
 
         monthKeys.forEachIndexed { monthIndex, mKey ->
             val slots = history[mKey]
             val mName = monthDisplayNames[monthIndex]
             if (slots != null) {
+                // Calculate max days for the specific month (e.g. 28/29 Feb, 30 Sep, 31 Aug)
+                val monthCal = Calendar.getInstance().apply {
+                    time = try { parseFormat.parse(mKey) ?: now.time } catch (e: Exception) { now.time }
+                }
+                val maxDayInMonth = monthCal.getActualMaximum(Calendar.DAY_OF_MONTH)
+
                 slots.forEachIndexed { slotIdx, amount ->
                     if (amount > 0.0) {
-                        val slotLabel = when (slotIdx) {
-                            0 -> "01-10 $mName"
-                            1 -> "11-20 $mName"
-                            else -> "21-End $mName"
+                        val isCurrentOngoingSlot = (mKey == currentMonthKey && slotIdx == currentSlotIndex)
+                        val slotLabel = if (isCurrentOngoingSlot) {
+                            "$currentDay $mName"
+                        } else {
+                            when (slotIdx) {
+                                0 -> "10 $mName"
+                                1 -> "20 $mName"
+                                else -> "$maxDayInMonth $mName"
+                            }
                         }
                         val globalSlot = (monthIndex * 3) + slotIdx
                         list.add(NetworthSlotPoint(globalSlot, slotLabel, amount))
@@ -114,20 +136,9 @@ fun NtwGraphCard(modifier: Modifier = Modifier) {
 
         // Fallback: If no historical slots found, pin current net worth to current month's slot
         if (list.isEmpty()) {
-            val cal = Calendar.getInstance()
-            val day = cal.get(Calendar.DAY_OF_MONTH)
-            val currentSlot = when {
-                day <= 10 -> 0
-                day <= 20 -> 1
-                else -> 2
-            }
-            val currentGlobalSlot = (5 * 3) + currentSlot // 5 is the current month index
+            val currentGlobalSlot = (5 * 3) + currentSlotIndex // 5 is the current month index
             val mName = monthDisplayNames.last()
-            val slotLabel = when (currentSlot) {
-                0 -> "01-10 $mName"
-                1 -> "11-20 $mName"
-                else -> "21-End $mName"
-            }
+            val slotLabel = "$currentDay $mName"
             list.add(NetworthSlotPoint(currentGlobalSlot, slotLabel, currentNetworth))
         }
 
