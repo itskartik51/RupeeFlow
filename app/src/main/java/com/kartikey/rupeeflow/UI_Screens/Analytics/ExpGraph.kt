@@ -187,7 +187,7 @@ fun ExpGraphCard(modifier: Modifier = Modifier) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "SPENDING BREAKDOWN",
+                    text = "SPENDS",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold
