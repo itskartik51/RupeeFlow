@@ -57,14 +57,14 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
 
     val context = LocalContext.current
 
-    // ⚡ UNBREAKABLE YAHOO SPARK ENGINE ⚡
+    // ⚡ PRO YAHOO SPARK ENGINE WITH 4 SMART FILTERS ⚡
     LaunchedEffect(assetName, assetType) {
         if (assetName.isBlank() || selectedSymbol.isNotEmpty() || assetType.isEmpty()) {
             searchResults = emptyList()
             return@LaunchedEffect
         }
         
-        delay(500) // Smart Debounce
+        delay(500) 
         isSearching = true
         
         withContext(Dispatchers.IO) {
@@ -72,16 +72,15 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                 val client = OkHttpClient()
                 val userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
                 
-                // 1. Strict Category Filters based on Selection
                 val validQuoteTypes = when (assetType) {
                     "Mutual Fund" -> listOf("MUTUALFUND")
                     "ETF" -> listOf("ETF")
                     "Bond" -> listOf("EQUITY", "ETF")
-                    else -> listOf("EQUITY") // Strictly Stocks
+                    else -> listOf("EQUITY") 
                 }
 
-                // Call 1: Yahoo Search API
-                val searchUrl = "https://query2.finance.yahoo.com/v1/finance/search?q=${assetName.replace(" ", "%20")}&quotesCount=25"
+                // ⚡ FIX 3: Increased limit to 100 & forced India Region (&region=IN) ⚡
+                val searchUrl = "https://query2.finance.yahoo.com/v1/finance/search?q=${assetName.replace(" ", "%20")}&quotesCount=100&region=IN"
                 val searchReq = Request.Builder().url(searchUrl).header("User-Agent", userAgent).get().build()
                 val searchResp = client.newCall(searchReq).execute()
                 val searchData = searchResp.body?.string() ?: ""
@@ -90,34 +89,57 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                     val jsonResponse = JSONObject(searchData)
                     val quotes = jsonResponse.optJSONArray("quotes")
                     
-                    val orderedSymbols = mutableListOf<String>()
+                    val baseSymbolMap = mutableMapOf<String, String>() 
                     val fallbackNames = mutableMapOf<String, String>()
+                    val orderedBaseSymbols = mutableListOf<String>() 
 
                     if (quotes != null) {
                         for (i in 0 until quotes.length()) {
                             val quote = quotes.getJSONObject(i)
                             val sym = quote.optString("symbol", "")
                             val qType = quote.optString("quoteType", "")
+                            val name = quote.optString("longname", quote.optString("shortname", ""))
                             
-                            // ⚡ IRON-CLAD FILTERS: Only .NS/.BO, Must Match Type, NO '0P' Garbage ⚡
+                            // Only Indian Assets
                             if (sym.isNotEmpty() && (sym.endsWith(".NS") || sym.endsWith(".BO"))) {
                                 if (validQuoteTypes.contains(qType)) {
                                     
-                                    // Block BSE Mutual Fund Garbage from appearing in Stocks
+                                    // ⚡ FIX 1: Block BSE Mutual Fund Garbage from appearing in Stocks
                                     if (assetType == "Stock" && sym.startsWith("0P")) continue
                                     
-                                    if (!orderedSymbols.contains(sym)) {
-                                        orderedSymbols.add(sym)
-                                        fallbackNames[sym] = quote.optString("longname", quote.optString("shortname", ""))
+                                    // ⚡ FIX 2: Block ETFs/Indexes appearing in Stocks completely
+                                    if (assetType == "Stock") {
+                                        val nameUpper = name.uppercase(Locale.getDefault())
+                                        if (nameUpper.contains("ETF") || nameUpper.contains("BEES") || 
+                                            nameUpper.contains("INDEX") || nameUpper.contains("LIQUID")) {
+                                            continue
+                                        }
+                                    }
+
+                                    val baseSym = sym.replace(".NS", "").replace(".BO", "")
+                                    val existing = baseSymbolMap[baseSym]
+
+                                    // ⚡ FIX 4: NSE over BSE Priority (Deduplication)
+                                    if (existing == null) {
+                                        baseSymbolMap[baseSym] = sym
+                                        fallbackNames[sym] = name
+                                        orderedBaseSymbols.add(baseSym)
+                                    } else if (!existing.endsWith(".NS") && sym.endsWith(".NS")) {
+                                        // Overwrite BO with NS if found later
+                                        baseSymbolMap[baseSym] = sym
+                                        fallbackNames.remove(existing)
+                                        fallbackNames[sym] = name
                                     }
                                 }
                             }
                         }
                     }
 
-                    // Call 2: Fetch Live Price via Secret Spark API
-                    if (orderedSymbols.isNotEmpty()) {
-                        val symbolsParam = orderedSymbols.take(15).joinToString(",")
+                    // Map back to ordered final list and take top 15
+                    val finalSymbolsToFetch = orderedBaseSymbols.mapNotNull { baseSymbolMap[it] }.take(15)
+
+                    if (finalSymbolsToFetch.isNotEmpty()) {
+                        val symbolsParam = finalSymbolsToFetch.joinToString(",")
                         val sparkUrl = "https://query1.finance.yahoo.com/v7/finance/spark?symbols=$symbolsParam"
                         val sparkReq = Request.Builder().url(sparkUrl).header("User-Agent", userAgent).get().build()
                         val sparkResp = client.newCall(sparkReq).execute()
@@ -140,9 +162,8 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                             }
                         }
 
-                        // Assemble Final Clean List (Preserving Yahoo's Relevance/Market Cap Sort Order)
                         val parsedList = mutableListOf<SearchRow>()
-                        for (sym in orderedSymbols.take(15)) {
+                        for (sym in finalSymbolsToFetch) {
                             val price = priceMap[sym] ?: 0.0
                             val name = fallbackNames[sym] ?: ""
                             val cleanSym = sym.replace(".NS", "").replace(".BO", "")
@@ -180,7 +201,6 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
     ) {
         Column(modifier = Modifier.padding(20.dp).verticalScroll(rememberScrollState())) {
             
-            // --- ASSET TYPE DROPDOWN ---
             Text(text = "Choose Investment Type", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(4.dp))
             
@@ -225,13 +245,11 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                 }
             }
 
-            // ⚡ Conditional Form UI ⚡
             if (assetType.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(20.dp))
                 HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // --- SEARCH BAR ---
                 OutlinedTextField(
                     value = assetName,
                     onValueChange = { 
@@ -265,7 +283,6 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                     }
                 )
 
-                // ⚡ INLINE SEARCH SUGGESTIONS (Zero Keyboard Overlap Bug) ⚡
                 if (assetName.isNotEmpty() && searchResults.isNotEmpty() && selectedSymbol.isEmpty()) {
                     Spacer(modifier = Modifier.height(6.dp))
                     Surface(
@@ -283,8 +300,15 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                                         .fillMaxWidth()
                                         .clickable {
                                             val prefix = if (row.rawSymbol.endsWith(".NS")) "NSE:" else if (row.rawSymbol.endsWith(".BO")) "BOM:" else "NSE:"
-                                            assetName = row.cleanSymbol 
-                                            selectedSymbol = row.cleanSymbol
+                                            
+                                            // ⚡ Auto-fill logic based on asset type ⚡
+                                            assetName = if (assetType == "Mutual Fund") {
+                                                if (row.fullName.length > 25) row.fullName.take(25) + "..." else row.fullName
+                                            } else {
+                                                row.cleanSymbol
+                                            }
+                                            
+                                            selectedSymbol = if (assetType == "Mutual Fund") row.rawSymbol else row.cleanSymbol
                                             sheetTicker = prefix + row.cleanSymbol
                                             
                                             if (row.livePrice > 0.0) {
@@ -297,17 +321,20 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Column(modifier = Modifier.weight(0.7f)) {
-                                        Text(text = row.cleanSymbol, fontWeight = FontWeight.Bold, fontSize = 14.5.sp, color = MaterialTheme.colorScheme.onSurface)
-                                        
-                                        // ⚡ Dynamic Name Truncation Logic ⚡
-                                        if (row.fullName.isNotBlank() && !row.fullName.equals(row.cleanSymbol, ignoreCase = true)) {
-                                            Spacer(modifier = Modifier.height(2.dp))
-                                            val cleanBracketName = if (row.fullName.length > 22) "${row.fullName.take(20)}..." else row.fullName
-                                            Text(text = "($cleanBracketName)", fontSize = 11.5.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        // ⚡ UI Clean-up: Hide 0P codes for Mutual Funds ⚡
+                                        if (assetType == "Mutual Fund") {
+                                            Text(text = row.fullName.ifEmpty { "Mutual Fund" }, fontWeight = FontWeight.Bold, fontSize = 14.5.sp, color = MaterialTheme.colorScheme.onSurface)
+                                        } else {
+                                            Text(text = row.cleanSymbol, fontWeight = FontWeight.Bold, fontSize = 14.5.sp, color = MaterialTheme.colorScheme.onSurface)
+                                            
+                                            if (row.fullName.isNotBlank() && !row.fullName.equals(row.cleanSymbol, ignoreCase = true)) {
+                                                Spacer(modifier = Modifier.height(2.dp))
+                                                val cleanBracketName = if (row.fullName.length > 22) "${row.fullName.take(20)}..." else row.fullName
+                                                Text(text = "($cleanBracketName)", fontSize = 11.5.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                            }
                                         }
                                     }
                                     
-                                    // ⚡ Live Price formatting ⚡
                                     Text(
                                         text = if (row.livePrice > 0.0) "₹ ${String.format(Locale.US, "%.2f", row.livePrice)}" else "-",
                                         fontWeight = FontWeight.ExtraBold,
@@ -327,7 +354,6 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // --- QUANTITY & BUY PRICE INPUTS ---
                 val isMutualFund = assetType == "Mutual Fund"
                 val qtyLabel = if (isMutualFund) "Total Units" else "Quantity"
                 val priceLabel = if (isMutualFund) "Average NAV" else "Buy Price"
@@ -337,9 +363,9 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                         value = quantity, 
                         onValueChange = { 
                             if (isMutualFund) {
-                                quantity = it // Allows Decimals
+                                quantity = it 
                             } else {
-                                if (it.all { char -> char.isDigit() }) quantity = it // Strictly Integers
+                                if (it.all { char -> char.isDigit() }) quantity = it 
                             }
                         },
                         label = { Text(qtyLabel) },
@@ -375,7 +401,6 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // --- SAVE BUTTON ---
                 Button(
                     onClick = {
                         val qty = quantity.toDoubleOrNull() ?: 0.0
