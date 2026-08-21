@@ -17,12 +17,10 @@ fun AnalyticsScreen(paddingValues: PaddingValues) {
             .background(MaterialTheme.colorScheme.background)
             .padding(paddingValues)
             .verticalScroll(rememberScrollState())
-            .padding(16.dp),
+            .padding(top = 4.dp, start = 16.dp, end = 16.dp, bottom = 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         // --- CARD 1: Spending Breakdown Donut Chart ---
         ExpGraphCard()
-
-        // (Future Analytics Cards jaise Net Worth Timeline Graph yahan stack honge)
     }
 }
