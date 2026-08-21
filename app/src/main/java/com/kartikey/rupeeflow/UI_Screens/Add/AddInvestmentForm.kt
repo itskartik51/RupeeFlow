@@ -54,7 +54,7 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
 
     val context = LocalContext.current
 
-    // ⚡ Advanced Dual-API Search Engine ⚡
+    // ⚡ Advanced Dual-API Search Engine with Fallback ⚡
     LaunchedEffect(assetName, assetType) {
         if (assetName.isBlank() || selectedSymbol.isNotEmpty() || assetType.isEmpty()) {
             searchResults = emptyList()
@@ -62,24 +62,27 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
             return@LaunchedEffect
         }
         
-        delay(600) // Debounce
+        delay(600) // Debounce delay
         isSearching = true
         
         withContext(Dispatchers.IO) {
             try {
                 val client = OkHttpClient()
+                // Fake Browser Identity to bypass Yahoo Bot Protection
+                val userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
                 
-                // --- Target Quote Type Filter ---
+                // Broadened target filters (Case insensitive matched later)
                 val validQuoteTypes = when (assetType) {
                     "Mutual Fund" -> listOf("MUTUALFUND")
-                    "ETF" -> listOf("ETF")
-                    "Bond" -> listOf("EQUITY", "ETF") // SGBs trade as equities usually
+                    "ETF" -> listOf("ETF", "EQUITY") 
+                    "Bond" -> listOf("EQUITY", "ETF", "MUTUALFUND") 
                     else -> listOf("EQUITY") // Stocks
                 }
 
                 // 1. First Call: Search API
                 val searchRequest = Request.Builder()
-                    .url("https://query2.finance.yahoo.com/v1/finance/search?q=${assetName.replace(" ", "%20")}&quotesCount=25")
+                    .url("https://query2.finance.yahoo.com/v1/finance/search?q=${assetName.replace(" ", "%20")}&quotesCount=20")
+                    .header("User-Agent", userAgent)
                     .get()
                     .build()
                     
@@ -91,7 +94,7 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                     val quotes = jsonResponse.optJSONArray("quotes")
                     
                     val symbolsToFetch = mutableListOf<String>()
-                    val fallbackNames = mutableMapOf<String, String>()
+                    val fallbackResults = mutableListOf<SearchRow>()
                     
                     if (quotes != null) {
                         for (i in 0 until quotes.length()) {
@@ -99,11 +102,15 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                             val sym = quote.optString("symbol", "")
                             val qType = quote.optString("quoteType", "")
                             
-                            // ⚡ Filter: Only Indian Assets & Strict Category Match ⚡
+                            // Filter: Only Indian Assets & Category Match
                             if (sym.isNotEmpty() && (sym.endsWith(".NS") || sym.endsWith(".BO"))) {
-                                if (validQuoteTypes.contains(qType)) {
+                                if (validQuoteTypes.any { it.equals(qType, ignoreCase = true) }) {
                                     symbolsToFetch.add(sym)
-                                    fallbackNames[sym] = quote.optString("longname", quote.optString("shortname", ""))
+                                    val fName = quote.optString("longname", quote.optString("shortname", ""))
+                                    val cleanSym = sym.replace(".NS", "").replace(".BO", "")
+                                    
+                                    // Save in Fallback just in case Quote API fails
+                                    fallbackResults.add(SearchRow(cleanSym, sym, fName, 0.0, 0L))
                                 }
                             }
                         }
@@ -111,57 +118,78 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                     
                     // 2. Second Call: Quote API for Live Price & Market Cap Sorting
                     if (symbolsToFetch.isNotEmpty()) {
-                        val symbolsParam = symbolsToFetch.take(15).joinToString(",") // Limit to top 15 matches
-                        val quoteRequest = Request.Builder()
-                            .url("https://query2.finance.yahoo.com/v7/finance/quote?symbols=$symbolsParam")
-                            .get()
-                            .build()
+                        try {
+                            val symbolsParam = symbolsToFetch.take(15).joinToString(",")
+                            val quoteRequest = Request.Builder()
+                                .url("https://query2.finance.yahoo.com/v7/finance/quote?symbols=$symbolsParam")
+                                .header("User-Agent", userAgent)
+                                .get()
+                                .build()
+                                
+                            val quoteResponse = client.newCall(quoteRequest).execute()
+                            val quoteData = quoteResponse.body?.string() ?: ""
                             
-                        val quoteResponse = client.newCall(quoteRequest).execute()
-                        val quoteData = quoteResponse.body?.string() ?: ""
-                        
-                        if (quoteResponse.isSuccessful && quoteData.isNotEmpty()) {
-                            val quoteJson = JSONObject(quoteData)
-                            val resultArr = quoteJson.optJSONObject("quoteResponse")?.optJSONArray("result")
-                            
-                            val parsedResults = mutableListOf<SearchRow>()
-                            
-                            if (resultArr != null) {
-                                for (i in 0 until resultArr.length()) {
-                                    val item = resultArr.getJSONObject(i)
-                                    val rawSym = item.optString("symbol", "")
-                                    val marketCap = item.optLong("marketCap", 0L)
-                                    val livePrice = item.optDouble("regularMarketPrice", 0.0)
-                                    
-                                    val fullName = item.optString("longName", item.optString("shortName", fallbackNames[rawSym] ?: ""))
-                                    val cleanSymbol = rawSym.replace(".NS", "").replace(".BO", "")
-                                    
-                                    if (rawSym.isNotEmpty() && livePrice > 0.0) {
-                                        parsedResults.add(
-                                            SearchRow(
-                                                cleanSymbol = cleanSymbol,
-                                                rawSymbol = rawSym,
-                                                fullName = fullName,
-                                                livePrice = livePrice,
-                                                marketCap = marketCap
+                            if (quoteResponse.isSuccessful && quoteData.isNotEmpty()) {
+                                val quoteJson = JSONObject(quoteData)
+                                val resultArr = quoteJson.optJSONObject("quoteResponse")?.optJSONArray("result")
+                                
+                                val parsedResults = mutableListOf<SearchRow>()
+                                
+                                if (resultArr != null) {
+                                    for (i in 0 until resultArr.length()) {
+                                        val item = resultArr.getJSONObject(i)
+                                        val rawSym = item.optString("symbol", "")
+                                        val marketCap = item.optLong("marketCap", 0L)
+                                        val livePrice = item.optDouble("regularMarketPrice", item.optDouble("previousClose", 0.0))
+                                        
+                                        val fallbackRow = fallbackResults.find { it.rawSymbol == rawSym }
+                                        val fullName = item.optString("longName", item.optString("shortName", fallbackRow?.fullName ?: ""))
+                                        val cleanSymbol = rawSym.replace(".NS", "").replace(".BO", "")
+                                        
+                                        if (rawSym.isNotEmpty()) {
+                                            parsedResults.add(
+                                                SearchRow(
+                                                    cleanSymbol = cleanSymbol,
+                                                    rawSymbol = rawSym,
+                                                    fullName = fullName,
+                                                    livePrice = livePrice,
+                                                    marketCap = marketCap
+                                                )
                                             )
-                                        )
+                                        }
                                     }
                                 }
-                            }
-                            
-                            // ⚡ Sort: Highest Market Cap to Lowest ⚡
-                            parsedResults.sortByDescending { it.marketCap }
-                            
-                            withContext(Dispatchers.Main) {
-                                searchResults = parsedResults
-                                isSearching = false
+                                
                                 if (parsedResults.isNotEmpty()) {
+                                    parsedResults.sortByDescending { it.marketCap }
+                                    withContext(Dispatchers.Main) {
+                                        searchResults = parsedResults
+                                        isSearching = false
+                                        searchExpanded = true
+                                    }
+                                } else {
+                                    // Robust Fallback Activation
+                                    withContext(Dispatchers.Main) {
+                                        searchResults = fallbackResults
+                                        isSearching = false
+                                        searchExpanded = true
+                                    }
+                                }
+                            } else {
+                                // Robust Fallback Activation if Server Error
+                                withContext(Dispatchers.Main) {
+                                    searchResults = fallbackResults
+                                    isSearching = false
                                     searchExpanded = true
                                 }
                             }
-                        } else {
-                            withContext(Dispatchers.Main) { isSearching = false }
+                        } catch (e: Exception) {
+                            // Robust Fallback Activation on Network Timeout
+                            withContext(Dispatchers.Main) {
+                                searchResults = fallbackResults
+                                isSearching = false
+                                searchExpanded = true
+                            }
                         }
                     } else {
                         withContext(Dispatchers.Main) { 
@@ -272,7 +300,7 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                             onDismissRequest = { searchExpanded = false },
                             modifier = Modifier
                                 .background(MaterialTheme.colorScheme.surface)
-                                .heightIn(max = 260.dp) // ⚡ Strict Height to prevent Keyboard overlap
+                                .heightIn(max = 260.dp) // Strict Height to prevent Keyboard overlap
                         ) {
                             searchResults.forEach { row ->
                                 DropdownMenuItem(
@@ -288,15 +316,14 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                                                 
                                                 if (row.fullName.isNotBlank() && !row.fullName.equals(row.cleanSymbol, ignoreCase = true)) {
                                                     Spacer(modifier = Modifier.height(2.dp))
-                                                    // Truncate logic to max 22 chars
                                                     val cleanBracketName = if (row.fullName.length > 22) "${row.fullName.take(20)}..." else row.fullName
                                                     Text(text = "($cleanBracketName)", fontSize = 11.5.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                                 }
                                             }
                                             
-                                            // --- Right Side: Live Price ---
+                                            // --- Right Side: Live Price (with fallback handler) ---
                                             Text(
-                                                text = "₹ ${String.format(Locale.US, "%.2f", row.livePrice)}",
+                                                text = if (row.livePrice > 0.0) "₹ ${String.format(Locale.US, "%.2f", row.livePrice)}" else "-",
                                                 fontWeight = FontWeight.ExtraBold,
                                                 fontSize = 14.sp,
                                                 color = MaterialTheme.colorScheme.primary,
@@ -311,7 +338,13 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                                         assetName = row.cleanSymbol 
                                         selectedSymbol = row.cleanSymbol
                                         sheetTicker = prefix + row.cleanSymbol
-                                        buyPrice = String.format(Locale.US, "%.2f", row.livePrice) // Auto-fill price
+                                        
+                                        // Auto-fill price only if successfully fetched
+                                        if (row.livePrice > 0.0) {
+                                            buyPrice = String.format(Locale.US, "%.2f", row.livePrice)
+                                        } else {
+                                            buyPrice = ""
+                                        }
                                         
                                         searchExpanded = false
                                     }
@@ -333,13 +366,9 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                         value = quantity, 
                         onValueChange = { 
                             if (isMutualFund) {
-                                // Mutual Funds: Allow Decimals
                                 quantity = it
                             } else {
-                                // Stocks/ETFs/Bonds: Strictly Whole Numbers (No dot allowed)
-                                if (it.all { char -> char.isDigit() }) {
-                                    quantity = it
-                                }
+                                if (it.all { char -> char.isDigit() }) quantity = it
                             }
                         },
                         label = { Text(qtyLabel) },
@@ -359,7 +388,6 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                     )
                 }
 
-                // Auto-calculate logic preview
                 val currentQty = quantity.toDoubleOrNull() ?: 0.0
                 val currentPrice = buyPrice.toDoubleOrNull() ?: 0.0
                 val totalAmount = currentQty * currentPrice
@@ -387,7 +415,6 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                             onDismiss() 
                             
                             CoroutineScope(Dispatchers.IO).launch {
-                                // Structuring clean data into the 'invest' Map
                                 try {
                                     val db = FirebaseFirestore.getInstance()
                                     val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
@@ -402,7 +429,7 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                                         val newKey = String.format(Locale.US, "%03d", maxKey + 1)
                                         
                                         val newInvestment = mapOf(
-                                            "name" to selectedSymbol, // Stores clean name (e.g. SBIN)
+                                            "name" to selectedSymbol, 
                                             "type" to assetType,
                                             "qnt" to qty,
                                             "avg" to price,
@@ -415,14 +442,13 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                                     e.printStackTrace()
                                 }
 
-                                // Sheet Auto-append ping logic
                                 try {
                                     val client = OkHttpClient()
                                     val jsonPayload = JSONObject().apply {
                                         put("action", "addTicker")
-                                        put("ticker", sheetTicker) // Sends Full name (e.g. NSE:SBIN)
+                                        put("ticker", sheetTicker) 
                                         put("name", assetName)
-                                        put("type", assetType) // ⚡ Appended for Google Sheets Parsing
+                                        put("type", assetType) 
                                     }.toString()
                                     
                                     val requestBody = jsonPayload.toRequestBody("application/json; charset=utf-8".toMediaTypeOrNull())
@@ -451,7 +477,6 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                     Text("Save Investment", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onPrimary)
                 }
             }
-            
             Spacer(modifier = Modifier.height(24.dp))
         }
     }
