@@ -81,6 +81,9 @@ fun ExpGraphCard(modifier: Modifier = Modifier) {
     var selectedCategoryName by remember { mutableStateOf<String?>(null) }
     var isExpanded by remember { mutableStateOf(false) }
 
+    // Theme color token for dark/light mode adaptable empty ring
+    val emptyRingColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+
     // ⚡ Real-Time In-Memory Aggregation ⚡
     val (filteredCategories, grandTotal) = remember(transactions, selectedFilter) {
         val now = Calendar.getInstance()
@@ -198,7 +201,7 @@ fun ExpGraphCard(modifier: Modifier = Modifier) {
             Spacer(modifier = Modifier.height(20.dp))
 
             if (filteredCategories.isEmpty() || grandTotal <= 0.0) {
-                // Empty State Placeholder Ring
+                // Empty State Adaptive Ring for Light & Dark Mode
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -207,7 +210,7 @@ fun ExpGraphCard(modifier: Modifier = Modifier) {
                 ) {
                     Canvas(modifier = Modifier.size(180.dp)) {
                         drawCircle(
-                            color = Color(0xFFEEEEEE),
+                            color = emptyRingColor,
                             style = Stroke(width = 24.dp.toPx())
                         )
                     }
@@ -344,7 +347,7 @@ fun ExpGraphCard(modifier: Modifier = Modifier) {
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(if (isSelected) item.color.copy(alpha = 0.1f) else Color.Transparent)
+                                .background(if (isSelected) item.color.copy(alpha = 0.12f) else Color.Transparent)
                                 .clickable {
                                     selectedCategoryName = if (isSelected) null else item.category
                                 }
