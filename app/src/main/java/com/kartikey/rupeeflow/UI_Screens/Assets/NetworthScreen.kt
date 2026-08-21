@@ -19,28 +19,22 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.formatRupeeAmount
 import com.kartikey.rupeeflow.UI_Screens.bounceClick
-import java.util.Locale
-import kotlin.math.abs
 
 @Composable
 fun NetworthCard(
     networthAmount: Double = 0.0,
-    oneDayReturnAmount: Double = 0.0,
-    oneDayReturnPercent: Double = 0.0,
-    totalReturnAmount: Double = 0.0,
-    totalReturnPercent: Double = 0.0,
     isLoading: Boolean = false,
     onRefresh: () -> Unit = {},
     onClick: () -> Unit = {}
 ) {
     var isVisible by remember { mutableStateOf(true) }
 
+    // Smooth spinning animation for refresh icon during background sync
     val infiniteTransition = rememberInfiniteTransition(label = "networthRefreshAnim")
     val rotateAngle by infiniteTransition.animateFloat(
         initialValue = 0f,
@@ -99,78 +93,13 @@ fun NetworthCard(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // --- MIDDLE ROW: Main Amount ---
+            // --- MIDDLE ROW: Main Amount (Instant from Local Memory) ---
             Text(
                 text = if (isVisible) formatRupeeAmount(networthAmount) else "••••••••",
                 fontWeight = FontWeight.ExtraBold,
                 fontSize = 32.sp,
                 color = MaterialTheme.colorScheme.onSurface
             )
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            // --- BOTTOM ROW: Returns ---
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Bottom
-            ) {
-                // Left Column (1D returns)
-                Column(horizontalAlignment = Alignment.Start) {
-                    Text(
-                        text = "1D Returns",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    
-                    val is1DPos = oneDayReturnAmount >= 0
-                    val color1D = if (is1DPos) Color(0xFF388E3C) else Color(0xFFD32F2F)
-                    val sign1D = if (is1DPos) "+" else "-"
-                    val formattedAmt1D = formatRupeeAmount(abs(oneDayReturnAmount))
-                    val formattedPct1D = String.format(Locale.US, "%.2f", abs(oneDayReturnPercent))
-                    
-                    Text(
-                        text = if (isVisible) {
-                            "$sign1D$formattedAmt1D ($formattedPct1D%)"
-                        } else {
-                            "•••• ($formattedPct1D%)"
-                        },
-                        color = color1D,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-
-                // Right Column (Total returns)
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(
-                        text = "Total Returns",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    
-                    val isTotalPos = totalReturnAmount >= 0
-                    val colorTotal = if (isTotalPos) Color(0xFF388E3C) else Color(0xFFD32F2F)
-                    val signTotal = if (isTotalPos) "+" else "-"
-                    val formattedAmtTotal = formatRupeeAmount(abs(totalReturnAmount))
-                    val formattedPctTotal = String.format(Locale.US, "%.2f", abs(totalReturnPercent))
-
-                    Text(
-                        text = if (isVisible) {
-                            "$signTotal$formattedAmtTotal ($formattedPctTotal%)"
-                        } else {
-                            "•••• ($formattedPctTotal%)"
-                        },
-                        color = colorTotal,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
         }
     }
 }
