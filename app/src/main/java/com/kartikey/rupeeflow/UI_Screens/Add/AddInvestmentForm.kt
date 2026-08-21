@@ -57,14 +57,14 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
 
     val context = LocalContext.current
 
-    // ⚡ Robust Search Engine (Groww API Primary + Multi-key Fallback) ⚡
+    // ⚡ UNBREAKABLE YAHOO SPARK ENGINE ⚡
     LaunchedEffect(assetName, assetType) {
         if (assetName.isBlank() || selectedSymbol.isNotEmpty() || assetType.isEmpty()) {
             searchResults = emptyList()
             return@LaunchedEffect
         }
         
-        delay(400) // Fast debounce
+        delay(500) // Smart Debounce
         isSearching = true
         
         withContext(Dispatchers.IO) {
@@ -72,89 +72,96 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                 val client = OkHttpClient()
                 val userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
                 
-                // Target category mapping
-                val targetTypes = when (assetType) {
-                    "Mutual Fund" -> listOf("MF", "MUTUAL_FUND", "MUTUALFUND")
+                // 1. Strict Category Filters based on Selection
+                val validQuoteTypes = when (assetType) {
+                    "Mutual Fund" -> listOf("MUTUALFUND")
                     "ETF" -> listOf("ETF")
-                    "Bond" -> listOf("BOND", "SGB", "STOCK", "EQUITY")
-                    else -> listOf("STOCK", "EQUITY")
+                    "Bond" -> listOf("EQUITY", "ETF")
+                    else -> listOf("EQUITY") // Strictly Stocks
                 }
 
-                // 1. Primary Attempt: Groww Native Entity Search
-                val growwUrl = "https://groww.in/v1/api/search/v1/derived/entity?app=false&entityType=ALL&page=0&query=${assetName.replace(" ", "%20")}&size=20"
-                val growwRequest = Request.Builder()
-                    .url(growwUrl)
-                    .header("User-Agent", userAgent)
-                    .header("Accept", "application/json")
-                    .get()
-                    .build()
-                    
-                val response = client.newCall(growwRequest).execute()
-                val responseData = response.body?.string() ?: ""
-                val parsedList = mutableListOf<SearchRow>()
+                // Call 1: Yahoo Search API
+                val searchUrl = "https://query2.finance.yahoo.com/v1/finance/search?q=${assetName.replace(" ", "%20")}&quotesCount=25"
+                val searchReq = Request.Builder().url(searchUrl).header("User-Agent", userAgent).get().build()
+                val searchResp = client.newCall(searchReq).execute()
+                val searchData = searchResp.body?.string() ?: ""
 
-                if (response.isSuccessful && responseData.isNotEmpty()) {
-                    val jsonResponse = JSONObject(responseData)
-                    val contentArr = jsonResponse.optJSONArray("content") 
-                        ?: jsonResponse.optJSONObject("data")?.optJSONArray("content")
-                        ?: jsonResponse.optJSONArray("data")
+                if (searchResp.isSuccessful && searchData.isNotEmpty()) {
+                    val jsonResponse = JSONObject(searchData)
+                    val quotes = jsonResponse.optJSONArray("quotes")
                     
-                    if (contentArr != null) {
-                        for (i in 0 until contentArr.length()) {
-                            val item = contentArr.getJSONObject(i)
-                            val qType = item.optString("entity_type", item.optString("type", "")).uppercase(Locale.getDefault())
+                    val orderedSymbols = mutableListOf<String>()
+                    val fallbackNames = mutableMapOf<String, String>()
+
+                    if (quotes != null) {
+                        for (i in 0 until quotes.length()) {
+                            val quote = quotes.getJSONObject(i)
+                            val sym = quote.optString("symbol", "")
+                            val qType = quote.optString("quoteType", "")
                             
-                            if (targetTypes.any { qType.contains(it) } || qType.isEmpty()) {
-                                val rawSym = item.optString("search_id", item.optString("nse_scrip_code", item.optString("bse_scrip_code", "")))
-                                val fullName = item.optString("title", item.optString("scheme_name", item.optString("name", "")))
-                                val livePrice = item.optDouble("live_price", item.optDouble("nav", item.optDouble("current_price", 0.0)))
-                                
-                                if (rawSym.isNotBlank() || fullName.isNotBlank()) {
-                                    val cleanSymbol = rawSym.replace(".NS", "").replace(".BO", "").ifEmpty { fullName.take(10).uppercase() }
-                                    parsedList.add(
-                                        SearchRow(
-                                            cleanSymbol = cleanSymbol,
-                                            rawSymbol = rawSym.ifEmpty { cleanSymbol },
-                                            fullName = fullName,
-                                            livePrice = livePrice
-                                        )
-                                    )
+                            // ⚡ IRON-CLAD FILTERS: Only .NS/.BO, Must Match Type, NO '0P' Garbage ⚡
+                            if (sym.isNotEmpty() && (sym.endsWith(".NS") || sym.endsWith(".BO"))) {
+                                if (validQuoteTypes.contains(qType)) {
+                                    
+                                    // Block BSE Mutual Fund Garbage from appearing in Stocks
+                                    if (assetType == "Stock" && sym.startsWith("0P")) continue
+                                    
+                                    if (!orderedSymbols.contains(sym)) {
+                                        orderedSymbols.add(sym)
+                                        fallbackNames[sym] = quote.optString("longname", quote.optString("shortname", ""))
+                                    }
                                 }
                             }
                         }
                     }
-                }
 
-                // 2. Secondary Fallback: If primary list is empty, hit Yahoo Search
-                if (parsedList.isEmpty()) {
-                    val yahooUrl = "https://query2.finance.yahoo.com/v1/finance/search?q=${assetName.replace(" ", "%20")}&quotesCount=15"
-                    val yahooReq = Request.Builder()
-                        .url(yahooUrl)
-                        .header("User-Agent", userAgent)
-                        .get()
-                        .build()
-                    val yResp = client.newCall(yahooReq).execute()
-                    val yData = yResp.body?.string() ?: ""
-                    
-                    if (yResp.isSuccessful && yData.isNotEmpty()) {
-                        val yQuotes = JSONObject(yData).optJSONArray("quotes")
-                        if (yQuotes != null) {
-                            for (i in 0 until yQuotes.length()) {
-                                val q = yQuotes.getJSONObject(i)
-                                val sym = q.optString("symbol", "")
-                                if (sym.endsWith(".NS") || sym.endsWith(".BO")) {
-                                    val name = q.optString("longname", q.optString("shortname", ""))
-                                    val clean = sym.replace(".NS", "").replace(".BO", "")
-                                    parsedList.add(SearchRow(cleanSymbol = clean, rawSymbol = sym, fullName = name, livePrice = 0.0))
+                    // Call 2: Fetch Live Price via Secret Spark API
+                    if (orderedSymbols.isNotEmpty()) {
+                        val symbolsParam = orderedSymbols.take(15).joinToString(",")
+                        val sparkUrl = "https://query1.finance.yahoo.com/v7/finance/spark?symbols=$symbolsParam"
+                        val sparkReq = Request.Builder().url(sparkUrl).header("User-Agent", userAgent).get().build()
+                        val sparkResp = client.newCall(sparkReq).execute()
+                        val sparkData = sparkResp.body?.string() ?: ""
+                        
+                        val priceMap = mutableMapOf<String, Double>()
+                        
+                        if (sparkResp.isSuccessful && sparkData.isNotEmpty()) {
+                            val sparkJson = JSONObject(sparkData)
+                            val resultArr = sparkJson.optJSONObject("spark")?.optJSONArray("result")
+                            
+                            if (resultArr != null) {
+                                for (i in 0 until resultArr.length()) {
+                                    val item = resultArr.getJSONObject(i)
+                                    val sym = item.optString("symbol", "")
+                                    val meta = item.optJSONArray("response")?.optJSONObject(0)?.optJSONObject("meta")
+                                    val price = meta?.optDouble("regularMarketPrice", 0.0) ?: 0.0
+                                    priceMap[sym] = price
                                 }
                             }
                         }
-                    }
-                }
 
-                withContext(Dispatchers.Main) {
-                    searchResults = parsedList
-                    isSearching = false
+                        // Assemble Final Clean List (Preserving Yahoo's Relevance/Market Cap Sort Order)
+                        val parsedList = mutableListOf<SearchRow>()
+                        for (sym in orderedSymbols.take(15)) {
+                            val price = priceMap[sym] ?: 0.0
+                            val name = fallbackNames[sym] ?: ""
+                            val cleanSym = sym.replace(".NS", "").replace(".BO", "")
+                            
+                            parsedList.add(SearchRow(cleanSymbol = cleanSym, rawSymbol = sym, fullName = name, livePrice = price))
+                        }
+
+                        withContext(Dispatchers.Main) {
+                            searchResults = parsedList
+                            isSearching = false
+                        }
+                    } else {
+                        withContext(Dispatchers.Main) { 
+                            searchResults = emptyList()
+                            isSearching = false 
+                        }
+                    }
+                } else {
+                    withContext(Dispatchers.Main) { isSearching = false }
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) { 
@@ -292,13 +299,15 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                                     Column(modifier = Modifier.weight(0.7f)) {
                                         Text(text = row.cleanSymbol, fontWeight = FontWeight.Bold, fontSize = 14.5.sp, color = MaterialTheme.colorScheme.onSurface)
                                         
+                                        // ⚡ Dynamic Name Truncation Logic ⚡
                                         if (row.fullName.isNotBlank() && !row.fullName.equals(row.cleanSymbol, ignoreCase = true)) {
                                             Spacer(modifier = Modifier.height(2.dp))
-                                            val cleanBracketName = if (row.fullName.length > 24) "${row.fullName.take(22)}..." else row.fullName
+                                            val cleanBracketName = if (row.fullName.length > 22) "${row.fullName.take(20)}..." else row.fullName
                                             Text(text = "($cleanBracketName)", fontSize = 11.5.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                         }
                                     }
                                     
+                                    // ⚡ Live Price formatting ⚡
                                     Text(
                                         text = if (row.livePrice > 0.0) "₹ ${String.format(Locale.US, "%.2f", row.livePrice)}" else "-",
                                         fontWeight = FontWeight.ExtraBold,
@@ -330,7 +339,7 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                             if (isMutualFund) {
                                 quantity = it // Allows Decimals
                             } else {
-                                if (it.all { char -> char.isDigit() }) quantity = it // Integers only
+                                if (it.all { char -> char.isDigit() }) quantity = it // Strictly Integers
                             }
                         },
                         label = { Text(qtyLabel) },
