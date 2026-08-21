@@ -279,7 +279,7 @@ fun ExpGraphCard(modifier: Modifier = Modifier) {
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // --- GRAPH & RIGHT LEGEND SECTION ---
+            // --- GRAPH & RIGHT LEGEND SECTION (60% Chart : 15% Gap : 25% Legend) ---
             if (filteredCategories.isEmpty() || grandTotal <= 0.0) {
                 Box(
                     modifier = Modifier
@@ -305,12 +305,12 @@ fun ExpGraphCard(modifier: Modifier = Modifier) {
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(180.dp),
-                    verticalAlignment = Alignment.Bottom
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // --- LEFT: 55% Donut Chart ---
+                    // --- LEFT: 60% Donut Chart ---
                     Box(
                         modifier = Modifier
-                            .weight(0.55f)
+                            .weight(0.60f)
                             .fillMaxHeight(),
                         contentAlignment = Alignment.Center
                     ) {
@@ -351,7 +351,8 @@ fun ExpGraphCard(modifier: Modifier = Modifier) {
                                 }
                         ) {
                             val strokeWidth = 22.dp.toPx()
-                            val diameter = size.minDimension - strokeWidth
+                            val minDim = minOf(size.width.toFloat(), size.height.toFloat())
+                            val diameter = minDim - strokeWidth
                             val topLeft = Offset(strokeWidth / 2f, strokeWidth / 2f)
                             val arcSize = Size(diameter, diameter)
 
@@ -429,24 +430,24 @@ fun ExpGraphCard(modifier: Modifier = Modifier) {
                         }
                     }
 
-                    // --- 5% GAP ---
-                    Spacer(modifier = Modifier.weight(0.05f))
+                    // --- 15% GAP ---
+                    Spacer(modifier = Modifier.weight(0.15f))
 
-                    // --- RIGHT: Compact Bottom-Aligned Legends (Strict Straight Line) ---
+                    // --- RIGHT: 25% Tight Category List ---
                     Column(
                         modifier = Modifier
-                            .weight(0.40f)
+                            .weight(0.25f)
                             .fillMaxHeight(),
-                        verticalArrangement = Arrangement.Bottom,
+                        verticalArrangement = Arrangement.spacedBy(2.dp, Alignment.Bottom),
                         horizontalAlignment = Alignment.Start
                     ) {
-                        val legendItems = filteredCategories.take(5)
+                        val legendItems = filteredCategories.take(8)
                         legendItems.forEach { item ->
                             val isSelected = item.category == selectedCategoryName
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clip(RoundedCornerShape(4.dp))
+                                    .clip(RoundedCornerShape(3.dp))
                                     .background(if (isSelected) item.color.copy(alpha = 0.15f) else Color.Transparent)
                                     .clickable(
                                         interactionSource = noRippleInteractionSource,
@@ -454,20 +455,19 @@ fun ExpGraphCard(modifier: Modifier = Modifier) {
                                     ) {
                                         selectedCategoryName = if (isSelected) null else item.category
                                     }
-                                    .padding(vertical = 2.5.dp, horizontal = 2.dp),
+                                    .padding(vertical = 1.5.dp, horizontal = 1.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.Start
                             ) {
-                                // Strictly vertically aligned micro square
                                 Box(
                                     modifier = Modifier
-                                        .size(6.5.dp)
-                                        .background(item.color, RoundedCornerShape(1.5.dp))
+                                        .size(5.5.dp)
+                                        .background(item.color, RoundedCornerShape(1.dp))
                                 )
-                                Spacer(modifier = Modifier.width(6.dp))
+                                Spacer(modifier = Modifier.width(4.5.dp))
                                 Text(
                                     text = item.category,
-                                    fontSize = 9.5.sp,
+                                    fontSize = 9.sp,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                     color = if (isSelected) item.color else MaterialTheme.colorScheme.onSurface,
                                     maxLines = 1,
@@ -476,13 +476,13 @@ fun ExpGraphCard(modifier: Modifier = Modifier) {
                             }
                         }
 
-                        if (filteredCategories.size > 5) {
+                        if (filteredCategories.size > 8) {
                             Text(
-                                text = "+${filteredCategories.size - 5} more",
-                                fontSize = 8.5.sp,
+                                text = "+${filteredCategories.size - 8} more",
+                                fontSize = 8.sp,
                                 fontWeight = FontWeight.Medium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(start = 12.5.dp, top = 2.dp)
+                                modifier = Modifier.padding(start = 10.dp, top = 1.dp)
                             )
                         }
                     }
