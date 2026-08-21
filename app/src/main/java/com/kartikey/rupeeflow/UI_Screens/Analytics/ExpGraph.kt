@@ -9,6 +9,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
@@ -29,13 +30,11 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.formatRupeeAmount
 import com.kartikey.rupeeflow.UI_Screens.CacheManager
-import com.kartikey.rupeeflow.UI_Screens.bounceClick
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -51,23 +50,24 @@ data class CategorySpendItem(
     val sweepAngle: Float = 0f
 )
 
-// ⚡ Vibrant Neon Color Palette ⚡
-private val NeonCategoryColors = mapOf(
-    "Food" to Color(0xFFFF6D00),          // Neon Deep Orange
-    "Groceries" to Color(0xFF00E676),     // Electric Neon Green
-    "Transport" to Color(0xFF00E5FF),     // Neon Cyan
-    "Fuel" to Color(0xFFFFD600),          // Bright Neon Amber/Yellow
-    "Shopping" to Color(0xFFE040FB),      // Neon Purple/Magenta
-    "Bills" to Color(0xFFFF1744),         // Neon Bright Red
-    "Rent" to Color(0xFFFF80AB),          // Neon Pink
-    "EMI" to Color(0xFF1DE9B6),           // Neon Aqua Teal
-    "Subscription" to Color(0xFFF50057),  // Neon Rose
-    "Gift" to Color(0xFF7C4DFF),          // Electric Purple
-    "Personal Care" to Color(0xFF00B0FF), // Electric Sky Blue
-    "Health" to Color(0xFF76FF03),        // Neon Bright Lime
-    "Education" to Color(0xFF3D5AFE),     // Electric Indigo
-    "Entertainment" to Color(0xFFFFAB00), // Vibrant Gold
-    "Custom" to Color(0xFF90A4AE)
+// ⚡ Dynamic High-Contrast Neon Color Pool (Auto-Cycles for Unlimited Categories) ⚡
+private val NeonColorPalette = listOf(
+    Color(0xFF00E5FF), // Neon Cyan
+    Color(0xFFFF6D00), // Neon Deep Orange
+    Color(0xFF00E676), // Electric Neon Green
+    Color(0xFFE040FB), // Neon Magenta
+    Color(0xFFFFD600), // Bright Neon Amber/Yellow
+    Color(0xFFFF1744), // Electric Neon Red
+    Color(0xFF7C4DFF), // Electric Violet
+    Color(0xFF1DE9B6), // Neon Aqua Teal
+    Color(0xFFFF4081), // Hot Pink
+    Color(0xFF76FF03), // Neon Bright Lime
+    Color(0xFF00B0FF), // Electric Sky Blue
+    Color(0xFFFF9100), // Pure Amber Glow
+    Color(0xFF651FFF), // Deep Electric Indigo
+    Color(0xFF00BFA5), // Dark Teal Glow
+    Color(0xFFFFAB00), // Radiant Gold
+    Color(0xFFF50057)  // Deep Rose Neon
 )
 
 @Composable
@@ -83,7 +83,7 @@ fun ExpGraphCard(modifier: Modifier = Modifier) {
     var selectedCategoryName by remember { mutableStateOf<String?>(null) }
     val emptyRingColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
 
-    // ⚡ Real-Time Filter Aggregation ⚡
+    // ⚡ Real-Time Filter Aggregation with Dynamic Palette Cycling ⚡
     val (filteredCategories, grandTotal) = remember(transactions, selectedFilter) {
         val now = Calendar.getInstance()
         val currDayStr = String.format(Locale.US, "%02d", now.get(Calendar.DAY_OF_MONTH))
@@ -129,10 +129,10 @@ fun ExpGraphCard(modifier: Modifier = Modifier) {
         val total = grouped.values.sum()
         var currentAngle = -90f
 
-        val list = grouped.entries.sortedByDescending { it.value }.map { entry ->
+        val list = grouped.entries.sortedByDescending { it.value }.mapIndexed { index, entry ->
             val pct = if (total > 0) (entry.value / total) * 100.0 else 0.0
             val sweep = ((pct / 100.0) * 360.0).toFloat()
-            val color = NeonCategoryColors[entry.key] ?: Color(0xFF90A4AE)
+            val color = NeonColorPalette[index % NeonColorPalette.size]
             val item = CategorySpendItem(
                 category = entry.key,
                 totalAmount = entry.value,
@@ -169,7 +169,7 @@ fun ExpGraphCard(modifier: Modifier = Modifier) {
     ) {
         Column(modifier = Modifier.padding(top = 16.dp, start = 16.dp, end = 16.dp, bottom = 18.dp)) {
 
-            // --- TOP ROW: Title & Animated Capsule Filter ---
+            // --- TOP ROW: Title & Animated Morphing Capsule Filter ---
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
