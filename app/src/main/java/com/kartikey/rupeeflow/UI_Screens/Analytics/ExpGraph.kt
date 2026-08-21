@@ -75,7 +75,7 @@ private val NeonColorPalette = listOf(
 fun ExpGraphCard(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val appDataState by CacheManager.appDataState.collectAsState()
-    val transactions = appDataState?.transactionList ?: emptyList()[cite: 1]
+    val transactions = appDataState?.transactionList ?: emptyList()
 
     var selectedFilter by remember { mutableStateOf("This Month") }
     var isCapsuleExpanded by remember { mutableStateOf(false) }
@@ -351,8 +351,7 @@ fun ExpGraphCard(modifier: Modifier = Modifier) {
                                 }
                         ) {
                             val strokeWidth = 22.dp.toPx()
-                            val minDim = minOf(size.width, size.height)
-                            val diameter = minDim - strokeWidth
+                            val diameter = size.minDimension - strokeWidth
                             val topLeft = Offset(strokeWidth / 2f, strokeWidth / 2f)
                             val arcSize = Size(diameter, diameter)
 
