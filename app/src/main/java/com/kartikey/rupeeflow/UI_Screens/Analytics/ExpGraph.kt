@@ -11,7 +11,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.KeyboardArrowUp
@@ -279,7 +281,7 @@ fun ExpGraphCard(modifier: Modifier = Modifier) {
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // --- GRAPH & RIGHT LEGEND SECTION (60% Chart : 15% Gap : 25% Legend) ---
+            // --- GRAPH & RIGHT LEGEND SECTION (60% Chart : 15% Gap : 25% Scrollable Legend) ---
             if (filteredCategories.isEmpty() || grandTotal <= 0.0) {
                 Box(
                     modifier = Modifier
@@ -307,7 +309,7 @@ fun ExpGraphCard(modifier: Modifier = Modifier) {
                         .height(180.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // --- LEFT: 60% Donut Chart ---
+                    // --- LEFT: 60% Donut Chart (Locked/Fixed) ---
                     Box(
                         modifier = Modifier
                             .weight(0.60f)
@@ -433,16 +435,16 @@ fun ExpGraphCard(modifier: Modifier = Modifier) {
                     // --- 15% GAP ---
                     Spacer(modifier = Modifier.weight(0.15f))
 
-                    // --- RIGHT: 25% Tight Category List ---
+                    // --- RIGHT: 25% Ultra-Tight Independently Scrollable Category List ---
                     Column(
                         modifier = Modifier
                             .weight(0.25f)
-                            .fillMaxHeight(),
-                        verticalArrangement = Arrangement.spacedBy(2.dp, Alignment.Bottom),
+                            .fillMaxHeight()
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(1.dp),
                         horizontalAlignment = Alignment.Start
                     ) {
-                        val legendItems = filteredCategories.take(8)
-                        legendItems.forEach { item ->
+                        filteredCategories.forEach { item ->
                             val isSelected = item.category == selectedCategoryName
                             Row(
                                 modifier = Modifier
@@ -455,7 +457,7 @@ fun ExpGraphCard(modifier: Modifier = Modifier) {
                                     ) {
                                         selectedCategoryName = if (isSelected) null else item.category
                                     }
-                                    .padding(vertical = 1.5.dp, horizontal = 1.dp),
+                                    .padding(vertical = 1.dp, horizontal = 1.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.Start
                             ) {
@@ -474,16 +476,6 @@ fun ExpGraphCard(modifier: Modifier = Modifier) {
                                     overflow = TextOverflow.Ellipsis
                                 )
                             }
-                        }
-
-                        if (filteredCategories.size > 8) {
-                            Text(
-                                text = "+${filteredCategories.size - 8} more",
-                                fontSize = 8.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(start = 10.dp, top = 1.dp)
-                            )
                         }
                     }
                 }
