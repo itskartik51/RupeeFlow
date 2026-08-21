@@ -10,7 +10,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -35,22 +34,23 @@ import java.util.Locale
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss: () -> Unit) { 
-    var assetType by remember { mutableStateOf("Stock") }
-    var assetName by remember { mutableStateOf("") }
+    // ⚡ Initial State Changed to Empty ⚡
+    var assetType by remember { mutableStateOf("") }[cite: 5]
+    var assetName by remember { mutableStateOf("") }[cite: 5]
     
-    var selectedSymbol by remember { mutableStateOf("") } // Clean Ticker for Firebase (e.g. SBIN)
-    var sheetTicker by remember { mutableStateOf("") }    // Full Ticker for Google Sheet (e.g. NSE:SBIN)
+    var selectedSymbol by remember { mutableStateOf("") }
+    var sheetTicker by remember { mutableStateOf("") }
     
-    var quantity by remember { mutableStateOf("") }
-    var buyPrice by remember { mutableStateOf("") }
+    var quantity by remember { mutableStateOf("") }[cite: 5]
+    var buyPrice by remember { mutableStateOf("") }[cite: 5]
     
-    var typeExpanded by remember { mutableStateOf(false) }
-    var searchExpanded by remember { mutableStateOf(false) }
+    var typeExpanded by remember { mutableStateOf(false) }[cite: 5]
+    var searchExpanded by remember { mutableStateOf(false) }[cite: 5]
     
-    var searchResults by remember { mutableStateOf<List<SearchRow>>(emptyList()) }
-    var isSearching by remember { mutableStateOf(false) }
+    var searchResults by remember { mutableStateOf<List<SearchRow>>(emptyList()) }[cite: 5]
+    var isSearching by remember { mutableStateOf(false) }[cite: 5]
 
-    val context = LocalContext.current
+    val context = LocalContext.current[cite: 5]
 
     LaunchedEffect(assetName) {
         if (assetName.isBlank() || selectedSymbol.isNotEmpty()) {
@@ -147,19 +147,27 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
     ) {
         Column(modifier = Modifier.padding(20.dp).verticalScroll(rememberScrollState())) {
             
+            // --- ASSET TYPE DROPDOWN ---
+            Text(text = "Choose Investment Type", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(4.dp))
+            
             ExposedDropdownMenuBox(
                 expanded = typeExpanded,
                 onExpandedChange = { typeExpanded = !typeExpanded }
             ) {
                 OutlinedTextField(
-                    value = assetType,
+                    value = if (assetType.isEmpty()) "Select Asset Type" else assetType,
                     onValueChange = {},
                     readOnly = true,
-                    label = { Text("Asset Type") },
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = typeExpanded) },
                     modifier = Modifier.fillMaxWidth().menuAnchor(),
                     shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary, unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), focusedTextColor = MaterialTheme.colorScheme.onSurface, unfocusedTextColor = MaterialTheme.colorScheme.onSurface)
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary, 
+                        unfocusedBorderColor = if (assetType.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), 
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface, 
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                    )
                 )
                 ExposedDropdownMenu(
                     expanded = typeExpanded,
@@ -174,6 +182,8 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                                 assetName = "" 
                                 selectedSymbol = ""
                                 sheetTicker = ""
+                                quantity = ""
+                                buyPrice = ""
                                 typeExpanded = false
                             }
                         )
@@ -181,170 +191,206 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            // ⚡ Conditional UI (Only visible when Type is selected) ⚡
+            if (assetType.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(20.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                Spacer(modifier = Modifier.height(16.dp))
 
-            ExposedDropdownMenuBox(
-                expanded = searchExpanded,
-                onExpandedChange = { 
-                    if (searchResults.isNotEmpty() && assetName.isNotEmpty()) {
-                        searchExpanded = it 
-                    }
-                }
-            ) {
-                OutlinedTextField(
-                    value = assetName,
-                    onValueChange = { 
-                        assetName = it 
-                        selectedSymbol = "" 
-                        sheetTicker = ""
-                        searchExpanded = it.isNotEmpty()
-                    },
-                    label = { Text("Search $assetType Name") },
-                    modifier = Modifier.fillMaxWidth().menuAnchor(),
-                    singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary, unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), focusedTextColor = MaterialTheme.colorScheme.onSurface, unfocusedTextColor = MaterialTheme.colorScheme.onSurface),
-                    trailingIcon = { 
-                        if (isSearching) {
-                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.primary)
-                        } else {
-                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = searchExpanded) 
+                ExposedDropdownMenuBox(
+                    expanded = searchExpanded,
+                    onExpandedChange = { 
+                        if (searchResults.isNotEmpty() && assetName.isNotEmpty()) {
+                            searchExpanded = it 
                         }
                     }
-                )
-                
-                if (assetName.isNotEmpty() && searchResults.isNotEmpty() && selectedSymbol.isEmpty()) {
-                    ExposedDropdownMenu(
-                        expanded = searchExpanded,
-                        onDismissRequest = { searchExpanded = false },
-                        modifier = Modifier.background(MaterialTheme.colorScheme.surface)
-                    ) {
-                        searchResults.forEach { row ->
-                            DropdownMenuItem(
-                                text = { 
-                                    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
-                                        Text(row.name, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurface)
-                                        Spacer(modifier = Modifier.height(2.dp))
-                                        Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                                            Text(row.displaySymbol, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Medium)
-                                            if (row.isIndian) {
-                                                Text("🇮🇳 India", fontSize = 11.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                ) {
+                    OutlinedTextField(
+                        value = assetName,
+                        onValueChange = { 
+                            assetName = it 
+                            selectedSymbol = "" 
+                            sheetTicker = ""
+                            searchExpanded = it.isNotEmpty()
+                        },
+                        label = { Text("Search $assetType Name") },
+                        modifier = Modifier.fillMaxWidth().menuAnchor(),
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary, unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), focusedTextColor = MaterialTheme.colorScheme.onSurface, unfocusedTextColor = MaterialTheme.colorScheme.onSurface),
+                        trailingIcon = { 
+                            if (isSearching) {
+                                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.primary)
+                            } else {
+                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = searchExpanded) 
+                            }
+                        }
+                    )
+                    
+                    if (assetName.isNotEmpty() && searchResults.isNotEmpty() && selectedSymbol.isEmpty()) {
+                        ExposedDropdownMenu(
+                            expanded = searchExpanded,
+                            onDismissRequest = { searchExpanded = false },
+                            modifier = Modifier.background(MaterialTheme.colorScheme.surface)
+                        ) {
+                            searchResults.forEach { row ->
+                                DropdownMenuItem(
+                                    text = { 
+                                        Column(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+                                            Text(row.name, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurface)
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                                                Text(row.displaySymbol, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Medium)
+                                                if (row.isIndian) {
+                                                    Text("🇮🇳 India", fontSize = 11.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                                                }
                                             }
                                         }
+                                    },
+                                    onClick = {
+                                        val prefix = if (row.rawSymbol.endsWith(".NS")) "NSE:" else if (row.rawSymbol.endsWith(".BO")) "BOM:" else ""
+                                        val cleanSymbol = row.rawSymbol.replace(".NS", "").replace(".BO", "")
+                                        
+                                        assetName = row.name 
+                                        selectedSymbol = cleanSymbol
+                                        sheetTicker = prefix + cleanSymbol
+                                        
+                                        searchExpanded = false
                                     }
-                                },
-                                onClick = {
-                                    val prefix = if (row.rawSymbol.endsWith(".NS")) "NSE:" else if (row.rawSymbol.endsWith(".BO")) "BOM:" else ""
-                                    val cleanSymbol = row.rawSymbol.replace(".NS", "").replace(".BO", "")
-                                    
-                                    assetName = row.name 
-                                    selectedSymbol = cleanSymbol // Only SBIN
-                                    sheetTicker = prefix + cleanSymbol // NSE:SBIN
-                                    
-                                    searchExpanded = false
-                                }
-                            )
+                                )
+                            }
                         }
                     }
                 }
-            }
 
-            Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(
-                    value = quantity, onValueChange = { quantity = it },
-                    label = { Text("Quantity") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.weight(1f), singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary, unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), focusedTextColor = MaterialTheme.colorScheme.onSurface, unfocusedTextColor = MaterialTheme.colorScheme.onSurface)
-                )
-                OutlinedTextField(
-                    value = buyPrice, onValueChange = { buyPrice = it },
-                    label = { Text("Buy Price") },
-                    prefix = { Text("₹ ", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.weight(1f), singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary, unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), focusedTextColor = MaterialTheme.colorScheme.onSurface, unfocusedTextColor = MaterialTheme.colorScheme.onSurface)
-                )
-            }
+                // ⚡ Dynamic Labels & Math Physics depending on Asset Type ⚡
+                val isMutualFund = assetType == "Mutual Fund"
+                val qtyLabel = if (isMutualFund) "Total Units" else "Quantity"
+                val priceLabel = if (isMutualFund) "Average NAV" else "Buy Price"
 
-            Spacer(modifier = Modifier.height(24.dp))
-
-            Button(
-                onClick = {
-                    val qty = quantity.toDoubleOrNull() ?: 0.0
-                    val price = buyPrice.toDoubleOrNull() ?: 0.0
-                    
-                    if (selectedSymbol.isNotBlank() && qty > 0 && price > 0) {
-                        
-                        onInvestmentAdded()
-                        onDismiss() 
-                        
-                        CoroutineScope(Dispatchers.IO).launch {
-                            // Structuring clean data into the 'invest' Map
-                            try {
-                                val db = FirebaseFirestore.getInstance()
-                                val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
-                                
-                                if (!userQuery.isEmpty) {
-                                    val userDoc = userQuery.documents[0]
-                                    val userRef = userDoc.reference
-                                    
-                                    val investMap = userDoc.get("invest") as? Map<String, Any> ?: emptyMap()
-                                    
-                                    val maxKey = investMap.keys.mapNotNull { it.toIntOrNull() }.maxOrNull() ?: 0
-                                    val newKey = String.format(Locale.US, "%03d", maxKey + 1)
-                                    
-                                    val newInvestment = mapOf(
-                                        "name" to selectedSymbol, // Stores clean name (e.g. SBIN)
-                                        "type" to assetType,
-                                        "qnt" to qty,
-                                        "avg" to price,
-                                        "amnt" to (qty * price)
-                                    )
-                                    
-                                    userRef.update("invest.$newKey", newInvestment).await()
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedTextField(
+                        value = quantity, 
+                        onValueChange = { 
+                            if (isMutualFund) {
+                                // Mutual Funds: Allow Decimals
+                                quantity = it
+                            } else {
+                                // Stocks/ETFs/Bonds: Strictly Whole Numbers (No dot allowed)
+                                if (it.all { char -> char.isDigit() }) {
+                                    quantity = it
                                 }
-                            } catch (e: Exception) {
-                                e.printStackTrace()
                             }
+                        },
+                        label = { Text(qtyLabel) },
+                        keyboardOptions = KeyboardOptions(keyboardType = if (isMutualFund) KeyboardType.Decimal else KeyboardType.Number),
+                        modifier = Modifier.weight(1f), singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary, unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), focusedTextColor = MaterialTheme.colorScheme.onSurface, unfocusedTextColor = MaterialTheme.colorScheme.onSurface)
+                    )
+                    OutlinedTextField(
+                        value = buyPrice, onValueChange = { buyPrice = it },
+                        label = { Text(priceLabel) },
+                        prefix = { Text("₹ ", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.weight(1f), singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary, unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), focusedTextColor = MaterialTheme.colorScheme.onSurface, unfocusedTextColor = MaterialTheme.colorScheme.onSurface)
+                    )
+                }
 
-                            // Sheet Auto-append ping logic (Sends Full Ticker)
-                            try {
-                                val client = OkHttpClient()
-                                val jsonPayload = JSONObject().apply {
-                                    put("action", "addTicker")
-                                    put("ticker", sheetTicker) // Sends Full name (e.g. NSE:SBIN)
-                                    put("name", assetName)
-                                }.toString()
-                                
-                                val requestBody = jsonPayload.toRequestBody("application/json; charset=utf-8".toMediaTypeOrNull())
-                                
-                                val request = Request.Builder()
-                                    .url(Constants.GOOGLE_SHEET_API_URL)
-                                    .post(requestBody)
-                                    .build()
+                // Auto-calculate logic preview (Optional view for user)
+                val currentQty = quantity.toDoubleOrNull() ?: 0.0
+                val currentPrice = buyPrice.toDoubleOrNull() ?: 0.0
+                val totalAmount = currentQty * currentPrice
+                if (totalAmount > 0) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Total Invested: ₹${String.format(Locale.US, "%.2f", totalAmount)}",
+                        color = MaterialTheme.colorScheme.primary,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(start = 4.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Button(
+                    onClick = {
+                        val qty = quantity.toDoubleOrNull() ?: 0.0
+                        val price = buyPrice.toDoubleOrNull() ?: 0.0
+                        
+                        if (selectedSymbol.isNotBlank() && qty > 0 && price > 0) {
+                            
+                            onInvestmentAdded()
+                            onDismiss() 
+                            
+                            CoroutineScope(Dispatchers.IO).launch {
+                                // Structuring clean data into the 'invest' Map
+                                try {
+                                    val db = FirebaseFirestore.getInstance()
+                                    val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
                                     
-                                client.newCall(request).execute()
-                            } catch (e: Exception) {
-                                e.printStackTrace()
+                                    if (!userQuery.isEmpty) {
+                                        val userDoc = userQuery.documents[0]
+                                        val userRef = userDoc.reference
+                                        
+                                        val investMap = userDoc.get("invest") as? Map<String, Any> ?: emptyMap()
+                                        
+                                        val maxKey = investMap.keys.mapNotNull { it.toIntOrNull() }.maxOrNull() ?: 0
+                                        val newKey = String.format(Locale.US, "%03d", maxKey + 1)
+                                        
+                                        val newInvestment = mapOf(
+                                            "name" to selectedSymbol, // Stores clean name (e.g. SBIN)
+                                            "type" to assetType,
+                                            "qnt" to qty,
+                                            "avg" to price,
+                                            "amnt" to (qty * price)
+                                        )
+                                        
+                                        userRef.update("invest.$newKey", newInvestment).await()
+                                    }
+                                } catch (e: Exception) {
+                                    e.printStackTrace()
+                                }
+
+                                // Sheet Auto-append ping logic (Sends Full Ticker)
+                                try {
+                                    val client = OkHttpClient()
+                                    val jsonPayload = JSONObject().apply {
+                                        put("action", "addTicker")
+                                        put("ticker", sheetTicker) // Sends Full name (e.g. NSE:SBIN)
+                                        put("name", assetName)
+                                    }.toString()
+                                    
+                                    val requestBody = jsonPayload.toRequestBody("application/json; charset=utf-8".toMediaTypeOrNull())
+                                    
+                                    val request = Request.Builder()
+                                        .url(Constants.GOOGLE_SHEET_API_URL)
+                                        .post(requestBody)
+                                        .build()
+                                        
+                                    client.newCall(request).execute()
+                                } catch (e: Exception) {
+                                    e.printStackTrace()
+                                }
                             }
+                        } else {
+                            Toast.makeText(context, "Please select an Asset and enter valid Details", Toast.LENGTH_LONG).show()
                         }
-                    } else {
-                        Toast.makeText(context, "Please select an Asset and enter valid Details", Toast.LENGTH_LONG).show()
-                    }
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp)
-                    .bounceClick(),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Text("Save Investment", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onPrimary)
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp)
+                        .bounceClick(),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("Save Investment", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onPrimary)
+                }
             }
             
             Spacer(modifier = Modifier.height(24.dp))
