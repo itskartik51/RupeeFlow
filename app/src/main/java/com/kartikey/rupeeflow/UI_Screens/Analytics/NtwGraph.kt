@@ -30,12 +30,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.formatRupeeAmount
 import com.kartikey.rupeeflow.UI_Screens.CacheManager
-import com.kartikey.rupeeflow.UI_Screens.NetworthDataPoint
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import kotlin.math.abs
+
+private data class NetworthSlotPoint(
+    val globalSlotIndex: Int, // 0 to 17 (6 Months * 3 Slots)
+    val label: String,
+    val amount: Double
+)
 
 // Compact currency formatter for Right Y-Axis markers (e.g. ₹1.5L, ₹50K)
 private fun formatCompactRupee(amount: Double): String {
@@ -67,58 +72,80 @@ fun NtwGraphCard(modifier: Modifier = Modifier) {
         }
     }
 
-    // ⚡ Build 6-Month Timeline Data Points ⚡
-    val timelineData = remember(appData, currentNetworth) {
-        val list = mutableListOf<NetworthDataPoint>()
-        val monthNameFormat = SimpleDateFormat("MMM", Locale.getDefault())
-        val parseFormat = SimpleDateFormat("yy-MM", Locale.getDefault())
+    // ⚡ Generate Fixed 6-Month Rolling Window (Always 6 Months) ⚡
+    val (monthKeys, monthDisplayNames) = remember {
+        val keys = mutableListOf<String>()
+        val names = mutableListOf<String>()
+        val keyFormat = SimpleDateFormat("yy-MM", Locale.getDefault())
+        val nameFormat = SimpleDateFormat("MMM", Locale.getDefault())
 
+        val cal = Calendar.getInstance()
+        cal.add(Calendar.MONTH, -5)
+        for (i in 0 until 6) {
+            keys.add(keyFormat.format(cal.time))
+            names.add(nameFormat.format(cal.time))
+            cal.add(Calendar.MONTH, 1)
+        }
+        Pair(keys, names)
+    }
+
+    // ⚡ Map Real Recorded Data to the 18-Slot Grid (No Fake Zeros) ⚡
+    val activeTimelinePoints = remember(appData, currentNetworth, monthKeys, monthDisplayNames) {
+        val list = mutableListOf<NetworthSlotPoint>()
         val history: Map<String, List<Double>> = appData?.networthHistory ?: emptyMap()
-        val sortedKeys = history.keys.sorted()
 
-        for (mKey in sortedKeys) {
-            val slots = history[mKey] ?: continue
-            val monthDate = try { parseFormat.parse(mKey) } catch (e: Exception) { null }
-            val mName = if (monthDate != null) monthNameFormat.format(monthDate) else mKey
-
-            slots.forEachIndexed { index, amount ->
-                if (amount > 0.0) {
-                    val label = when (index) {
-                        0 -> "01-10 $mName"
-                        1 -> "11-20 $mName"
-                        else -> "21-End $mName"
+        monthKeys.forEachIndexed { monthIndex, mKey ->
+            val slots = history[mKey]
+            val mName = monthDisplayNames[monthIndex]
+            if (slots != null) {
+                slots.forEachIndexed { slotIdx, amount ->
+                    if (amount > 0.0) {
+                        val slotLabel = when (slotIdx) {
+                            0 -> "01-10 $mName"
+                            1 -> "11-20 $mName"
+                            else -> "21-End $mName"
+                        }
+                        val globalSlot = (monthIndex * 3) + slotIdx
+                        list.add(NetworthSlotPoint(globalSlot, slotLabel, amount))
                     }
-                    list.add(NetworthDataPoint(mKey, index, label, amount))
                 }
             }
         }
 
-        // Fallback if history is empty
+        // Fallback: If no historical slots found, pin current net worth to current month's slot
         if (list.isEmpty()) {
             val cal = Calendar.getInstance()
-            val currMonth = monthNameFormat.format(cal.time)
-            val currKey = SimpleDateFormat("yy-MM", Locale.getDefault()).format(cal.time)
-            list.add(NetworthDataPoint(currKey, 0, "01-10 $currMonth", currentNetworth))
-            list.add(NetworthDataPoint(currKey, 1, "11-20 $currMonth", currentNetworth))
-            list.add(NetworthDataPoint(currKey, 2, "21-End $currMonth", currentNetworth))
+            val day = cal.get(Calendar.DAY_OF_MONTH)
+            val currentSlot = when {
+                day <= 10 -> 0
+                day <= 20 -> 1
+                else -> 2
+            }
+            val currentGlobalSlot = (5 * 3) + currentSlot // 5 is the current month index
+            val mName = monthDisplayNames.last()
+            val slotLabel = when (currentSlot) {
+                0 -> "01-10 $mName"
+                1 -> "11-20 $mName"
+                else -> "21-End $mName"
+            }
+            list.add(NetworthSlotPoint(currentGlobalSlot, slotLabel, currentNetworth))
         }
-        list
+
+        list.sortedBy { it.globalSlotIndex }
     }
 
-    // ⚡ 1. Dynamic Min-Max Scaling Engine with 15% Buffer ⚡
-    val (yMin, yMax, yMid) = remember(timelineData) {
-        val values = timelineData.map { it.amount }
-        val minVal = values.minOrNull() ?: 0.0
-        val maxVal = values.maxOrNull() ?: 0.0
+    // ⚡ Dynamic Min-Max Scaling Engine with 15% Buffer ⚡
+    val (yMin, yMax, yMid) = remember(activeTimelinePoints, currentNetworth) {
+        val values = activeTimelinePoints.map { it.amount }
+        val minVal = values.minOrNull() ?: currentNetworth
+        val maxVal = values.maxOrNull() ?: currentNetworth
         val range = maxVal - minVal
 
         if (range <= 0.0001) {
-            // Edge Case: Flat Data
             val fallbackMin = if (maxVal != 0.0) maxVal * 0.95 else -100.0
             val fallbackMax = if (maxVal != 0.0) maxVal * 1.05 else 100.0
             Triple(fallbackMin, fallbackMax, (fallbackMin + fallbackMax) / 2.0)
         } else {
-            // 15% Range Buffer Formula
             val padding = range * 0.15
             val calculatedMin = minVal - padding
             val calculatedMax = maxVal + padding
@@ -126,13 +153,11 @@ fun NtwGraphCard(modifier: Modifier = Modifier) {
         }
     }
 
-    // Interactive Touch State
     var selectedPointIndex by remember { mutableStateOf<Int?>(null) }
     val noRippleInteractionSource = remember { MutableInteractionSource() }
 
-    // Wave Reveal Animation
     val animProgress = remember { Animatable(0f) }
-    LaunchedEffect(timelineData.size) {
+    LaunchedEffect(activeTimelinePoints.size) {
         animProgress.snapTo(0f)
         animProgress.animateTo(
             targetValue = 1f,
@@ -141,8 +166,8 @@ fun NtwGraphCard(modifier: Modifier = Modifier) {
     }
 
     val textMeasurer = rememberTextMeasurer()
-    val lineColor = Color(0xFF7C4DFF) // Electric Radiant Violet
-    val gridLineColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.20f)
+    val lineColor = Color(0xFF7C4DFF)
+    val gridLineColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)
     val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
 
     Card(
@@ -161,8 +186,8 @@ fun NtwGraphCard(modifier: Modifier = Modifier) {
     ) {
         Column(modifier = Modifier.padding(top = 16.dp, start = 16.dp, end = 16.dp, bottom = 14.dp)) {
 
-            // --- HEADER: Net Worth Title & Amount (Left-Aligned) ---
-            val activePoint = selectedPointIndex?.let { timelineData.getOrNull(it) }
+            // --- HEADER: Net Worth Title & Amount ---
+            val activePoint = selectedPointIndex?.let { activeTimelinePoints.getOrNull(it) }
             val displayAmount = activePoint?.amount ?: currentNetworth
             val displayLabel = activePoint?.label ?: "Current"
 
@@ -192,7 +217,7 @@ fun NtwGraphCard(modifier: Modifier = Modifier) {
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // --- GRAPH CANVAS: Smooth Cubic Spline + 3-Gridlines + Gradient Under-Fill ---
+            // --- GRAPH CANVAS: 6 Months X-Axis + Zero Right Gap + Precise Wave Start ---
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -201,39 +226,69 @@ fun NtwGraphCard(modifier: Modifier = Modifier) {
                 Canvas(
                     modifier = Modifier
                         .fillMaxSize()
-                        .pointerInput(timelineData) {
+                        .pointerInput(activeTimelinePoints) {
                             detectTapGestures(
                                 onTap = { offset ->
-                                    val yAxisLabelWidth = 52.dp.toPx()
-                                    val chartWidth = size.width - yAxisLabelWidth
-                                    if (timelineData.size > 1 && offset.x <= chartWidth) {
-                                        val stepX = chartWidth / (timelineData.size - 1)
-                                        val tappedIndex = ((offset.x + stepX / 2f) / stepX).toInt().coerceIn(0, timelineData.size - 1)
-                                        selectedPointIndex = if (selectedPointIndex == tappedIndex) null else tappedIndex
-                                    } else {
-                                        selectedPointIndex = null
+                                    if (activeTimelinePoints.isEmpty()) return@detectTapGestures
+                                    val totalGridSlots = 17f
+                                    val topLayout = textMeasurer.measure(formatCompactRupee(yMax), TextStyle(fontSize = 9.sp))
+                                    val midLayout = textMeasurer.measure(formatCompactRupee(yMid), TextStyle(fontSize = 9.sp))
+                                    val botLayout = textMeasurer.measure(formatCompactRupee(yMin), TextStyle(fontSize = 9.sp))
+                                    val labelMaxWidth = maxOf(topLayout.size.width, midLayout.size.width, botLayout.size.width).toFloat()
+                                    val chartWidth = size.width - labelMaxWidth - 6.dp.toPx()
+
+                                    // Find closest recorded point to touch
+                                    var closestIdx = -1
+                                    var minDistance = Float.MAX_VALUE
+                                    activeTimelinePoints.forEachIndexed { index, point ->
+                                        val px = (point.globalSlotIndex / totalGridSlots) * chartWidth
+                                        val dist = abs(px - offset.x)
+                                        if (dist < minDistance) {
+                                            minDistance = dist
+                                            closestIdx = index
+                                        }
                                     }
+
+                                    selectedPointIndex = if (selectedPointIndex == closestIdx) null else closestIdx
                                 }
                             )
                         }
-                        .pointerInput(timelineData) {
+                        .pointerInput(activeTimelinePoints) {
                             detectDragGestures(
                                 onDragEnd = { },
                                 onDragCancel = { selectedPointIndex = null },
                                 onDrag = { change, _ ->
-                                    val yAxisLabelWidth = 52.dp.toPx()
-                                    val chartWidth = size.width - yAxisLabelWidth
-                                    if (timelineData.size > 1 && change.position.x <= chartWidth) {
-                                        val stepX = chartWidth / (timelineData.size - 1)
-                                        val draggedIndex = ((change.position.x + stepX / 2f) / stepX).toInt().coerceIn(0, timelineData.size - 1)
-                                        selectedPointIndex = draggedIndex
+                                    if (activeTimelinePoints.isEmpty()) return@detectDragGestures
+                                    val totalGridSlots = 17f
+                                    val topLayout = textMeasurer.measure(formatCompactRupee(yMax), TextStyle(fontSize = 9.sp))
+                                    val midLayout = textMeasurer.measure(formatCompactRupee(yMid), TextStyle(fontSize = 9.sp))
+                                    val botLayout = textMeasurer.measure(formatCompactRupee(yMin), TextStyle(fontSize = 9.sp))
+                                    val labelMaxWidth = maxOf(topLayout.size.width, midLayout.size.width, botLayout.size.width).toFloat()
+                                    val chartWidth = size.width - labelMaxWidth - 6.dp.toPx()
+
+                                    var closestIdx = 0
+                                    var minDistance = Float.MAX_VALUE
+                                    activeTimelinePoints.forEachIndexed { index, point ->
+                                        val px = (point.globalSlotIndex / totalGridSlots) * chartWidth
+                                        val dist = abs(px - change.position.x)
+                                        if (dist < minDistance) {
+                                            minDistance = dist
+                                            closestIdx = index
+                                        }
                                     }
+                                    selectedPointIndex = closestIdx
                                 }
                             )
                         }
                 ) {
-                    val yAxisLabelWidth = 52.dp.toPx()
-                    val chartWidth = size.width - yAxisLabelWidth
+                    // Pre-measure right labels to eliminate all dead margin on the right
+                    val topLayout = textMeasurer.measure(formatCompactRupee(yMax), TextStyle(fontSize = 9.sp, fontWeight = FontWeight.Medium, color = labelColor))
+                    val midLayout = textMeasurer.measure(formatCompactRupee(yMid), TextStyle(fontSize = 9.sp, fontWeight = FontWeight.Medium, color = labelColor))
+                    val botLayout = textMeasurer.measure(formatCompactRupee(yMin), TextStyle(fontSize = 9.sp, fontWeight = FontWeight.Medium, color = labelColor))
+                    val labelMaxWidth = maxOf(topLayout.size.width, midLayout.size.width, botLayout.size.width).toFloat()
+
+                    // Chart occupies all remaining width with zero right-side waste
+                    val chartWidth = size.width - labelMaxWidth - 6.dp.toPx()
                     val bottomXAxisHeight = 18.dp.toPx()
                     val chartHeight = size.height - bottomXAxisHeight
 
@@ -244,11 +299,15 @@ fun NtwGraphCard(modifier: Modifier = Modifier) {
                         return chartHeight - (normalized * chartHeight)
                     }
 
-                    // --- 1. Draw 3 Faint Dashed Gridlines & Right Y-Labels ---
+                    // --- 1. Draw 3 Dashed Gridlines & Right-Aligned Labels (Zero Right Gap) ---
                     val dashedEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
-                    val gridLevels = listOf(yMax, yMid, yMin)
+                    val gridLevels = listOf(
+                        Pair(yMax, topLayout),
+                        Pair(yMid, midLayout),
+                        Pair(yMin, botLayout)
+                    )
 
-                    gridLevels.forEach { levelVal ->
+                    gridLevels.forEach { (levelVal, layout) ->
                         val yPos = getYCoordinate(levelVal)
                         drawLine(
                             color = gridLineColor,
@@ -258,44 +317,33 @@ fun NtwGraphCard(modifier: Modifier = Modifier) {
                             pathEffect = dashedEffect
                         )
 
-                        // Y-Axis Right Label
-                        val labelText = formatCompactRupee(levelVal)
-                        val textLayout = textMeasurer.measure(
-                            text = labelText,
-                            style = TextStyle(
-                                fontSize = 8.5.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = labelColor
-                            )
-                        )
+                        // Draw label pushed directly against the right boundary
                         drawText(
-                            textLayoutResult = textLayout,
-                            topLeft = Offset(chartWidth + 6.dp.toPx(), yPos - (textLayout.size.height / 2f))
+                            textLayoutResult = layout,
+                            topLeft = Offset(size.width - layout.size.width, yPos - (layout.size.height / 2f))
                         )
                     }
 
-                    if (timelineData.isEmpty()) return@Canvas
-
-                    // --- 2. Calculate Screen Coordinates for Data Points ---
-                    val stepX = if (timelineData.size > 1) chartWidth / (timelineData.size - 1) else chartWidth
-                    val points = timelineData.mapIndexed { index, point ->
-                        val x = index * stepX
+                    // --- 2. Calculate Screen Coordinates (Mapped strictly to 18-Slot Grid) ---
+                    val totalGridSlots = 17f
+                    val screenPoints = activeTimelinePoints.map { point ->
+                        val x = (point.globalSlotIndex / totalGridSlots) * chartWidth
                         val y = getYCoordinate(point.amount)
                         Offset(x, y)
                     }
 
-                    // --- 3. Build Smooth Cubic Spline (Monotone Bezier Path) ---
-                    val strokePath = Path()
-                    val fillPath = Path()
+                    // --- 3. Render Area & Spline Wave (Starts strictly at first recorded point) ---
+                    if (screenPoints.size >= 2) {
+                        val strokePath = Path()
+                        val fillPath = Path()
 
-                    if (points.isNotEmpty()) {
-                        strokePath.moveTo(points.first().x, points.first().y)
-                        fillPath.moveTo(points.first().x, chartHeight)
-                        fillPath.lineTo(points.first().x, points.first().y)
+                        strokePath.moveTo(screenPoints.first().x, screenPoints.first().y)
+                        fillPath.moveTo(screenPoints.first().x, chartHeight)
+                        fillPath.lineTo(screenPoints.first().x, screenPoints.first().y)
 
-                        for (i in 0 until points.size - 1) {
-                            val p0 = points[i]
-                            val p1 = points[i + 1]
+                        for (i in 0 until screenPoints.size - 1) {
+                            val p0 = screenPoints[i]
+                            val p1 = screenPoints[i + 1]
                             val cp1 = Offset(p0.x + (p1.x - p0.x) / 2f, p0.y)
                             val cp2 = Offset(p0.x + (p1.x - p0.x) / 2f, p1.y)
 
@@ -303,43 +351,43 @@ fun NtwGraphCard(modifier: Modifier = Modifier) {
                             fillPath.cubicTo(cp1.x, cp1.y, cp2.x, cp2.y, p1.x, p1.y)
                         }
 
-                        fillPath.lineTo(points.last().x, chartHeight)
+                        fillPath.lineTo(screenPoints.last().x, chartHeight)
                         fillPath.close()
+
+                        // Gradient Under-fill
+                        val underFillBrush = Brush.verticalGradient(
+                            colors = listOf(
+                                lineColor.copy(alpha = 0.35f * animProgress.value),
+                                lineColor.copy(alpha = 0.06f * animProgress.value),
+                                Color.Transparent
+                            ),
+                            startY = 0f,
+                            endY = chartHeight
+                        )
+                        drawPath(path = fillPath, brush = underFillBrush)
+
+                        // Wave Stroke Line
+                        drawPath(
+                            path = strokePath,
+                            color = lineColor.copy(alpha = animProgress.value),
+                            style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round)
+                        )
                     }
 
-                    // --- 4. Render Gradient Under-Fill ---
-                    val underFillBrush = Brush.verticalGradient(
-                        colors = listOf(
-                            lineColor.copy(alpha = 0.35f * animProgress.value),
-                            lineColor.copy(alpha = 0.08f * animProgress.value),
-                            Color.Transparent
-                        ),
-                        startY = 0f,
-                        endY = chartHeight
-                    )
-                    drawPath(path = fillPath, brush = underFillBrush)
-
-                    // --- 5. Render Glowing Stroke Wave ---
-                    drawPath(
-                        path = strokePath,
-                        color = lineColor.copy(alpha = animProgress.value),
-                        style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round)
-                    )
-
-                    // --- 6. Reference Line & End/Selected Glow Dot ---
-                    val activeIndex = selectedPointIndex ?: (points.size - 1)
-                    val targetPoint = points.getOrNull(activeIndex)
+                    // --- 4. Reference Line & Glowing Indicator Dot ---
+                    val activeIndex = selectedPointIndex ?: (screenPoints.size - 1)
+                    val targetPoint = screenPoints.getOrNull(activeIndex)
 
                     if (targetPoint != null) {
                         drawLine(
-                            color = lineColor.copy(alpha = 0.40f),
+                            color = lineColor.copy(alpha = 0.35f),
                             start = Offset(0f, targetPoint.y),
                             end = Offset(chartWidth, targetPoint.y),
                             strokeWidth = 1.dp.toPx(),
                             pathEffect = dashedEffect
                         )
 
-                        // Outer Glowing Ring Dot
+                        // Glowing Outer & Inner Dot
                         drawCircle(
                             color = lineColor.copy(alpha = 0.25f),
                             radius = 7.dp.toPx(),
@@ -357,28 +405,27 @@ fun NtwGraphCard(modifier: Modifier = Modifier) {
                         )
                     }
 
-                    // --- 7. Bottom X-Axis Month Markers ---
-                    val distinctMonths = timelineData.map { it.label.substringAfterLast(" ") }.distinct()
-                    if (distinctMonths.isNotEmpty()) {
-                        val mStepX = if (distinctMonths.size > 1) chartWidth / (distinctMonths.size - 1) else chartWidth / 2f
-                        distinctMonths.forEachIndexed { idx, mName ->
-                            val xPos = idx * mStepX
-                            val mLayout = textMeasurer.measure(
-                                text = mName,
-                                style = TextStyle(
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = labelColor
-                                )
+                    // --- 5. Always Render Fixed 6 Months on X-Axis ---
+                    val mStepX = chartWidth / 5f
+                    monthDisplayNames.forEachIndexed { idx, mName ->
+                        val xPos = idx * mStepX
+                        val mLayout = textMeasurer.measure(
+                            text = mName,
+                            style = TextStyle(
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = labelColor
                             )
-                            drawText(
-                                textLayoutResult = mLayout,
-                                topLeft = Offset(
-                                    (xPos - (mLayout.size.width / 2f)).coerceIn(0f, chartWidth - mLayout.size.width),
-                                    size.height - mLayout.size.height
-                                )
-                            )
+                        )
+                        val textX = when (idx) {
+                            0 -> 0f // Leftmost alignment
+                            5 -> (chartWidth - mLayout.size.width) // Rightmost alignment
+                            else -> (xPos - (mLayout.size.width / 2f)).coerceIn(0f, chartWidth - mLayout.size.width)
                         }
+                        drawText(
+                            textLayoutResult = mLayout,
+                            topLeft = Offset(textX, size.height - mLayout.size.height)
+                        )
                     }
                 }
             }
