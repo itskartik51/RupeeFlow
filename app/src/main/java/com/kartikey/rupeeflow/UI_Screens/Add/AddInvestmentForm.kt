@@ -438,9 +438,7 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                                 }
                             }
                         } else {
-                            withContext(Dispatchers.Main) {
-                                Toast.makeText(context, "Please select an Asset and enter valid Details", Toast.LENGTH_LONG).show()
-                            }
+                            Toast.makeText(context, "Please select an Asset and enter valid Details", Toast.LENGTH_LONG).show()
                         }
                     },
                     modifier = Modifier
