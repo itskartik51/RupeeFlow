@@ -12,6 +12,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -50,23 +51,23 @@ data class CategorySpendItem(
     val sweepAngle: Float = 0f
 )
 
-// ⚡ Dynamic High-Contrast Neon Color Pool (Auto-Cycles for Unlimited Categories) ⚡
+// ⚡ High-Contrast Vibrant Palette (Optimized for both Light & Dark themes) ⚡
 private val NeonColorPalette = listOf(
-    Color(0xFF00E5FF), // Neon Cyan
+    Color(0xFF00B4D8), // Vibrant Cyan Blue
     Color(0xFFFF6D00), // Neon Deep Orange
-    Color(0xFF00E676), // Electric Neon Green
-    Color(0xFFE040FB), // Neon Magenta
-    Color(0xFFFFD600), // Bright Neon Amber/Yellow
-    Color(0xFFFF1744), // Electric Neon Red
+    Color(0xFF00C853), // Electric Vivid Green
+    Color(0xFFD500F9), // Neon Magenta
+    Color(0xFFFFAB00), // Rich Amber Gold
+    Color(0xFFFF1744), // Electric Vivid Red
     Color(0xFF7C4DFF), // Electric Violet
-    Color(0xFF1DE9B6), // Neon Aqua Teal
-    Color(0xFFFF4081), // Hot Pink
-    Color(0xFF76FF03), // Neon Bright Lime
-    Color(0xFF00B0FF), // Electric Sky Blue
+    Color(0xFF00BFA5), // Deep Neon Aqua Teal
+    Color(0xFFFF4081), // Vivid Hot Pink
+    Color(0xFF64DD17), // Vivid Electric Lime
+    Color(0xFF0091EA), // Rich Sky Blue
     Color(0xFFFF9100), // Pure Amber Glow
     Color(0xFF651FFF), // Deep Electric Indigo
-    Color(0xFF00BFA5), // Dark Teal Glow
-    Color(0xFFFFAB00), // Radiant Gold
+    Color(0xFF00897B), // Rich Teal Glow
+    Color(0xFFFF8F00), // Radiant Deep Gold
     Color(0xFFF50057)  // Deep Rose Neon
 )
 
@@ -82,6 +83,7 @@ fun ExpGraphCard(modifier: Modifier = Modifier) {
 
     var selectedCategoryName by remember { mutableStateOf<String?>(null) }
     val emptyRingColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+    val centerInteractionSource = remember { MutableInteractionSource() }
 
     // ⚡ Real-Time Filter Aggregation with Dynamic Palette Cycling ⚡
     val (filteredCategories, grandTotal) = remember(transactions, selectedFilter) {
@@ -183,7 +185,7 @@ fun ExpGraphCard(modifier: Modifier = Modifier) {
                     modifier = Modifier.padding(top = 8.dp)
                 )
 
-                // ⚡ Morphing Capsule Dropdown (Constant 16dp Rounded Corners) ⚡
+                // ⚡ Theme-Adaptive Morphing Capsule Dropdown ⚡
                 Box(
                     modifier = Modifier
                         .width(132.dp)
@@ -191,7 +193,7 @@ fun ExpGraphCard(modifier: Modifier = Modifier) {
                         .clip(RoundedCornerShape(16.dp))
                         .background(MaterialTheme.colorScheme.surface)
                         .border(
-                            BorderStroke(1.dp, Color.White.copy(alpha = 0.75f)),
+                            BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
                             RoundedCornerShape(16.dp)
                         )
                 ) {
@@ -341,12 +343,17 @@ fun ExpGraphCard(modifier: Modifier = Modifier) {
                         }
                     }
 
-                    // Dynamic Center Info
+                    // Dynamic Center Info (Ripple-Free Clean Tap)
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier
                             .padding(horizontal = 20.dp)
-                            .clickable { selectedCategoryName = null }
+                            .clickable(
+                                interactionSource = centerInteractionSource,
+                                indication = null
+                            ) {
+                                selectedCategoryName = null
+                            }
                     ) {
                         if (activeCategory != null) {
                             Text(
