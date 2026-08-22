@@ -271,7 +271,8 @@ fun InvestmentListItem(item: InvestmentItem) {
                     .padding(top = 10.dp, bottom = 4.dp),
                 shape = RoundedCornerShape(12.dp),
                 color = MaterialTheme.colorScheme.surface,
-                elevation = 0.dp
+                tonalElevation = 0.dp,
+                shadowElevation = 0.dp
             ) {
                 Column(
                     modifier = Modifier
