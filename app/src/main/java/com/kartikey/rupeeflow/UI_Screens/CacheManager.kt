@@ -546,6 +546,23 @@ object CacheManager {
                 val userDoc = userQuery.documents[0]
                 val userRef = userDoc.reference
 
+                // Write 'ver' (Double) and 'lst_opn' (Timestamp) on backend data fetch
+                try {
+                    val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
+                    val rawVersionName = packageInfo.versionName ?: "1.0"
+                    val appVersionDouble = rawVersionName.replace("[^0-9.]".toRegex(), "").toDoubleOrNull() ?: 1.0
+                    
+                    userRef.set(
+                        mapOf(
+                            "ver" to appVersionDouble,
+                            "lst_opn" to FieldValue.serverTimestamp()
+                        ),
+                        SetOptions.merge()
+                    )
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+
                 val profileObj = JSONObject().apply {
                     put("name", userDoc.getString("name") ?: "")
                     put("email", userDoc.getString("email") ?: "")
