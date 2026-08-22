@@ -160,7 +160,6 @@ fun InvestmentSummaryCard(
 @Composable
 fun SummaryRow(label: String, amount: Double, percent: Double) {
     val isPositive = amount >= 0
-    // Dynamic theme color injection for profit/loss
     val color = if (isPositive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
     val sign = if (isPositive) "+" else ""
 
@@ -191,7 +190,6 @@ fun InvestmentListItem(item: InvestmentItem) {
     val totalRetPct = if (investedVal > 0) (totalRet / investedVal) * 100 else 0.0
     val oneDPct = if (item.currentPrice - item.oneDayChangePrice > 0) (item.oneDayChangePrice / (item.currentPrice - item.oneDayChangePrice)) * 100 else 0.0
 
-    // Dynamic theme color injection for list items
     val oneDayColor = if (item.oneDayChangePrice >= 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
     val oneDaySign = if (item.oneDayChangePrice >= 0) "+" else ""
     
@@ -226,3 +224,22 @@ fun formatRupee(amount: Double): String {
     format.maximumFractionDigits = 2
     return format.format(amount).replace("-₹", "-₹ ") 
 }
+
+// --- DATA CLASSES FOR CACHEMANAGER ---
+data class InvestmentHistoryItem(
+    val date: String,
+    val quantity: Double,
+    val price: Double,
+    val amount: Double,
+    val brokerage: Double
+)
+
+data class InvestmentItem(
+    val assetName: String,
+    val assetType: String,
+    val quantity: Double,
+    val avgBuyPrice: Double,
+    val currentPrice: Double,
+    val oneDayChangePrice: Double,
+    val history: List<InvestmentHistoryItem> = emptyList() // Default emptyList ensures UI does not crash
+)
