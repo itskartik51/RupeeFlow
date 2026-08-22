@@ -365,6 +365,172 @@ object CacheManager {
         }
     }
 
+    fun deleteInvestment(context: Context, username: String, assetName: String) {
+        val cached = getCachedData(context, username) ?: return
+        val updatedInvList = cached.investmentList.filterNot { it.assetName.equals(assetName, true) }
+        val updatedData = cached.copy(investmentList = updatedInvList)
+        updateOptimisticCache(context, username, updatedData)
+
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val db = FirebaseFirestore.getInstance()
+                val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
+                if (!userQuery.isEmpty) {
+                    val userDoc = userQuery.documents[0]
+                    val userRef = userDoc.reference
+                    val investMap = (userDoc.get("invest") as? Map<String, Any>)?.toMutableMap() ?: mutableMapOf()
+                    
+                    val keyToRemove = investMap.keys.find { key ->
+                        val item = investMap[key] as? Map<*, *>
+                        val name = item?.get("name")?.toString()?.trim() ?: key
+                        name.equals(assetName, true) || key.equals(assetName, true)
+                    }
+                    if (keyToRemove != null) {
+                        investMap.remove(keyToRemove)
+                        userRef.update("invest", investMap).await()
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    fun deleteHistoryLot(context: Context, username: String, assetName: String, lotIndex: Int) {
+        val cached = getCachedData(context, username) ?: return
+        val inv = cached.investmentList.find { it.assetName.equals(assetName, true) } ?: return
+        val currentHistory = inv.history.toMutableList()
+        if (lotIndex !in currentHistory.indices) return
+        
+        currentHistory.removeAt(lotIndex)
+        
+        if (currentHistory.isEmpty()) {
+            deleteInvestment(context, username, assetName)
+            return
+        }
+
+        val newQty = currentHistory.sumOf { it.quantity }
+        val newTotalCost = currentHistory.sumOf { it.quantity * it.price }
+        val newAvg = if (newQty > 0) newTotalCost / newQty else 0.0
+
+        val updatedInv = inv.copy(
+            quantity = newQty,
+            avgBuyPrice = newAvg,
+            history = currentHistory
+        )
+        val updatedInvList = cached.investmentList.toMutableList()
+        val invIndex = updatedInvList.indexOfFirst { it.assetName.equals(assetName, true) }
+        if (invIndex != -1) {
+            updatedInvList[invIndex] = updatedInv
+        }
+
+        val updatedData = cached.copy(investmentList = updatedInvList)
+        updateOptimisticCache(context, username, updatedData)
+
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val db = FirebaseFirestore.getInstance()
+                val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
+                if (!userQuery.isEmpty) {
+                    val userDoc = userQuery.documents[0]
+                    val userRef = userDoc.reference
+                    val investMap = (userDoc.get("invest") as? Map<String, Any>)?.toMutableMap() ?: mutableMapOf()
+                    val targetKey = investMap.keys.find { key ->
+                        val item = investMap[key] as? Map<*, *>
+                        val name = item?.get("name")?.toString()?.trim() ?: key
+                        name.equals(assetName, true) || key.equals(assetName, true)
+                    } ?: assetName
+
+                    val newHistMap = mutableMapOf<String, Any>()
+                    currentHistory.forEachIndexed { idx, h ->
+                        newHistMap[idx.toString()] = mapOf(
+                            "dt" to h.date,
+                            "qnt" to h.quantity,
+                            "prc" to h.price,
+                            "amnt" to h.amount,
+                            "brkrg" to h.brokerage
+                        )
+                    }
+
+                    val existingAssetMap = (investMap[targetKey] as? Map<String, Any>)?.toMutableMap() ?: mutableMapOf()
+                    existingAssetMap["qnt"] = newQty
+                    existingAssetMap["avg"] = newAvg
+                    existingAssetMap["history"] = newHistMap
+                    
+                    investMap[targetKey] = existingAssetMap
+                    userRef.update("invest", investMap).await()
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    fun editHistoryLot(context: Context, username: String, assetName: String, lotIndex: Int, updatedLot: InvestmentHistoryItem) {
+        val cached = getCachedData(context, username) ?: return
+        val inv = cached.investmentList.find { it.assetName.equals(assetName, true) } ?: return
+        val currentHistory = inv.history.toMutableList()
+        if (lotIndex !in currentHistory.indices) return
+        
+        currentHistory[lotIndex] = updatedLot
+        
+        val newQty = currentHistory.sumOf { it.quantity }
+        val newTotalCost = currentHistory.sumOf { it.quantity * it.price }
+        val newAvg = if (newQty > 0) newTotalCost / newQty else 0.0
+
+        val updatedInv = inv.copy(
+            quantity = newQty,
+            avgBuyPrice = newAvg,
+            history = currentHistory
+        )
+        val updatedInvList = cached.investmentList.toMutableList()
+        val invIndex = updatedInvList.indexOfFirst { it.assetName.equals(assetName, true) }
+        if (invIndex != -1) {
+            updatedInvList[invIndex] = updatedInv
+        }
+
+        val updatedData = cached.copy(investmentList = updatedInvList)
+        updateOptimisticCache(context, username, updatedData)
+
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val db = FirebaseFirestore.getInstance()
+                val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
+                if (!userQuery.isEmpty) {
+                    val userDoc = userQuery.documents[0]
+                    val userRef = userDoc.reference
+                    val investMap = (userDoc.get("invest") as? Map<String, Any>)?.toMutableMap() ?: mutableMapOf()
+                    val targetKey = investMap.keys.find { key ->
+                        val item = investMap[key] as? Map<*, *>
+                        val name = item?.get("name")?.toString()?.trim() ?: key
+                        name.equals(assetName, true) || key.equals(assetName, true)
+                    } ?: assetName
+
+                    val newHistMap = mutableMapOf<String, Any>()
+                    currentHistory.forEachIndexed { idx, h ->
+                        newHistMap[idx.toString()] = mapOf(
+                            "dt" to h.date,
+                            "qnt" to h.quantity,
+                            "prc" to h.price,
+                            "amnt" to h.amount,
+                            "brkrg" to h.brokerage
+                        )
+                    }
+
+                    val existingAssetMap = (investMap[targetKey] as? Map<String, Any>)?.toMutableMap() ?: mutableMapOf()
+                    existingAssetMap["qnt"] = newQty
+                    existingAssetMap["avg"] = newAvg
+                    existingAssetMap["history"] = newHistMap
+                    
+                    investMap[targetKey] = existingAssetMap
+                    userRef.update("invest", investMap).await()
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
     suspend fun fetchAndCacheData(context: Context, username: String, forceRefresh: Boolean = false): AppData? {
         return withContext(Dispatchers.IO) {
             try {
