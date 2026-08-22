@@ -6,30 +6,49 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.outlined.CalendarToday
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import com.kartikey.rupeeflow.UI_Screens.CacheManager
 import com.kartikey.rupeeflow.UI_Screens.bounceClick
+import kotlinx.coroutines.launch
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
 import java.util.Locale
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -40,6 +59,11 @@ fun InvestmentScreen(
     isLoading: Boolean = false, 
     onRefreshClick: () -> Unit = {}
 ) { 
+    val context = LocalContext.current
+    var editingLotInfo by remember { mutableStateOf<Triple<InvestmentItem, Int, InvestmentHistoryItem>?>(null) }
+    var deletingAssetTarget by remember { mutableStateOf<InvestmentItem?>(null) }
+    var deletingLotTarget by remember { mutableStateOf<Pair<InvestmentItem, Int>?>(null) }
+
     val totalInvested = investmentList.sumOf { it.quantity * it.avgBuyPrice }
     val totalCurrent = investmentList.sumOf { it.quantity * it.currentPrice }
     val total1DChange = investmentList.sumOf { it.quantity * it.oneDayChangePrice }
@@ -88,8 +112,13 @@ fun InvestmentScreen(
                 Spacer(modifier = Modifier.height(8.dp))
             }
 
-            items(investmentList) { item ->
-                InvestmentListItem(item)
+            items(investmentList, key = { it.assetName }) { item ->
+                InvestmentListItem(
+                    item = item,
+                    onDeleteAssetClick = { deletingAssetTarget = item },
+                    onEditLotClick = { lotIdx, lot -> editingLotInfo = Triple(item, lotIdx, lot) },
+                    onDeleteLotClick = { lotIdx -> deletingLotTarget = Pair(item, lotIdx) }
+                )
                 HorizontalDivider(
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), 
                     thickness = 1.dp, 
@@ -97,6 +126,77 @@ fun InvestmentScreen(
                 )
             }
         }
+    }
+
+    // Delete Entire Asset Confirmation Dialog
+    if (deletingAssetTarget != null) {
+        AlertDialog(
+            onDismissRequest = { deletingAssetTarget = null },
+            title = { Text("Delete Asset?", fontWeight = FontWeight.Bold) },
+            text = { Text("Do you want to delete it permanently? All purchase history for ${deletingAssetTarget?.assetName} will be removed.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        deletingAssetTarget?.let {
+                            CacheManager.deleteInvestment(context, username, it.assetName)
+                        }
+                        deletingAssetTarget = null
+                    },
+                    modifier = Modifier.bounceClick()
+                ) {
+                    Text("Delete", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { deletingAssetTarget = null }, modifier = Modifier.bounceClick()) {
+                    Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            },
+            shape = RoundedCornerShape(16.dp),
+            containerColor = MaterialTheme.colorScheme.surface
+        )
+    }
+
+    // Delete Lot Confirmation Dialog
+    if (deletingLotTarget != null) {
+        AlertDialog(
+            onDismissRequest = { deletingLotTarget = null },
+            title = { Text("Delete Buy Record?", fontWeight = FontWeight.Bold) },
+            text = { Text("Do you want to delete this purchase entry permanently?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        deletingLotTarget?.let { (asset, idx) ->
+                            CacheManager.deleteHistoryLot(context, username, asset.assetName, idx)
+                        }
+                        deletingLotTarget = null
+                    },
+                    modifier = Modifier.bounceClick()
+                ) {
+                    Text("Delete", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { deletingLotTarget = null }, modifier = Modifier.bounceClick()) {
+                    Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            },
+            shape = RoundedCornerShape(16.dp),
+            containerColor = MaterialTheme.colorScheme.surface
+        )
+    }
+
+    // Edit Lot Popup Dialog
+    if (editingLotInfo != null) {
+        val (targetAsset, targetLotIndex, targetLot) = editingLotInfo!!
+        EditHistoryLotDialog(
+            initialLot = targetLot,
+            onDismiss = { editingLotInfo = null },
+            onSave = { updatedLot ->
+                CacheManager.editHistoryLot(context, username, targetAsset.assetName, targetLotIndex, updatedLot)
+                editingLotInfo = null
+            }
+        )
     }
 }
 
@@ -215,8 +315,17 @@ fun ListHeaderRow() {
 }
 
 @Composable
-fun InvestmentListItem(item: InvestmentItem) {
+fun InvestmentListItem(
+    item: InvestmentItem,
+    onDeleteAssetClick: () -> Unit,
+    onEditLotClick: (Int, InvestmentHistoryItem) -> Unit,
+    onDeleteLotClick: (Int) -> Unit
+) {
     var expanded by remember { mutableStateOf(false) }
+    val bannerOffsetX = remember { Animatable(0f) }
+    val coroutineScope = rememberCoroutineScope()
+    val density = LocalDensity.current
+    val maxBannerSwipe = with(density) { 70.dp.toPx() }
 
     val currentVal = item.quantity * item.currentPrice
     val investedVal = item.quantity * item.avgBuyPrice
@@ -230,36 +339,94 @@ fun InvestmentListItem(item: InvestmentItem) {
     val totalRetColor = if (totalRet >= 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
     val totalRetSign = if (totalRet >= 0) "+" else ""
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { expanded = !expanded }
-    ) {
-        // Main Stock Row
-        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Column(modifier = Modifier.weight(0.8f)) {
-                Text(item.assetName, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                val qtyDisplay = if (item.quantity % 1.0 == 0.0) "${item.quantity.toInt()} shares" else "${String.format(Locale.US, "%.3f", item.quantity)} units"
-                Text(qtyDisplay, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Column(modifier = Modifier.fillMaxWidth()) {
+        // Main Stock Row (Banner) with Swipe-to-Delete Action Reveal
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+        ) {
+            // Background Action (Delete Bin)
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .background(MaterialTheme.colorScheme.errorContainer),
+                contentAlignment = Alignment.CenterEnd
+            ) {
+                IconButton(
+                    onClick = {
+                        coroutineScope.launch { bannerOffsetX.animateTo(0f) }
+                        onDeleteAssetClick()
+                    },
+                    modifier = Modifier
+                        .padding(end = 12.dp)
+                        .bounceClick()
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Delete,
+                        contentDescription = "Delete Asset",
+                        tint = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                }
             }
-            
-            Column(modifier = Modifier.weight(1.3f), horizontalAlignment = Alignment.End) {
-                Text(formatRupee(item.currentPrice), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)
-                Text("$oneDaySign${item.oneDayChangePrice} ($oneDaySign${String.format(Locale.US, "%.2f", oneDPct)}%)", fontSize = 11.sp, color = oneDayColor)
-            }
-            
-            Column(modifier = Modifier.weight(1.2f), horizontalAlignment = Alignment.End) {
-                Text(formatRupee(currentVal), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)
-                Text("(${formatRupee(investedVal)})", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            
-            Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.End) {
-                Text("$totalRetSign${formatRupee(totalRet)}", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)
-                Text("($totalRetSign${String.format(Locale.US, "%.2f", totalRetPct)}%)", fontSize = 11.sp, color = totalRetColor)
+
+            // Foreground Main Stock Banner Row
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .offset { IntOffset(bannerOffsetX.value.roundToInt(), 0) }
+                    .background(MaterialTheme.colorScheme.background)
+                    .pointerInput(Unit) {
+                        detectHorizontalDragGestures(
+                            onHorizontalDrag = { change, dragAmount ->
+                                change.consume()
+                                val newOffset = (bannerOffsetX.value + dragAmount).coerceIn(-maxBannerSwipe, 0f)
+                                coroutineScope.launch { bannerOffsetX.snapTo(newOffset) }
+                            },
+                            onDragEnd = {
+                                coroutineScope.launch {
+                                    if (bannerOffsetX.value < -maxBannerSwipe / 2) {
+                                        bannerOffsetX.animateTo(-maxBannerSwipe, spring(stiffness = Spring.StiffnessMediumLow))
+                                    } else {
+                                        bannerOffsetX.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow))
+                                    }
+                                }
+                            }
+                        )
+                    }
+                    .clickable { 
+                        if (bannerOffsetX.value < 0f) {
+                            coroutineScope.launch { bannerOffsetX.animateTo(0f) }
+                        } else {
+                            expanded = !expanded 
+                        }
+                    },
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(0.8f)) {
+                    Text(item.assetName, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    val qtyDisplay = if (item.quantity % 1.0 == 0.0) "${item.quantity.toInt()} shares" else "${String.format(Locale.US, "%.3f", item.quantity)} units"
+                    Text(qtyDisplay, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                
+                Column(modifier = Modifier.weight(1.3f), horizontalAlignment = Alignment.End) {
+                    Text(formatRupee(item.currentPrice), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)
+                    Text("$oneDaySign${item.oneDayChangePrice} ($oneDaySign${String.format(Locale.US, "%.2f", oneDPct)}%)", fontSize = 11.sp, color = oneDayColor)
+                }
+                
+                Column(modifier = Modifier.weight(1.2f), horizontalAlignment = Alignment.End) {
+                    Text(formatRupee(currentVal), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)
+                    Text("(${formatRupee(investedVal)})", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                
+                Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.End) {
+                    Text("$totalRetSign${formatRupee(totalRet)}", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)
+                    Text("($totalRetSign${String.format(Locale.US, "%.2f", totalRetPct)}%)", fontSize = 11.sp, color = totalRetColor)
+                }
             }
         }
 
-        // Expandable Purchase History Sub-Table Container (Surface Card Background)
+        // Expandable Sub-Banner (Purchase History)
         AnimatedVisibility(
             visible = expanded,
             enter = expandVertically() + fadeIn(),
@@ -318,90 +485,339 @@ fun InvestmentListItem(item: InvestmentItem) {
                     HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), thickness = 0.8.dp)
                     Spacer(modifier = Modifier.height(6.dp))
 
-                    // Sub-Table History Rows
-                    item.history.forEach { historyEntry ->
-                        val (dateLine1, dateLine2) = formatHistoryDate(historyEntry.date)
-                        val trancheQtyDisplay = if (historyEntry.quantity % 1.0 == 0.0) "${historyEntry.quantity.toInt()}" else String.format(Locale.US, "%.3f", historyEntry.quantity)
-                        val trancheInvested = historyEntry.quantity * historyEntry.price
-                        val trancheCurrent = historyEntry.quantity * item.currentPrice
-                        val tranchePL = trancheCurrent - trancheInvested
-                        val tranchePct = if (historyEntry.price > 0) ((item.currentPrice - historyEntry.price) / historyEntry.price) * 100 else 0.0
-
-                        val plColor = if (tranchePL >= 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
-                        val plSign = if (tranchePL >= 0) "+" else ""
-
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            // Date Column
-                            Column(modifier = Modifier.weight(0.7f)) {
-                                Text(
-                                    text = dateLine1,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1
-                                )
-                                if (dateLine2.isNotEmpty()) {
-                                    Text(
-                                        text = dateLine2,
-                                        fontSize = 10.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                                        maxLines = 1
-                                    )
-                                }
-                            }
-
-                            // Price (Qty) & (Invested)
-                            Column(modifier = Modifier.weight(1.35f), horizontalAlignment = Alignment.End) {
-                                Text(
-                                    text = "${formatRupee(historyEntry.price)} ($trancheQtyDisplay)",
-                                    fontSize = 11.5.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    maxLines = 1
-                                )
-                                Text(
-                                    text = "(${formatRupee(trancheInvested)})",
-                                    fontSize = 10.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1
-                                )
-                            }
-
-                            // Brkg Column
-                            Column(modifier = Modifier.weight(0.65f), horizontalAlignment = Alignment.End) {
-                                Text(
-                                    text = if (historyEntry.brokerage > 0) formatRupee(historyEntry.brokerage) else "₹0",
-                                    fontSize = 11.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1
-                                )
-                            }
-
-                            // P/L (%) & (Current)
-                            Column(modifier = Modifier.weight(1.6f), horizontalAlignment = Alignment.End) {
-                                Text(
-                                    text = "$plSign${formatRupee(tranchePL)} ($plSign${String.format(Locale.US, "%.2f", tranchePct)}%)",
-                                    fontSize = 11.5.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = plColor,
-                                    maxLines = 1
-                                )
-                                Text(
-                                    text = "(${formatRupee(trancheCurrent)})",
-                                    fontSize = 10.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1
-                                )
-                            }
-                        }
+                    // History Rows with Swipe Actions
+                    item.history.forEachIndexed { lotIdx, historyEntry ->
+                        SubBannerHistoryRow(
+                            lotIdx = lotIdx,
+                            historyEntry = historyEntry,
+                            currentPrice = item.currentPrice,
+                            onEditClick = { onEditLotClick(lotIdx, historyEntry) },
+                            onDeleteClick = { onDeleteLotClick(lotIdx) }
+                        )
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun SubBannerHistoryRow(
+    lotIdx: Int,
+    historyEntry: InvestmentHistoryItem,
+    currentPrice: Double,
+    onEditClick: () -> Unit,
+    onDeleteClick: () -> Unit
+) {
+    val coroutineScope = rememberCoroutineScope()
+    val lotOffsetX = remember { Animatable(0f) }
+    val density = LocalDensity.current
+    val maxSubSwipe = with(density) { 120.dp.toPx() }
+
+    val (dateLine1, dateLine2) = formatHistoryDate(historyEntry.date)
+    val trancheQtyDisplay = if (historyEntry.quantity % 1.0 == 0.0) "${historyEntry.quantity.toInt()}" else String.format(Locale.US, "%.3f", historyEntry.quantity)
+    val trancheInvested = historyEntry.quantity * historyEntry.price
+    val trancheCurrent = historyEntry.quantity * currentPrice
+    val tranchePL = trancheCurrent - trancheInvested
+    val tranchePct = if (historyEntry.price > 0) ((currentPrice - historyEntry.price) / historyEntry.price) * 100 else 0.0
+
+    val plColor = if (tranchePL >= 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+    val plSign = if (tranchePL >= 0) "+" else ""
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(6.dp))
+            .padding(vertical = 3.dp)
+    ) {
+        // Actions Background (Edit + Delete)
+        Row(
+            modifier = Modifier
+                .matchParentSize()
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(
+                onClick = {
+                    coroutineScope.launch { lotOffsetX.animateTo(0f) }
+                    onEditClick()
+                },
+                modifier = Modifier
+                    .size(38.dp)
+                    .bounceClick()
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Edit,
+                    contentDescription = "Edit Lot",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+            IconButton(
+                onClick = {
+                    coroutineScope.launch { lotOffsetX.animateTo(0f) }
+                    onDeleteClick()
+                },
+                modifier = Modifier
+                    .size(38.dp)
+                    .bounceClick()
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Delete,
+                    contentDescription = "Delete Lot",
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
+
+        // Foreground Lot Row
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .offset { IntOffset(lotOffsetX.value.roundToInt(), 0) }
+                .background(MaterialTheme.colorScheme.surface)
+                .pointerInput(Unit) {
+                    detectHorizontalDragGestures(
+                        onHorizontalDrag = { change, dragAmount ->
+                            change.consume()
+                            val newOffset = (lotOffsetX.value + dragAmount).coerceIn(-maxSubSwipe, 0f)
+                            coroutineScope.launch { lotOffsetX.snapTo(newOffset) }
+                        },
+                        onDragEnd = {
+                            coroutineScope.launch {
+                                if (lotOffsetX.value < -maxSubSwipe / 2) {
+                                    lotOffsetX.animateTo(-maxSubSwipe, spring(stiffness = Spring.StiffnessMediumLow))
+                                } else {
+                                    lotOffsetX.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow))
+                                }
+                            }
+                        }
+                    )
+                }
+                .clickable {
+                    if (lotOffsetX.value < 0f) {
+                        coroutineScope.launch { lotOffsetX.animateTo(0f) }
+                    }
+                }
+                .padding(vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Date Column
+            Column(modifier = Modifier.weight(0.7f)) {
+                Text(
+                    text = dateLine1,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1
+                )
+                if (dateLine2.isNotEmpty()) {
+                    Text(
+                        text = dateLine2,
+                        fontSize = 10.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        maxLines = 1
+                    )
+                }
+            }
+
+            // Price (Qty) & (Invested)
+            Column(modifier = Modifier.weight(1.35f), horizontalAlignment = Alignment.End) {
+                Text(
+                    text = "${formatRupee(historyEntry.price)} ($trancheQtyDisplay)",
+                    fontSize = 11.5.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1
+                )
+                Text(
+                    text = "(${formatRupee(trancheInvested)})",
+                    fontSize = 10.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1
+                )
+            }
+
+            // Brkg Column
+            Column(modifier = Modifier.weight(0.65f), horizontalAlignment = Alignment.End) {
+                Text(
+                    text = if (historyEntry.brokerage > 0) formatRupee(historyEntry.brokerage) else "₹0",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1
+                )
+            }
+
+            // P/L (%) & (Current)
+            Column(modifier = Modifier.weight(1.6f), horizontalAlignment = Alignment.End) {
+                Text(
+                    text = "$plSign${formatRupee(tranchePL)} ($plSign${String.format(Locale.US, "%.2f", tranchePct)}%)",
+                    fontSize = 11.5.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = plColor,
+                    maxLines = 1
+                )
+                Text(
+                    text = "(${formatRupee(trancheCurrent)})",
+                    fontSize = 10.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun EditHistoryLotDialog(
+    initialLot: InvestmentHistoryItem,
+    onDismiss: () -> Unit,
+    onSave: (InvestmentHistoryItem) -> Unit
+) {
+    var qtyText by remember { mutableStateOf(if (initialLot.quantity % 1.0 == 0.0) initialLot.quantity.toInt().toString() else initialLot.quantity.toString()) }
+    var priceText by remember { mutableStateOf(if (initialLot.price % 1.0 == 0.0) initialLot.price.toInt().toString() else initialLot.price.toString()) }
+    var dateText by remember { mutableStateOf(initialLot.date) }
+    var brkgText by remember { mutableStateOf(if (initialLot.brokerage % 1.0 == 0.0) initialLot.brokerage.toInt().toString() else initialLot.brokerage.toString()) }
+
+    var showDatePicker by remember { mutableStateOf(false) }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Row 1: Quantity & Buy Price
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    OutlinedTextField(
+                        value = qtyText,
+                        onValueChange = { qtyText = it },
+                        label = { Text("Quantity") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        singleLine = true
+                    )
+
+                    OutlinedTextField(
+                        value = priceText,
+                        onValueChange = { priceText = it },
+                        label = { Text("Buy Price") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        singleLine = true
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Row 2: Date & Brokerage
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    OutlinedTextField(
+                        value = dateText,
+                        onValueChange = { dateText = it },
+                        label = { Text("Date") },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        singleLine = true,
+                        trailingIcon = {
+                            IconButton(onClick = { showDatePicker = true }, modifier = Modifier.bounceClick()) {
+                                Icon(
+                                    imageVector = Icons.Outlined.CalendarToday,
+                                    contentDescription = "Pick Date",
+                                    tint = Color(0xFF22C55E),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                    )
+
+                    OutlinedTextField(
+                        value = brkgText,
+                        onValueChange = { brkgText = it },
+                        label = { Text("Brokerage") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        singleLine = true
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // Save Investment Button
+                Button(
+                    onClick = {
+                        val parsedQty = qtyText.toDoubleOrNull() ?: initialLot.quantity
+                        val parsedPrice = priceText.toDoubleOrNull() ?: initialLot.price
+                        val parsedBrkg = brkgText.toDoubleOrNull() ?: 0.0
+                        val updated = InvestmentHistoryItem(
+                            date = dateText.trim(),
+                            quantity = parsedQty,
+                            price = parsedPrice,
+                            amount = parsedQty * parsedPrice,
+                            brokerage = parsedBrkg
+                        )
+                        onSave(updated)
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp)
+                        .bounceClick(),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF22C55E),
+                        contentColor = Color.Black
+                    )
+                ) {
+                    Text("Save Investment", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                }
+            }
+        }
+    }
+
+    if (showDatePicker) {
+        val datePickerState = rememberDatePickerState()
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val selectedMillis = datePickerState.selectedDateMillis
+                        if (selectedMillis != null) {
+                            val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+                            dateText = sdf.format(Date(selectedMillis))
+                        }
+                        showDatePicker = false
+                    },
+                    modifier = Modifier.bounceClick()
+                ) {
+                    Text("OK", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }, modifier = Modifier.bounceClick()) {
+                    Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        ) {
+            DatePicker(state = datePickerState)
         }
     }
 }
