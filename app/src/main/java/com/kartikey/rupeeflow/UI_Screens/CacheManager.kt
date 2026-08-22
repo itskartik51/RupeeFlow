@@ -35,9 +35,9 @@ import java.util.Date
 import java.util.Locale
 
 data class NetworthDataPoint(
-    val monthKey: String, // e.g. "26-08"
-    val slotIndex: Int,   // 0, 1, 2
-    val label: String,    // e.g. "01-10 Aug", "11-20 Aug", "21-End Aug"
+    val monthKey: String, 
+    val slotIndex: Int,   
+    val label: String,    
     val amount: Double
 )
 
@@ -64,7 +64,6 @@ data class AppData(
 object CacheManager {
     private const val PREFS_NAME = "RupeeFlow_GlobalCache"
     
-    // ⚡ Reactive Live State Flow for Zero-Latency UI Updates ⚡
     private val _appDataState = MutableStateFlow<AppData?>(null)
     val appDataState: StateFlow<AppData?> = _appDataState.asStateFlow()
 
@@ -247,7 +246,6 @@ object CacheManager {
                         put("current_price", inv.currentPrice)
                         put("one_day_change", inv.oneDayChangePrice)
                         
-                        // ⚡ Sync History Array to Local Cache ⚡
                         val histArray = JSONArray()
                         inv.history.forEach { h ->
                             histArray.put(JSONObject().apply {
@@ -733,7 +731,6 @@ object CacheManager {
                         val currentPrice = liveData?.first ?: buyPrice
                         val oneDayChange = liveData?.second ?: 0.0
                         
-                        // ⚡ Parse History Sub-Collection from Firestore ⚡
                         val parsedHistoryList = mutableListOf<InvestmentHistoryItem>()
                         val historyMapRaw = itemData["history"] as? Map<String, Any>
                         if (historyMapRaw != null) {
@@ -910,7 +907,6 @@ object CacheManager {
             for (i in 0 until invArray.length()) { 
                 val item = invArray.getJSONObject(i)
                 
-                // ⚡ Read History Array from Local JSON ⚡
                 val histArray = item.optJSONArray("history")
                 val parsedHistory = mutableListOf<InvestmentHistoryItem>()
                 if (histArray != null) {
@@ -936,7 +932,7 @@ object CacheManager {
                         avgBuyPrice = item.optDouble("buy_price", 0.0),
                         currentPrice = item.optDouble("current_price", item.optDouble("buy_price", 0.0)),
                         oneDayChangePrice = item.optDouble("one_day_change", 0.0),
-                        history = parsedHistory // Seamlessly passed to Data Class
+                        history = parsedHistory 
                     )
                 ) 
             }
