@@ -17,7 +17,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Refresh
@@ -41,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.kartikey.rupeeflow.UI_Screens.CacheManager
+import com.kartikey.rupeeflow.UI_Screens.CustomDatePicker
 import com.kartikey.rupeeflow.UI_Screens.bounceClick
 import kotlinx.coroutines.launch
 import java.text.NumberFormat
@@ -680,9 +680,8 @@ fun EditHistoryLotDialog(
     var qtyText by remember { mutableStateOf(if (initialLot.quantity % 1.0 == 0.0) initialLot.quantity.toInt().toString() else initialLot.quantity.toString()) }
     var priceText by remember { mutableStateOf(if (initialLot.price % 1.0 == 0.0) initialLot.price.toInt().toString() else initialLot.price.toString()) }
     var dateText by remember { mutableStateOf(initialLot.date) }
+    var selectedDateMillis by remember { mutableStateOf(parseDateToMillis(initialLot.date)) }
     var brkgText by remember { mutableStateOf(if (initialLot.brokerage % 1.0 == 0.0) initialLot.brokerage.toInt().toString() else initialLot.brokerage.toString()) }
-
-    var showDatePicker by remember { mutableStateOf(false) }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -715,6 +714,9 @@ fun EditHistoryLotDialog(
                         value = priceText,
                         onValueChange = { priceText = it },
                         label = { Text("Buy Price") },
+                        prefix = if (priceText.isNotEmpty()) {
+                            { Text("₹", color = MaterialTheme.colorScheme.onSurface) }
+                        } else null,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(12.dp),
@@ -724,36 +726,32 @@ fun EditHistoryLotDialog(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Row 2: Date & Brokerage
+                // Row 2: Date (60%) & Brokerage (40%)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    OutlinedTextField(
-                        value = dateText,
-                        onValueChange = { dateText = it },
-                        label = { Text("Date") },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp),
-                        singleLine = true,
-                        trailingIcon = {
-                            IconButton(onClick = { showDatePicker = true }, modifier = Modifier.bounceClick()) {
-                                Icon(
-                                    imageVector = Icons.Outlined.CalendarToday,
-                                    contentDescription = "Pick Date",
-                                    tint = Color(0xFF22C55E),
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-                        }
+                    CustomDatePicker(
+                        label = "Date",
+                        selectedDateMillis = selectedDateMillis,
+                        onDateSelected = { millis ->
+                            selectedDateMillis = millis
+                            val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+                            dateText = sdf.format(Date(millis))
+                        },
+                        modifier = Modifier.weight(0.6f)
                     )
 
                     OutlinedTextField(
                         value = brkgText,
                         onValueChange = { brkgText = it },
                         label = { Text("Brokerage") },
+                        prefix = if (brkgText.isNotEmpty()) {
+                            { Text("₹", color = MaterialTheme.colorScheme.onSurface) }
+                        } else null,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(0.4f),
                         shape = RoundedCornerShape(12.dp),
                         singleLine = true
                     )
@@ -791,34 +789,17 @@ fun EditHistoryLotDialog(
             }
         }
     }
+}
 
-    if (showDatePicker) {
-        val datePickerState = rememberDatePickerState()
-        DatePickerDialog(
-            onDismissRequest = { showDatePicker = false },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        val selectedMillis = datePickerState.selectedDateMillis
-                        if (selectedMillis != null) {
-                            val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
-                            dateText = sdf.format(Date(selectedMillis))
-                        }
-                        showDatePicker = false
-                    },
-                    modifier = Modifier.bounceClick()
-                ) {
-                    Text("OK", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDatePicker = false }, modifier = Modifier.bounceClick()) {
-                    Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-        ) {
-            DatePicker(state = datePickerState)
-        }
+fun parseDateToMillis(dateStr: String): Long? {
+    if (dateStr.isBlank()) return null
+    return try {
+        val inFormat = if (dateStr.contains("/")) SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+                       else if (dateStr.contains("-")) SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                       else SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
+        inFormat.parse(dateStr)?.time
+    } catch (e: Exception) {
+        null
     }
 }
 
