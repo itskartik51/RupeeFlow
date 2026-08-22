@@ -1,6 +1,12 @@
 package com.kartikey.rupeeflow.UI_Screens.Assets
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -22,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kartikey.rupeeflow.UI_Screens.bounceClick
 import java.text.NumberFormat
+import java.text.SimpleDateFormat
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -61,7 +68,6 @@ fun InvestmentScreen(
                 .padding(horizontal = 12.dp)
         ) {
             item {
-                // Subtle top gap between TopAppBar and Summary Card
                 Spacer(modifier = Modifier.height(8.dp))
                 
                 InvestmentSummaryCard(
@@ -209,6 +215,8 @@ fun ListHeaderRow() {
 
 @Composable
 fun InvestmentListItem(item: InvestmentItem) {
+    var expanded by remember { mutableStateOf(false) }
+
     val currentVal = item.quantity * item.currentPrice
     val investedVal = item.quantity * item.avgBuyPrice
     val totalRet = currentVal - investedVal
@@ -221,26 +229,187 @@ fun InvestmentListItem(item: InvestmentItem) {
     val totalRetColor = if (totalRet >= 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
     val totalRetSign = if (totalRet >= 0) "+" else ""
 
-    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Column(modifier = Modifier.weight(0.8f)) {
-            Text(item.assetName, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text("${item.quantity.toInt()} shares", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { expanded = !expanded }
+    ) {
+        // Main Stock Row
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(0.8f)) {
+                Text(item.assetName, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                val qtyDisplay = if (item.quantity % 1.0 == 0.0) "${item.quantity.toInt()} shares" else "${String.format(Locale.US, "%.3f", item.quantity)} units"
+                Text(qtyDisplay, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            
+            Column(modifier = Modifier.weight(1.3f), horizontalAlignment = Alignment.End) {
+                Text(formatRupee(item.currentPrice), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)
+                Text("$oneDaySign${item.oneDayChangePrice} ($oneDaySign${String.format(Locale.US, "%.2f", oneDPct)}%)", fontSize = 11.sp, color = oneDayColor)
+            }
+            
+            Column(modifier = Modifier.weight(1.2f), horizontalAlignment = Alignment.End) {
+                Text(formatRupee(currentVal), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)
+                Text("(${formatRupee(investedVal)})", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            
+            Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.End) {
+                Text("$totalRetSign${formatRupee(totalRet)}", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)
+                Text("($totalRetSign${String.format(Locale.US, "%.2f", totalRetPct)}%)", fontSize = 11.sp, color = totalRetColor)
+            }
         }
-        
-        Column(modifier = Modifier.weight(1.3f), horizontalAlignment = Alignment.End) {
-            Text(formatRupee(item.currentPrice), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)
-            Text("$oneDaySign${item.oneDayChangePrice} ($oneDaySign${String.format(Locale.US, "%.2f", oneDPct)}%)", fontSize = 11.sp, color = oneDayColor)
+
+        // Expandable Purchase History Sub-Table
+        AnimatedVisibility(
+            visible = expanded,
+            enter = expandVertically() + fadeIn(),
+            exit = shrinkVertically() + fadeOut()
+        ) {
+            Column(modifier = Modifier.fillMaxWidth().padding(top = 10.dp, bottom = 4.dp)) {
+                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f), thickness = 0.8.dp)
+                Spacer(modifier = Modifier.height(6.dp))
+
+                // Sub-Table Headers with optimized weights (0.7f, 1.35f, 0.65f, 1.6f)
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
+                    Text(
+                        text = "Date",
+                        fontSize = 10.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(0.7f)
+                    )
+                    Text(
+                        text = "Price (Qty)\n(Invested)",
+                        fontSize = 10.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.End,
+                        maxLines = 2,
+                        modifier = Modifier.weight(1.35f)
+                    )
+                    Text(
+                        text = "Brkg",
+                        fontSize = 10.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.End,
+                        maxLines = 1,
+                        modifier = Modifier.weight(0.65f)
+                    )
+                    Text(
+                        text = "P/L (%)\n(Current)",
+                        fontSize = 10.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.End,
+                        maxLines = 2,
+                        modifier = Modifier.weight(1.6f)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(6.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f), thickness = 0.5.dp)
+                Spacer(modifier = Modifier.height(6.dp))
+
+                // Sub-Table History Rows
+                item.history.forEach { historyEntry ->
+                    val (dateLine1, dateLine2) = formatHistoryDate(historyEntry.date)
+                    val trancheQtyDisplay = if (historyEntry.quantity % 1.0 == 0.0) "${historyEntry.quantity.toInt()}" else String.format(Locale.US, "%.3f", historyEntry.quantity)
+                    val trancheInvested = historyEntry.quantity * historyEntry.price
+                    val trancheCurrent = historyEntry.quantity * item.currentPrice
+                    val tranchePL = trancheCurrent - trancheInvested
+                    val tranchePct = if (historyEntry.price > 0) ((item.currentPrice - historyEntry.price) / historyEntry.price) * 100 else 0.0
+
+                    val plColor = if (tranchePL >= 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                    val plSign = if (tranchePL >= 0) "+" else ""
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Date Column
+                        Column(modifier = Modifier.weight(0.7f)) {
+                            Text(
+                                text = dateLine1,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1
+                            )
+                            if (dateLine2.isNotEmpty()) {
+                                Text(
+                                    text = dateLine2,
+                                    fontSize = 10.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                    maxLines = 1
+                                )
+                            }
+                        }
+
+                        // Price (Qty) & (Invested)
+                        Column(modifier = Modifier.weight(1.35f), horizontalAlignment = Alignment.End) {
+                            Text(
+                                text = "${formatRupee(historyEntry.price)} ($trancheQtyDisplay)",
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1
+                            )
+                            Text(
+                                text = "(${formatRupee(trancheInvested)})",
+                                fontSize = 10.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1
+                            )
+                        }
+
+                        // Brkg Column
+                        Column(modifier = Modifier.weight(0.65f), horizontalAlignment = Alignment.End) {
+                            Text(
+                                text = if (historyEntry.brokerage > 0) formatRupee(historyEntry.brokerage) else "₹0",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1
+                            )
+                        }
+
+                        // P/L (%) & (Current)
+                        Column(modifier = Modifier.weight(1.6f), horizontalAlignment = Alignment.End) {
+                            Text(
+                                text = "$plSign${formatRupee(tranchePL)} ($plSign${String.format(Locale.US, "%.2f", tranchePct)}%)",
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = plColor,
+                                maxLines = 1
+                            )
+                            Text(
+                                text = "(${formatRupee(trancheCurrent)})",
+                                fontSize = 10.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1
+                            )
+                        }
+                    }
+                }
+            }
         }
-        
-        Column(modifier = Modifier.weight(1.2f), horizontalAlignment = Alignment.End) {
-            Text(formatRupee(currentVal), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)
-            Text("(${formatRupee(investedVal)})", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+fun formatHistoryDate(dateStr: String): Pair<String, String> {
+    if (dateStr.isBlank()) return Pair("-", "")
+    return try {
+        val inFormat = if (dateStr.contains("/")) SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+                       else if (dateStr.contains("-")) SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                       else SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
+        val dateObj = inFormat.parse(dateStr)
+        if (dateObj != null) {
+            val line1 = SimpleDateFormat("dd MMM", Locale.getDefault()).format(dateObj)
+            val line2 = SimpleDateFormat("yyyy", Locale.getDefault()).format(dateObj)
+            Pair(line1, line2)
+        } else {
+            Pair(dateStr, "")
         }
-        
-        Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.End) {
-            Text("$totalRetSign${formatRupee(totalRet)}", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)
-            Text("($totalRetSign${String.format(Locale.US, "%.2f", totalRetPct)}%)", fontSize = 11.sp, color = totalRetColor)
-        }
+    } catch (e: Exception) {
+        Pair(dateStr, "")
     }
 }
 
