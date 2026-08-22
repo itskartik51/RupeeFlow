@@ -61,6 +61,9 @@ fun InvestmentScreen(
                 .padding(horizontal = 12.dp)
         ) {
             item {
+                // Subtle top gap between TopAppBar and Summary Card
+                Spacer(modifier = Modifier.height(8.dp))
+                
                 InvestmentSummaryCard(
                     itemCount = investmentList.size,
                     totalCurrent = totalCurrent,
@@ -80,7 +83,11 @@ fun InvestmentScreen(
 
             items(investmentList) { item ->
                 InvestmentListItem(item)
-                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), thickness = 1.dp, modifier = Modifier.padding(vertical = 8.dp))
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), 
+                    thickness = 1.dp, 
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
             }
         }
     }
@@ -88,8 +95,13 @@ fun InvestmentScreen(
 
 @Composable
 fun InvestmentSummaryCard(
-    itemCount: Int, totalCurrent: Double, total1DChange: Double, total1DPercent: Double, 
-    totalReturn: Double, totalReturnPercent: Double, totalInvested: Double,
+    itemCount: Int, 
+    totalCurrent: Double, 
+    total1DChange: Double, 
+    total1DPercent: Double, 
+    totalReturn: Double, 
+    totalReturnPercent: Double, 
+    totalInvested: Double,
     isLoading: Boolean, 
     onRefreshClick: () -> Unit = {}
 ) {
@@ -116,7 +128,13 @@ fun InvestmentSummaryCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("INVESTMENT ($itemCount)", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                Text(
+                    text = "INVESTMENT ($itemCount)", 
+                    color = MaterialTheme.colorScheme.onSurfaceVariant, 
+                    fontSize = 12.sp, 
+                    fontWeight = FontWeight.Bold, 
+                    letterSpacing = 1.sp
+                )
                 Row {
                     IconButton(onClick = { }, modifier = Modifier.size(32.dp).bounceClick()) {
                         Icon(Icons.Outlined.Visibility, contentDescription = "Hide", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
@@ -137,7 +155,12 @@ fun InvestmentSummaryCard(
                 }
             }
 
-            Text(text = formatRupee(totalCurrent), fontWeight = FontWeight.ExtraBold, fontSize = 32.sp, color = MaterialTheme.colorScheme.onSurface)
+            Text(
+                text = formatRupee(totalCurrent), 
+                fontWeight = FontWeight.ExtraBold, 
+                fontSize = 32.sp, 
+                color = MaterialTheme.colorScheme.onSurface
+            )
             
             Spacer(modifier = Modifier.height(20.dp))
             HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
@@ -166,8 +189,10 @@ fun SummaryRow(label: String, amount: Double, percent: Double) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
         Text(
-            text = "$sign${formatRupee(amount)} ($sign${String.format("%.2f", percent)}%)",
-            color = color, fontWeight = FontWeight.Medium, fontSize = 14.sp
+            text = "$sign${formatRupee(amount)} ($sign${String.format(Locale.US, "%.2f", percent)}%)",
+            color = color, 
+            fontWeight = FontWeight.Medium, 
+            fontSize = 14.sp
         )
     }
 }
@@ -204,7 +229,7 @@ fun InvestmentListItem(item: InvestmentItem) {
         
         Column(modifier = Modifier.weight(1.3f), horizontalAlignment = Alignment.End) {
             Text(formatRupee(item.currentPrice), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)
-            Text("$oneDaySign${item.oneDayChangePrice} ($oneDaySign${String.format("%.2f", oneDPct)}%)", fontSize = 11.sp, color = oneDayColor)
+            Text("$oneDaySign${item.oneDayChangePrice} ($oneDaySign${String.format(Locale.US, "%.2f", oneDPct)}%)", fontSize = 11.sp, color = oneDayColor)
         }
         
         Column(modifier = Modifier.weight(1.2f), horizontalAlignment = Alignment.End) {
@@ -214,7 +239,7 @@ fun InvestmentListItem(item: InvestmentItem) {
         
         Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.End) {
             Text("$totalRetSign${formatRupee(totalRet)}", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)
-            Text("($totalRetSign${String.format("%.2f", totalRetPct)}%)", fontSize = 11.sp, color = totalRetColor)
+            Text("($totalRetSign${String.format(Locale.US, "%.2f", totalRetPct)}%)", fontSize = 11.sp, color = totalRetColor)
         }
     }
 }
@@ -222,5 +247,5 @@ fun InvestmentListItem(item: InvestmentItem) {
 fun formatRupee(amount: Double): String {
     val format = NumberFormat.getCurrencyInstance(Locale("en", "IN"))
     format.maximumFractionDigits = 2
-    return format.format(amount).replace("-₹", "-₹ ") 
+    return format.format(amount)
 }
