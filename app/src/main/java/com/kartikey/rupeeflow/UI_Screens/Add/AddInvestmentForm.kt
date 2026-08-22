@@ -22,8 +22,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FirebaseFirestore
 import com.kartikey.rupeeflow.Cloud_Database.Constants
+import com.kartikey.rupeeflow.UI_Screens.CustomDatePicker //[cite: 1]
 import com.kartikey.rupeeflow.UI_Screens.bounceClick
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -36,6 +38,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
+import java.util.Date
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -49,6 +52,10 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
     
     var quantity by remember { mutableStateOf("") }
     var buyPrice by remember { mutableStateOf("") }
+    
+    // ⚡ New states for Date and Brokerage ⚡
+    var selectedDateMillis by remember { mutableStateOf<Long?>(System.currentTimeMillis()) }
+    var brokerage by remember { mutableStateOf("") }
     
     var typeExpanded by remember { mutableStateOf(false) }
     
@@ -230,6 +237,8 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                                 sheetTicker = ""
                                 quantity = ""
                                 buyPrice = ""
+                                selectedDateMillis = System.currentTimeMillis()
+                                brokerage = ""
                                 searchResults = emptyList()
                                 typeExpanded = false
                             }
@@ -349,6 +358,7 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                 val qtyLabel = if (isMutualFund) "Total Units" else "Quantity"
                 val priceLabel = if (isMutualFund) "Average NAV" else "Buy Price"
 
+                // --- QUANTITY & BUY PRICE ---
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedTextField(
                         value = quantity, 
@@ -376,6 +386,35 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                     )
                 }
 
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // --- DATE PICKER & BROKERAGE (SIDE-BY-SIDE) ---
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    CustomDatePicker(
+                        label = "Date",
+                        selectedDateMillis = selectedDateMillis,
+                        onDateSelected = { selectedDateMillis = it },
+                        modifier = Modifier.weight(1f),
+                        restrictToCurrentMonth = false
+                    )
+                    OutlinedTextField(
+                        value = brokerage,
+                        onValueChange = { brokerage = it },
+                        label = { Text("Brokerage") },
+                        prefix = { Text("₹ ", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.weight(1f),
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                        )
+                    )
+                }
+
                 val currentQty = quantity.toDoubleOrNull() ?: 0.0
                 val currentPrice = buyPrice.toDoubleOrNull() ?: 0.0
                 val totalAmount = currentQty * currentPrice
@@ -392,11 +431,13 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // --- SAVE BUTTON WITH WEIGHTED AVERAGE PRICE ENGINE ---
+                // --- SAVE BUTTON WITH WEIGHTED AVERAGE & HISTORY LOGGING ---
                 Button(
                     onClick = {
                         val qty = quantity.toDoubleOrNull() ?: 0.0
                         val price = buyPrice.toDoubleOrNull() ?: 0.0
+                        val brkrgVal = brokerage.toDoubleOrNull() ?: 0.0
+                        val dateVal = selectedDateMillis ?: System.currentTimeMillis()
                         
                         if (selectedSymbol.isNotBlank() && qty > 0 && price > 0) {
                             onInvestmentAdded()
@@ -413,7 +454,6 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                                         
                                         val rawInvestMap = userDoc.get("invest") as? Map<String, Any> ?: emptyMap()
                                         
-                                        // ⚡ Scan for existing holding of the same asset ⚡
                                         var existingKey: String? = null
                                         var existingHolding: Map<String, Any>? = null
 
@@ -431,8 +471,16 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                                             }
                                         }
 
+                                        val newHistoryEntry = mapOf(
+                                            "dt" to Timestamp(Date(dateVal)),
+                                            "qnt" to qty,
+                                            "prc" to price,
+                                            "amnt" to (qty * price),
+                                            "brkrg" to brkrgVal
+                                        )
+
                                         if (existingKey != null && existingHolding != null) {
-                                            // ⚡ WEIGHTED AVERAGE PRICE LOGIC ⚡
+                                            // ⚡ WEIGHTED AVERAGE PRICE CALCULATION (Option A) ⚡
                                             val oldQty = (existingHolding["qnt"] as? Number)?.toDouble() ?: 0.0
                                             val oldAvg = (existingHolding["avg"] as? Number)?.toDouble() ?: 0.0
 
@@ -440,26 +488,36 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                                             val combinedTotalAmount = (oldQty * oldAvg) + (qty * price)
                                             val newCalculatedAvg = if (combinedQty > 0) combinedTotalAmount / combinedQty else 0.0
 
+                                            // Append to existing history map
+                                            val existingHistoryMap = (existingHolding["history"] as? Map<String, Any>)?.toMutableMap() ?: mutableMapOf()
+                                            val maxHistoryKey = existingHistoryMap.keys.mapNotNull { it.toIntOrNull() }.maxOrNull() ?: 0
+                                            val newHistoryKey = String.format(Locale.US, "%03d", maxHistoryKey + 1)
+                                            existingHistoryMap[newHistoryKey] = newHistoryEntry
+
                                             val updatedInvestment = mapOf(
                                                 "name" to selectedSymbol,
                                                 "type" to assetType,
                                                 "qnt" to combinedQty,
                                                 "avg" to newCalculatedAvg,
-                                                "amnt" to combinedTotalAmount
+                                                "amnt" to combinedTotalAmount,
+                                                "history" to existingHistoryMap
                                             )
 
                                             userRef.update("invest.$existingKey", updatedInvestment).await()
                                         } else {
-                                            // ⚡ NEW HOLDING ENTRY ⚡
+                                            // ⚡ NEW HOLDING ENTRY WITH HISTORY MAP ⚡
                                             val maxKey = rawInvestMap.keys.mapNotNull { it.toIntOrNull() }.maxOrNull() ?: 0
                                             val newKey = String.format(Locale.US, "%03d", maxKey + 1)
                                             
+                                            val initialHistoryMap = mapOf("001" to newHistoryEntry)
+
                                             val newInvestment = mapOf(
                                                 "name" to selectedSymbol, 
                                                 "type" to assetType,
                                                 "qnt" to qty,
                                                 "avg" to price,
-                                                "amnt" to (qty * price)
+                                                "amnt" to (qty * price),
+                                                "history" to initialHistoryMap
                                             )
                                             
                                             userRef.update("invest.$newKey", newInvestment).await()
