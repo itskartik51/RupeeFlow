@@ -25,7 +25,7 @@ import androidx.compose.ui.unit.sp
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FirebaseFirestore
 import com.kartikey.rupeeflow.Cloud_Database.Constants
-import com.kartikey.rupeeflow.UI_Screens.CustomDatePicker[cite: 1]
+import com.kartikey.rupeeflow.UI_Screens.CustomDatePicker
 import com.kartikey.rupeeflow.UI_Screens.bounceClick
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -431,7 +431,7 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                         onDateSelected = { selectedDateMillis = it },
                         modifier = Modifier.weight(0.6f),
                         restrictToCurrentMonth = false
-                    )[cite: 1]
+                    )
                     OutlinedTextField(
                         value = brokerage,
                         onValueChange = { brokerage = it },
