@@ -25,7 +25,7 @@ import androidx.compose.ui.unit.sp
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FirebaseFirestore
 import com.kartikey.rupeeflow.Cloud_Database.Constants
-import com.kartikey.rupeeflow.UI_Screens.CustomDatePicker //[cite: 1]
+import com.kartikey.rupeeflow.UI_Screens.CustomDatePicker[cite: 1]
 import com.kartikey.rupeeflow.UI_Screens.bounceClick
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -53,7 +53,6 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
     var quantity by remember { mutableStateOf("") }
     var buyPrice by remember { mutableStateOf("") }
     
-    // ⚡ New states for Date and Brokerage ⚡
     var selectedDateMillis by remember { mutableStateOf<Long?>(System.currentTimeMillis()) }
     var brokerage by remember { mutableStateOf("") }
     
@@ -201,7 +200,14 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
     ) {
         Column(modifier = Modifier.padding(20.dp).verticalScroll(rememberScrollState())) {
             
-            Text(text = "Choose Investment Type", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            Text(
+                text = "Choose Investment Type", 
+                color = MaterialTheme.colorScheme.onSurfaceVariant, 
+                fontSize = 12.sp, 
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
             Spacer(modifier = Modifier.height(4.dp))
             
             ExposedDropdownMenuBox(
@@ -212,6 +218,8 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                     value = if (assetType.isEmpty()) "Select Asset Type" else assetType,
                     onValueChange = {},
                     readOnly = true,
+                    singleLine = true,
+                    maxLines = 1,
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = typeExpanded) },
                     modifier = Modifier.fillMaxWidth().menuAnchor(),
                     shape = RoundedCornerShape(12.dp),
@@ -229,7 +237,7 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                 ) {
                     listOf("Stock", "Mutual Fund", "ETF", "Bond").forEach { selectionOption ->
                         DropdownMenuItem(
-                            text = { Text(selectionOption, color = MaterialTheme.colorScheme.onSurface) },
+                            text = { Text(selectionOption, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                             onClick = {
                                 assetType = selectionOption
                                 assetName = "" 
@@ -259,9 +267,10 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                         selectedSymbol = "" 
                         sheetTicker = ""
                     },
-                    label = { Text("Search $assetType Name") },
+                    label = { Text("Search $assetType Name", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
+                    maxLines = 1,
                     shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = MaterialTheme.colorScheme.primary, 
@@ -323,14 +332,34 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                                 ) {
                                     Column(modifier = Modifier.weight(0.7f)) {
                                         if (assetType == "Mutual Fund") {
-                                            Text(text = row.fullName.ifEmpty { "Mutual Fund" }, fontWeight = FontWeight.Bold, fontSize = 14.5.sp, color = MaterialTheme.colorScheme.onSurface)
+                                            Text(
+                                                text = row.fullName.ifEmpty { "Mutual Fund" }, 
+                                                fontWeight = FontWeight.Bold, 
+                                                fontSize = 14.5.sp, 
+                                                color = MaterialTheme.colorScheme.onSurface,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
                                         } else {
-                                            Text(text = row.cleanSymbol, fontWeight = FontWeight.Bold, fontSize = 14.5.sp, color = MaterialTheme.colorScheme.onSurface)
+                                            Text(
+                                                text = row.cleanSymbol, 
+                                                fontWeight = FontWeight.Bold, 
+                                                fontSize = 14.5.sp, 
+                                                color = MaterialTheme.colorScheme.onSurface,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
                                             
                                             if (row.fullName.isNotBlank() && !row.fullName.equals(row.cleanSymbol, ignoreCase = true)) {
                                                 Spacer(modifier = Modifier.height(2.dp))
                                                 val cleanBracketName = if (row.fullName.length > 22) "${row.fullName.take(20)}..." else row.fullName
-                                                Text(text = "($cleanBracketName)", fontSize = 11.5.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                                Text(
+                                                    text = "($cleanBracketName)", 
+                                                    fontSize = 11.5.sp, 
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant, 
+                                                    maxLines = 1, 
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
                                             }
                                         }
                                     }
@@ -341,7 +370,9 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                                         fontSize = 13.5.sp,
                                         color = MaterialTheme.colorScheme.primary,
                                         modifier = Modifier.weight(0.3f),
-                                        textAlign = TextAlign.End
+                                        textAlign = TextAlign.End,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                 }
                                 if (index < searchResults.size - 1) {
@@ -369,18 +400,22 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                                 if (it.all { char -> char.isDigit() }) quantity = it 
                             }
                         },
-                        label = { Text(qtyLabel) },
+                        label = { Text(qtyLabel, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                         keyboardOptions = KeyboardOptions(keyboardType = if (isMutualFund) KeyboardType.Decimal else KeyboardType.Number),
-                        modifier = Modifier.weight(1f), singleLine = true,
+                        modifier = Modifier.weight(1f), 
+                        singleLine = true,
+                        maxLines = 1,
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary, unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), focusedTextColor = MaterialTheme.colorScheme.onSurface, unfocusedTextColor = MaterialTheme.colorScheme.onSurface)
                     )
                     OutlinedTextField(
                         value = buyPrice, onValueChange = { buyPrice = it },
-                        label = { Text(priceLabel) },
-                        prefix = { Text("₹ ", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
+                        label = { Text(priceLabel, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        prefix = { Text("₹ ", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, maxLines = 1) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        modifier = Modifier.weight(1f), singleLine = true,
+                        modifier = Modifier.weight(1f), 
+                        singleLine = true,
+                        maxLines = 1,
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary, unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), focusedTextColor = MaterialTheme.colorScheme.onSurface, unfocusedTextColor = MaterialTheme.colorScheme.onSurface)
                     )
@@ -388,23 +423,24 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // --- DATE PICKER & BROKERAGE (SIDE-BY-SIDE) ---
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                // --- DATE PICKER & BROKERAGE (60:40 RATIO WITH STRICT SINGLE LINE) ---
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                     CustomDatePicker(
                         label = "Date",
                         selectedDateMillis = selectedDateMillis,
                         onDateSelected = { selectedDateMillis = it },
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(0.6f),
                         restrictToCurrentMonth = false
-                    )
+                    )[cite: 1]
                     OutlinedTextField(
                         value = brokerage,
                         onValueChange = { brokerage = it },
-                        label = { Text("Brokerage") },
-                        prefix = { Text("₹ ", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
+                        label = { Text("Brokerage", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        prefix = { Text("₹ ", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, maxLines = 1) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(0.4f),
                         singleLine = true,
+                        maxLines = 1,
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = MaterialTheme.colorScheme.primary,
@@ -425,13 +461,15 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                         color = MaterialTheme.colorScheme.primary,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.padding(start = 4.dp)
                     )
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // --- SAVE BUTTON WITH WEIGHTED AVERAGE & HISTORY LOGGING ---
+                // --- SAVE BUTTON ---
                 Button(
                     onClick = {
                         val qty = quantity.toDoubleOrNull() ?: 0.0
@@ -480,7 +518,6 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                                         )
 
                                         if (existingKey != null && existingHolding != null) {
-                                            // ⚡ WEIGHTED AVERAGE PRICE CALCULATION (Option A) ⚡
                                             val oldQty = (existingHolding["qnt"] as? Number)?.toDouble() ?: 0.0
                                             val oldAvg = (existingHolding["avg"] as? Number)?.toDouble() ?: 0.0
 
@@ -488,7 +525,6 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                                             val combinedTotalAmount = (oldQty * oldAvg) + (qty * price)
                                             val newCalculatedAvg = if (combinedQty > 0) combinedTotalAmount / combinedQty else 0.0
 
-                                            // Append to existing history map
                                             val existingHistoryMap = (existingHolding["history"] as? Map<String, Any>)?.toMutableMap() ?: mutableMapOf()
                                             val maxHistoryKey = existingHistoryMap.keys.mapNotNull { it.toIntOrNull() }.maxOrNull() ?: 0
                                             val newHistoryKey = String.format(Locale.US, "%03d", maxHistoryKey + 1)
@@ -505,7 +541,6 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
 
                                             userRef.update("invest.$existingKey", updatedInvestment).await()
                                         } else {
-                                            // ⚡ NEW HOLDING ENTRY WITH HISTORY MAP ⚡
                                             val maxKey = rawInvestMap.keys.mapNotNull { it.toIntOrNull() }.maxOrNull() ?: 0
                                             val newKey = String.format(Locale.US, "%03d", maxKey + 1)
                                             
@@ -558,7 +593,7 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                     shape = RoundedCornerShape(12.dp)
                 ) {
-                    Text("Save Investment", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onPrimary)
+                    Text("Save Investment", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
             Spacer(modifier = Modifier.height(24.dp))
