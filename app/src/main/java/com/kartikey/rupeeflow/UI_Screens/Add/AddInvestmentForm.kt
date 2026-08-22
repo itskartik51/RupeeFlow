@@ -79,7 +79,6 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                     else -> listOf("EQUITY") 
                 }
 
-                // ⚡ FIX 3: Increased limit to 100 & forced India Region (&region=IN) ⚡
                 val searchUrl = "https://query2.finance.yahoo.com/v1/finance/search?q=${assetName.replace(" ", "%20")}&quotesCount=100&region=IN"
                 val searchReq = Request.Builder().url(searchUrl).header("User-Agent", userAgent).get().build()
                 val searchResp = client.newCall(searchReq).execute()
@@ -100,14 +99,11 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                             val qType = quote.optString("quoteType", "")
                             val name = quote.optString("longname", quote.optString("shortname", ""))
                             
-                            // Only Indian Assets
                             if (sym.isNotEmpty() && (sym.endsWith(".NS") || sym.endsWith(".BO"))) {
                                 if (validQuoteTypes.contains(qType)) {
                                     
-                                    // ⚡ FIX 1: Block BSE Mutual Fund Garbage from appearing in Stocks
                                     if (assetType == "Stock" && sym.startsWith("0P")) continue
                                     
-                                    // ⚡ FIX 2: Block ETFs/Indexes appearing in Stocks completely
                                     if (assetType == "Stock") {
                                         val nameUpper = name.uppercase(Locale.getDefault())
                                         if (nameUpper.contains("ETF") || nameUpper.contains("BEES") || 
@@ -119,13 +115,11 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                                     val baseSym = sym.replace(".NS", "").replace(".BO", "")
                                     val existing = baseSymbolMap[baseSym]
 
-                                    // ⚡ FIX 4: NSE over BSE Priority (Deduplication)
                                     if (existing == null) {
                                         baseSymbolMap[baseSym] = sym
                                         fallbackNames[sym] = name
                                         orderedBaseSymbols.add(baseSym)
                                     } else if (!existing.endsWith(".NS") && sym.endsWith(".NS")) {
-                                        // Overwrite BO with NS if found later
                                         baseSymbolMap[baseSym] = sym
                                         fallbackNames.remove(existing)
                                         fallbackNames[sym] = name
@@ -135,7 +129,6 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                         }
                     }
 
-                    // Map back to ordered final list and take top 15
                     val finalSymbolsToFetch = orderedBaseSymbols.mapNotNull { baseSymbolMap[it] }.take(15)
 
                     if (finalSymbolsToFetch.isNotEmpty()) {
@@ -301,7 +294,6 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                                         .clickable {
                                             val prefix = if (row.rawSymbol.endsWith(".NS")) "NSE:" else if (row.rawSymbol.endsWith(".BO")) "BOM:" else "NSE:"
                                             
-                                            // ⚡ Auto-fill logic based on asset type ⚡
                                             assetName = if (assetType == "Mutual Fund") {
                                                 if (row.fullName.length > 25) row.fullName.take(25) + "..." else row.fullName
                                             } else {
@@ -321,7 +313,6 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Column(modifier = Modifier.weight(0.7f)) {
-                                        // ⚡ UI Clean-up: Hide 0P codes for Mutual Funds ⚡
                                         if (assetType == "Mutual Fund") {
                                             Text(text = row.fullName.ifEmpty { "Mutual Fund" }, fontWeight = FontWeight.Bold, fontSize = 14.5.sp, color = MaterialTheme.colorScheme.onSurface)
                                         } else {
@@ -401,6 +392,7 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
 
                 Spacer(modifier = Modifier.height(24.dp))
 
+                // --- SAVE BUTTON WITH WEIGHTED AVERAGE PRICE ENGINE ---
                 Button(
                     onClick = {
                         val qty = quantity.toDoubleOrNull() ?: 0.0
@@ -419,19 +411,59 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                                         val userDoc = userQuery.documents[0]
                                         val userRef = userDoc.reference
                                         
-                                        val investMap = userDoc.get("invest") as? Map<String, Any> ?: emptyMap()
-                                        val maxKey = investMap.keys.mapNotNull { it.toIntOrNull() }.maxOrNull() ?: 0
-                                        val newKey = String.format(Locale.US, "%03d", maxKey + 1)
+                                        val rawInvestMap = userDoc.get("invest") as? Map<String, Any> ?: emptyMap()
                                         
-                                        val newInvestment = mapOf(
-                                            "name" to selectedSymbol, 
-                                            "type" to assetType,
-                                            "qnt" to qty,
-                                            "avg" to price,
-                                            "amnt" to (qty * price)
-                                        )
-                                        
-                                        userRef.update("invest.$newKey", newInvestment).await()
+                                        // ⚡ Scan for existing holding of the same asset ⚡
+                                        var existingKey: String? = null
+                                        var existingHolding: Map<String, Any>? = null
+
+                                        for ((key, value) in rawInvestMap) {
+                                            val holding = value as? Map<String, Any>
+                                            if (holding != null) {
+                                                val existingName = holding["name"] as? String ?: ""
+                                                val existingType = holding["type"] as? String ?: ""
+                                                if (existingName.equals(selectedSymbol, ignoreCase = true) && 
+                                                    existingType.equals(assetType, ignoreCase = true)) {
+                                                    existingKey = key
+                                                    existingHolding = holding
+                                                    break
+                                                }
+                                            }
+                                        }
+
+                                        if (existingKey != null && existingHolding != null) {
+                                            // ⚡ WEIGHTED AVERAGE PRICE LOGIC ⚡
+                                            val oldQty = (existingHolding["qnt"] as? Number)?.toDouble() ?: 0.0
+                                            val oldAvg = (existingHolding["avg"] as? Number)?.toDouble() ?: 0.0
+
+                                            val combinedQty = oldQty + qty
+                                            val combinedTotalAmount = (oldQty * oldAvg) + (qty * price)
+                                            val newCalculatedAvg = if (combinedQty > 0) combinedTotalAmount / combinedQty else 0.0
+
+                                            val updatedInvestment = mapOf(
+                                                "name" to selectedSymbol,
+                                                "type" to assetType,
+                                                "qnt" to combinedQty,
+                                                "avg" to newCalculatedAvg,
+                                                "amnt" to combinedTotalAmount
+                                            )
+
+                                            userRef.update("invest.$existingKey", updatedInvestment).await()
+                                        } else {
+                                            // ⚡ NEW HOLDING ENTRY ⚡
+                                            val maxKey = rawInvestMap.keys.mapNotNull { it.toIntOrNull() }.maxOrNull() ?: 0
+                                            val newKey = String.format(Locale.US, "%03d", maxKey + 1)
+                                            
+                                            val newInvestment = mapOf(
+                                                "name" to selectedSymbol, 
+                                                "type" to assetType,
+                                                "qnt" to qty,
+                                                "avg" to price,
+                                                "amnt" to (qty * price)
+                                            )
+                                            
+                                            userRef.update("invest.$newKey", newInvestment).await()
+                                        }
                                     }
                                 } catch (e: Exception) {
                                     e.printStackTrace()
