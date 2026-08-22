@@ -35,13 +35,23 @@ import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.formatRupeeAmount
 import com.kartikey.rupeeflow.UI_Screens.CacheManager
 import com.kartikey.rupeeflow.UI_Screens.bounceClick
 
+// --- UPDATED DATA CLASSES ---
+data class InvestmentHistoryItem(
+    val date: String,
+    val quantity: Double,
+    val price: Double,
+    val amount: Double,
+    val brokerage: Double
+)
+
 data class InvestmentItem(
     val assetName: String,
     val assetType: String, 
     val quantity: Double,
     val avgBuyPrice: Double,
     val currentPrice: Double,
-    val oneDayChangePrice: Double
+    val oneDayChangePrice: Double,
+    val history: List<InvestmentHistoryItem> = emptyList() // Added History parameter safely
 )
 
 data class BankAccountItem(
