@@ -224,22 +224,3 @@ fun formatRupee(amount: Double): String {
     format.maximumFractionDigits = 2
     return format.format(amount).replace("-₹", "-₹ ") 
 }
-
-// --- DATA CLASSES FOR CACHEMANAGER ---
-data class InvestmentHistoryItem(
-    val date: String,
-    val quantity: Double,
-    val price: Double,
-    val amount: Double,
-    val brokerage: Double
-)
-
-data class InvestmentItem(
-    val assetName: String,
-    val assetType: String,
-    val quantity: Double,
-    val avgBuyPrice: Double,
-    val currentPrice: Double,
-    val oneDayChangePrice: Double,
-    val history: List<InvestmentHistoryItem> = emptyList() // Default emptyList ensures UI does not crash
-)
