@@ -9,6 +9,7 @@ import com.google.firebase.firestore.SetOptions
 import com.kartikey.rupeeflow.Cloud_Database.Constants
 import com.kartikey.rupeeflow.UI_Screens.Add.TransactionModel
 import com.kartikey.rupeeflow.UI_Screens.Assets.InvestmentItem
+import com.kartikey.rupeeflow.UI_Screens.Assets.InvestmentHistoryItem
 import com.kartikey.rupeeflow.UI_Screens.Assets.BankAccountItem
 import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.CashItem
 import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.CreditCardItem
@@ -245,6 +246,19 @@ object CacheManager {
                         put("buy_price", inv.avgBuyPrice)
                         put("current_price", inv.currentPrice)
                         put("one_day_change", inv.oneDayChangePrice)
+                        
+                        // ⚡ Sync History Array to Local Cache ⚡
+                        val histArray = JSONArray()
+                        inv.history.forEach { h ->
+                            histArray.put(JSONObject().apply {
+                                put("date", h.date)
+                                put("quantity", h.quantity)
+                                put("price", h.price)
+                                put("amount", h.amount)
+                                put("brokerage", h.brokerage)
+                            })
+                        }
+                        put("history", histArray)
                     })
                 }
                 put("investments", invArray)
@@ -264,7 +278,6 @@ object CacheManager {
                 }
                 put("contri_rooms", contriArray)
 
-                // Save Net Worth History map into master JSON
                 val ntworthObj = JSONObject()
                 data.networthHistory.forEach { (mKey, slotList) ->
                     val arr = JSONArray()
@@ -282,7 +295,6 @@ object CacheManager {
         }
     }
 
-    // ⚡ READ HELPER: Get Sorted Net Worth Timeline for UI / Graphs ⚡
     fun getTimelineNetworth(context: Context, username: String): List<NetworthDataPoint> {
         val appData = getCachedData(context, username) ?: return emptyList()
         val timelineList = mutableListOf<NetworthDataPoint>()
@@ -290,7 +302,7 @@ object CacheManager {
         val monthNameFormat = SimpleDateFormat("MMM", Locale.getDefault())
         val parseFormat = SimpleDateFormat("yy-MM", Locale.getDefault())
 
-        val sortedMonths = appData.networthHistory.keys.sorted() // Chronological order
+        val sortedMonths = appData.networthHistory.keys.sorted() 
         for (mKey in sortedMonths) {
             val slots = appData.networthHistory[mKey] ?: continue
             val monthDate = try { parseFormat.parse(mKey) } catch (e: Exception) { null }
@@ -310,7 +322,6 @@ object CacheManager {
         return timelineList
     }
 
-    // ⚡ WRITE & SYNC: Live slot update for 10-day period with 6-month retention ⚡
     fun syncNetworthSlot(context: Context, username: String, currentNetworth: Double) {
         if (currentNetworth <= 0.0) return
         val cached = getCachedData(context, username) ?: return
@@ -335,7 +346,6 @@ object CacheManager {
         existingSlots[slotIndex] = currentNetworth
         historyMap[monthKey] = existingSlots
 
-        // Enforce 6-Month Rolling Window (Auto-prune oldest if months > 6)
         if (historyMap.size > 6) {
             val sortedKeys = historyMap.keys.sorted()
             val keysToRemove = sortedKeys.take(historyMap.size - 6)
@@ -345,7 +355,6 @@ object CacheManager {
         val updatedData = cached.copy(networthHistory = historyMap)
         updateOptimisticCache(context, username, updatedData)
 
-        // Silent Firestore Sync
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val db = FirebaseFirestore.getInstance()
@@ -724,6 +733,32 @@ object CacheManager {
                         val currentPrice = liveData?.first ?: buyPrice
                         val oneDayChange = liveData?.second ?: 0.0
                         
+                        // ⚡ Parse History Sub-Collection from Firestore ⚡
+                        val parsedHistoryList = mutableListOf<InvestmentHistoryItem>()
+                        val historyMapRaw = itemData["history"] as? Map<String, Any>
+                        if (historyMapRaw != null) {
+                            for ((_, hVal) in historyMapRaw) {
+                                val hData = hVal as? Map<String, Any>
+                                if (hData != null) {
+                                    val rawDt = hData["dt"]
+                                    val dtStr = when (rawDt) {
+                                        is Timestamp -> SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(rawDt.toDate())
+                                        is String -> rawDt
+                                        else -> ""
+                                    }
+                                    parsedHistoryList.add(
+                                        InvestmentHistoryItem(
+                                            date = dtStr,
+                                            quantity = (hData["qnt"] as? Number)?.toDouble() ?: 0.0,
+                                            price = (hData["prc"] as? Number)?.toDouble() ?: 0.0,
+                                            amount = (hData["amnt"] as? Number)?.toDouble() ?: 0.0,
+                                            brokerage = (hData["brkrg"] as? Number)?.toDouble() ?: 0.0
+                                        )
+                                    )
+                                }
+                            }
+                        }
+                        
                         val invObj = JSONObject().apply {
                             put("asset_name", dbName) 
                             put("asset_type", itemData["type"]?.toString() ?: "Stock")
@@ -731,6 +766,18 @@ object CacheManager {
                             put("buy_price", buyPrice)
                             put("current_price", currentPrice)
                             put("one_day_change", oneDayChange)
+                            
+                            val hArray = JSONArray()
+                            parsedHistoryList.forEach { h ->
+                                hArray.put(JSONObject().apply {
+                                    put("date", h.date)
+                                    put("quantity", h.quantity)
+                                    put("price", h.price)
+                                    put("amount", h.amount)
+                                    put("brokerage", h.brokerage)
+                                })
+                            }
+                            put("history", hArray)
                         }
                         invArray.put(invObj)
                     }
@@ -753,7 +800,6 @@ object CacheManager {
                     }
                 }
 
-                // Parse Net Worth map from Firestore User Document
                 val ntworthObj = JSONObject()
                 val rawNtworth = userDoc.get("ntworth") as? Map<*, *> ?: emptyMap<Any, Any>()
                 rawNtworth.forEach { (k, v) ->
@@ -863,6 +909,25 @@ object CacheManager {
         if (invArray != null) {
             for (i in 0 until invArray.length()) { 
                 val item = invArray.getJSONObject(i)
+                
+                // ⚡ Read History Array from Local JSON ⚡
+                val histArray = item.optJSONArray("history")
+                val parsedHistory = mutableListOf<InvestmentHistoryItem>()
+                if (histArray != null) {
+                    for (j in 0 until histArray.length()) {
+                        val hItem = histArray.getJSONObject(j)
+                        parsedHistory.add(
+                            InvestmentHistoryItem(
+                                date = hItem.optString("date", ""),
+                                quantity = hItem.optDouble("quantity", 0.0),
+                                price = hItem.optDouble("price", 0.0),
+                                amount = hItem.optDouble("amount", 0.0),
+                                brokerage = hItem.optDouble("brokerage", 0.0)
+                            )
+                        )
+                    }
+                }
+
                 fetchedInvList.add(
                     InvestmentItem(
                         assetName = item.optString("asset_name", ""),
@@ -870,7 +935,8 @@ object CacheManager {
                         quantity = item.optDouble("quantity", 0.0), 
                         avgBuyPrice = item.optDouble("buy_price", 0.0),
                         currentPrice = item.optDouble("current_price", item.optDouble("buy_price", 0.0)),
-                        oneDayChangePrice = item.optDouble("one_day_change", 0.0)
+                        oneDayChangePrice = item.optDouble("one_day_change", 0.0),
+                        history = parsedHistory // Seamlessly passed to Data Class
                     )
                 ) 
             }
@@ -975,7 +1041,6 @@ object CacheManager {
 
         val fetchedBudgetLimit = jsonResponse.optDouble("budget_limit", 0.0)
         
-        // Read historical Net Worth map from JSON
         val ntworthMap = mutableMapOf<String, List<Double>>()
         val ntworthObj = jsonResponse.optJSONObject("ntworth")
         if (ntworthObj != null) {
