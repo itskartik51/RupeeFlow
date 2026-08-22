@@ -53,26 +53,53 @@ data class UpdateInfo(
     val apkUrl: String
 )
 
-suspend fun checkIsUpdateAvailable(context: Context): Boolean = withContext(Dispatchers.IO) {
-    // ==========================================
-    // 🚀 NEW: AUTO-CLEANUP ENGINE (Runs on Boot)
-    // ==========================================
+/**
+ * Auto-Cleanup Engine: Deletes previously downloaded APK file once the user updates to that version or higher.
+ */
+fun cleanOldUpdateApks(context: Context) {
     try {
         val sharedPrefs = context.getSharedPreferences("RupeeFlow_Updates", Context.MODE_PRIVATE)
-        val oldDownloadId = sharedPrefs.getLong("last_update_download_id", -1L)
-        if (oldDownloadId != -1L) {
-            val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-            dm.remove(oldDownloadId) // Magic line: deletes APK file + clears download history
-            sharedPrefs.edit().remove("last_update_download_id").apply()
+        val savedPath = sharedPrefs.getString("last_downloaded_apk_path", null)
+        val downloadedVersionCode = sharedPrefs.getInt("last_downloaded_version_code", -1)
+        val downloadId = sharedPrefs.getLong("last_update_download_id", -1L)
+
+        val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
+        val currentVersionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            packageInfo.longVersionCode.toInt()
+        } else {
+            packageInfo.versionCode
+        }
+
+        if (downloadedVersionCode != -1 && currentVersionCode >= downloadedVersionCode) {
+            // Delete the physical APK file from private storage
+            if (savedPath != null) {
+                val file = File(savedPath)
+                if (file.exists()) {
+                    file.delete()
+                }
+            }
+            // Remove download record and notification entry from DownloadManager
+            if (downloadId != -1L) {
+                val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as? DownloadManager
+                dm?.remove(downloadId)
+            }
+            sharedPrefs.edit().clear().apply()
         }
     } catch (e: Exception) {
         e.printStackTrace()
     }
+}
 
-    // Checking for updates...
+suspend fun checkIsUpdateAvailable(context: Context): Boolean = withContext(Dispatchers.IO) {
+    cleanOldUpdateApks(context)
+
     try {
         val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
-        val currentVersionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) packageInfo.longVersionCode.toInt() else packageInfo.versionCode
+        val currentVersionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            packageInfo.longVersionCode.toInt()
+        } else {
+            packageInfo.versionCode
+        }
         
         val request = Request.Builder()
             .url("https://raw.githubusercontent.com/itskartik51/RupeeFlow/main/Updates/version.json")
@@ -135,7 +162,7 @@ fun AppUpdateRow(isUpdateAvailableBadge: Boolean) {
 
             withContext(Dispatchers.IO) {
                 try {
-                    delay(600) // UX Delay
+                    delay(600)
                     
                     val request = Request.Builder()
                         .url("https://raw.githubusercontent.com/itskartik51/RupeeFlow/main/Updates/version.json")
@@ -269,15 +296,17 @@ fun AppUpdateRow(isUpdateAvailableBadge: Boolean) {
                                             checkState = "DOWNLOADING"
                                             val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
                                             val uri = Uri.parse(updateInfo?.apkUrl)
+                                            val fileName = "RupeeFlow_Update_${updateInfo?.versionCode}.apk"
+                                            
+                                            // Downloads directly to App-Controlled Private Storage
                                             val request = DownloadManager.Request(uri)
                                                 .setTitle("RupeeFlow Update")
                                                 .setDescription("Downloading latest version...")
-                                                .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "RupeeFlow_Update_${updateInfo?.versionCode}.apk")
+                                                .setDestinationInExternalFilesDir(context, Environment.DIRECTORY_DOWNLOADS, fileName)
                                                 .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
                                             
                                             val downloadId = downloadManager.enqueue(request)
                                             
-                                            // 🚀 NEW: Save ID to trigger Auto-Cleanup on next App Boot
                                             context.getSharedPreferences("RupeeFlow_Updates", Context.MODE_PRIVATE)
                                                 .edit()
                                                 .putLong("last_update_download_id", downloadId)
@@ -293,9 +322,16 @@ fun AppUpdateRow(isUpdateAvailableBadge: Boolean) {
                                                         if (status == DownloadManager.STATUS_SUCCESSFUL) {
                                                             isDownloading = false
                                                             val localUriStr = cursor.getString(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_LOCAL_URI))
-                                                            val downloadedFile = File(Uri.parse(localUriStr).path!!)
+                                                            val downloadedFile = File(Uri.parse(localUriStr).path ?: "")
                                                             val finalUri = FileProvider.getUriForFile(context, "${context.packageName}.provider", downloadedFile)
                                                             
+                                                            // Store path and version for boot cleaner
+                                                            context.getSharedPreferences("RupeeFlow_Updates", Context.MODE_PRIVATE)
+                                                                .edit()
+                                                                .putString("last_downloaded_apk_path", downloadedFile.absolutePath)
+                                                                .putInt("last_downloaded_version_code", updateInfo?.versionCode ?: 0)
+                                                                .apply()
+
                                                             withContext(Dispatchers.Main) {
                                                                 downloadedApkUri = finalUri
                                                                 checkState = "READY"
