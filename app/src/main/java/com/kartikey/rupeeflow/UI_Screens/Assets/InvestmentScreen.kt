@@ -6,7 +6,6 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -44,6 +43,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.kartikey.rupeeflow.UI_Screens.CacheManager
 import com.kartikey.rupeeflow.UI_Screens.CustomDatePicker
+import com.kartikey.rupeeflow.UI_Screens.RupeeFlowCard
 import com.kartikey.rupeeflow.UI_Screens.bounceClick
 import kotlinx.coroutines.launch
 import java.text.NumberFormat
@@ -231,14 +231,8 @@ fun InvestmentSummaryCard(
         label = "spinAnim"
     )
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        // Solid opaque border removed from transparent alpha
-        border = BorderStroke(1.dp, Color(0xFF2E2E2E)),
-        elevation = CardDefaults.cardElevation(0.dp),
-        shape = RoundedCornerShape(16.dp)
-    ) {
+    // Yahan ab normal Card ki jagah humara Master Frame (RupeeFlowCard) use hua hai
+    RupeeFlowCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(20.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(), 
@@ -260,7 +254,8 @@ fun InvestmentSummaryCard(
                         modifier = Modifier
                             .size(34.dp)
                             .clip(CircleShape)
-                            .background(Color(0xFF2E2E2E)) // Solid grey instead of transparent
+                            // Hardcoded hat gaya, ab yeh seedha Theme se border wala opaque color uthayega
+                            .background(MaterialTheme.colorScheme.outlineVariant) 
                             .clickable { onToggleVisibility() }
                             .bounceClick(),
                         contentAlignment = Alignment.Center
@@ -278,7 +273,7 @@ fun InvestmentSummaryCard(
                         modifier = Modifier
                             .size(34.dp)
                             .clip(CircleShape)
-                            .background(Color(0xFF2E2E2E))
+                            .background(MaterialTheme.colorScheme.outlineVariant)
                             .clickable { onRefreshClick() }
                             .bounceClick(),
                         contentAlignment = Alignment.Center
@@ -298,7 +293,7 @@ fun InvestmentSummaryCard(
                         modifier = Modifier
                             .size(34.dp)
                             .clip(CircleShape)
-                            .background(Color(0xFF2E2E2E))
+                            .background(MaterialTheme.colorScheme.outlineVariant)
                             .clickable { }
                             .bounceClick(),
                         contentAlignment = Alignment.Center
@@ -759,6 +754,7 @@ fun EditHistoryLotDialog(
     var selectedDateMillis by remember { mutableStateOf(parseDateToMillis(initialLot.date)) }
     var brkgText by remember { mutableStateOf(if (initialLot.brokerage % 1.0 == 0.0) initialLot.brokerage.toInt().toString() else initialLot.brokerage.toString()) }
 
+    // Ab tum yahan Card ki jagah bhi apna RupeeFlowCard laga sakte ho future me, par dialog ke liye abhi simple Card theek hai
     Dialog(onDismissRequest = onDismiss) {
         Card(
             shape = RoundedCornerShape(20.dp),
