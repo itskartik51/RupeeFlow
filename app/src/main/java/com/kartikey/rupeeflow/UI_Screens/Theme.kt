@@ -25,7 +25,7 @@ val BackgroundLight = Color(0xFFF8F9FA)
 val BackgroundDark = Color(0xFF0A0A0A) // True Neutral Dark / Pitch Black
 
 val SurfaceLight = Color.White 
-val SurfaceDark = Color(0xFF1A1A1A) // Pure Neutral Grey for Cards
+val SurfaceDark = Color(0xFF141819) // Custom Deep Slate for Cards & Dialogs
 
 val SurfaceVariantLight = Color(0xFFEEEEEE)
 val SurfaceVariantDark = Color(0xFF262626) // Pure Grey Borders & Dividers
