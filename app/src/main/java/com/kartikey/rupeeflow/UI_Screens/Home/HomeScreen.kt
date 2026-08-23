@@ -31,6 +31,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.google.firebase.firestore.FirebaseFirestore
 import com.kartikey.rupeeflow.R
+import com.kartikey.rupeeflow.UI_Screens.RupeeFlowCard
 import com.kartikey.rupeeflow.UI_Screens.bounceClick 
 import com.kartikey.rupeeflow.UI_Screens.Profile.ProfileAvatar 
 import kotlinx.coroutines.Dispatchers
@@ -189,7 +190,7 @@ fun HomeDashboardDesign(
                 )
             }
             
-            Spacer(modifier = Modifier.height(16.dp)) // 🚀 FIX: Reduced from 24.dp to 16.dp to match upper section distance
+            Spacer(modifier = Modifier.height(16.dp))
             
             SpendingTrackerCard(transactions = transactionList) 
             
@@ -354,10 +355,7 @@ fun ContriDashboardCard(
     contriCount: Int,
     modifier: Modifier = Modifier
 ) {
-    Card(
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+    RupeeFlowCard(
         modifier = modifier
     ) {
         Column(
