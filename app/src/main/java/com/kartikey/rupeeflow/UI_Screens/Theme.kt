@@ -36,7 +36,7 @@ val TextPrimaryDark = Color(0xFFF5F5F5)
 val TextSecondaryLight = Color.Gray
 val TextSecondaryDark = Color(0xFFA1A1A1) // Neutral Faded Grey for Subtext
 
-val ErrorRed = Color(0xFFE15A5A) // Groww-style Warm Rust/Vermilion Red
+val ErrorRed = Color(0xFFFC5F3A) // Custom Vibrant Orange-Red
 
 private val DarkColorScheme = darkColorScheme(
     primary = PrimaryGreenDark,
