@@ -6,10 +6,8 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Visibility
@@ -23,6 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.formatRupeeAmount
+import com.kartikey.rupeeflow.UI_Screens.RupeeFlowCard
 import com.kartikey.rupeeflow.UI_Screens.bounceClick
 
 @Composable
@@ -46,14 +45,10 @@ fun NetworthCard(
         label = "spinAngle"
     )
 
-    Card(
+    RupeeFlowCard(
         modifier = Modifier
             .fillMaxWidth()
-            .bounceClick { onClick() },
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(2.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            .bounceClick { onClick() }
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
 
