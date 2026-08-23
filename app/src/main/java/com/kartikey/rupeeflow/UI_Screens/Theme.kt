@@ -22,7 +22,7 @@ val PrimaryContainerLight = Color(0xFFE8F5E9)
 val PrimaryContainerDark = Color(0xFF1B3B22) 
 
 val BackgroundLight = Color(0xFFF8F9FA) 
-val BackgroundDark = Color(0xFF0A0A0A) // True Neutral Dark / Pitch Black (No Blue Tint)
+val BackgroundDark = Color(0xFF0A0A0A) // True Neutral Dark / Pitch Black
 
 val SurfaceLight = Color.White 
 val SurfaceDark = Color(0xFF1A1A1A) // Pure Neutral Grey for Cards
@@ -36,7 +36,7 @@ val TextPrimaryDark = Color(0xFFF5F5F5)
 val TextSecondaryLight = Color.Gray
 val TextSecondaryDark = Color(0xFFA1A1A1) // Neutral Faded Grey for Subtext
 
-val ErrorRed = Color(0xFFEB5757) // Groww-style Crisp Coral Red
+val ErrorRed = Color(0xFFE15A5A) // Groww-style Warm Rust/Vermilion Red
 
 private val DarkColorScheme = darkColorScheme(
     primary = PrimaryGreenDark,
