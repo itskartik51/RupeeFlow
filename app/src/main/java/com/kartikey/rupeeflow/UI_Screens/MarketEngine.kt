@@ -211,14 +211,34 @@ object MarketEngine {
 
                                 if (meta != null) {
                                     val price = meta.optDouble("regularMarketPrice", 0.0)
-                                    val prevClose = if (meta.has("chartPreviousClose")) {
-                                        meta.optDouble("chartPreviousClose", price)
-                                    } else {
-                                        meta.optDouble("previousClose", price)
+
+                                    // Direct 1D change values from Yahoo meta
+                                    val hasDirectChange = meta.has("regularMarketChange")
+                                    val directChange = meta.optDouble("regularMarketChange", 0.0)
+                                    val directChangePercent = meta.optDouble("regularMarketChangePercent", 0.0)
+
+                                    // Accurate previous close hierarchy
+                                    val prevClose = when {
+                                        meta.has("regularMarketPreviousClose") -> meta.optDouble("regularMarketPreviousClose", price)
+                                        meta.has("previousClose") -> meta.optDouble("previousClose", price)
+                                        else -> meta.optDouble("chartPreviousClose", price)
                                     }
 
-                                    val changeRs = if (prevClose > 0.0 && price > 0.0) price - prevClose else 0.0
-                                    val changePct = if (prevClose > 0.0 && price > 0.0) (changeRs / prevClose) * 100.0 else 0.0
+                                    val changeRs = if (hasDirectChange && directChange != 0.0) {
+                                        directChange
+                                    } else if (prevClose > 0.0 && price > 0.0) {
+                                        price - prevClose
+                                    } else {
+                                        0.0
+                                    }
+
+                                    val changePct = if (hasDirectChange && directChangePercent != 0.0) {
+                                        directChangePercent
+                                    } else if (prevClose > 0.0 && price > 0.0) {
+                                        (changeRs / prevClose) * 100.0
+                                    } else {
+                                        0.0
+                                    }
 
                                     val quote = MarketLiveQuote(
                                         symbol = returnedSym,
