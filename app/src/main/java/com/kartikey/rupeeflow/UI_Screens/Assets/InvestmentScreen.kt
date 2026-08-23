@@ -231,7 +231,6 @@ fun InvestmentSummaryCard(
         label = "spinAnim"
     )
 
-    // Yahan ab normal Card ki jagah humara Master Frame (RupeeFlowCard) use hua hai
     RupeeFlowCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(20.dp)) {
             Row(
@@ -254,7 +253,6 @@ fun InvestmentSummaryCard(
                         modifier = Modifier
                             .size(34.dp)
                             .clip(CircleShape)
-                            // Hardcoded hat gaya, ab yeh seedha Theme se border wala opaque color uthayega
                             .background(MaterialTheme.colorScheme.outlineVariant) 
                             .clickable { onToggleVisibility() }
                             .bounceClick(),
@@ -491,20 +489,16 @@ fun InvestmentListItem(
             }
         }
 
-        // Expandable Sub-Banner (Purchase History)
+        // Expandable Sub-Banner (Purchase History) with RupeeFlowCard Master Frame
         AnimatedVisibility(
             visible = expanded,
             enter = expandVertically() + fadeIn(),
             exit = shrinkVertically() + fadeOut()
         ) {
-            Surface(
+            RupeeFlowCard(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 10.dp, bottom = 4.dp),
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.surface,
-                tonalElevation = 0.dp,
-                shadowElevation = 0.dp
+                    .padding(top = 10.dp, bottom = 4.dp)
             ) {
                 Column(
                     modifier = Modifier
@@ -754,7 +748,6 @@ fun EditHistoryLotDialog(
     var selectedDateMillis by remember { mutableStateOf(parseDateToMillis(initialLot.date)) }
     var brkgText by remember { mutableStateOf(if (initialLot.brokerage % 1.0 == 0.0) initialLot.brokerage.toInt().toString() else initialLot.brokerage.toString()) }
 
-    // Ab tum yahan Card ki jagah bhi apna RupeeFlowCard laga sakte ho future me, par dialog ke liye abhi simple Card theek hai
     Dialog(onDismissRequest = onDismiss) {
         Card(
             shape = RoundedCornerShape(20.dp),
