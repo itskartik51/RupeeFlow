@@ -1,6 +1,5 @@
 package com.kartikey.rupeeflow.UI_Screens.Assets
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState 
@@ -33,6 +32,7 @@ import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.CreditCardItem
 import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.FDItem
 import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.formatRupeeAmount
 import com.kartikey.rupeeflow.UI_Screens.CacheManager
+import com.kartikey.rupeeflow.UI_Screens.RupeeFlowCard
 import com.kartikey.rupeeflow.UI_Screens.bounceClick
 
 // --- UPDATED DATA CLASSES ---
@@ -51,7 +51,7 @@ data class InvestmentItem(
     val avgBuyPrice: Double,
     val currentPrice: Double,
     val oneDayChangePrice: Double,
-    val history: List<InvestmentHistoryItem> = emptyList() // Added History parameter safely
+    val history: List<InvestmentHistoryItem> = emptyList()
 )
 
 data class BankAccountItem(
@@ -226,14 +226,10 @@ fun AssetsScreen(
 
 @Composable
 fun InvestmentGridCard(title: String, amount: Double, hasData: Boolean, addText: String, onClick: () -> Unit) {
-    Card(
+    RupeeFlowCard(
         modifier = Modifier
             .fillMaxWidth()
-            .bounceClick { onClick() },
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), 
-        shape = RoundedCornerShape(12.dp), 
-        elevation = CardDefaults.cardElevation(2.dp), 
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            .bounceClick { onClick() }
     ) {
         Column(modifier = Modifier.padding(16.dp).fillMaxWidth(), horizontalAlignment = Alignment.Start) {
             Text(text = title, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -266,14 +262,10 @@ fun FinanceGridCard(
     iconColor: Color, 
     onClick: () -> Unit
 ) {
-    Card(
+    RupeeFlowCard(
         modifier = Modifier
             .fillMaxWidth()
-            .bounceClick { onClick() },
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(12.dp), 
-        elevation = CardDefaults.cardElevation(2.dp), 
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            .bounceClick { onClick() }
     ) {
         Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.Start) {
             Row(verticalAlignment = Alignment.CenterVertically) {
