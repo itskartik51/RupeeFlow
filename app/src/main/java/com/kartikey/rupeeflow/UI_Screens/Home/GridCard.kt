@@ -3,8 +3,6 @@ package com.kartikey.rupeeflow.UI_Screens.Home
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -14,6 +12,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.kartikey.rupeeflow.UI_Screens.RupeeFlowCard
 import com.kartikey.rupeeflow.UI_Screens.bounceClick
 
 @Composable
@@ -24,11 +23,8 @@ fun GridCard(
     modifier: Modifier = Modifier,
     onClick: () -> Unit = {} 
 ) {
-    Card(
-        modifier = modifier.bounceClick { onClick() }, 
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(2.dp),
-        shape = RoundedCornerShape(12.dp)
+    RupeeFlowCard(
+        modifier = modifier.bounceClick { onClick() }
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Text(title, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
