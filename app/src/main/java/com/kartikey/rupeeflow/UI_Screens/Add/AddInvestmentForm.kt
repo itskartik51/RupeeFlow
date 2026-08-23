@@ -24,20 +24,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FirebaseFirestore
-import com.kartikey.rupeeflow.Cloud_Database.Constants
 import com.kartikey.rupeeflow.UI_Screens.CustomDatePicker
+import com.kartikey.rupeeflow.UI_Screens.MarketEngine
+import com.kartikey.rupeeflow.UI_Screens.MarketSearchResult
 import com.kartikey.rupeeflow.UI_Screens.bounceClick
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
-import kotlinx.coroutines.withContext
-import okhttp3.MediaType.Companion.toMediaTypeOrNull
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
-import org.json.JSONObject
 import java.util.Date
 import java.util.Locale
 
@@ -58,12 +53,12 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
     
     var typeExpanded by remember { mutableStateOf(false) }
     
-    var searchResults by remember { mutableStateOf<List<SearchRow>>(emptyList()) }
+    var searchResults by remember { mutableStateOf<List<MarketSearchResult>>(emptyList()) }
     var isSearching by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
 
-    // ⚡ PRO YAHOO SPARK ENGINE WITH 4 SMART FILTERS ⚡
+    // ⚡ CLEAN SEARCH & PRICING POWERED BY STANDALONE MARKET ENGINE ⚡
     LaunchedEffect(assetName, assetType) {
         if (assetName.isBlank() || selectedSymbol.isNotEmpty() || assetType.isEmpty()) {
             searchResults = emptyList()
@@ -73,123 +68,9 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
         delay(500) 
         isSearching = true
         
-        withContext(Dispatchers.IO) {
-            try {
-                val client = OkHttpClient()
-                val userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
-                
-                val validQuoteTypes = when (assetType) {
-                    "Mutual Fund" -> listOf("MUTUALFUND")
-                    "ETF" -> listOf("ETF")
-                    "Bond" -> listOf("EQUITY", "ETF")
-                    else -> listOf("EQUITY") 
-                }
-
-                val searchUrl = "https://query2.finance.yahoo.com/v1/finance/search?q=${assetName.replace(" ", "%20")}&quotesCount=100&region=IN"
-                val searchReq = Request.Builder().url(searchUrl).header("User-Agent", userAgent).get().build()
-                val searchResp = client.newCall(searchReq).execute()
-                val searchData = searchResp.body?.string() ?: ""
-
-                if (searchResp.isSuccessful && searchData.isNotEmpty()) {
-                    val jsonResponse = JSONObject(searchData)
-                    val quotes = jsonResponse.optJSONArray("quotes")
-                    
-                    val baseSymbolMap = mutableMapOf<String, String>() 
-                    val fallbackNames = mutableMapOf<String, String>()
-                    val orderedBaseSymbols = mutableListOf<String>() 
-
-                    if (quotes != null) {
-                        for (i in 0 until quotes.length()) {
-                            val quote = quotes.getJSONObject(i)
-                            val sym = quote.optString("symbol", "")
-                            val qType = quote.optString("quoteType", "")
-                            val name = quote.optString("longname", quote.optString("shortname", ""))
-                            
-                            if (sym.isNotEmpty() && (sym.endsWith(".NS") || sym.endsWith(".BO"))) {
-                                if (validQuoteTypes.contains(qType)) {
-                                    
-                                    if (assetType == "Stock" && sym.startsWith("0P")) continue
-                                    
-                                    if (assetType == "Stock") {
-                                        val nameUpper = name.uppercase(Locale.getDefault())
-                                        if (nameUpper.contains("ETF") || nameUpper.contains("BEES") || 
-                                            nameUpper.contains("INDEX") || nameUpper.contains("LIQUID")) {
-                                            continue
-                                        }
-                                    }
-
-                                    val baseSym = sym.replace(".NS", "").replace(".BO", "")
-                                    val existing = baseSymbolMap[baseSym]
-
-                                    if (existing == null) {
-                                        baseSymbolMap[baseSym] = sym
-                                        fallbackNames[sym] = name
-                                        orderedBaseSymbols.add(baseSym)
-                                    } else if (!existing.endsWith(".NS") && sym.endsWith(".NS")) {
-                                        baseSymbolMap[baseSym] = sym
-                                        fallbackNames.remove(existing)
-                                        fallbackNames[sym] = name
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    val finalSymbolsToFetch = orderedBaseSymbols.mapNotNull { baseSymbolMap[it] }.take(15)
-
-                    if (finalSymbolsToFetch.isNotEmpty()) {
-                        val symbolsParam = finalSymbolsToFetch.joinToString(",")
-                        val sparkUrl = "https://query1.finance.yahoo.com/v7/finance/spark?symbols=$symbolsParam"
-                        val sparkReq = Request.Builder().url(sparkUrl).header("User-Agent", userAgent).get().build()
-                        val sparkResp = client.newCall(sparkReq).execute()
-                        val sparkData = sparkResp.body?.string() ?: ""
-                        
-                        val priceMap = mutableMapOf<String, Double>()
-                        
-                        if (sparkResp.isSuccessful && sparkData.isNotEmpty()) {
-                            val sparkJson = JSONObject(sparkData)
-                            val resultArr = sparkJson.optJSONObject("spark")?.optJSONArray("result")
-                            
-                            if (resultArr != null) {
-                                for (i in 0 until resultArr.length()) {
-                                    val item = resultArr.getJSONObject(i)
-                                    val sym = item.optString("symbol", "")
-                                    val meta = item.optJSONArray("response")?.optJSONObject(0)?.optJSONObject("meta")
-                                    val price = meta?.optDouble("regularMarketPrice", 0.0) ?: 0.0
-                                    priceMap[sym] = price
-                                }
-                            }
-                        }
-
-                        val parsedList = mutableListOf<SearchRow>()
-                        for (sym in finalSymbolsToFetch) {
-                            val price = priceMap[sym] ?: 0.0
-                            val name = fallbackNames[sym] ?: ""
-                            val cleanSym = sym.replace(".NS", "").replace(".BO", "")
-                            
-                            parsedList.add(SearchRow(cleanSymbol = cleanSym, rawSymbol = sym, fullName = name, livePrice = price))
-                        }
-
-                        withContext(Dispatchers.Main) {
-                            searchResults = parsedList
-                            isSearching = false
-                        }
-                    } else {
-                        withContext(Dispatchers.Main) { 
-                            searchResults = emptyList()
-                            isSearching = false 
-                        }
-                    }
-                } else {
-                    withContext(Dispatchers.Main) { isSearching = false }
-                }
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) { 
-                    searchResults = emptyList()
-                    isSearching = false 
-                }
-            }
-        }
+        val results = MarketEngine.searchAssets(query = assetName, assetType = assetType)
+        searchResults = results
+        isSearching = false
     }
 
     Card(
@@ -562,25 +443,7 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
                                     e.printStackTrace()
                                 }
 
-                                try {
-                                    val client = OkHttpClient()
-                                    val jsonPayload = JSONObject().apply {
-                                        put("action", "addTicker")
-                                        put("ticker", sheetTicker) 
-                                        put("name", assetName)
-                                        put("type", assetType)
-                                    }.toString()
-                                    
-                                    val requestBody = jsonPayload.toRequestBody("application/json; charset=utf-8".toMediaTypeOrNull())
-                                    val request = Request.Builder()
-                                        .url(Constants.GOOGLE_SHEET_API_URL)
-                                        .post(requestBody)
-                                        .build()
-                                        
-                                    client.newCall(request).execute()
-                                } catch (e: Exception) {
-                                    e.printStackTrace()
-                                }
+                                MarketEngine.registerTickerInSheet(sheetTicker, assetName, assetType)
                             }
                         } else {
                             Toast.makeText(context, "Please select an Asset and enter valid Details", Toast.LENGTH_LONG).show()
@@ -600,10 +463,3 @@ fun AddInvestmentForm(username: String, onInvestmentAdded: () -> Unit, onDismiss
         }
     }
 }
-
-data class SearchRow(
-    val cleanSymbol: String,
-    val rawSymbol: String,
-    val fullName: String,
-    val livePrice: Double
-)
