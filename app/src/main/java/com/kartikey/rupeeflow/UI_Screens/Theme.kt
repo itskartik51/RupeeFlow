@@ -16,27 +16,27 @@ import androidx.core.view.WindowCompat
 // STRICT CORE COLORS
 // ==========================================
 val PrimaryGreenLight = Color(0xFF2E7D32)
-val PrimaryGreenDark = Color(0xFF1ED760) // Naya Neon/Vibrant Green shade for Dark Mode
+val PrimaryGreenDark = Color(0xFF22C55E) // Crisp Emerald/Neon Green
 
 val PrimaryContainerLight = Color(0xFFE8F5E9)
 val PrimaryContainerDark = Color(0xFF1B3B22) 
 
 val BackgroundLight = Color(0xFFF8F9FA) 
-val BackgroundDark = Color(0xFF121212)
+val BackgroundDark = Color(0xFF0E1116) // Deep Pitch Slate Black
 
 val SurfaceLight = Color.White 
-val SurfaceDark = Color(0xFF1E1E1E)
+val SurfaceDark = Color(0xFF181B22) // Cool Obsidian Charcoal Surface
 
 val SurfaceVariantLight = Color(0xFFEEEEEE)
-val SurfaceVariantDark = Color(0xFF2C2C2C)
+val SurfaceVariantDark = Color(0xFF252932) // Cool Slate Borders & Dividers
 
 val TextPrimaryLight = Color.Black
 val TextPrimaryDark = Color(0xFFF5F5F5)
 
 val TextSecondaryLight = Color.Gray
-val TextSecondaryDark = Color(0xFFAAAAAA)
+val TextSecondaryDark = Color(0xFF8B949E) // Refined Slate Grey Muted Text
 
-val ErrorRed = Color(0xFFD32F2F)
+val ErrorRed = Color(0xFFEB5757) // Groww-style Crisp Coral Red
 
 private val DarkColorScheme = darkColorScheme(
     primary = PrimaryGreenDark,
