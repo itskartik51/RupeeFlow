@@ -48,7 +48,6 @@ import com.kartikey.rupeeflow.UI_Screens.bounceClick
 import kotlinx.coroutines.launch
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
-import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import kotlin.math.roundToInt
@@ -235,7 +234,8 @@ fun InvestmentSummaryCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)),
+        // Solid opaque border removed from transparent alpha
+        border = BorderStroke(1.dp, Color(0xFF2E2E2E)),
         elevation = CardDefaults.cardElevation(0.dp),
         shape = RoundedCornerShape(16.dp)
     ) {
@@ -260,7 +260,7 @@ fun InvestmentSummaryCard(
                         modifier = Modifier
                             .size(34.dp)
                             .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                            .background(Color(0xFF2E2E2E)) // Solid grey instead of transparent
                             .clickable { onToggleVisibility() }
                             .bounceClick(),
                         contentAlignment = Alignment.Center
@@ -278,7 +278,7 @@ fun InvestmentSummaryCard(
                         modifier = Modifier
                             .size(34.dp)
                             .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                            .background(Color(0xFF2E2E2E))
                             .clickable { onRefreshClick() }
                             .bounceClick(),
                         contentAlignment = Alignment.Center
@@ -298,7 +298,7 @@ fun InvestmentSummaryCard(
                         modifier = Modifier
                             .size(34.dp)
                             .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                            .background(Color(0xFF2E2E2E))
                             .clickable { }
                             .bounceClick(),
                         contentAlignment = Alignment.Center
