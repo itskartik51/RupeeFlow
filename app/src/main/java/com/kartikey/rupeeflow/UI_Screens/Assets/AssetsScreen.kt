@@ -22,7 +22,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.BankAccountsScreen
-import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.FinanceScreen
 import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.CashScreen
 import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.CreditCardsScreen
 import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.FixedDepositsScreen
@@ -163,13 +162,8 @@ fun AssetsScreen(
             
             Spacer(modifier = Modifier.height(24.dp))
             
-            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text(text = "My Finance", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.onBackground)
-                TextButton(onClick = { onViewChange("FinanceDetails") }, modifier = Modifier.bounceClick()) { 
-                    Text("More", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold) 
-                }
-            }
-            Spacer(modifier = Modifier.height(8.dp))
+            Text(text = "My Finance", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.onBackground, modifier = Modifier.padding(horizontal = 4.dp))
+            Spacer(modifier = Modifier.height(12.dp))
             
             val hasCash = cashData.amount > 0.0
             val hasBank = bankList.isNotEmpty()
@@ -203,20 +197,6 @@ fun AssetsScreen(
         }
     } else if (currentView == "InvestmentDetails") {
         InvestmentScreen(onBackClick = { onViewChange("Main") }, username = username, investmentList = investmentList, isLoading = isLoading, onRefreshClick = onRefreshClick)
-    } else if (currentView == "FinanceDetails") {
-        FinanceScreen(
-            onBackClick = { onViewChange("Main") },
-            username = username,
-            bankList = bankList,
-            ccList = ccList,
-            fdList = fdList,
-            cashData = cashData,
-            isLoading = isLoading,
-            onRefreshClick = onRefreshClick,
-            onEditBankClick = onEditBankClick,
-            onEditCCClick = onEditCCClick,
-            onEditFDClick = onEditFDClick
-        )
     } else if (currentView == "DirectBankAccounts") {
         BankAccountsScreen(onBackClick = { onViewChange("Main") }, username = username, bankList = bankList, isLoading = isLoading, onRefreshClick = onRefreshClick, onEditBankClick = onEditBankClick)
     } else if (currentView == "DirectCreditCards") {
