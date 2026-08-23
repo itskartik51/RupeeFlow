@@ -8,7 +8,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountBalance
 import androidx.compose.material.icons.outlined.CreditCard
-import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.Money
 import androidx.compose.material.icons.outlined.Savings
 import androidx.compose.material3.*
@@ -177,22 +176,27 @@ fun AssetsScreen(
             val hasCC = ccList.isNotEmpty()
             val hasFD = fdList.isNotEmpty()
 
+            val cashTitle = "CASH"
+            val bankTitle = if (hasBank) "BANK BALANCE (${bankList.size})" else "BANK BALANCE"
+            val ccTitle = if (hasCC) "CREDIT CARD (${ccList.size})" else "CREDIT CARD"
+            val fdTitle = if (hasFD) "FD (${fdList.size})" else "FD : FIXED DEPOSIT"
+
             Column(modifier = Modifier.fillMaxWidth()) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Box(modifier = Modifier.weight(1f)) { 
-                        FinanceGridCard("Cash", totalCash, hasCash, "+ Add Cash", null, Icons.Outlined.Money, Color(0xFF388E3C)) { onViewChange("DirectCash") } 
+                        FinanceGridCard(cashTitle, totalCash, hasCash, "+ Add Cash", Icons.Outlined.Money, Color(0xFF388E3C)) { onViewChange("DirectCash") } 
                     }
                     Box(modifier = Modifier.weight(1f)) { 
-                        FinanceGridCard("Bank Balance", totalBank, hasBank, "+ Add Bank", if (hasBank) "${bankList.size}" else null, Icons.Outlined.AccountBalance, Color(0xFF1976D2)) { onViewChange("DirectBankAccounts") } 
+                        FinanceGridCard(bankTitle, totalBank, hasBank, "+ Add Bank", Icons.Outlined.AccountBalance, Color(0xFF1976D2)) { onViewChange("DirectBankAccounts") } 
                     }
                 }
                 Spacer(modifier = Modifier.height(12.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Box(modifier = Modifier.weight(1f)) { 
-                        FinanceGridCard("Credit Card", totalCC, hasCC, "+ Add Card", if (hasCC) "${ccList.size}" else null, Icons.Outlined.CreditCard, Color(0xFFD32F2F)) { onViewChange("DirectCreditCards") } 
+                        FinanceGridCard(ccTitle, totalCC, hasCC, "+ Add Card", Icons.Outlined.CreditCard, Color(0xFFD32F2F)) { onViewChange("DirectCreditCards") } 
                     }
                     Box(modifier = Modifier.weight(1f)) { 
-                        FinanceGridCard("FD : Fixed Deposit", totalFD, hasFD, "+ Add FD", if (hasFD) "${fdList.size}" else null, Icons.Outlined.Savings, Color(0xFFF57C00)) { onViewChange("DirectFDs") } 
+                        FinanceGridCard(fdTitle, totalFD, hasFD, "+ Add FD", Icons.Outlined.Savings, Color(0xFFF57C00)) { onViewChange("DirectFDs") } 
                     }
                 }
             }
@@ -257,7 +261,6 @@ fun FinanceGridCard(
     amount: Double, 
     hasData: Boolean, 
     addText: String, 
-    linkCount: String?, 
     icon: ImageVector, 
     iconColor: Color, 
     onClick: () -> Unit
@@ -276,28 +279,14 @@ fun FinanceGridCard(
             Spacer(modifier = Modifier.height(8.dp))
             
             if (hasData) {
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        text = formatRupeeAmount(amount), 
-                        color = MaterialTheme.colorScheme.onSurface, 
-                        fontSize = 19.sp, 
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false) 
-                    )
-                    if (linkCount != null) {
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Row(
-                            modifier = Modifier.background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(4.dp)).padding(horizontal = 4.dp, vertical = 2.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(Icons.Outlined.Link, contentDescription = "Link", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(10.dp))
-                            Spacer(modifier = Modifier.width(2.dp))
-                            Text(linkCount, color = MaterialTheme.colorScheme.primary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
+                Text(
+                    text = formatRupeeAmount(amount), 
+                    color = MaterialTheme.colorScheme.onSurface, 
+                    fontSize = 19.sp, 
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             } else {
                 Text(text = addText, color = iconColor, fontSize = 14.sp, fontWeight = FontWeight.Bold)
             }
