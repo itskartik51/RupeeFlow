@@ -411,7 +411,11 @@ fun InvestmentListItem(
                 
                 Column(modifier = Modifier.weight(1.3f), horizontalAlignment = Alignment.End) {
                     Text(formatRupee(item.currentPrice), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)
-                    Text("$oneDaySign${item.oneDayChangePrice} ($oneDaySign${String.format(Locale.US, "%.2f", oneDPct)}%)", fontSize = 11.sp, color = oneDayColor)
+                    Text(
+                        text = "$oneDaySign${String.format(Locale.US, "%.2f", item.oneDayChangePrice)} ($oneDaySign${String.format(Locale.US, "%.2f", oneDPct)}%)",
+                        fontSize = 11.sp, 
+                        color = oneDayColor
+                    )
                 }
                 
                 Column(modifier = Modifier.weight(1.2f), horizontalAlignment = Alignment.End) {
