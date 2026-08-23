@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.kartikey.rupeeflow.UI_Screens.Add.TransactionModel
+import com.kartikey.rupeeflow.UI_Screens.RupeeFlowCard
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -164,7 +165,6 @@ fun SpendingTrackerCard(
         pageCount = { maxAvailableWeeks }
     )
     
-    // Counter strictly triggers vertical grow animation on button clicks and initial load
     var triggerVerticalAnim by remember { mutableIntStateOf(0) }
     
     LaunchedEffect(maxAvailableWeeks) {
@@ -187,10 +187,7 @@ fun SpendingTrackerCard(
     var isScrubbing by remember { mutableStateOf(false) }
     var rowWidthPx by remember { mutableFloatStateOf(1f) }
 
-    Card(
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+    RupeeFlowCard(
         modifier = modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -312,10 +309,8 @@ fun SpendingTrackerCard(
                     val pageOffset = pageIndex - (maxAvailableWeeks - 1)
                     val pageData = remember(transactions, pageOffset) { getWeekData(transactions, pageOffset) }
                     
-                    // Starts at 1f so swiped pages remain fully visible with zero animation during swipe
                     val barGrowth = remember(pageIndex) { Animatable(1f) }
                     
-                    // Strictly triggers animation only when triggerVerticalAnim increments on button click / first load
                     LaunchedEffect(triggerVerticalAnim) {
                         if (triggerVerticalAnim > 0 && pagerState.currentPage == pageIndex) {
                             barGrowth.snapTo(0f)
@@ -390,15 +385,14 @@ fun SpendingTrackerCard(
                     }
                 }
 
-                // Master Overlay Layer (Theme-Adaptive Elevated Capsule)
+                // Master Overlay Layer
                 if (isScrubbing && touchedBarIndex in 0..6) {
                     val density = LocalDensity.current
                     val primaryColor = MaterialTheme.colorScheme.primary
                     
-                    // High-contrast theme-adaptive color tokens
                     val pillBg = if (isDark) Color(0xFF262626) else Color(0xFFFFFFFF)
                     val pillBorder = if (isDark) Color(0xFF404040) else Color(0xFFE5E7EB)
-                    val amtTextColor = if (isDark) Color(0xFF4ADE80) else Color(0xFF047857) // Bright Mint in Dark / Deep Emerald in Light
+                    val amtTextColor = if (isDark) Color(0xFF4ADE80) else Color(0xFF047857)
                     val dateTextColor = if (isDark) Color(0xFFE5E7EB) else Color(0xFF4B5563)
                     val lineColor = if (isDark) Color.White.copy(alpha = 0.65f) else Color.Black.copy(alpha = 0.5f)
                     val dotColor = if (isDark) Color.White else Color(0xFF1E293B)
