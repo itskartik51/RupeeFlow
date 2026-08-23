@@ -85,10 +85,14 @@ fun FinanceScreen(
                 val totalFD = fdList.sumOf { it.accruedValue }
                 val totalCC = ccList.sumOf { it.outstanding }
 
+                val bankTitle = if (bankList.isNotEmpty()) "Bank Accounts (${bankList.size})" else "Bank Accounts"
+                val ccTitle = if (ccList.isNotEmpty()) "Credit Card (${ccList.size})" else "Credit Card"
+                val fdTitle = if (fdList.isNotEmpty()) "FD : Fixed Deposit (${fdList.size})" else "FD : Fixed Deposit"
+
                 BigFinanceCard("Cash", formatRupeeAmount(totalCash), Icons.Outlined.Money, Color(0xFF388E3C), isClickable = true) { currentFinanceView = "Cash" }
-                BigFinanceCard("Bank Accounts", formatRupeeAmount(totalBank), Icons.Outlined.AccountBalance, Color(0xFF1976D2), isClickable = true) { currentFinanceView = "BankAccounts" }
-                BigFinanceCard("Credit Card", formatRupeeAmount(totalCC), Icons.Outlined.CreditCard, Color(0xFFD32F2F), isClickable = true) { currentFinanceView = "CreditCards" }
-                BigFinanceCard("FD : Fixed Deposit", formatRupeeAmount(totalFD), Icons.Outlined.Savings, Color(0xFFF57C00), isClickable = true) { currentFinanceView = "FixedDeposits" }
+                BigFinanceCard(bankTitle, formatRupeeAmount(totalBank), Icons.Outlined.AccountBalance, Color(0xFF1976D2), isClickable = true) { currentFinanceView = "BankAccounts" }
+                BigFinanceCard(ccTitle, formatRupeeAmount(totalCC), Icons.Outlined.CreditCard, Color(0xFFD32F2F), isClickable = true) { currentFinanceView = "CreditCards" }
+                BigFinanceCard(fdTitle, formatRupeeAmount(totalFD), Icons.Outlined.Savings, Color(0xFFF57C00), isClickable = true) { currentFinanceView = "FixedDeposits" }
             }
         }
     } else if (currentFinanceView == "BankAccounts") {
