@@ -24,6 +24,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kartikey.rupeeflow.UI_Screens.bounceClick
+import com.kartikey.rupeeflow.UI_Screens.RupeeFlowCard
 import java.text.NumberFormat
 import java.util.Locale
 
@@ -70,13 +71,11 @@ fun ExpenseSummaryCard(
         return format.format(amount)
     }
 
-    Card(
+    // Yahan humne apna Master Frame use kiya hai
+    RupeeFlowCard(
         modifier = Modifier
             .fillMaxWidth()
-            .bounceClick(), 
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(20.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp) 
+            .bounceClick()
     ) {
         Column(
             modifier = Modifier.padding(16.dp) 
@@ -155,7 +154,7 @@ fun ExpenseSummaryCard(
                     modifier = Modifier
                         .size(28.dp) 
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .background(MaterialTheme.colorScheme.outlineVariant) // Theme se linked
                         .bounceClick { if (!isLoadingExpenses) onRefreshExpenses() }, 
                     contentAlignment = Alignment.Center
                 ) {
@@ -196,7 +195,7 @@ fun ExpenseSummaryCard(
                             .fillMaxWidth()
                             .height(8.dp) 
                             .clip(RoundedCornerShape(50))
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .background(MaterialTheme.colorScheme.outlineVariant) // Theme se linked
                     ) {
                         if (animatedProgressRatio > 0f) {
                             Box(
