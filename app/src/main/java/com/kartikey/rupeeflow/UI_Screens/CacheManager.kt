@@ -860,59 +860,28 @@ object CacheManager {
                     }
                 }
 
-                val liveMap = mutableMapOf<String, Pair<Double, Double>>()
-                try {
-                    val client = OkHttpClient()
-                    val request = Request.Builder()
-                        .url(Constants.GOOGLE_SHEET_API_URL)
-                        .header("Accept", "application/json")
-                        .build()
-                        
-                    val response = client.newCall(request).execute()
-                    val responseData = response.body?.string() ?: ""
-
-                    if (response.isSuccessful && responseData.isNotEmpty()) {
-                        val json = JSONObject(responseData)
-                        if (json.optString("status") == "success") {
-                            val dataObj = json.optJSONObject("data")
-                            fun extractCategory(category: String) {
-                                val arr = dataObj?.optJSONArray(category)
-                                if (arr != null) {
-                                    for (i in 0 until arr.length()) {
-                                        val item = arr.getJSONObject(i)
-                                        val rawTicker = item.optString("ticker", "").trim().uppercase()
-                                        val price = item.optString("live_price").toDoubleOrNull() ?: item.optDouble("live_price", 0.0)
-                                        val changeRs = item.optString("change_rs").toDoubleOrNull() ?: item.optDouble("change_rs", 0.0)
-                                        
-                                        if (rawTicker.isNotEmpty() && price > 0) {
-                                            val cleanKey = if (rawTicker.contains(":")) rawTicker.substringAfter(":") else rawTicker
-                                            liveMap[cleanKey] = Pair(price, changeRs)
-                                        }
-                                    }
-                                }
-                            }
-                            extractCategory("stocks")
-                            extractCategory("mutual_funds")
-                            extractCategory("etfs")
-                            extractCategory("bonds")
-                        }
-                    }
-                } catch (e: Exception) {
-                    e.printStackTrace() 
-                }
-
+                // ⚡ FETCH LIVE MARKET QUOTES VIA ISOLATED MARKET ENGINE ⚡
                 val investMap = userDoc.get("invest") as? Map<String, Any> ?: emptyMap()
+                val symbolsToFetch = mutableListOf<String>()
+                for ((_, value) in investMap) {
+                    val itemData = value as? Map<String, Any>
+                    val sym = itemData?.get("name")?.toString()?.trim() ?: ""
+                    if (sym.isNotEmpty()) {
+                        symbolsToFetch.add(sym)
+                    }
+                }
+                val liveQuotesMap = MarketEngine.fetchQuotes(symbolsToFetch)
+
                 val invArray = JSONArray()
-                
                 for ((key, value) in investMap) {
                     val itemData = value as? Map<String, Any>
                     if (itemData != null) {
                         val dbName = itemData["name"]?.toString()?.trim()?.uppercase() ?: ""
                         val buyPrice = (itemData["avg"] as? Number)?.toDouble() ?: 0.0
                         
-                        val liveData = liveMap[dbName]
-                        val currentPrice = liveData?.first ?: buyPrice
-                        val oneDayChange = liveData?.second ?: 0.0
+                        val liveQuote = liveQuotesMap[dbName] ?: liveQuotesMap[dbName.replace(".NS", "").replace(".BO", "")]
+                        val currentPrice = if (liveQuote != null && liveQuote.currentPrice > 0.0) liveQuote.currentPrice else buyPrice
+                        val oneDayChange = liveQuote?.oneDayChangePrice ?: 0.0
                         
                         val parsedHistoryList = mutableListOf<InvestmentHistoryItem>()
                         val historyMapRaw = itemData["history"] as? Map<String, Any>
