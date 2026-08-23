@@ -19,6 +19,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kartikey.rupeeflow.UI_Screens.Assets.BankAccountItem
+import com.kartikey.rupeeflow.UI_Screens.RupeeFlowCard
 import com.kartikey.rupeeflow.UI_Screens.bounceClick
 import java.text.NumberFormat
 import java.util.Locale
@@ -103,14 +104,11 @@ fun FinanceScreen(
 
 @Composable
 fun BigFinanceCard(title: String, amount: String, icon: ImageVector, iconColor: Color, isClickable: Boolean, onClick: () -> Unit) {
-    Card(
+    RupeeFlowCard(
         modifier = Modifier
             .fillMaxWidth()
             .height(100.dp)
-            .let { if (isClickable) it.bounceClick(scaleDown = 0.97f) { onClick() } else it },
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), 
-        shape = RoundedCornerShape(16.dp), 
-        elevation = CardDefaults.cardElevation(if (isClickable) 4.dp else 1.dp)
+            .let { if (isClickable) it.bounceClick(scaleDown = 0.97f) { onClick() } else it }
     ) {
         Row(modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(modifier = Modifier.size(50.dp).background(iconColor.copy(alpha = 0.15f), RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
