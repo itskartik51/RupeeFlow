@@ -145,7 +145,7 @@ fun InsideContriScreen(
 
                     val membersMap = mutableMapOf<String, MemberLedger>()
                     
-                    // PHASE 3: Fetching entire room data from Master Map "expenses_data"
+                    // Fetching entire room data from Master Map "expenses_data"
                     val expensesData = contriDoc.get("expenses_data") as? Map<String, Any> ?: emptyMap()
 
                     for (mId in memberIds) {
@@ -286,7 +286,7 @@ fun InsideContriScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 6.dp),
                 shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 elevation = CardDefaults.cardElevation(0.dp)
             ) {
                 Row(
@@ -325,9 +325,10 @@ fun InsideContriScreen(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Box(
                                 modifier = Modifier
+                                    .clip(RoundedCornerShape(50))
                                     .bounceClick { showSettleDialog = true }
-                                    .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(8.dp))
-                                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                                    .background(MaterialTheme.colorScheme.primary)
+                                    .padding(horizontal = 14.dp, vertical = 6.dp),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text("Settle-up", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimary)
@@ -526,22 +527,29 @@ fun InsideContriScreen(
                             if (!q.isEmpty) {
                                 val doc = q.documents[0]
                                 
-                                // Clean Map Deduction Logic
-                                val expensesData = doc.get("expenses_data") as? Map<String, Any> ?: emptyMap()
-                                val userExpMap = expensesData[targetUserId] as? Map<String, Any> ?: emptyMap()
-                                
-                                var amountToDeduct = 0.0
-                                for ((_, expObj) in userExpMap) {
-                                    val mapObj = expObj as? Map<String, Any> ?: continue
-                                    val amt = (mapObj["amnt"] as? Number)?.toDouble() ?: 0.0
-                                    amountToDeduct += amt
-                                }
+                                val memberIds = (doc.get("member_ids") as? List<*>)?.map { it.toString() } ?: emptyList()
+                                val remainingMembers = memberIds.filter { it != targetUserId }
 
-                                doc.reference.update(
-                                    "total_group_expense", FieldValue.increment(-amountToDeduct),
-                                    "member_ids", FieldValue.arrayRemove(targetUserId),
-                                    "expenses_data.$targetUserId", FieldValue.delete() // Master Delete User map
-                                ).await()
+                                // Delete room permanently from Firebase if last member removed
+                                if (remainingMembers.isEmpty()) {
+                                    doc.reference.delete().await()
+                                } else {
+                                    val expensesData = doc.get("expenses_data") as? Map<String, Any> ?: emptyMap()
+                                    val userExpMap = expensesData[targetUserId] as? Map<String, Any> ?: emptyMap()
+                                    
+                                    var amountToDeduct = 0.0
+                                    for ((_, expObj) in userExpMap) {
+                                        val mapObj = expObj as? Map<String, Any> ?: continue
+                                        val amt = (mapObj["amnt"] as? Number)?.toDouble() ?: 0.0
+                                        amountToDeduct += amt
+                                    }
+
+                                    doc.reference.update(
+                                        "total_group_expense", FieldValue.increment(-amountToDeduct),
+                                        "member_ids", FieldValue.arrayRemove(targetUserId),
+                                        "expenses_data.$targetUserId", FieldValue.delete()
+                                    ).await()
+                                }
                                 
                                 val targetUserDocRef = db.collection("Users").document(targetUserId)
                                 val targetData = targetUserDocRef.get().await().data ?: emptyMap<String, Any>()
@@ -586,7 +594,6 @@ fun InsideContriScreen(
                                 val doc = q.documents[0]
                                 val ref = doc.reference
                                 
-                                // Master map reset for new cycle
                                 ref.update(
                                     "total_group_expense", 0.0,
                                     "expenses_data", emptyMap<String, Any>()
@@ -620,22 +627,29 @@ fun InsideContriScreen(
                             if (!q.isEmpty) {
                                 val doc = q.documents[0]
                                 
-                                // Clean Map Deduction Logic for leaving
-                                val expensesData = doc.get("expenses_data") as? Map<String, Any> ?: emptyMap()
-                                val userExpMap = expensesData[currentUserId] as? Map<String, Any> ?: emptyMap()
-                                
-                                var amountToDeduct = 0.0
-                                for ((_, expObj) in userExpMap) {
-                                    val mapObj = expObj as? Map<String, Any> ?: continue
-                                    val amt = (mapObj["amnt"] as? Number)?.toDouble() ?: 0.0
-                                    amountToDeduct += amt
-                                }
+                                val memberIds = (doc.get("member_ids") as? List<*>)?.map { it.toString() } ?: emptyList()
+                                val remainingMembers = memberIds.filter { it != currentUserId }
 
-                                doc.reference.update(
-                                    "total_group_expense", FieldValue.increment(-amountToDeduct),
-                                    "member_ids", FieldValue.arrayRemove(currentUserId),
-                                    "expenses_data.$currentUserId", FieldValue.delete() // Wipe from map
-                                ).await()
+                                // Delete room permanently from Firebase if last member left
+                                if (remainingMembers.isEmpty()) {
+                                    doc.reference.delete().await()
+                                } else {
+                                    val expensesData = doc.get("expenses_data") as? Map<String, Any> ?: emptyMap()
+                                    val userExpMap = expensesData[currentUserId] as? Map<String, Any> ?: emptyMap()
+                                    
+                                    var amountToDeduct = 0.0
+                                    for ((_, expObj) in userExpMap) {
+                                        val mapObj = expObj as? Map<String, Any> ?: continue
+                                        val amt = (mapObj["amnt"] as? Number)?.toDouble() ?: 0.0
+                                        amountToDeduct += amt
+                                    }
+
+                                    doc.reference.update(
+                                        "total_group_expense", FieldValue.increment(-amountToDeduct),
+                                        "member_ids", FieldValue.arrayRemove(currentUserId),
+                                        "expenses_data.$currentUserId", FieldValue.delete()
+                                    ).await()
+                                }
                                 
                                 val currentUserDocRef = db.collection("Users").document(currentUserId)
                                 val userData = currentUserDocRef.get().await().data ?: emptyMap<String, Any>()
@@ -676,7 +690,6 @@ fun InsideContriScreen(
                                 val doc = q.documents[0]
                                 val ref = doc.reference
                                 
-                                // Sequence Generator Map Logic
                                 val expensesData = doc.get("expenses_data") as? Map<String, Any> ?: emptyMap()
                                 val userExpMap = expensesData[currentUserId] as? Map<String, Any> ?: emptyMap()
                                 
@@ -720,7 +733,7 @@ fun InsideContriScreen(
 }
 
 // ==========================================
-// MODULAR DIALOG COMPONENTS (Extracted)
+// MODULAR DIALOG COMPONENTS
 // ==========================================
 
 @Composable
@@ -996,8 +1009,27 @@ fun DynamicLedgerView(ledgers: List<MemberLedger>) {
 }
 
 // ==========================================
-// ALGORITHM & SETTLE UP DIALOG
+// SMART NAME FORMATTER & SETTLE UP DIALOG
 // ==========================================
+fun formatMemberDisplayName(fullName: String, allFullNames: List<String>): String {
+    val trimmed = fullName.trim()
+    if (trimmed.isEmpty()) return "Unknown"
+    val parts = trimmed.split("\\s+".toRegex())
+    val firstName = parts.firstOrNull() ?: trimmed
+    val lastName = if (parts.size > 1) parts.last() else ""
+
+    val sameFirstNameCount = allFullNames.count { name ->
+        val otherFirst = name.trim().split("\\s+".toRegex()).firstOrNull() ?: name.trim()
+        otherFirst.equals(firstName, ignoreCase = true)
+    }
+
+    return if (sameFirstNameCount > 1 && lastName.isNotEmpty()) {
+        "${lastName.first().uppercaseChar()} $firstName"
+    } else {
+        firstName
+    }
+}
+
 fun calculateUserSettlements(ledgers: List<MemberLedger>, totalExpense: Double): Pair<Double, List<Settlement>> {
     if (ledgers.isEmpty()) return Pair(0.0, emptyList())
     val perPerson = totalExpense / ledgers.size
@@ -1030,6 +1062,11 @@ fun calculateUserSettlements(ledgers: List<MemberLedger>, totalExpense: Double):
 fun SettleUpDialog(myName: String, ledgers: List<MemberLedger>, totalExpense: Double, onDismiss: () -> Unit) {
     val (_, allSettlements) = calculateUserSettlements(ledgers, totalExpense)
     
+    val allMemberNames = ledgers.map { it.memberName }
+    val formattedNameMap = ledgers.associate { ledger ->
+        ledger.memberName to formatMemberDisplayName(ledger.memberName, allMemberNames)
+    }
+
     val sortedSettlements = allSettlements.sortedWith(
         compareByDescending<Settlement> { it.from == myName || it.to == myName }
         .thenByDescending { it.amount }
@@ -1050,9 +1087,8 @@ fun SettleUpDialog(myName: String, ledgers: List<MemberLedger>, totalExpense: Do
                         Text("No pending payments.", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
                     } else {
                         sortedSettlements.forEach { settlement ->
-                            
-                            val fromText = if (settlement.from == myName) "You" else settlement.from
-                            val toText = if (settlement.to == myName) "You" else settlement.to
+                            val fromText = if (settlement.from == myName) "You" else (formattedNameMap[settlement.from] ?: settlement.from)
+                            val toText = if (settlement.to == myName) "You" else (formattedNameMap[settlement.to] ?: settlement.to)
 
                             Row(
                                 modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp), 
@@ -1060,7 +1096,7 @@ fun SettleUpDialog(myName: String, ledgers: List<MemberLedger>, totalExpense: Do
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = "$fromText pay $toText", 
+                                    text = "$fromText pays $toText", 
                                     fontSize = 14.sp, 
                                     fontWeight = if (fromText == "You" || toText == "You") FontWeight.ExtraBold else FontWeight.SemiBold, 
                                     color = MaterialTheme.colorScheme.onSurface
