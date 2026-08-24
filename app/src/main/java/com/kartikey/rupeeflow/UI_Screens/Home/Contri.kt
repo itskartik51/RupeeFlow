@@ -37,6 +37,10 @@ import androidx.compose.ui.window.DialogProperties
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
+import com.kartikey.rupeeflow.UI_Screens.QR.CustomDownloadIcon
+import com.kartikey.rupeeflow.UI_Screens.QR.CustomPaperPlaneIcon
+import com.kartikey.rupeeflow.UI_Screens.QR.saveQRToGallery
+import com.kartikey.rupeeflow.UI_Screens.QR.shareQRCode
 import com.kartikey.rupeeflow.UI_Screens.bounceClick 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -256,7 +260,12 @@ fun ContriScreen(
         }
     }
 
+    // ==========================================
+    // QR DISPLAY DIALOG WITH DOWNLOAD & SHARE
+    // ==========================================
     if (qrRoomToDisplay != null) {
+        val qrPayload = "${qrRoomToDisplay!!.roomCode}|${qrRoomToDisplay!!.pin}|${qrRoomToDisplay!!.roomName}"
+        
         Dialog(
             onDismissRequest = { qrRoomToDisplay = null },
             properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = true)
@@ -267,22 +276,92 @@ fun ContriScreen(
                 elevation = CardDefaults.cardElevation(8.dp)
             ) {
                 Column(
-                    modifier = Modifier.padding(24.dp).fillMaxWidth(),
+                    modifier = Modifier
+                        .padding(24.dp)
+                        .fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(qrRoomToDisplay!!.roomName, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onSurface)
-                    Text("Ask your friend to scan to join instantly", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    
-                    Spacer(modifier = Modifier.height(24.dp))
-                    
-                    com.kartikey.rupeeflow.UI_Screens.QR.PremiumQRCode(
-                        data = "${qrRoomToDisplay!!.roomCode}|${qrRoomToDisplay!!.pin}|${qrRoomToDisplay!!.roomName}",
-                        size = 180.dp
+                    Text(
+                        text = qrRoomToDisplay!!.roomName, 
+                        fontSize = 20.sp, 
+                        fontWeight = FontWeight.ExtraBold, 
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "Ask your friend to scan to join instantly", 
+                        fontSize = 12.sp, 
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     
-                    Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(20.dp))
+                    
+                    // Rounded Hard-Black QR Code
+                    com.kartikey.rupeeflow.UI_Screens.QR.PremiumQRCode(
+                        data = qrPayload,
+                        size = 185.dp,
+                        cornerRadius = 16.dp
+                    )
+                    
+                    Spacer(modifier = Modifier.height(20.dp))
                     Text("Room Code", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(qrRoomToDisplay!!.roomCode, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 2.sp, color = MaterialTheme.colorScheme.onSurface)
+                    Text(
+                        text = qrRoomToDisplay!!.roomCode, 
+                        fontSize = 17.sp, 
+                        fontWeight = FontWeight.ExtraBold, 
+                        letterSpacing = 2.sp, 
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    
+                    Spacer(modifier = Modifier.height(20.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f), thickness = 1.dp)
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Bottom Action Bar: Download (Left) & Share (Right)
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Download Button (Left)
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                                .bounceClick {
+                                    saveQRToGallery(context, qrPayload, qrRoomToDisplay!!.roomName)
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CustomDownloadIcon(
+                                modifier = Modifier.size(24.dp),
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+
+                        // Share Button (Right)
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                                .bounceClick {
+                                    shareQRCode(
+                                        context = context,
+                                        data = qrPayload,
+                                        roomName = qrRoomToDisplay!!.roomName,
+                                        roomCode = qrRoomToDisplay!!.roomCode,
+                                        pin = qrRoomToDisplay!!.pin
+                                    )
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CustomPaperPlaneIcon(
+                                modifier = Modifier.size(24.dp),
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
                 }
             }
         }
