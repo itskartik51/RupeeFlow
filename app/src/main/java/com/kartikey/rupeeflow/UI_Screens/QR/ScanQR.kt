@@ -19,7 +19,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.FlashOff
+import androidx.compose.material.icons.outlined.FlashOn
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -76,6 +78,8 @@ fun ScanQRScreen(
     }
 
     var isScanned by remember { mutableStateOf(false) }
+    var cameraControl by remember { mutableStateOf<CameraControl?>(null) }
+    var isTorchOn by remember { mutableStateOf(false) }
 
     // Gallery QR Picker Launcher
     val galleryLauncher = rememberLauncherForActivityResult(
@@ -165,12 +169,13 @@ fun ScanQRScreen(
 
                         try {
                             cameraProvider.unbindAll()
-                            cameraProvider.bindToLifecycle(
+                            val camera = cameraProvider.bindToLifecycle(
                                 lifecycleOwner,
                                 cameraSelector,
                                 preview,
                                 imageAnalysis
                             )
+                            cameraControl = camera.cameraControl
                         } catch (e: Exception) {
                             e.printStackTrace()
                         }
@@ -181,10 +186,10 @@ fun ScanQRScreen(
                 modifier = Modifier.fillMaxSize()
             )
 
-            // 4-Corner Brackets & Neon Laser Overlay
+            // GPay-Style Bold 4-Corner Brackets & Inset Camera Cutout
             ScannerOverlay(primaryColor = primaryNeon)
             
-            // Floating UI Overlay Controls
+            // Full-Screen Floating UI Controls
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -192,12 +197,13 @@ fun ScanQRScreen(
                     .navigationBarsPadding(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Top Bar with Back Button
+                // Top Bar: Cross (Close) on Left, Torch Toggle on Right
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Box(
                         modifier = Modifier
@@ -207,13 +213,38 @@ fun ScanQRScreen(
                             .bounceClick { onBackClick() },
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Outlined.ArrowBack, contentDescription = "Back", tint = Color.White)
+                        Icon(
+                            imageVector = Icons.Outlined.Close, 
+                            contentDescription = "Close", 
+                            tint = Color.White,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(CircleShape)
+                            .background(Color.Black.copy(alpha = 0.5f))
+                            .bounceClick {
+                                isTorchOn = !isTorchOn
+                                cameraControl?.enableTorch(isTorchOn)
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = if (isTorchOn) Icons.Outlined.FlashOn else Icons.Outlined.FlashOff,
+                            contentDescription = "Torch",
+                            tint = if (isTorchOn) primaryNeon else Color.White,
+                            modifier = Modifier.size(22.dp)
+                        )
                     }
                 }
 
-                Spacer(modifier = Modifier.weight(1f))
+                // Push "Upload from Gallery" directly beneath the Scanner Viewfinder
+                Spacer(modifier = Modifier.fillMaxHeight(0.55f))
 
-                // Upload from Gallery Button (Pill Shape)
+                // Upload from Gallery Pill Button
                 Surface(
                     shape = RoundedCornerShape(50),
                     color = Color.Black.copy(alpha = 0.65f),
@@ -221,7 +252,6 @@ fun ScanQRScreen(
                     shadowElevation = 4.dp,
                     modifier = Modifier
                         .bounceClick { galleryLauncher.launch("image/*") }
-                        .padding(bottom = 24.dp)
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
@@ -243,7 +273,9 @@ fun ScanQRScreen(
                     }
                 }
 
-                // Bottom 4-Corner Rounded Information Card (Theme Surface Color)
+                Spacer(modifier = Modifier.weight(1f))
+
+                // Bottom 4-Corner Rounded Information Card
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -307,35 +339,41 @@ fun ScannerOverlay(primaryColor: Color) {
         val canvasWidth = size.width
         val canvasHeight = size.height
 
-        val rectSize = canvasWidth * 0.72f
+        val rectSize = canvasWidth * 0.74f
         val rectLeft = (canvasWidth - rectSize) / 2f
-        val rectTop = (canvasHeight - rectSize) / 2.35f
+        val rectTop = canvasHeight * 0.18f
         val rectRight = rectLeft + rectSize
         val rectBottom = rectTop + rectSize
         
+        // GPay Floating Offset: Punch hole is slightly inset from outer brackets
+        val innerPadding = 14f
+        val innerLeft = rectLeft + innerPadding
+        val innerTop = rectTop + innerPadding
+        val innerSize = rectSize - (innerPadding * 2f)
+
         // Punch hole out of dark translucent overlay
         with(drawContext.canvas.nativeCanvas) {
             val checkPoint = saveLayer(null, null)
             
             drawRect(
-                color = Color.Black.copy(alpha = 0.6f),
+                color = Color.Black.copy(alpha = 0.65f),
                 size = size
             )
 
             drawRoundRect(
                 color = Color.Transparent,
-                topLeft = Offset(rectLeft, rectTop),
-                size = androidx.compose.ui.geometry.Size(rectSize, rectSize),
-                cornerRadius = CornerRadius(48f, 48f),
+                topLeft = Offset(innerLeft, innerTop),
+                size = androidx.compose.ui.geometry.Size(innerSize, innerSize),
+                cornerRadius = CornerRadius(36f, 36f),
                 blendMode = BlendMode.Clear
             )
             
             restoreToCount(checkPoint)
         }
 
-        // 4 GPay-Style Disconnected Rounded Corner Brackets
-        val cornerArm = 70f
-        val cornerRadius = 40f
+        // 4 GPay-Style Bold Disconnected Rounded Corner Brackets
+        val cornerArm = 85f
+        val cornerRadius = 44f
         
         val cornerPath = Path().apply {
             // 1. Top-Left Corner
@@ -360,32 +398,32 @@ fun ScannerOverlay(primaryColor: Color) {
             moveTo(rectLeft + cornerArm, rectBottom)
             lineTo(rectLeft + cornerRadius, rectBottom)
             quadraticBezierTo(rectLeft, rectBottom, rectLeft, rectBottom - cornerRadius)
-            lineTo(rectLeft, rectBottom - cornerArm)
+            lineTo(rectLeft - cornerArm, rectBottom)
         }
 
         drawPath(
             path = cornerPath,
             color = primaryColor,
-            style = Stroke(width = 11f, cap = StrokeCap.Round, join = StrokeJoin.Round)
+            style = Stroke(width = 15f, cap = StrokeCap.Round, join = StrokeJoin.Round)
         )
 
         // Animated Neon Laser Line
-        val currentLaserY = rectTop + (rectSize * laserY)
+        val currentLaserY = innerTop + (innerSize * laserY)
         
         // Laser Core Beam
         drawLine(
             color = primaryColor.copy(alpha = 0.95f),
-            start = Offset(rectLeft + 20f, currentLaserY),
-            end = Offset(rectRight - 20f, currentLaserY),
-            strokeWidth = 5f,
+            start = Offset(innerLeft + 16f, currentLaserY),
+            end = Offset(innerLeft + innerSize - 16f, currentLaserY),
+            strokeWidth = 4.5f,
             cap = StrokeCap.Round
         )
         
         // Laser Soft Glow
         drawLine(
             color = primaryColor.copy(alpha = 0.35f),
-            start = Offset(rectLeft + 20f, currentLaserY),
-            end = Offset(rectRight - 20f, currentLaserY),
+            start = Offset(innerLeft + 16f, currentLaserY),
+            end = Offset(innerLeft + innerSize - 16f, currentLaserY),
             strokeWidth = 18f,
             cap = StrokeCap.Round
         )
