@@ -261,7 +261,7 @@ fun ContriScreen(
     }
 
     // ==========================================
-    // QR DISPLAY DIALOG WITH DOWNLOAD & SHARE
+    // QR DISPLAY DIALOG WITH PARALLEL ROUNDED QR
     // ==========================================
     if (qrRoomToDisplay != null) {
         val qrPayload = "${qrRoomToDisplay!!.roomCode}|${qrRoomToDisplay!!.pin}|${qrRoomToDisplay!!.roomName}"
@@ -295,7 +295,7 @@ fun ContriScreen(
                     
                     Spacer(modifier = Modifier.height(20.dp))
                     
-                    // Rounded Hard-Black QR Code
+                    // Parallel Directional-Rounded Hard-Black QR Code
                     com.kartikey.rupeeflow.UI_Screens.QR.PremiumQRCode(
                         data = qrPayload,
                         size = 185.dp,
@@ -316,7 +316,7 @@ fun ContriScreen(
                     HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f), thickness = 1.dp)
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Bottom Action Bar: Download (Left) & Share (Right)
+                    // Bottom Action Bar: Download (Left) & Balanced Share (Right)
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -334,12 +334,12 @@ fun ContriScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             CustomDownloadIcon(
-                                modifier = Modifier.size(24.dp),
+                                modifier = Modifier.size(22.dp),
                                 tint = MaterialTheme.colorScheme.onSurface
                             )
                         }
 
-                        // Share Button (Right)
+                        // Subtle Share Button (Right)
                         Box(
                             modifier = Modifier
                                 .size(48.dp)
@@ -357,7 +357,7 @@ fun ContriScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             CustomPaperPlaneIcon(
-                                modifier = Modifier.size(24.dp),
+                                modifier = Modifier.size(20.dp),
                                 tint = MaterialTheme.colorScheme.onSurface
                             )
                         }
