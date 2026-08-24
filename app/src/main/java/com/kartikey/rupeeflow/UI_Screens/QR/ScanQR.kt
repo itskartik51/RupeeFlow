@@ -189,7 +189,7 @@ fun ScanQRScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .statusBarsPadding()
-                    .padding(bottom = 76.dp), // Floating right above the bottom navigation bar
+                    .padding(bottom = 76.dp), // Positioned above the bottom navigation bar
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 // Top Bar: Clean Close Button
@@ -216,8 +216,8 @@ fun ScanQRScreen(
                     }
                 }
 
-                // Push "Upload from Gallery" directly beneath the Viewfinder box
-                Spacer(modifier = Modifier.fillMaxHeight(0.51f))
+                // Push "Upload from Gallery" cleanly below the viewfinder square
+                Spacer(modifier = Modifier.fillMaxHeight(0.61f))
 
                 // Upload from Gallery Pill Button
                 Surface(
@@ -262,7 +262,7 @@ fun ScanQRScreen(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 16.dp, horizontal = 16.dp),
+                            .padding(vertical = 18.dp, horizontal = 16.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
@@ -321,9 +321,9 @@ fun ScannerOverlay(primaryColor: Color) {
         val rectBottom = rectTop + rectSize
         
         // Exact Concentric Math: Inner Radius = Outer Radius - Inner Padding
-        val outerRadius = 44f
-        val innerPadding = 14f
-        val innerRadius = outerRadius - innerPadding // 30f for perfectly parallel curve
+        val outerRadius = 50f
+        val innerPadding = 28f // Doubled gap for prominent floating bracket look
+        val innerRadius = outerRadius - innerPadding // 22f for matching parallel curve
 
         val innerLeft = rectLeft + innerPadding
         val innerTop = rectTop + innerPadding
@@ -371,7 +371,7 @@ fun ScannerOverlay(primaryColor: Color) {
             quadraticBezierTo(rectRight, rectBottom, rectRight - outerRadius, rectBottom)
             lineTo(rectRight - cornerArm, rectBottom)
 
-            // 4. Bottom-Left Corner (Fixed upward coordinate line)
+            // 4. Bottom-Left Corner
             moveTo(rectLeft + cornerArm, rectBottom)
             lineTo(rectLeft + outerRadius, rectBottom)
             quadraticBezierTo(rectLeft, rectBottom, rectLeft, rectBottom - outerRadius)
