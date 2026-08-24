@@ -47,29 +47,24 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
-import java.text.SimpleDateFormat
-import java.util.Date
 import java.util.Locale
 
 @Composable
 fun LoginScreen(onLoginSuccess: (String) -> Unit) {
-    var authStep by remember { mutableStateOf(1) } // 1 = Google Button, 2 = Complete Profile
+    var authStep by remember { mutableStateOf(1) }
     var statusMessage by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
 
-    // Google Fetched Data
     var googleEmail by remember { mutableStateOf("") }
     var googleName by remember { mutableStateOf("") }
     var googlePhotoUrl by remember { mutableStateOf("") }
 
-    // Form Inputs (New User)
     var inputName by remember { mutableStateOf("") }
     var inputUsername by remember { mutableStateOf("") }
     var inputMobile by remember { mutableStateOf("") }
     
-    // Username Check States
     var isCheckingUsername by remember { mutableStateOf(false) }
-    var usernameAvailable by remember { mutableStateOf<Boolean?>(null) } // null = unchecked, true = yes, false = taken
+    var usernameAvailable by remember { mutableStateOf<Boolean?>(null) }
 
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -86,12 +81,11 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
     
     val googleSignInClient = remember { GoogleSignIn.getClient(context, gso) }
 
-    // Smart Interaction Lock: Back button on Step 2 cancels signup and signs out of Google
     BackHandler(enabled = authStep == 2) {
         auth.signOut()
         googleSignInClient.signOut()
         authStep = 1
-        statusMessage = "" // Removed "Signup Cancelled" text
+        statusMessage = ""
     }
 
     val launcher = rememberLauncherForActivityResult(
@@ -118,18 +112,15 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
                         val query = db.collection("Users").whereEqualTo("email", userEmail).get().await()
                         
                         if (!query.isEmpty) {
-                            // EXISTING USER
                             val userDoc = query.documents[0]
                             val savedUsername = userDoc.getString("username") ?: userEmail.substringBefore("@")
                             
-                            // 🚀 UPDATE: Silently update the latest profile photo link for existing users
                             userDoc.reference.update("prfl", fetchedPhotoUrl).await()
 
                             withContext(Dispatchers.Main) {
                                 onLoginSuccess(savedUsername)
                             }
                         } else {
-                            // NEW USER -> Send to Step 2
                             withContext(Dispatchers.Main) {
                                 googleEmail = userEmail
                                 googleName = firebaseUser.displayName ?: ""
@@ -150,7 +141,7 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
                 }
             }
         } else {
-            statusMessage = "" // Removed "Google Sign-In Cancelled" text
+            statusMessage = ""
             isLoading = false
         }
     }
@@ -181,7 +172,6 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
             Spacer(modifier = Modifier.height(60.dp))
 
             if (isLoading) {
-                // Clean loading UI (only spinner)
                 CircularProgressIndicator(color = MaterialTheme.colorScheme.primary, strokeWidth = 3.dp)
             } else {
                 Surface(
@@ -194,7 +184,7 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
                         .height(56.dp)
                         .bounceClick {
                             isLoading = true
-                            statusMessage = "" // Cleared loading message
+                            statusMessage = ""
                             googleSignInClient.signOut().addOnCompleteListener {
                                 launcher.launch(googleSignInClient.signInIntent)
                             }
@@ -226,14 +216,12 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
                 }
             }
         } else {
-            // STEP 2: COMPLETE PROFILE FOR NEW USERS
             Text("Complete Your Profile", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onBackground)
             Spacer(modifier = Modifier.height(6.dp))
             Text("Choose a unique identity for RupeeFlow.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             
             Spacer(modifier = Modifier.height(32.dp))
 
-            // 1. Name Field (Pre-filled, Editable, Updated Label)
             OutlinedTextField(
                 value = inputName,
                 onValueChange = { inputName = it },
@@ -255,12 +243,11 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
             
             Spacer(modifier = Modifier.height(12.dp))
 
-            // 2. Username Field (Lowercase, No Spaces, Realtime Check, Updated Label)
             OutlinedTextField(
                 value = inputUsername,
                 onValueChange = { newValue ->
                     inputUsername = newValue.lowercase().replace(" ", "")
-                    usernameAvailable = null // Reset check state when typing
+                    usernameAvailable = null
                 },
                 label = { Text("Username", color = MaterialTheme.colorScheme.onSurfaceVariant) },
                 leadingIcon = { 
@@ -282,14 +269,13 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .onFocusChanged { focusState ->
-                        // The Magic Check: When user leaves this field
                         if (!focusState.isFocused && inputUsername.isNotBlank()) {
                             isCheckingUsername = true
                             coroutineScope.launch(Dispatchers.IO) {
                                 try {
                                     val checkQuery = db.collection("Users").whereEqualTo("username", inputUsername).get().await()
                                     withContext(Dispatchers.Main) {
-                                        usernameAvailable = checkQuery.isEmpty // true if empty (available)
+                                        usernameAvailable = checkQuery.isEmpty
                                         isCheckingUsername = false
                                     }
                                 } catch (e: Exception) {
@@ -311,7 +297,6 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
                 keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
             )
             
-            // Availability Helper Text
             if (usernameAvailable == false) {
                 Text("Username already taken! Please try another.", color = MaterialTheme.colorScheme.error, fontSize = 11.sp, modifier = Modifier.align(Alignment.Start).padding(start = 12.dp, top = 2.dp))
             } else if (usernameAvailable == true) {
@@ -320,11 +305,9 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // 3. Mobile Number Field (Strict Numeric, 10 Digits)
             OutlinedTextField(
                 value = inputMobile,
                 onValueChange = { newValue ->
-                    // Strict numeric filter & max length 10
                     if (newValue.all { it.isDigit() } && newValue.length <= 10) {
                         inputMobile = newValue
                     }
@@ -356,7 +339,6 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
                 Spacer(modifier = Modifier.height(8.dp))
             }
 
-            // Create Profile Button
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -384,10 +366,9 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
                             try {
                                 withContext(Dispatchers.Main) { 
                                     isLoading = true
-                                    statusMessage = "" // Cleared loading message
+                                    statusMessage = ""
                                 }
 
-                                // Fetch Counter and Gen ID
                                 val metaRef = db.collection("System").document("Metadata")
                                 val metaDoc = metaRef.get().await()
                                 var lastCounter = 8L
@@ -397,10 +378,8 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
                                 val nextCounter = lastCounter + 1
                                 val newUserId = String.format(Locale.US, "%04d", nextCounter)
 
-                                // Update Counter
                                 metaRef.set(mapOf("last_user_id" to nextCounter), SetOptions.merge()).await()
 
-                                // Build Clean Data (No password field, prfl included)
                                 val userData = hashMapOf(
                                     "name" to finalName,
                                     "username" to inputUsername,
@@ -414,13 +393,6 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
 
                                 val newUserRef = db.collection("Users").document(newUserId)
                                 newUserRef.set(userData).await()
-
-                                // Seed Cash Doc
-                                val cashData = hashMapOf(
-                                    "total_cash" to 0.0,
-                                    "last_updated" to SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
-                                )
-                                newUserRef.collection("Finances").document("Cash").set(cashData).await()
 
                                 withContext(Dispatchers.Main) {
                                     onLoginSuccess(inputUsername)
