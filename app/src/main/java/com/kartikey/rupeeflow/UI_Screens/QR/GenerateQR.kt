@@ -6,6 +6,7 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.Path as AndroidPath
 import android.graphics.RectF
 import android.net.Uri
 import android.os.Build
@@ -26,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
@@ -46,8 +48,8 @@ import java.io.OutputStream
 @Composable
 fun PremiumQRCode(
     data: String,
-    size: Dp = 200.dp,
-    qrColor: Color = Color(0xFF000000), // Solid Hard Black #000000
+    size: Dp = 185.dp,
+    qrColor: Color = Color(0xFF000000), // Pure Solid Hard Black
     backgroundColor: Color = Color(0xFFFFFFFF),
     cornerRadius: Dp = 16.dp
 ) {
@@ -66,6 +68,7 @@ fun PremiumQRCode(
             Image(
                 bitmap = bitmap.asImageBitmap(),
                 contentDescription = "QR Code",
+                filterQuality = FilterQuality.None, // Prevents subpixel blur and keeps pitch black contrast
                 modifier = Modifier
                     .size(size)
                     .clip(RoundedCornerShape(cornerRadius))
@@ -77,7 +80,7 @@ fun PremiumQRCode(
 fun generateRoundedQRCode(
     content: String,
     sizePx: Int,
-    color: Int = 0xFF000000.toInt(), // Pure hard black
+    color: Int = 0xFF000000.toInt(),
     bgColor: Int = 0xFFFFFFFF.toInt()
 ): Bitmap? {
     try {
@@ -87,42 +90,101 @@ fun generateRoundedQRCode(
         )
         val bitMatrix = MultiFormatWriter().encode(content, BarcodeFormat.QR_CODE, sizePx, sizePx, hints)
         
-        val width = bitMatrix.width
-        val height = bitMatrix.height
-        val bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val matrixWidth = bitMatrix.width
+        val matrixHeight = bitMatrix.height
+        val bmp = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bmp)
         
-        // Anti-aliased pure white background
+        // Pure White Background
         val bgPaint = Paint().apply { 
             this.color = bgColor
-            isAntiAlias = true
+            isAntiAlias = false
         }
-        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgPaint)
+        canvas.drawRect(0f, 0f, sizePx.toFloat(), sizePx.toFloat(), bgPaint)
 
-        // Solid Black Dots Paint
+        // Solid Black Paint for data modules
         val dotPaint = Paint().apply {
             this.color = color
-            isAntiAlias = true
+            isAntiAlias = false
         }
 
-        val moduleWidth = width.toFloat() / bitMatrix.width
-        val moduleHeight = height.toFloat() / bitMatrix.height
-        val cornerRadius = moduleWidth / 2.5f
+        val moduleWidth = sizePx.toFloat() / matrixWidth
+        val moduleHeight = sizePx.toFloat() / matrixHeight
 
-        for (x in 0 until bitMatrix.width) {
-            for (y in 0 until bitMatrix.height) {
-                if (bitMatrix[x, y]) {
-                    val rect = RectF(
+        // Draw regular data modules excluding 3 corner finder zones (7x7)
+        for (x in 0 until matrixWidth) {
+            for (y in 0 until matrixHeight) {
+                val isTopLeft = x < 7 && y < 7
+                val isTopRight = x >= matrixWidth - 7 && y < 7
+                val isBottomLeft = x < 7 && y >= matrixHeight - 7
+
+                if (!isTopLeft && !isTopRight && !isBottomLeft && bitMatrix[x, y]) {
+                    canvas.drawRect(
                         x * moduleWidth,
                         y * moduleHeight,
                         (x + 1) * moduleWidth,
-                        (y + 1) * moduleHeight
+                        (y + 1) * moduleHeight,
+                        dotPaint
                     )
-                    rect.inset(moduleWidth * 0.05f, moduleHeight * 0.05f)
-                    canvas.drawRoundRect(rect, cornerRadius, cornerRadius, dotPaint)
                 }
             }
         }
+
+        // Custom Parallel Rounded Corner Finder Eyes
+        val cornerPaint = Paint().apply {
+            this.color = color
+            isAntiAlias = true
+            style = Paint.Style.FILL
+        }
+
+        val cornerRadius = moduleWidth * 2.8f
+        val innerCornerRadius = moduleWidth * 1.5f
+
+        // Helper to draw single directional eye
+        fun drawDirectionalEye(startX: Float, startY: Float, outerRadii: FloatArray, centerRadii: FloatArray) {
+            val outerRect = RectF(startX, startY, startX + (7 * moduleWidth), startY + (7 * moduleHeight))
+            val cutoutRect = RectF(startX + moduleWidth, startY + moduleHeight, startX + (6 * moduleWidth), startY + (6 * moduleHeight))
+            val centerRect = RectF(startX + (2 * moduleWidth), startY + (2 * moduleHeight), startX + (5 * moduleWidth), startY + (5 * moduleHeight))
+
+            val outerPath = AndroidPath().apply {
+                addRoundRect(outerRect, outerRadii, AndroidPath.Direction.CW)
+            }
+            val cutoutPath = AndroidPath().apply {
+                addRoundRect(cutoutRect, innerCornerRadius, innerCornerRadius, AndroidPath.Direction.CW)
+            }
+            outerPath.op(cutoutPath, AndroidPath.Op.DIFFERENCE)
+            canvas.drawPath(outerPath, cornerPaint)
+
+            val centerPath = AndroidPath().apply {
+                addRoundRect(centerRect, centerRadii, AndroidPath.Direction.CW)
+            }
+            canvas.drawPath(centerPath, cornerPaint)
+        }
+
+        // 1. Top-Left Eye (Outer Top-Left Corner Deep Rounded Parallel to White Card)
+        drawDirectionalEye(
+            startX = 0f,
+            startY = 0f,
+            outerRadii = floatArrayOf(cornerRadius, cornerRadius, 8f, 8f, 8f, 8f, 8f, 8f),
+            centerRadii = floatArrayOf(innerCornerRadius, innerCornerRadius, 4f, 4f, 4f, 4f, 4f, 4f)
+        )
+
+        // 2. Top-Right Eye (Outer Top-Right Corner Deep Rounded)
+        drawDirectionalEye(
+            startX = (matrixWidth - 7) * moduleWidth,
+            startY = 0f,
+            outerRadii = floatArrayOf(8f, 8f, cornerRadius, cornerRadius, 8f, 8f, 8f, 8f),
+            centerRadii = floatArrayOf(4f, 4f, innerCornerRadius, innerCornerRadius, 4f, 4f, 4f, 4f)
+        )
+
+        // 3. Bottom-Left Eye (Outer Bottom-Left Corner Deep Rounded)
+        drawDirectionalEye(
+            startX = 0f,
+            startY = (matrixHeight - 7) * moduleHeight,
+            outerRadii = floatArrayOf(8f, 8f, 8f, 8f, 8f, 8f, cornerRadius, cornerRadius),
+            centerRadii = floatArrayOf(4f, 4f, 4f, 4f, 4f, 4f, innerCornerRadius, innerCornerRadius)
+        )
+
         return bmp
     } catch (e: Exception) {
         e.printStackTrace()
@@ -131,7 +193,7 @@ fun generateRoundedQRCode(
 }
 
 // ==========================================
-// CUSTOM VECTOR ICONS (EXACT USER REPLICAS)
+// CUSTOM VECTOR ICONS (CLEAN & SUBTLE)
 // ==========================================
 
 @Composable
@@ -194,12 +256,12 @@ fun CustomPaperPlaneIcon(
     Canvas(modifier = modifier) {
         val strokeWidth = size.width * 0.085f
 
-        // Paper Airplane Outer Wings
+        // Scaled inward to make it minimal and non-aggressive
         val plane = Path().apply {
-            moveTo(size.width * 0.94f, size.height * 0.06f) // Top-Right Tip
-            lineTo(size.width * 0.06f, size.height * 0.45f) // Left Wing
-            lineTo(size.width * 0.40f, size.height * 0.58f) // Inner Crease
-            lineTo(size.width * 0.55f, size.height * 0.94f) // Bottom Tip
+            moveTo(size.width * 0.88f, size.height * 0.12f) // Top-Right Tip
+            lineTo(size.width * 0.12f, size.height * 0.48f) // Left Wing
+            lineTo(size.width * 0.42f, size.height * 0.58f) // Inner Fold
+            lineTo(size.width * 0.52f, size.height * 0.88f) // Bottom Tip
             close()
         }
         drawPath(
@@ -211,8 +273,8 @@ fun CustomPaperPlaneIcon(
         // Center Fold Crease Line
         drawLine(
             color = tint,
-            start = Offset(size.width * 0.94f, size.height * 0.06f),
-            end = Offset(size.width * 0.40f, size.height * 0.58f),
+            start = Offset(size.width * 0.88f, size.height * 0.12f),
+            end = Offset(size.width * 0.42f, size.height * 0.58f),
             strokeWidth = strokeWidth,
             cap = StrokeCap.Round
         )
