@@ -75,8 +75,9 @@ fun ContriScreen(
     var autoJoinData by remember { mutableStateOf<Triple<String, String, String>?>(null) }
 
     val coroutineScope = rememberCoroutineScope()
+    val context = LocalContext.current
     
-    // Phase 3: Directly sync with CacheManager's lightweight live data
+    // Directly sync with CacheManager's lightweight live data
     var fetchedRooms by remember(contriRooms) { mutableStateOf(contriRooms) }
 
     // REFRESH ANIMATION STATES
@@ -100,7 +101,9 @@ fun ContriScreen(
             onBackClick = { showScanner = false },
             onQrScanned = { qrValue -> 
                 showScanner = false
-                if (qrValue.contains("|")) {
+                if (fetchedRooms.size >= 5) {
+                    Toast.makeText(context, "Limit reached! Maximum 5 Contri rooms allowed.", Toast.LENGTH_SHORT).show()
+                } else if (qrValue.contains("|")) {
                     val parts = qrValue.split("|")
                     val code = parts.getOrNull(0) ?: ""
                     val pin = parts.getOrNull(1) ?: ""
@@ -133,7 +136,7 @@ fun ContriScreen(
                 onBackClick = { openedRoom = null },
                 onLeaveClick = { 
                     openedRoom = null 
-                    onRefresh() // Trigger parent CacheManager refresh
+                    onRefresh()
                 }
             )
         }
@@ -165,8 +168,8 @@ fun ContriScreen(
                             if (!isRefreshing) {
                                 isRefreshing = true
                                 coroutineScope.launch {
-                                    onRefresh() // Triggers CacheManager to fetch latest
-                                    delay(1000) // Visual feedback for sync
+                                    onRefresh()
+                                    delay(1000)
                                     isRefreshing = false
                                 }
                             }
@@ -217,21 +220,31 @@ fun ContriScreen(
                     ContriGridCard(
                         title = "Create Contri",
                         icon = Icons.Outlined.Add,
-                        iconTint = MaterialTheme.colorScheme.primary,
+                        iconTint = MaterialTheme.colorScheme.onSurface,
                         bgColor = MaterialTheme.colorScheme.primaryContainer,
                         modifier = Modifier.weight(1f),
-                        onClick = { showCreateDialog = true }
+                        onClick = { 
+                            if (fetchedRooms.size >= 5) {
+                                Toast.makeText(context, "Limit reached! Maximum 5 Contri rooms allowed.", Toast.LENGTH_SHORT).show()
+                            } else {
+                                showCreateDialog = true 
+                            }
+                        }
                     )
                     
                     ContriGridCard(
                         title = "Join Contri",
                         icon = Icons.Outlined.GroupAdd,
-                        iconTint = MaterialTheme.colorScheme.primary,
+                        iconTint = MaterialTheme.colorScheme.onSurface,
                         bgColor = MaterialTheme.colorScheme.primaryContainer,
                         modifier = Modifier.weight(1f),
                         onClick = { 
-                            scannedRoomCode = ""
-                            showJoinDialog = true 
+                            if (fetchedRooms.size >= 5) {
+                                Toast.makeText(context, "Limit reached! Maximum 5 Contri rooms allowed.", Toast.LENGTH_SHORT).show()
+                            } else {
+                                scannedRoomCode = ""
+                                showJoinDialog = true 
+                            }
                         }
                     )
                 }
@@ -282,7 +295,7 @@ fun ContriScreen(
             onDismiss = { autoJoinData = null },
             onSuccess = {
                 autoJoinData = null
-                onRefresh() // Trigger parent CacheManager refresh
+                onRefresh()
             }
         )
     }
@@ -293,7 +306,7 @@ fun ContriScreen(
             onDismiss = { showCreateDialog = false },
             onSuccess = { 
                 showCreateDialog = false
-                onRefresh() // Trigger parent CacheManager refresh
+                onRefresh()
             }
         )
     }
@@ -310,7 +323,7 @@ fun ContriScreen(
             onSuccess = {
                 showJoinDialog = false
                 scannedRoomCode = ""
-                onRefresh() // Trigger parent CacheManager refresh
+                onRefresh()
             }
         )
     }
@@ -348,8 +361,18 @@ fun AutoJoinContriDialog(
                         val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
                         
                         if (!userQuery.isEmpty) {
-                            val userDocRef = userQuery.documents[0].reference
-                            val currentUserId = userQuery.documents[0].id
+                            val userDoc = userQuery.documents[0]
+                            val userDocRef = userDoc.reference
+                            val currentUserId = userDoc.id
+                            
+                            val existingRooms = userDoc.get("rooms") as? List<*> ?: emptyList<Any>()
+                            if (existingRooms.size >= 5) {
+                                withContext(Dispatchers.Main) {
+                                    Toast.makeText(context, "Limit reached! Max 5 Contri rooms allowed.", Toast.LENGTH_LONG).show()
+                                    onDismiss()
+                                }
+                                return@launch
+                            }
                             
                             doc.reference.update("member_ids", FieldValue.arrayUnion(currentUserId)).await()
 
@@ -449,7 +472,7 @@ fun ActiveRoomCard(room: ContriRoomModel, onClick: () -> Unit, onQrClick: () -> 
                     .bounceClick { onQrClick() },
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Outlined.QrCode2, contentDescription = "Show QR", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
+                Icon(Icons.Outlined.QrCode2, contentDescription = "Show QR", tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(24.dp))
             }
         }
     }
@@ -559,26 +582,36 @@ fun CreateContriDialog(username: String, onDismiss: () -> Unit, onSuccess: () ->
                             coroutineScope.launch(Dispatchers.IO) {
                                 try {
                                     val db = FirebaseFirestore.getInstance()
-                                    val metaRef = db.collection("System").document("Metadata")
-                                    val metaDoc = metaRef.get().await()
-                                    
-                                    val lastCounter = metaDoc.getLong("last_contri_id") ?: 0L
-                                    val nextCounter = lastCounter + 1
-                                    metaRef.set(mapOf("last_contri_id" to nextCounter), SetOptions.merge()).await()
-
-                                    val counterStr = String.format(Locale.US, "%03d", nextCounter)
-                                    val randomChars = (1..6).map { ('A'..'Z').random() }.joinToString("")
-                                    val randomCode = "${randomChars.take(3)}-${(100..999).random()}-${randomChars.takeLast(3)}"
-                                    
-                                    val docId = "${counterStr}_${contriName.replace(" ", "")}_$randomCode"
-                                    val todayStr = SimpleDateFormat("dd-MM-yyyy", Locale.getDefault()).format(Date())
-
                                     val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
                                     
                                     if (!userQuery.isEmpty) {
-                                        val currentUserId = userQuery.documents[0].id
+                                        val userDoc = userQuery.documents[0]
+                                        val userDocRef = userDoc.reference
+                                        val currentUserId = userDoc.id
                                         
-                                        // Initializes the clean master map for the room
+                                        val existingRooms = userDoc.get("rooms") as? List<*> ?: emptyList<Any>()
+                                        if (existingRooms.size >= 5) {
+                                            withContext(Dispatchers.Main) {
+                                                isSubmitting = false
+                                                Toast.makeText(context, "Limit reached! Max 5 Contri rooms allowed.", Toast.LENGTH_LONG).show()
+                                            }
+                                            return@launch
+                                        }
+
+                                        val metaRef = db.collection("System").document("Metadata")
+                                        val metaDoc = metaRef.get().await()
+                                        
+                                        val lastCounter = metaDoc.getLong("last_contri_id") ?: 0L
+                                        val nextCounter = lastCounter + 1
+                                        metaRef.set(mapOf("last_contri_id" to nextCounter), SetOptions.merge()).await()
+
+                                        val counterStr = String.format(Locale.US, "%03d", nextCounter)
+                                        val randomChars = (1..6).map { ('A'..'Z').random() }.joinToString("")
+                                        val randomCode = "${randomChars.take(3)}-${(100..999).random()}-${randomChars.takeLast(3)}"
+                                        
+                                        val docId = "${counterStr}_${contriName.replace(" ", "")}_$randomCode"
+                                        val todayStr = SimpleDateFormat("dd-MM-yyyy", Locale.getDefault()).format(Date())
+
                                         val contriData = hashMapOf(
                                             "contri_code" to randomCode,
                                             "contri_date" to todayStr,
@@ -591,8 +624,6 @@ fun CreateContriDialog(username: String, onDismiss: () -> Unit, onSuccess: () ->
                                         )
                                         
                                         db.collection("Contri").document(docId).set(contriData).await()
-                                        
-                                        val userDocRef = userQuery.documents[0].reference
                                         
                                         val roomArrayString = "${counterStr}_${randomCode}_${contriName}"
                                         userDocRef.update("rooms", FieldValue.arrayUnion(roomArrayString)).await()
@@ -786,19 +817,30 @@ fun JoinContriDialog(
                                 coroutineScope.launch(Dispatchers.IO) {
                                     try {
                                         val db = FirebaseFirestore.getInstance()
-                                        val query = db.collection("Contri").whereEqualTo("contri_code", formattedCode).get().await()
+                                        val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
                                         
-                                        if (!query.isEmpty) {
-                                            val doc = query.documents[0]
-                                            val dbPasskey = doc.getString("passkey")
+                                        if (!userQuery.isEmpty) {
+                                            val userDoc = userQuery.documents[0]
+                                            val userDocRef = userDoc.reference
+                                            val currentUserId = userDoc.id
                                             
-                                            if (dbPasskey == pin || dbPasskey.isNullOrEmpty()) {
-                                                val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
-                                                val roomName = doc.getString("contri_name") ?: "Contri Room"
+                                            val existingRooms = userDoc.get("rooms") as? List<*> ?: emptyList<Any>()
+                                            if (existingRooms.size >= 5) {
+                                                withContext(Dispatchers.Main) {
+                                                    isSubmitting = false
+                                                    Toast.makeText(context, "Limit reached! Max 5 Contri rooms allowed.", Toast.LENGTH_LONG).show()
+                                                }
+                                                return@launch
+                                            }
+
+                                            val query = db.collection("Contri").whereEqualTo("contri_code", formattedCode).get().await()
+                                            
+                                            if (!query.isEmpty) {
+                                                val doc = query.documents[0]
+                                                val dbPasskey = doc.getString("passkey")
                                                 
-                                                if (!userQuery.isEmpty) {
-                                                    val currentUserId = userQuery.documents[0].id
-                                                    val userDocRef = userQuery.documents[0].reference
+                                                if (dbPasskey == pin || dbPasskey.isNullOrEmpty()) {
+                                                    val roomName = doc.getString("contri_name") ?: "Contri Room"
                                                     
                                                     doc.reference.update("member_ids", FieldValue.arrayUnion(currentUserId)).await()
                                                     
@@ -813,17 +855,17 @@ fun JoinContriDialog(
                                                         Toast.makeText(context, "Joined Successfully!", Toast.LENGTH_SHORT).show()
                                                         onSuccess()
                                                     }
+                                                } else {
+                                                    withContext(Dispatchers.Main) {
+                                                        isSubmitting = false
+                                                        Toast.makeText(context, "Invalid Pin", Toast.LENGTH_LONG).show()
+                                                    }
                                                 }
                                             } else {
                                                 withContext(Dispatchers.Main) {
                                                     isSubmitting = false
-                                                    Toast.makeText(context, "Invalid Pin", Toast.LENGTH_LONG).show()
+                                                    Toast.makeText(context, "Room not found", Toast.LENGTH_LONG).show()
                                                 }
-                                            }
-                                        } else {
-                                            withContext(Dispatchers.Main) {
-                                                isSubmitting = false
-                                                Toast.makeText(context, "Room not found", Toast.LENGTH_LONG).show()
                                             }
                                         }
                                     } catch (e: Exception) {
