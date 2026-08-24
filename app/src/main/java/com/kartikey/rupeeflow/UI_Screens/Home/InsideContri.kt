@@ -325,8 +325,8 @@ fun InsideContriScreen(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Box(
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(50))
                                     .bounceClick { showSettleDialog = true }
+                                    .clip(RoundedCornerShape(50))
                                     .background(MaterialTheme.colorScheme.primary)
                                     .padding(horizontal = 14.dp, vertical = 6.dp),
                                 contentAlignment = Alignment.Center
@@ -338,8 +338,8 @@ fun InsideContriScreen(
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Box(
                                     modifier = Modifier
-                                        .clip(RoundedCornerShape(50))
                                         .bounceClick { showNewCycleDialog = true }
+                                        .clip(RoundedCornerShape(50))
                                         .border(1.2.dp, MaterialTheme.colorScheme.onSurfaceVariant, RoundedCornerShape(50))
                                         .padding(horizontal = 12.dp, vertical = 5.dp),
                                     contentAlignment = Alignment.Center
@@ -1089,6 +1089,7 @@ fun SettleUpDialog(myName: String, ledgers: List<MemberLedger>, totalExpense: Do
                         sortedSettlements.forEach { settlement ->
                             val fromText = if (settlement.from == myName) "You" else (formattedNameMap[settlement.from] ?: settlement.from)
                             val toText = if (settlement.to == myName) "You" else (formattedNameMap[settlement.to] ?: settlement.to)
+                            val actionWord = if (fromText == "You") "Pay" else "Pays"
 
                             Row(
                                 modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp), 
@@ -1096,7 +1097,7 @@ fun SettleUpDialog(myName: String, ledgers: List<MemberLedger>, totalExpense: Do
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = "$fromText pays $toText", 
+                                    text = "$fromText $actionWord $toText", 
                                     fontSize = 14.sp, 
                                     fontWeight = if (fromText == "You" || toText == "You") FontWeight.ExtraBold else FontWeight.SemiBold, 
                                     color = MaterialTheme.colorScheme.onSurface
