@@ -181,7 +181,7 @@ fun ScanQRScreen(
                 modifier = Modifier.fillMaxSize()
             )
 
-            // GPay-Style Concentric 4-Corner Brackets & Soft Inset Camera Cutout
+            // GPay-Style Concentric Deep-Round Brackets & Cutout
             ScannerOverlay(primaryColor = primaryNeon)
             
             // Full-Screen Floating UI Controls
@@ -189,7 +189,7 @@ fun ScanQRScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .statusBarsPadding()
-                    .padding(bottom = 76.dp), // Positioned above the bottom navigation bar
+                    .padding(bottom = 76.dp), // Positioned cleanly above bottom nav bar
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 // Top Bar: Clean Close Button
@@ -216,7 +216,7 @@ fun ScanQRScreen(
                     }
                 }
 
-                // Push "Upload from Gallery" cleanly below the viewfinder square
+                // Push "Upload from Gallery" directly beneath the viewfinder square
                 Spacer(modifier = Modifier.fillMaxHeight(0.61f))
 
                 // Upload from Gallery Pill Button
@@ -320,16 +320,17 @@ fun ScannerOverlay(primaryColor: Color) {
         val rectRight = rectLeft + rectSize
         val rectBottom = rectTop + rectSize
         
-        // Exact Concentric Math: Inner Radius = Outer Radius - Inner Padding
-        val outerRadius = 50f
-        val innerPadding = 28f // Doubled gap for prominent floating bracket look
-        val innerRadius = outerRadius - innerPadding // 22f for matching parallel curve
+        // GPay Deep Round Concentric Math
+        val innerRadius = 56f
+        val innerPadding = 20f
+        val outerRadius = innerRadius + innerPadding // 76f
+        val cornerArm = 105f
 
         val innerLeft = rectLeft + innerPadding
         val innerTop = rectTop + innerPadding
         val innerSize = rectSize - (innerPadding * 2f)
 
-        // Punch hole out of dark translucent overlay
+        // Punch hole out of dark translucent overlay with deep squircle corners
         with(drawContext.canvas.nativeCanvas) {
             val checkPoint = saveLayer(null, null)
             
@@ -349,9 +350,7 @@ fun ScannerOverlay(primaryColor: Color) {
             restoreToCount(checkPoint)
         }
 
-        // 4 GPay-Style Bold Disconnected Rounded Corner Brackets
-        val cornerArm = 85f
-        
+        // 4 GPay-Style Bold Disconnected Deep-Rounded Corner Brackets
         val cornerPath = Path().apply {
             // 1. Top-Left Corner
             moveTo(rectLeft, rectTop + cornerArm)
