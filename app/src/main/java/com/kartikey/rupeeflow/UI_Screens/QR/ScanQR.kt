@@ -181,7 +181,7 @@ fun ScanQRScreen(
                 modifier = Modifier.fillMaxSize()
             )
 
-            // GPay-Style Bold 4-Corner Brackets & Inset Camera Cutout
+            // GPay-Style Concentric 4-Corner Brackets & Soft Inset Camera Cutout
             ScannerOverlay(primaryColor = primaryNeon)
             
             // Full-Screen Floating UI Controls
@@ -189,7 +189,7 @@ fun ScanQRScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .statusBarsPadding()
-                    .navigationBarsPadding(),
+                    .padding(bottom = 76.dp), // Floating right above the bottom navigation bar
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 // Top Bar: Clean Close Button
@@ -216,8 +216,8 @@ fun ScanQRScreen(
                     }
                 }
 
-                // Push "Upload from Gallery" directly beneath the Scanner Viewfinder
-                Spacer(modifier = Modifier.fillMaxHeight(0.55f))
+                // Push "Upload from Gallery" directly beneath the Viewfinder box
+                Spacer(modifier = Modifier.fillMaxHeight(0.51f))
 
                 // Upload from Gallery Pill Button
                 Surface(
@@ -250,11 +250,11 @@ fun ScanQRScreen(
 
                 Spacer(modifier = Modifier.weight(1f))
 
-                // Bottom 4-Corner Rounded Information Card
+                // Bottom 4-Corner Rounded Information Card (Placed above the bottom bar)
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                        .padding(horizontal = 16.dp, vertical = 6.dp),
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(containerColor = cardSurface),
                     elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
@@ -262,7 +262,7 @@ fun ScanQRScreen(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 18.dp, horizontal = 16.dp),
+                            .padding(vertical = 16.dp, horizontal = 16.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
@@ -316,12 +316,15 @@ fun ScannerOverlay(primaryColor: Color) {
 
         val rectSize = canvasWidth * 0.74f
         val rectLeft = (canvasWidth - rectSize) / 2f
-        val rectTop = canvasHeight * 0.18f
+        val rectTop = canvasHeight * 0.16f
         val rectRight = rectLeft + rectSize
         val rectBottom = rectTop + rectSize
         
-        // GPay Floating Offset: Punch hole is slightly inset from outer brackets
+        // Exact Concentric Math: Inner Radius = Outer Radius - Inner Padding
+        val outerRadius = 44f
         val innerPadding = 14f
+        val innerRadius = outerRadius - innerPadding // 30f for perfectly parallel curve
+
         val innerLeft = rectLeft + innerPadding
         val innerTop = rectTop + innerPadding
         val innerSize = rectSize - (innerPadding * 2f)
@@ -339,7 +342,7 @@ fun ScannerOverlay(primaryColor: Color) {
                 color = Color.Transparent,
                 topLeft = Offset(innerLeft, innerTop),
                 size = androidx.compose.ui.geometry.Size(innerSize, innerSize),
-                cornerRadius = CornerRadius(36f, 36f),
+                cornerRadius = CornerRadius(innerRadius, innerRadius),
                 blendMode = BlendMode.Clear
             )
             
@@ -348,32 +351,31 @@ fun ScannerOverlay(primaryColor: Color) {
 
         // 4 GPay-Style Bold Disconnected Rounded Corner Brackets
         val cornerArm = 85f
-        val cornerRadius = 44f
         
         val cornerPath = Path().apply {
             // 1. Top-Left Corner
             moveTo(rectLeft, rectTop + cornerArm)
-            lineTo(rectLeft, rectTop + cornerRadius)
-            quadraticBezierTo(rectLeft, rectTop, rectLeft + cornerRadius, rectTop)
+            lineTo(rectLeft, rectTop + outerRadius)
+            quadraticBezierTo(rectLeft, rectTop, rectLeft + outerRadius, rectTop)
             lineTo(rectLeft + cornerArm, rectTop)
 
             // 2. Top-Right Corner
             moveTo(rectRight - cornerArm, rectTop)
-            lineTo(rectRight - cornerRadius, rectTop)
-            quadraticBezierTo(rectRight, rectTop, rectRight, rectTop + cornerRadius)
+            lineTo(rectRight - outerRadius, rectTop)
+            quadraticBezierTo(rectRight, rectTop, rectRight, rectTop + outerRadius)
             lineTo(rectRight, rectTop + cornerArm)
 
             // 3. Bottom-Right Corner
             moveTo(rectRight, rectBottom - cornerArm)
-            lineTo(rectRight, rectBottom - cornerRadius)
-            quadraticBezierTo(rectRight, rectBottom, rectRight - cornerRadius, rectBottom)
+            lineTo(rectRight, rectBottom - outerRadius)
+            quadraticBezierTo(rectRight, rectBottom, rectRight - outerRadius, rectBottom)
             lineTo(rectRight - cornerArm, rectBottom)
 
-            // 4. Bottom-Left Corner
+            // 4. Bottom-Left Corner (Fixed upward coordinate line)
             moveTo(rectLeft + cornerArm, rectBottom)
-            lineTo(rectLeft + cornerRadius, rectBottom)
-            quadraticBezierTo(rectLeft, rectBottom, rectLeft, rectBottom - cornerRadius)
-            lineTo(rectLeft - cornerArm, rectBottom)
+            lineTo(rectLeft + outerRadius, rectBottom)
+            quadraticBezierTo(rectLeft, rectBottom, rectLeft, rectBottom - outerRadius)
+            lineTo(rectLeft, rectBottom - cornerArm)
         }
 
         drawPath(
