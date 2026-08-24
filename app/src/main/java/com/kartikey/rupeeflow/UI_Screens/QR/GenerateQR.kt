@@ -49,7 +49,7 @@ import java.io.OutputStream
 fun PremiumQRCode(
     data: String,
     size: Dp = 185.dp,
-    qrColor: Color = Color(0xFF000000), // Pure Solid Hard Black
+    qrColor: Color = Color(0xFF000000), // Pure Solid Hard Black #000000
     backgroundColor: Color = Color(0xFFFFFFFF),
     cornerRadius: Dp = 16.dp
 ) {
@@ -68,7 +68,7 @@ fun PremiumQRCode(
             Image(
                 bitmap = bitmap.asImageBitmap(),
                 contentDescription = "QR Code",
-                filterQuality = FilterQuality.None, // Prevents subpixel blur and keeps pitch black contrast
+                filterQuality = FilterQuality.None, // Zero-blur sharp jet black rendering
                 modifier = Modifier
                     .size(size)
                     .clip(RoundedCornerShape(cornerRadius))
@@ -84,11 +84,12 @@ fun generateRoundedQRCode(
     bgColor: Int = 0xFFFFFFFF.toInt()
 ): Bitmap? {
     try {
-        val hints = mapOf(
+        val hints = hashMapOf<EncodeHintType, Any>(
             EncodeHintType.ERROR_CORRECTION to ErrorCorrectionLevel.H,
-            EncodeHintType.MARGIN to 1
+            EncodeHintType.MARGIN to 0,
+            EncodeHintType.CHARACTER_SET to "UTF-8"
         )
-        val bitMatrix = MultiFormatWriter().encode(content, BarcodeFormat.QR_CODE, sizePx, sizePx, hints)
+        val bitMatrix = MultiFormatWriter().encode(content, BarcodeFormat.QR_CODE, 0, 0, hints)
         
         val matrixWidth = bitMatrix.width
         val matrixHeight = bitMatrix.height
@@ -108,10 +109,10 @@ fun generateRoundedQRCode(
             isAntiAlias = false
         }
 
-        val moduleWidth = sizePx.toFloat() / matrixWidth
-        val moduleHeight = sizePx.toFloat() / matrixHeight
+        val modW = sizePx.toFloat() / matrixWidth
+        val modH = sizePx.toFloat() / matrixHeight
 
-        // Draw regular data modules excluding 3 corner finder zones (7x7)
+        // 1. Draw regular data modules — Completely skipping standard 7x7 corner eyes
         for (x in 0 until matrixWidth) {
             for (y in 0 until matrixHeight) {
                 val isTopLeft = x < 7 && y < 7
@@ -120,69 +121,82 @@ fun generateRoundedQRCode(
 
                 if (!isTopLeft && !isTopRight && !isBottomLeft && bitMatrix[x, y]) {
                     canvas.drawRect(
-                        x * moduleWidth,
-                        y * moduleHeight,
-                        (x + 1) * moduleWidth,
-                        (y + 1) * moduleHeight,
+                        x * modW,
+                        y * modH,
+                        (x + 1) * modW,
+                        (y + 1) * modH,
                         dotPaint
                     )
                 }
             }
         }
 
-        // Custom Parallel Rounded Corner Finder Eyes
-        val cornerPaint = Paint().apply {
+        // 2. Custom Finder Eyes (Parallel directional rounded squircle design)
+        val eyePaint = Paint().apply {
             this.color = color
             isAntiAlias = true
             style = Paint.Style.FILL
         }
 
-        val cornerRadius = moduleWidth * 2.8f
-        val innerCornerRadius = moduleWidth * 1.5f
-
-        // Helper to draw single directional eye
-        fun drawDirectionalEye(startX: Float, startY: Float, outerRadii: FloatArray, centerRadii: FloatArray) {
-            val outerRect = RectF(startX, startY, startX + (7 * moduleWidth), startY + (7 * moduleHeight))
-            val cutoutRect = RectF(startX + moduleWidth, startY + moduleHeight, startX + (6 * moduleWidth), startY + (6 * moduleHeight))
-            val centerRect = RectF(startX + (2 * moduleWidth), startY + (2 * moduleHeight), startX + (5 * moduleWidth), startY + (5 * moduleHeight))
-
-            val outerPath = AndroidPath().apply {
-                addRoundRect(outerRect, outerRadii, AndroidPath.Direction.CW)
-            }
-            val cutoutPath = AndroidPath().apply {
-                addRoundRect(cutoutRect, innerCornerRadius, innerCornerRadius, AndroidPath.Direction.CW)
-            }
-            outerPath.op(cutoutPath, AndroidPath.Op.DIFFERENCE)
-            canvas.drawPath(outerPath, cornerPaint)
-
-            val centerPath = AndroidPath().apply {
-                addRoundRect(centerRect, centerRadii, AndroidPath.Direction.CW)
-            }
-            canvas.drawPath(centerPath, cornerPaint)
+        val holePaint = Paint().apply {
+            this.color = bgColor
+            isAntiAlias = true
+            style = Paint.Style.FILL
         }
 
-        // 1. Top-Left Eye (Outer Top-Left Corner Deep Rounded Parallel to White Card)
+        val cornerRadius = modW * 3.2f
+        val innerRadius = modW * 2.1f
+        val centerRadius = modW * 1.5f
+
+        // Helper to render custom 3-layer directional squircle eye
+        fun drawDirectionalEye(
+            startX: Float, 
+            startY: Float, 
+            outerRadii: FloatArray, 
+            innerRadii: FloatArray, 
+            centerRadii: FloatArray
+        ) {
+            // Outer Frame (7x7)
+            val outerRect = RectF(startX, startY, startX + (7 * modW), startY + (7 * modH))
+            val outerPath = AndroidPath().apply { addRoundRect(outerRect, outerRadii, AndroidPath.Direction.CW) }
+            canvas.drawPath(outerPath, eyePaint)
+
+            // Inner Cutout (5x5 White Box)
+            val innerRect = RectF(startX + modW, startY + modH, startX + (6 * modW), startY + (6 * modH))
+            val innerPath = AndroidPath().apply { addRoundRect(innerRect, innerRadii, AndroidPath.Direction.CW) }
+            canvas.drawPath(innerPath, holePaint)
+
+            // Center Box (3x3 Solid Black)
+            val centerRect = RectF(startX + (2 * modW), startY + (2 * modH), startX + (5 * modW), startY + (5 * modH))
+            val centerPath = AndroidPath().apply { addRoundRect(centerRect, centerRadii, AndroidPath.Direction.CW) }
+            canvas.drawPath(centerPath, eyePaint)
+        }
+
+        // Top-Left Eye (Top-Left outer corner deeply rounded parallel to card)
         drawDirectionalEye(
             startX = 0f,
             startY = 0f,
-            outerRadii = floatArrayOf(cornerRadius, cornerRadius, 8f, 8f, 8f, 8f, 8f, 8f),
-            centerRadii = floatArrayOf(innerCornerRadius, innerCornerRadius, 4f, 4f, 4f, 4f, 4f, 4f)
+            outerRadii = floatArrayOf(cornerRadius, cornerRadius, 6f, 6f, 6f, 6f, 6f, 6f),
+            innerRadii = floatArrayOf(innerRadius, innerRadius, 4f, 4f, 4f, 4f, 4f, 4f),
+            centerRadii = floatArrayOf(centerRadius, centerRadius, 3f, 3f, 3f, 3f, 3f, 3f)
         )
 
-        // 2. Top-Right Eye (Outer Top-Right Corner Deep Rounded)
+        // Top-Right Eye (Top-Right outer corner deeply rounded parallel to card)
         drawDirectionalEye(
-            startX = (matrixWidth - 7) * moduleWidth,
+            startX = (matrixWidth - 7) * modW,
             startY = 0f,
-            outerRadii = floatArrayOf(8f, 8f, cornerRadius, cornerRadius, 8f, 8f, 8f, 8f),
-            centerRadii = floatArrayOf(4f, 4f, innerCornerRadius, innerCornerRadius, 4f, 4f, 4f, 4f)
+            outerRadii = floatArrayOf(6f, 6f, cornerRadius, cornerRadius, 6f, 6f, 6f, 6f),
+            innerRadii = floatArrayOf(4f, 4f, innerRadius, innerRadius, 4f, 4f, 4f, 4f),
+            centerRadii = floatArrayOf(3f, 3f, centerRadius, centerRadius, 3f, 3f, 3f, 3f)
         )
 
-        // 3. Bottom-Left Eye (Outer Bottom-Left Corner Deep Rounded)
+        // Bottom-Left Eye (Bottom-Left outer corner deeply rounded parallel to card)
         drawDirectionalEye(
             startX = 0f,
-            startY = (matrixHeight - 7) * moduleHeight,
-            outerRadii = floatArrayOf(8f, 8f, 8f, 8f, 8f, 8f, cornerRadius, cornerRadius),
-            centerRadii = floatArrayOf(4f, 4f, 4f, 4f, 4f, 4f, innerCornerRadius, innerCornerRadius)
+            startY = (matrixHeight - 7) * modH,
+            outerRadii = floatArrayOf(6f, 6f, 6f, 6f, 6f, 6f, cornerRadius, cornerRadius),
+            innerRadii = floatArrayOf(4f, 4f, 4f, 4f, 4f, 4f, innerRadius, innerRadius),
+            centerRadii = floatArrayOf(3f, 3f, 3f, 3f, 3f, 3f, centerRadius, centerRadius)
         )
 
         return bmp
@@ -193,7 +207,7 @@ fun generateRoundedQRCode(
 }
 
 // ==========================================
-// CUSTOM VECTOR ICONS (CLEAN & SUBTLE)
+// CUSTOM VECTOR ICONS
 // ==========================================
 
 @Composable
@@ -249,34 +263,58 @@ fun CustomDownloadIcon(
 }
 
 @Composable
-fun CustomPaperPlaneIcon(
+fun CustomShareExportIcon(
     modifier: Modifier = Modifier,
     tint: Color = LocalContentColor.current
 ) {
     Canvas(modifier = modifier) {
         val strokeWidth = size.width * 0.085f
 
-        // Scaled inward to make it minimal and non-aggressive
-        val plane = Path().apply {
-            moveTo(size.width * 0.88f, size.height * 0.12f) // Top-Right Tip
-            lineTo(size.width * 0.12f, size.height * 0.48f) // Left Wing
-            lineTo(size.width * 0.42f, size.height * 0.58f) // Inner Fold
-            lineTo(size.width * 0.52f, size.height * 0.88f) // Bottom Tip
-            close()
+        // Rounded Outer Box with Top-Right Opening
+        val boxPath = Path().apply {
+            moveTo(size.width * 0.50f, size.height * 0.20f)
+            lineTo(size.width * 0.26f, size.height * 0.20f)
+            quadraticBezierTo(
+                size.width * 0.16f, size.height * 0.20f,
+                size.width * 0.16f, size.height * 0.30f
+            )
+            lineTo(size.width * 0.16f, size.height * 0.76f)
+            quadraticBezierTo(
+                size.width * 0.16f, size.height * 0.86f,
+                size.width * 0.26f, size.height * 0.86f
+            )
+            lineTo(size.width * 0.74f, size.height * 0.86f)
+            quadraticBezierTo(
+                size.width * 0.84f, size.height * 0.86f,
+                size.width * 0.84f, size.height * 0.76f
+            )
+            lineTo(size.width * 0.84f, size.height * 0.50f)
         }
         drawPath(
-            path = plane,
+            path = boxPath,
             color = tint,
             style = Stroke(width = strokeWidth, cap = StrokeCap.Round, join = StrokeJoin.Round)
         )
 
-        // Center Fold Crease Line
+        // Diagonal Export Arrow Stem
         drawLine(
             color = tint,
-            start = Offset(size.width * 0.88f, size.height * 0.12f),
-            end = Offset(size.width * 0.42f, size.height * 0.58f),
+            start = Offset(size.width * 0.44f, size.height * 0.56f),
+            end = Offset(size.width * 0.83f, size.height * 0.18f),
             strokeWidth = strokeWidth,
             cap = StrokeCap.Round
+        )
+
+        // Diagonal Arrow Head (Pointing Top-Right)
+        val arrowHead = Path().apply {
+            moveTo(size.width * 0.58f, size.height * 0.18f)
+            lineTo(size.width * 0.84f, size.height * 0.18f)
+            lineTo(size.width * 0.84f, size.height * 0.44f)
+        }
+        drawPath(
+            path = arrowHead,
+            color = tint,
+            style = Stroke(width = strokeWidth, cap = StrokeCap.Round, join = StrokeJoin.Round)
         )
     }
 }
