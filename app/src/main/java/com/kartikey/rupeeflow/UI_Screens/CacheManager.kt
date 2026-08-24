@@ -546,15 +546,14 @@ object CacheManager {
                 val userDoc = userQuery.documents[0]
                 val userRef = userDoc.reference
 
-                // Write 'ver' (Double) and 'lst_opn' (Timestamp) on backend data fetch
+                // Write exact 'ver' String (e.g. "1.00.012") and 'lst_opn' (Timestamp) on backend data fetch
                 try {
                     val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
-                    val rawVersionName = packageInfo.versionName ?: "1.0"
-                    val appVersionDouble = rawVersionName.replace("[^0-9.]".toRegex(), "").toDoubleOrNull() ?: 1.0
+                    val currentVersionName = packageInfo.versionName ?: "1.00.000"
                     
                     userRef.set(
                         mapOf(
-                            "ver" to appVersionDouble,
+                            "ver" to currentVersionName,
                             "lst_opn" to FieldValue.serverTimestamp()
                         ),
                         SetOptions.merge()
