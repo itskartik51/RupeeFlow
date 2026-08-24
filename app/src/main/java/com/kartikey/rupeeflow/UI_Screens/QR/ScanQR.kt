@@ -20,8 +20,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material.icons.outlined.FlashOff
-import androidx.compose.material.icons.outlined.FlashOn
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -78,8 +76,6 @@ fun ScanQRScreen(
     }
 
     var isScanned by remember { mutableStateOf(false) }
-    var cameraControl by remember { mutableStateOf<CameraControl?>(null) }
-    var isTorchOn by remember { mutableStateOf(false) }
 
     // Gallery QR Picker Launcher
     val galleryLauncher = rememberLauncherForActivityResult(
@@ -169,13 +165,12 @@ fun ScanQRScreen(
 
                         try {
                             cameraProvider.unbindAll()
-                            val camera = cameraProvider.bindToLifecycle(
+                            cameraProvider.bindToLifecycle(
                                 lifecycleOwner,
                                 cameraSelector,
                                 preview,
                                 imageAnalysis
                             )
-                            cameraControl = camera.cameraControl
                         } catch (e: Exception) {
                             e.printStackTrace()
                         }
@@ -197,13 +192,12 @@ fun ScanQRScreen(
                     .navigationBarsPadding(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Top Bar: Cross (Close) on Left, Torch Toggle on Right
+                // Top Bar: Clean Close Button
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Box(
                         modifier = Modifier
@@ -218,25 +212,6 @@ fun ScanQRScreen(
                             contentDescription = "Close", 
                             tint = Color.White,
                             modifier = Modifier.size(24.dp)
-                        )
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .size(44.dp)
-                            .clip(CircleShape)
-                            .background(Color.Black.copy(alpha = 0.5f))
-                            .bounceClick {
-                                isTorchOn = !isTorchOn
-                                cameraControl?.enableTorch(isTorchOn)
-                            },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = if (isTorchOn) Icons.Outlined.FlashOn else Icons.Outlined.FlashOff,
-                            contentDescription = "Torch",
-                            tint = if (isTorchOn) primaryNeon else Color.White,
-                            modifier = Modifier.size(22.dp)
                         )
                     }
                 }
