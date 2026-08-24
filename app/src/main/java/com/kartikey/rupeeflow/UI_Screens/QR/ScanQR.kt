@@ -2,8 +2,10 @@ package com.kartikey.rupeeflow.UI_Screens.QR
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.util.Size
 import android.view.HapticFeedbackConstants
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.OptIn
@@ -15,8 +17,10 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -30,13 +34,16 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
+import com.kartikey.rupeeflow.UI_Screens.bounceClick
 import java.util.concurrent.Executors
 
 @Composable
@@ -48,24 +55,59 @@ fun ScanQRScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     val localView = LocalView.current
     
+    val primaryNeon = MaterialTheme.colorScheme.primary
+    val cardSurface = MaterialTheme.colorScheme.surface
+    
     var hasCameraPermission by remember { 
         mutableStateOf(
             ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
         ) 
     }
 
-    val launcher = rememberLauncherForActivityResult(
+    val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
         onResult = { granted -> hasCameraPermission = granted }
     )
 
     LaunchedEffect(Unit) {
         if (!hasCameraPermission) {
-            launcher.launch(Manifest.permission.CAMERA)
+            permissionLauncher.launch(Manifest.permission.CAMERA)
         }
     }
 
     var isScanned by remember { mutableStateOf(false) }
+
+    // Gallery QR Picker Launcher
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let { imageUri ->
+            try {
+                val inputImage = InputImage.fromFilePath(context, imageUri)
+                val scanner = BarcodeScanning.getClient(
+                    BarcodeScannerOptions.Builder()
+                        .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
+                        .build()
+                )
+                scanner.process(inputImage)
+                    .addOnSuccessListener { barcodes ->
+                        val qrValue = barcodes.firstOrNull()?.rawValue
+                        if (!qrValue.isNullOrBlank() && !isScanned) {
+                            isScanned = true
+                            localView.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                            onQrScanned(qrValue)
+                        } else {
+                            Toast.makeText(context, "No valid QR Code found in image", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                    .addOnFailureListener {
+                        Toast.makeText(context, "Failed to scan image", Toast.LENGTH_SHORT).show()
+                    }
+            } catch (e: Exception) {
+                Toast.makeText(context, "Unable to read selected image", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
         if (hasCameraPermission) {
@@ -105,7 +147,6 @@ fun ScanQRScreen(
                                             barcode.rawValue?.let { qrValue ->
                                                 if (!isScanned) {
                                                     isScanned = true
-                                                    // Premium physical touch feel on scan
                                                     localView.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
                                                     onQrScanned(qrValue)
                                                 }
@@ -140,48 +181,123 @@ fun ScanQRScreen(
                 modifier = Modifier.fillMaxSize()
             )
 
-            // Premium Overlay UI
-            ScannerOverlay()
+            // 4-Corner Brackets & Neon Laser Overlay
+            ScannerOverlay(primaryColor = primaryNeon)
+            
+            // Floating UI Overlay Controls
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .statusBarsPadding()
+                    .navigationBarsPadding(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Top Bar with Back Button
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(CircleShape)
+                            .background(Color.Black.copy(alpha = 0.5f))
+                            .bounceClick { onBackClick() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Outlined.ArrowBack, contentDescription = "Back", tint = Color.White)
+                    }
+                }
+
+                Spacer(modifier = Modifier.weight(1f))
+
+                // Upload from Gallery Button (Pill Shape)
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = Color.Black.copy(alpha = 0.65f),
+                    tonalElevation = 6.dp,
+                    shadowElevation = 4.dp,
+                    modifier = Modifier
+                        .bounceClick { galleryLauncher.launch("image/*") }
+                        .padding(bottom = 24.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Image,
+                            contentDescription = "Gallery",
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Upload from Gallery",
+                            color = Color.White,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+
+                // Bottom 4-Corner Rounded Information Card (Theme Surface Color)
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = cardSurface),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 18.dp, horizontal = 16.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "Scan QR Code to Join any Contri",
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            }
             
         } else {
             Column(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                Text("Camera permission is required to scan QR.", color = Color.White)
+                Text("Camera permission is required to scan QR.", color = Color.White, textAlign = TextAlign.Center)
                 Spacer(modifier = Modifier.height(16.dp))
                 Button(
-                    onClick = { launcher.launch(Manifest.permission.CAMERA) },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
+                    onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) },
+                    colors = ButtonDefaults.buttonColors(containerColor = primaryNeon)
                 ) {
-                    Text("Grant Permission", fontWeight = FontWeight.Bold)
+                    Text("Grant Permission", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimary)
                 }
             }
-        }
-
-        // Floating Back Button
-        IconButton(
-            onClick = onBackClick,
-            modifier = Modifier
-                .padding(top = 48.dp, start = 16.dp)
-                .size(48.dp)
-                .clip(CircleShape)
-                .background(Color.Black.copy(alpha = 0.5f))
-        ) {
-            Icon(Icons.Outlined.ArrowBack, contentDescription = "Back", tint = Color.White)
         }
     }
 }
 
 @Composable
-fun ScannerOverlay() {
+fun ScannerOverlay(primaryColor: Color) {
     val infiniteTransition = rememberInfiniteTransition(label = "laser_transition")
     val laserY by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(1500, easing = LinearEasing),
+            animation = tween(1600, easing = LinearEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "laser_animation"
@@ -191,57 +307,86 @@ fun ScannerOverlay() {
         val canvasWidth = size.width
         val canvasHeight = size.height
 
-        val rectSize = canvasWidth * 0.7f
+        val rectSize = canvasWidth * 0.72f
         val rectLeft = (canvasWidth - rectSize) / 2f
-        val rectTop = (canvasHeight - rectSize) / 2f
+        val rectTop = (canvasHeight - rectSize) / 2.35f
+        val rectRight = rectLeft + rectSize
+        val rectBottom = rectTop + rectSize
         
+        // Punch hole out of dark translucent overlay
         with(drawContext.canvas.nativeCanvas) {
             val checkPoint = saveLayer(null, null)
             
-            // Dark transparent background
             drawRect(
                 color = Color.Black.copy(alpha = 0.6f),
                 size = size
             )
 
-            // Punch the scanner hole (Clear out pixels)
             drawRoundRect(
                 color = Color.Transparent,
                 topLeft = Offset(rectLeft, rectTop),
                 size = androidx.compose.ui.geometry.Size(rectSize, rectSize),
-                cornerRadius = CornerRadius(40f, 40f),
+                cornerRadius = CornerRadius(48f, 48f),
                 blendMode = BlendMode.Clear
             )
             
             restoreToCount(checkPoint)
         }
 
-        // Focus Box Border
-        drawRoundRect(
-            color = Color(0xFF2E7D32),
-            topLeft = Offset(rectLeft, rectTop),
-            size = androidx.compose.ui.geometry.Size(rectSize, rectSize),
-            cornerRadius = CornerRadius(40f, 40f),
-            style = Stroke(width = 4f)
+        // 4 GPay-Style Disconnected Rounded Corner Brackets
+        val cornerArm = 70f
+        val cornerRadius = 40f
+        
+        val cornerPath = Path().apply {
+            // 1. Top-Left Corner
+            moveTo(rectLeft, rectTop + cornerArm)
+            lineTo(rectLeft, rectTop + cornerRadius)
+            quadraticBezierTo(rectLeft, rectTop, rectLeft + cornerRadius, rectTop)
+            lineTo(rectLeft + cornerArm, rectTop)
+
+            // 2. Top-Right Corner
+            moveTo(rectRight - cornerArm, rectTop)
+            lineTo(rectRight - cornerRadius, rectTop)
+            quadraticBezierTo(rectRight, rectTop, rectRight, rectTop + cornerRadius)
+            lineTo(rectRight, rectTop + cornerArm)
+
+            // 3. Bottom-Right Corner
+            moveTo(rectRight, rectBottom - cornerArm)
+            lineTo(rectRight, rectBottom - cornerRadius)
+            quadraticBezierTo(rectRight, rectBottom, rectRight - cornerRadius, rectBottom)
+            lineTo(rectRight - cornerArm, rectBottom)
+
+            // 4. Bottom-Left Corner
+            moveTo(rectLeft + cornerArm, rectBottom)
+            lineTo(rectLeft + cornerRadius, rectBottom)
+            quadraticBezierTo(rectLeft, rectBottom, rectLeft, rectBottom - cornerRadius)
+            lineTo(rectLeft, rectBottom - cornerArm)
+        }
+
+        drawPath(
+            path = cornerPath,
+            color = primaryColor,
+            style = Stroke(width = 11f, cap = StrokeCap.Round, join = StrokeJoin.Round)
         )
 
+        // Animated Neon Laser Line
         val currentLaserY = rectTop + (rectSize * laserY)
         
-        // Laser Core
+        // Laser Core Beam
         drawLine(
-            color = Color(0xFF2E7D32).copy(alpha = 0.8f),
+            color = primaryColor.copy(alpha = 0.95f),
             start = Offset(rectLeft + 20f, currentLaserY),
-            end = Offset(rectLeft + rectSize - 20f, currentLaserY),
-            strokeWidth = 6f,
+            end = Offset(rectRight - 20f, currentLaserY),
+            strokeWidth = 5f,
             cap = StrokeCap.Round
         )
         
-        // Laser Glow
+        // Laser Soft Glow
         drawLine(
-            color = Color(0xFF2E7D32).copy(alpha = 0.3f),
+            color = primaryColor.copy(alpha = 0.35f),
             start = Offset(rectLeft + 20f, currentLaserY),
-            end = Offset(rectLeft + rectSize - 20f, currentLaserY),
-            strokeWidth = 20f,
+            end = Offset(rectRight - 20f, currentLaserY),
+            strokeWidth = 18f,
             cap = StrokeCap.Round
         )
     }
