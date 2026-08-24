@@ -26,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
@@ -314,6 +315,7 @@ fun InsideContriScreen(
                                 tint = if (isSyncing || actionProcessing) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier
                                     .size(24.dp)
+                                    .graphicsLayer { scaleX = -1f }
                                     .rotate(currentRotation)
                                     .bounceClick { if (!isSyncing && !actionProcessing) refreshTrigger++ }
                                     .padding(2.dp)
