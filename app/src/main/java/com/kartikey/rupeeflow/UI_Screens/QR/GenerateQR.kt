@@ -6,7 +6,6 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
-import android.graphics.Path as AndroidPath
 import android.graphics.RectF
 import android.net.Uri
 import android.os.Build
@@ -50,7 +49,7 @@ import java.io.OutputStream
 fun PremiumQRCode(
     data: String,
     size: Dp = 190.dp,
-    qrColor: Color = Color(0xFF000000), // Pure Solid Jet Black #000000
+    qrColor: Color = Color(0xFF000000), // Pure Solid Hard Black
     backgroundColor: Color = Color(0xFFFFFFFF),
     cornerRadius: Dp = 18.dp
 ) {
@@ -63,14 +62,14 @@ fun PremiumQRCode(
             .size(size)
             .clip(RoundedCornerShape(cornerRadius))
             .background(backgroundColor)
-            .padding(14.dp), // Safe white breathing margin for instant camera lock
+            .padding(14.dp),
         contentAlignment = Alignment.Center
     ) {
         if (bitmap != null) {
             Image(
                 bitmap = bitmap.asImageBitmap(),
                 contentDescription = "QR Code",
-                filterQuality = FilterQuality.None, // Zero-blur sharp black rendering
+                filterQuality = FilterQuality.None, // Zero-blur sharp jet black rendering
                 modifier = Modifier.size(size - 28.dp)
             )
         }
@@ -103,38 +102,25 @@ fun generateRoundedQRCode(
         }
         canvas.drawRect(0f, 0f, sizePx.toFloat(), sizePx.toFloat(), bgPaint)
 
-        // Solid Black Paint for data modules
+        // Pure Jet-Black Paint (Zero blur / No Anti-Aliasing wash)
         val dotPaint = Paint().apply {
             this.color = color
-            isAntiAlias = true
+            isAntiAlias = false
         }
 
         val modW = sizePx.toFloat() / matrixWidth
         val modH = sizePx.toFloat() / matrixHeight
-        val dotRadius = modW * 0.35f
 
         for (x in 0 until matrixWidth) {
             for (y in 0 until matrixHeight) {
                 if (bitMatrix[x, y]) {
-                    val isFinderZone = (x < 8 && y < 8) || 
-                                       (x >= matrixWidth - 8 && y < 8) || 
-                                       (x < 8 && y >= matrixHeight - 8)
-
-                    val rect = RectF(
+                    canvas.drawRect(
                         x * modW,
                         y * modH,
                         (x + 1) * modW,
-                        (y + 1) * modH
+                        (y + 1) * modH,
+                        dotPaint
                     )
-
-                    if (isFinderZone) {
-                        // Scan-safe solid blocks for finder eyes
-                        canvas.drawRect(rect, dotPaint)
-                    } else {
-                        // Premium micro-squircle rounded modules for data
-                        rect.inset(modW * 0.05f, modH * 0.05f)
-                        canvas.drawRoundRect(rect, dotRadius, dotRadius, dotPaint)
-                    }
                 }
             }
         }
@@ -147,7 +133,7 @@ fun generateRoundedQRCode(
 }
 
 // ==========================================
-// CUSTOM VECTOR ICONS (EXACT REPLICAS)
+// CUSTOM VECTOR DOWNLOAD ICON
 // ==========================================
 
 @Composable
@@ -196,63 +182,6 @@ fun CustomDownloadIcon(
         }
         drawPath(
             path = tray,
-            color = tint,
-            style = Stroke(width = strokeWidth, cap = StrokeCap.Round, join = StrokeJoin.Round)
-        )
-    }
-}
-
-@Composable
-fun CustomShareExportIcon(
-    modifier: Modifier = Modifier,
-    tint: Color = LocalContentColor.current
-) {
-    Canvas(modifier = modifier) {
-        val strokeWidth = size.width * 0.088f
-
-        // Open Rounded Box (Exact 1:1 layout as user reference)
-        val boxPath = Path().apply {
-            moveTo(size.width * 0.48f, size.height * 0.24f)
-            lineTo(size.width * 0.28f, size.height * 0.24f)
-            quadraticBezierTo(
-                size.width * 0.15f, size.height * 0.24f,
-                size.width * 0.15f, size.height * 0.37f
-            )
-            lineTo(size.width * 0.15f, size.height * 0.73f)
-            quadraticBezierTo(
-                size.width * 0.15f, size.height * 0.86f,
-                size.width * 0.28f, size.height * 0.86f
-            )
-            lineTo(size.width * 0.72f, size.height * 0.86f)
-            quadraticBezierTo(
-                size.width * 0.85f, size.height * 0.86f,
-                size.width * 0.85f, size.height * 0.73f
-            )
-            lineTo(size.width * 0.85f, size.height * 0.52f)
-        }
-        drawPath(
-            path = boxPath,
-            color = tint,
-            style = Stroke(width = strokeWidth, cap = StrokeCap.Round, join = StrokeJoin.Round)
-        )
-
-        // Diagonal 45° Arrow Stem emerging from center
-        drawLine(
-            color = tint,
-            start = Offset(size.width * 0.46f, size.height * 0.54f),
-            end = Offset(size.width * 0.83f, size.height * 0.17f),
-            strokeWidth = strokeWidth,
-            cap = StrokeCap.Round
-        )
-
-        // Arrow Head Pointing Top-Right
-        val arrowHead = Path().apply {
-            moveTo(size.width * 0.58f, size.height * 0.17f)
-            lineTo(size.width * 0.83f, size.height * 0.17f)
-            lineTo(size.width * 0.83f, size.height * 0.42f)
-        }
-        drawPath(
-            path = arrowHead,
             color = tint,
             style = Stroke(width = strokeWidth, cap = StrokeCap.Round, join = StrokeJoin.Round)
         )
