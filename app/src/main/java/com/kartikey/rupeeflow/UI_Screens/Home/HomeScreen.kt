@@ -47,7 +47,7 @@ fun HomeDashboardDesign(
     onBankClick: () -> Unit,
     onBudgetSaved: () -> Unit
 ) {
-    Column(modifier = Modifier.fillMaxSize().padding(paddingValues)) {[cite: 3]
+    Column(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
         
         Surface(
             color = MaterialTheme.colorScheme.surface,
@@ -65,11 +65,11 @@ fun HomeDashboardDesign(
                     painter = painterResource(id = R.mipmap.ic_launcher), 
                     contentDescription = "App Logo", 
                     modifier = Modifier.size(46.dp).clip(CircleShape)
-                )[cite: 3]
-                Spacer(modifier = Modifier.width(12.dp))[cite: 3]
+                )
+                Spacer(modifier = Modifier.width(12.dp))
                 
-                Column(modifier = Modifier.weight(1f)) {[cite: 3]
-                    Text("RupeeFlow", fontWeight = FontWeight.ExtraBold, fontSize = 22.sp, color = MaterialTheme.colorScheme.onSurface)[cite: 3]
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("RupeeFlow", fontWeight = FontWeight.ExtraBold, fontSize = 22.sp, color = MaterialTheme.colorScheme.onSurface)
                     Row(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -77,23 +77,23 @@ fun HomeDashboardDesign(
                             text = "Hi, $username", 
                             color = MaterialTheme.colorScheme.onSurfaceVariant, 
                             fontSize = 13.sp
-                        )[cite: 3]
-                        Spacer(modifier = Modifier.width(4.dp))[cite: 3]
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
                         Icon(
                             imageVector = Icons.Default.Verified,
                             contentDescription = "Verified User",
                             tint = Color(0xFF1D9BF0),
                             modifier = Modifier.size(13.dp)
-                        )[cite: 3]
+                        )
                     }
                 }
                 
                 ProfileAvatar(
-                    name = userFullName.ifBlank { username },[cite: 3]
-                    profilePicUrl = profilePicUrl,[cite: 3]
-                    size = 42.dp,[cite: 3]
-                    fontSize = 18.sp,[cite: 3]
-                    onClick = onAvatarClick[cite: 3]
+                    name = userFullName.ifBlank { username },
+                    profilePicUrl = profilePicUrl,
+                    size = 42.dp,
+                    fontSize = 18.sp,
+                    onClick = onAvatarClick
                 )
             }
         }
@@ -104,7 +104,7 @@ fun HomeDashboardDesign(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp)
         ) {
-            Spacer(modifier = Modifier.height(12.dp))[cite: 3]
+            Spacer(modifier = Modifier.height(12.dp))
             
             ExpenseSummaryCard(
                 todayExpenses = todayExpenses, 
@@ -114,11 +114,10 @@ fun HomeDashboardDesign(
                 isLoadingExpenses = isLoadingExpenses,
                 onRefreshExpenses = onRefreshExpenses, 
                 onExpenseCardClick = onExpenseCardClick,
-            )[cite: 3]
+            )
             
-            Spacer(modifier = Modifier.height(16.dp))[cite: 3]
+            Spacer(modifier = Modifier.height(16.dp))
 
-            // 🚀 Encapsulated Clean Cards Grid (All logic handled in GridCard.kt)
             HomeQuickCardsGrid(
                 contriCount = contriCount,
                 totalInvestment = totalInvestment,
@@ -132,15 +131,15 @@ fun HomeDashboardDesign(
                 onBudgetSaved = onBudgetSaved
             )
             
-            Spacer(modifier = Modifier.height(16.dp))[cite: 3]
+            Spacer(modifier = Modifier.height(16.dp))
             
-            SpendingTrackerCard(transactions = transactionList) [cite: 3]
+            SpendingTrackerCard(transactions = transactionList) 
             
-            Spacer(modifier = Modifier.height(16.dp))[cite: 3]
+            Spacer(modifier = Modifier.height(16.dp))
             
-            ReminderBanner()[cite: 3]
+            ReminderBanner()
             
-            Spacer(modifier = Modifier.height(30.dp)) [cite: 3]
+            Spacer(modifier = Modifier.height(30.dp)) 
         }
     }
 }
