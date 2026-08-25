@@ -92,7 +92,7 @@ fun ContriScreen(
         if (isRefreshing) {
             while (true) {
                 delay(16)
-                currentRotation += 8f
+                currentRotation -= 8f // Inverted for true clockwise visual spin when mirrored
             }
         } else {
             currentRotation = 0f
