@@ -130,7 +130,32 @@ fun ProfileDetailsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Profile Details", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
+                title = { 
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Profile", 
+                            fontWeight = FontWeight.Bold, 
+                            fontSize = 20.sp,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Verified User",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Normal,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(
+                            imageVector = Icons.Default.Verified,
+                            contentDescription = "Verified User",
+                            tint = Color(0xFF1D9BF0),
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = onBackClick, modifier = Modifier.bounceClick()) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.onSurface)
@@ -199,7 +224,6 @@ fun ProfileDetailsScreen(
                     }
                 }
 
-                // 🚀 FIX: Replaced AnimatedVisibility with scale/alpha states to fix Context Scope Error
                 val iconScale by animateFloatAsState(
                     targetValue = if (isSelected && !isEditing) 1f else 0.5f,
                     animationSpec = if (isSelected && !isEditing) spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow) else tween(150),
@@ -223,7 +247,7 @@ fun ProfileDetailsScreen(
                                 if (isEditableField) {
                                     if (isSavingStatus && (isEditing || isSelected)) {
                                         CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.primary)
-                                    } else if (iconAlpha > 0.01f) { // Only render if visible
+                                    } else if (iconAlpha > 0.01f) { 
                                         IconButton(
                                             onClick = onEditClick, 
                                             enabled = !isSaving,
