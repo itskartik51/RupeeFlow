@@ -1,6 +1,9 @@
 package com.kartikey.rupeeflow.UI_Screens.Home
 
 import android.widget.Toast
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -12,7 +15,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
@@ -239,18 +241,27 @@ fun ContriDashboardCard(
     modifier: Modifier = Modifier
 ) {
     val safeCount = contriCount.coerceIn(0, 5)
-    val progress = (safeCount / 5f).coerceIn(0f, 1f)
+    val targetProgress = (safeCount / 5f).coerceIn(0f, 1f)
+
+    var animatedProgress by remember { mutableFloatStateOf(0f) }
+    val progress by animateFloatAsState(
+        targetValue = animatedProgress,
+        animationSpec = tween(durationMillis = 800, easing = FastOutSlowInEasing),
+        label = "ContriProgressAnim"
+    )
+
+    LaunchedEffect(targetProgress) {
+        animatedProgress = targetProgress
+    }
+
+    val headerTitle = if (contriCount > 0) "CONTRI ($safeCount/5)" else "CONTRI"
 
     RupeeFlowCard(
         modifier = modifier
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp)
-        ) {
+        Column(modifier = Modifier.padding(12.dp)) {
             Text(
-                text = "CONTRI",
+                text = headerTitle,
                 fontSize = 10.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -270,32 +281,18 @@ fun ContriDashboardCard(
             )
             Spacer(modifier = Modifier.height(8.dp))
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.65f)
+                    .height(3.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
             ) {
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth(0.55f)
-                        .height(3.5.dp)
-                        .clip(RoundedCornerShape(50))
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth(progress)
-                            .fillMaxHeight()
-                            .background(Color(0xFF00E676), RoundedCornerShape(50))
-                    )
-                }
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = "$safeCount/5",
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    softWrap = false
+                        .fillMaxWidth(progress)
+                        .fillMaxHeight()
+                        .background(Color(0xFF00E676), RoundedCornerShape(50))
                 )
             }
         }
