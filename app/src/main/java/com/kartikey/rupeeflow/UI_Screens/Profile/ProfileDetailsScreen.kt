@@ -195,27 +195,18 @@ fun ProfileDetailsScreen(
                         size = 110.dp,
                         fontSize = 42.sp,
                         isEditable = false,
+                        onClick = { isBadgeFlipped = !isBadgeFlipped },
                         forceUpdateTrigger = imageUpdateTrigger
                     )
 
                     Box(
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
-                            .offset(x = 2.dp, y = 2.dp)
-                            .size(30.dp)
+                            .size(32.dp)
                             .graphicsLayer {
                                 rotationY = badgeRotation
                                 cameraDistance = 12f * density
                             }
-                            .then(
-                                if (badgeRotation > 90f) {
-                                    Modifier
-                                        .clip(CircleShape)
-                                        .background(Color(0xFF00E676))
-                                } else {
-                                    Modifier
-                                }
-                            )
                             .bounceClick {
                                 if (!isBadgeFlipped) {
                                     isBadgeFlipped = true
@@ -226,21 +217,35 @@ fun ProfileDetailsScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         if (badgeRotation <= 90f) {
+                            Box(
+                                modifier = Modifier
+                                    .size(14.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.White)
+                            )
                             Icon(
                                 imageVector = Icons.Default.Verified,
                                 contentDescription = "Verified Badge",
                                 tint = Color(0xFF1D9BF0),
-                                modifier = Modifier.size(30.dp)
+                                modifier = Modifier.size(32.dp)
                             )
                         } else {
-                            Icon(
-                                imageVector = Icons.Default.PhotoCamera,
-                                contentDescription = "Change Photo",
-                                tint = Color.Black,
+                            Box(
                                 modifier = Modifier
-                                    .size(17.dp)
-                                    .graphicsLayer { rotationY = 180f }
-                            )
+                                    .fillMaxSize()
+                                    .clip(CircleShape)
+                                    .background(Color(0xFF00E676)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.PhotoCamera,
+                                    contentDescription = "Change Photo",
+                                    tint = Color.Black,
+                                    modifier = Modifier
+                                        .size(18.dp)
+                                        .graphicsLayer { rotationY = 180f }
+                                )
+                            }
                         }
                     }
                 }
