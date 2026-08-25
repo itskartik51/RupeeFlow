@@ -10,6 +10,7 @@ import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -25,7 +26,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -125,7 +128,7 @@ private fun ProfileMainContent(
     }
 
     val encodedEmail = "cnVwZWVmbG93LnJmQGdtYWlsLmNvbQ==" 
-    val encodedPhone = "OTE9ODI4ODk3MjY4" 
+    val encodedPhone = "OTE5ODI4ODk3MjY4" 
 
     val decodedEmail = remember(encodedEmail) {
         try { String(Base64.decode(encodedEmail, Base64.DEFAULT), Charsets.UTF_8) } catch (e: Exception) { "" }
@@ -134,7 +137,6 @@ private fun ProfileMainContent(
         try { String(Base64.decode(encodedPhone, Base64.DEFAULT), Charsets.UTF_8) } catch (e: Exception) { "" }
     }
 
-    // 🚀 FIXED BIOMETRIC AUTH FOR STANDARD SWITCH
     fun authenticateAndToggleLock(targetState: Boolean) {
         val activity = context as? FragmentActivity ?: return
         val executor = ContextCompat.getMainExecutor(activity)
@@ -151,8 +153,6 @@ private fun ProfileMainContent(
 
                 override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
                     super.onAuthenticationError(errorCode, errString)
-                    // Reset UI State on error
-                    isLockEnabled = !targetState
                     Toast.makeText(context, "Auth Error: $errString", Toast.LENGTH_SHORT).show()
                 }
             }
@@ -182,6 +182,8 @@ private fun ProfileMainContent(
 
         val displayEmail = if (email.isNotBlank()) email else "Add Mail"
         val displayName = name.ifBlank { "User" }
+        val displayUsername = username.ifBlank { "N/A" }
+        val displayMobile = mobile.ifBlank { "N/A" }
 
         ProfileAvatar(
             name = displayName,
@@ -238,20 +240,24 @@ private fun ProfileMainContent(
                         fontWeight = FontWeight.Medium,
                         color = MaterialTheme.colorScheme.onSurface
                     )
-                    // 🚀 FIXED: Standard Material Design 3 Switch
                     Switch(
                         checked = isLockEnabled,
                         onCheckedChange = { newState ->
-                            // Biometric trigger logic still works instantly on click
                             authenticateAndToggleLock(newState)
-                        }
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+                            checkedTrackColor = MaterialTheme.colorScheme.primary,
+                            uncheckedThumbColor = MaterialTheme.colorScheme.outline,
+                            uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                        )
                     )
                 }
             }
             HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
         }
 
-        // Currency Block (RADIO OPTION FIXED)
+        // Currency Block
         Column {
             Row(
                 modifier = Modifier
@@ -270,9 +276,8 @@ private fun ProfileMainContent(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            // Fixed: Using clickable here makes the entire row interactable like a RadioOption
-                            .clickable { } 
-                            .padding(vertical = 8.dp), 
+                            .bounceClick(scaleDown = 0.98f) { }
+                            .padding(vertical = 2.dp), 
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         RadioButton(
@@ -283,7 +288,7 @@ private fun ProfileMainContent(
                                 unselectedColor = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         )
-                        Spacer(modifier = Modifier.width(12.dp)) 
+                        Spacer(modifier = Modifier.width(4.dp)) 
                         Text(text = "₹  INR", fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface)
                     }
                 }
@@ -345,7 +350,7 @@ private fun ProfileMainContent(
                             .fillMaxWidth()
                             .bounceClick(scaleDown = 0.98f) {
                                 try {
-                                    val mailBody = "Dear RupeeFlow,\nI am Need Help regarding..."
+                                    val mailBody = "Dear RupeeFlow,\nI am $displayName ($displayUsername), [$displayMobile]. I Need Help regarding..."
                                     val encodedSubject = Uri.encode("RupeeFlow Support Inquiry")
                                     val encodedBody = Uri.encode(mailBody)
                                     
@@ -380,7 +385,7 @@ private fun ProfileMainContent(
                             .fillMaxWidth()
                             .bounceClick(scaleDown = 0.98f) {
                                 try {
-                                    val waMessage = "Hi RupeeFlow, I need help regarding "
+                                    val waMessage = "Hi RupeeFlow, $displayName ($displayUsername) is Here, I need help regarding "
                                     val encodedText = Uri.encode(waMessage)
                                     val waUrl = "https://wa.me/$decodedPhone?text=$encodedText"
                                     val intent = Intent(Intent.ACTION_VIEW, Uri.parse(waUrl))
@@ -392,7 +397,7 @@ private fun ProfileMainContent(
                             .padding(vertical = 8.dp), 
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Default.Chat, contentDescription = "WhatsApp Support", tint = Color(0xFF25D366), modifier = Modifier.size(20.dp))
+                        WhatsAppIcon(modifier = Modifier.size(20.dp))
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(
                             text = "WhatsApp Support", 
@@ -444,7 +449,7 @@ private fun ProfileMainContent(
     }
 }
 
-// 🚀 FIXED: UNIVERSAL PROFILE AVATAR WITH CUT-OUT DESIGN
+// UNIVERSAL PROFILE AVATAR WITH CUT-OUT DESIGN
 @Composable
 fun ProfileAvatar(
     name: String,
@@ -458,11 +463,28 @@ fun ProfileAvatar(
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
-    // Using simple CacheManager mock for simulation
-    val profileFile = remember { context.getCacheDir().resolve("profile.pic") }
+    val profileFile = remember { com.kartikey.rupeeflow.UI_Screens.CacheManager.getProfilePicFile(context) }
     
-    var lastModified by remember(forceUpdateTrigger) { mutableStateOf(if (profileFile.exists()) profileFile.lastModified() else 0L) }
+    var lastModified by remember(forceUpdateTrigger) { mutableStateOf(profileFile.lastModified()) }
     var fileExists by remember(lastModified) { mutableStateOf(profileFile.exists()) }
+
+    LaunchedEffect(Unit) {
+        val currentModified = profileFile.lastModified()
+        if (currentModified != lastModified) {
+            lastModified = currentModified
+        }
+    }
+
+    LaunchedEffect(profilePicUrl, fileExists) {
+        if (!fileExists && profilePicUrl.isNotBlank()) {
+            coroutineScope.launch {
+                val success = com.kartikey.rupeeflow.UI_Screens.CacheManager.downloadAndCacheProfilePic(context, profilePicUrl)
+                if (success) {
+                    lastModified = profileFile.lastModified()
+                }
+            }
+        }
+    }
 
     Box(modifier = Modifier.size(size)) {
         // Main Avatar Circle (Static if Editable, Bouncy if Not)
@@ -475,25 +497,33 @@ fun ProfileAvatar(
             contentAlignment = Alignment.Center
         ) {
             if (fileExists) {
-                // AsyncImage simulation, will show blank here but data logic is present
-                Box(modifier = Modifier.fillMaxSize().background(Color.Gray)) 
+                coil.compose.AsyncImage(
+                    model = coil.request.ImageRequest.Builder(context)
+                        .data(profileFile)
+                        .memoryCacheKey(lastModified.toString()) 
+                        .diskCacheKey(lastModified.toString())
+                        .build(),
+                    contentDescription = "Profile Picture",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                )
             } else {
                 val displayLetter = if (name.isNotBlank()) name.take(1).uppercase() else "?"
                 Text(displayLetter, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, fontSize = fontSize)
             }
         }
         
-        // 🚀 SMART CUT-OUT CAMERA ICON
+        // SMART CUT-OUT CAMERA ICON
         if (isEditable) {
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .offset(x = 4.dp, y = 4.dp) // Slight offset for perfect overlap
+                    .offset(x = 4.dp, y = 4.dp)
                     .size(size * 0.35f)
-                    .background(MaterialTheme.colorScheme.background, CircleShape) // The gap/cut-out matching screen background
-                    .padding(4.dp) // Gap thickness
+                    .background(MaterialTheme.colorScheme.background, CircleShape)
+                    .padding(4.dp)
                     .background(MaterialTheme.colorScheme.primary, CircleShape)
-                    .bounceClick { onEditClick() }, // Only camera is bouncy
+                    .bounceClick { onEditClick() },
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
@@ -508,11 +538,27 @@ fun ProfileAvatar(
 }
 
 @Composable
+fun WhatsAppIcon(modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier) {
+        val waPathData = "M12.011 2c-5.506 0-9.98 4.474-9.98 9.98 0 1.758.459 3.469 1.332 4.978l-1.363 4.977 5.093-1.335c1.453.792 3.097 1.21 4.767 1.21 5.506 0 9.98-4.474 9.98-9.98 0-5.506-4.474-9.98-9.98-9.98zm5.83 14.28c-.244.688-1.226 1.261-1.996 1.428-.528.115-1.218.207-3.535-.754-2.964-1.228-4.871-4.24-5.019-4.437-.147-.197-1.202-1.603-1.202-3.057 0-1.454.76-2.171 1.032-2.464.272-.293.593-.367.791-.367.197 0 .395.003.568.012.183.009.43-.07.671.508.244.588.835 2.038.908 2.186.073.148.122.321.024.516-.098.196-.147.321-.295.494-.148.173-.311.387-.444.52-.148.148-.302.309-.13.604.172.295.767 1.268 1.648 2.052 1.134 1.01 2.091 1.323 2.387 1.471.296.148.468.123.641-.074.173-.197.74-.863.938-1.159.198-.296.395-.246.666-.148.272.098 1.728.815 2.024.962.296.148.494.222.568.345.074.123.074.714-.17 1.402z"
+        val waPath = PathParser().parsePathString(waPathData).toPath()
+
+        val scaleX = size.width / 24f
+        val scaleY = size.height / 24f
+        scale(scaleX, scaleY, pivot = androidx.compose.ui.geometry.Offset.Zero) {
+            drawPath(
+                path = waPath,
+                color = Color(0xFF25D366) 
+            )
+        }
+    }
+}
+
+@Composable
 fun ThemeRadioOption(title: String, modeValue: Int, currentMode: Int, onThemeChange: (Int) -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            // Fixed: Entire row is bouncy and clickable like standard RadioOption
             .bounceClick(scaleDown = 0.98f) { onThemeChange(modeValue) }
             .padding(vertical = 2.dp), 
         verticalAlignment = Alignment.CenterVertically
@@ -525,7 +571,7 @@ fun ThemeRadioOption(title: String, modeValue: Int, currentMode: Int, onThemeCha
                 unselectedColor = MaterialTheme.colorScheme.onSurfaceVariant
             )
         )
-        Spacer(modifier = Modifier.width(12.dp))
+        Spacer(modifier = Modifier.width(4.dp))
         Text(text = title, fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface)
     }
 }
@@ -550,44 +596,4 @@ fun ProfileOptionRow(
         Text(text = title, fontSize = 16.sp, fontWeight = FontWeight.Medium, color = finalColor)
     }
     HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-}
-
-// Simple AppUpdateRow mock for profile screen logic
-@Composable
-fun AppUpdateRow(isUpdateAvailableBadge: Boolean) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 16.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(imageVector = Icons.Default.Update, contentDescription = "Update", tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(24.dp))
-        Spacer(modifier = Modifier.width(16.dp))
-        Text("App Update", fontSize = 16.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
-        if (isUpdateAvailableBadge) {
-            Spacer(modifier = Modifier.weight(1f))
-            Box(
-                modifier = Modifier.size(10.dp).clip(CircleShape).background(MaterialTheme.colorScheme.error)
-            )
-        }
-    }
-    HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-}
-
-// ProfileDetailsScreen mock for simulation
-@Composable
-fun ProfileDetailsScreen(
-    username: String,
-    name: String,
-    email: String,
-    mobile: String,
-    profilePicUrl: String,
-    dob: String,
-    onBackClick: () -> Unit,
-    onProfileUpdated: () -> Unit
-) {
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        Text("Profile Details Screen Simulation", fontSize = 18.sp, fontWeight = FontWeight.Bold)
-        Button(onClick = onBackClick) { Text("Back") }
-    }
 }
