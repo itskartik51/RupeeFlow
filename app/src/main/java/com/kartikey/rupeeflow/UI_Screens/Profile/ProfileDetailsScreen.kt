@@ -184,10 +184,7 @@ fun ProfileDetailsScreen(
                 Box(
                     modifier = Modifier
                         .size(110.dp)
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null
-                        ) {
+                        .bounceClick {
                             isBadgeFlipped = !isBadgeFlipped
                         },
                     contentAlignment = Alignment.Center
