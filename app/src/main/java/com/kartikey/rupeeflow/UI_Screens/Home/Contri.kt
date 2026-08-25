@@ -226,7 +226,7 @@ fun ContriScreen(
                         title = "Create Contri",
                         icon = Icons.Outlined.Add,
                         iconTint = MaterialTheme.colorScheme.onSurface,
-                        bgColor = MaterialTheme.colorScheme.primaryContainer,
+                        bgColor = MaterialTheme.colorScheme.surfaceVariant,
                         modifier = Modifier.weight(1f),
                         onClick = { 
                             if (fetchedRooms.size >= 5) {
@@ -241,7 +241,7 @@ fun ContriScreen(
                         title = "Join Contri",
                         icon = Icons.Outlined.GroupAdd,
                         iconTint = MaterialTheme.colorScheme.onSurface,
-                        bgColor = MaterialTheme.colorScheme.primaryContainer,
+                        bgColor = MaterialTheme.colorScheme.surfaceVariant,
                         modifier = Modifier.weight(1f),
                         onClick = { 
                             if (fetchedRooms.size >= 5) {
@@ -550,7 +550,7 @@ fun ActiveRoomCard(room: ContriRoomModel, onClick: () -> Unit, onQrClick: () -> 
                 modifier = Modifier
                     .size(44.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primaryContainer)
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
                     .bounceClick { onQrClick() },
                 contentAlignment = Alignment.Center
             ) {
