@@ -181,11 +181,20 @@ private fun ProfileMainContent(
     ) {
         Spacer(modifier = Modifier.height(24.dp))
 
-        val displayEmail = if (email.isNotBlank()) email else "Add Mail"
+        val cleanMobileDigits = mobile.filter { it.isDigit() }.takeLast(10)
+        val displayMobileFormatted = if (cleanMobileDigits.length == 10) {
+            "+91 $cleanMobileDigits"
+        } else if (mobile.isNotBlank()) {
+            mobile
+        } else {
+            "Add Mobile Number"
+        }
+
         val displayName = name.ifBlank { "User" }
         val displayUsername = username.ifBlank { "N/A" }
         val displayMobile = mobile.ifBlank { "N/A" }
 
+        // 1. Profile Avatar (Bounce Removed -> Smooth Clickable)
         ProfileAvatar(
             name = displayName,
             profilePicUrl = profilePicUrl,
@@ -196,19 +205,32 @@ private fun ProfileMainContent(
         
         Spacer(modifier = Modifier.height(16.dp))
         
-        Text(
-            text = displayName, 
-            fontWeight = FontWeight.ExtraBold, 
-            fontSize = 22.sp,
-            color = MaterialTheme.colorScheme.onBackground,
-            modifier = Modifier.bounceClick { onNameClick() }
-        )
+        // 2. Name with Verified Blue Tick (Exact 22dp Match & Bounce Removed)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.clickable { onNameClick() }
+        ) {
+            Text(
+                text = displayName, 
+                fontWeight = FontWeight.ExtraBold, 
+                fontSize = 22.sp,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Icon(
+                imageVector = Icons.Default.Verified,
+                contentDescription = "Verified User",
+                tint = Color(0xFF1D9BF0),
+                modifier = Modifier.size(22.dp)
+            )
+        }
         
+        // 3. Mobile Number (Formatted as +91 9876543210 & Bounce Removed)
         Text(
-            text = displayEmail, 
+            text = displayMobileFormatted, 
             color = MaterialTheme.colorScheme.onSurfaceVariant, 
             fontSize = 14.sp,
-            modifier = Modifier.bounceClick { onNameClick() }
+            modifier = Modifier.clickable { onNameClick() }
         )
         
         Spacer(modifier = Modifier.height(32.dp))
@@ -451,6 +473,7 @@ private fun ProfileMainContent(
     }
 }
 
+// UNIVERSAL PROFILE AVATAR WITH CUT-OUT DESIGN
 @Composable
 fun ProfileAvatar(
     name: String,
@@ -488,13 +511,13 @@ fun ProfileAvatar(
     }
 
     Box(modifier = Modifier.size(size)) {
-        // Main Avatar Circle (Static if Editable, Bouncy if Not)
+        // Main Avatar Circle (Clean click without bounce if not editable)
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.primaryContainer)
-                .then(if (!isEditable) Modifier.bounceClick { onClick() } else Modifier),
+                .then(if (!isEditable) Modifier.clickable { onClick() } else Modifier),
             contentAlignment = Alignment.Center
         ) {
             if (fileExists) {
