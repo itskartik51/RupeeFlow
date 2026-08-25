@@ -4,10 +4,12 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -19,6 +21,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -70,6 +73,7 @@ fun ProfileDetailsScreen(
     
     var isSaving by remember { mutableStateOf(false) }
     var usernameError by remember { mutableStateOf(false) }
+    var isBadgeFlipped by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -84,6 +88,7 @@ fun ProfileDetailsScreen(
 
     var imageUpdateTrigger by remember { mutableStateOf(System.currentTimeMillis()) }
     val imagePickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        isBadgeFlipped = false
         if (uri != null) {
             coroutineScope.launch(Dispatchers.IO) {
                 val success = com.kartikey.rupeeflow.UI_Screens.CacheManager.saveCustomProfilePic(context, uri)
@@ -98,6 +103,12 @@ fun ProfileDetailsScreen(
             }
         }
     }
+
+    val badgeRotation by animateFloatAsState(
+        targetValue = if (isBadgeFlipped) 180f else 0f,
+        animationSpec = tween(durationMillis = 400, easing = FastOutSlowInEasing),
+        label = "BadgeCoinFlip"
+    )
 
     fun saveFieldToFirestore(field: String, value: Any, onSuccess: () -> Unit) {
         isSaving = true
@@ -131,30 +142,12 @@ fun ProfileDetailsScreen(
         topBar = {
             TopAppBar(
                 title = { 
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Profile", 
-                            fontWeight = FontWeight.Bold, 
-                            fontSize = 20.sp,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Spacer(modifier = Modifier.width(14.dp))
-                        Text(
-                            text = "Verified User",
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Normal,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Icon(
-                            imageVector = Icons.Default.Verified,
-                            contentDescription = "Verified User",
-                            tint = Color(0xFF1D9BF0),
-                            modifier = Modifier.size(19.dp)
-                        )
-                    }
+                    Text(
+                        text = "Profile", 
+                        fontWeight = FontWeight.Bold, 
+                        fontSize = 20.sp,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
                 },
                 navigationIcon = {
                     IconButton(onClick = onBackClick, modifier = Modifier.bounceClick()) {
@@ -176,6 +169,7 @@ fun ProfileDetailsScreen(
                     indication = null
                 ) { 
                     if (editingField == null) selectedCell = null 
+                    isBadgeFlipped = false
                     focusManager.clearFocus()
                 }
                 .verticalScroll(rememberScrollState()),
@@ -183,16 +177,69 @@ fun ProfileDetailsScreen(
         ) {
             Spacer(modifier = Modifier.height(12.dp))
 
-            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                ProfileAvatar(
-                    name = currentName,
-                    profilePicUrl = profilePicUrl,
-                    size = 110.dp,
-                    fontSize = 42.sp,
-                    isEditable = true,
-                    onEditClick = { imagePickerLauncher.launch("image/*") },
-                    forceUpdateTrigger = imageUpdateTrigger
-                )
+            Box(
+                modifier = Modifier.fillMaxWidth(), 
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(110.dp)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
+                        ) {
+                            isBadgeFlipped = !isBadgeFlipped
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    ProfileAvatar(
+                        name = currentName,
+                        profilePicUrl = profilePicUrl,
+                        size = 110.dp,
+                        fontSize = 42.sp,
+                        isEditable = false,
+                        forceUpdateTrigger = imageUpdateTrigger
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .offset(x = 2.dp, y = 2.dp)
+                            .size(34.dp)
+                            .graphicsLayer {
+                                rotationY = badgeRotation
+                                cameraDistance = 12f * density
+                            }
+                            .clip(CircleShape)
+                            .background(if (badgeRotation <= 90f) Color(0xFF1D9BF0) else Color(0xFF00E676))
+                            .bounceClick {
+                                if (!isBadgeFlipped) {
+                                    isBadgeFlipped = true
+                                } else {
+                                    imagePickerLauncher.launch("image/*")
+                                }
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (badgeRotation <= 90f) {
+                            Icon(
+                                imageVector = Icons.Default.Verified,
+                                contentDescription = "Verified Badge",
+                                tint = Color.White,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.PhotoCamera,
+                                contentDescription = "Change Photo",
+                                tint = Color.Black,
+                                modifier = Modifier
+                                    .size(18.dp)
+                                    .graphicsLayer { rotationY = 180f }
+                            )
+                        }
+                    }
+                }
             }
             
             Spacer(modifier = Modifier.height(8.dp))
