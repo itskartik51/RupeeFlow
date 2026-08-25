@@ -140,19 +140,19 @@ fun ProfileDetailsScreen(
                             fontSize = 20.sp,
                             color = MaterialTheme.colorScheme.onSurface
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(14.dp))
                         Text(
                             text = "Verified User",
-                            fontSize = 12.sp,
+                            fontSize = 20.sp,
                             fontWeight = FontWeight.Normal,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
                         )
-                        Spacer(modifier = Modifier.width(4.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
                         Icon(
                             imageVector = Icons.Default.Verified,
                             contentDescription = "Verified User",
                             tint = Color(0xFF1D9BF0),
-                            modifier = Modifier.size(14.dp)
+                            modifier = Modifier.size(19.dp)
                         )
                     }
                 },
