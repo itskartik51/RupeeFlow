@@ -59,6 +59,7 @@ fun ProfileDetailsScreen(
     mobile: String,
     profilePicUrl: String, 
     dob: String,
+    isVerified: Boolean = false,
     onBackClick: () -> Unit,
     onProfileUpdated: () -> Unit
 ) {
@@ -169,7 +170,7 @@ fun ProfileDetailsScreen(
                     indication = null
                 ) { 
                     if (editingField == null) selectedCell = null 
-                    isBadgeFlipped = false
+                    if (isVerified) isBadgeFlipped = false
                     focusManager.clearFocus()
                 }
                 .verticalScroll(rememberScrollState()),
@@ -194,62 +195,83 @@ fun ProfileDetailsScreen(
                         forceUpdateTrigger = imageUpdateTrigger
                     )
 
-                    Box(
-                        modifier = Modifier
-                            .matchParentSize()
-                            .clip(CircleShape)
-                            .bounceClick {
-                                isBadgeFlipped = !isBadgeFlipped
-                            }
-                    )
-
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .size(32.dp)
-                            .graphicsLayer {
-                                rotationY = badgeRotation
-                                cameraDistance = 12f * density
-                            }
-                            .bounceClick {
-                                if (!isBadgeFlipped) {
-                                    isBadgeFlipped = true
-                                } else {
-                                    imagePickerLauncher.launch("image/*")
+                    if (isVerified) {
+                        Box(
+                            modifier = Modifier
+                                .matchParentSize()
+                                .clip(CircleShape)
+                                .bounceClick {
+                                    isBadgeFlipped = !isBadgeFlipped
                                 }
-                            },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (badgeRotation <= 90f) {
-                            Box(
-                                modifier = Modifier
-                                    .size(20.dp)
-                                    .clip(CircleShape)
-                                    .background(Color.White)
-                            )
-                            Icon(
-                                imageVector = Icons.Default.Verified,
-                                contentDescription = "Verified Badge",
-                                tint = Color(0xFF1D9BF0),
-                                modifier = Modifier.size(32.dp)
-                            )
-                        } else {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .clip(CircleShape)
-                                    .background(Color(0xFF00E676)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.PhotoCamera,
-                                    contentDescription = "Change Photo",
-                                    tint = Color.Black,
+                        )
+
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .size(32.dp)
+                                .graphicsLayer {
+                                    rotationY = badgeRotation
+                                    cameraDistance = 12f * density
+                                }
+                                .bounceClick {
+                                    if (!isBadgeFlipped) {
+                                        isBadgeFlipped = true
+                                    } else {
+                                        imagePickerLauncher.launch("image/*")
+                                    }
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (badgeRotation <= 90f) {
+                                Box(
                                     modifier = Modifier
-                                        .size(18.dp)
-                                        .graphicsLayer { rotationY = 180f }
+                                        .size(20.dp)
+                                        .clip(CircleShape)
+                                        .background(Color.White)
                                 )
+                                Icon(
+                                    imageVector = Icons.Default.Verified,
+                                    contentDescription = "Verified Badge",
+                                    tint = Color(0xFF1D9BF0),
+                                    modifier = Modifier.size(32.dp)
+                                )
+                            } else {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .clip(CircleShape)
+                                        .background(Color(0xFF00E676)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.PhotoCamera,
+                                        contentDescription = "Change Photo",
+                                        tint = Color.Black,
+                                        modifier = Modifier
+                                            .size(18.dp)
+                                            .graphicsLayer { rotationY = 180f }
+                                    )
+                                }
                             }
+                        }
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF00E676))
+                                .bounceClick {
+                                    imagePickerLauncher.launch("image/*")
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.PhotoCamera,
+                                contentDescription = "Change Photo",
+                                tint = Color.Black,
+                                modifier = Modifier.size(18.dp)
+                            )
                         }
                     }
                 }
