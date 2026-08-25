@@ -40,6 +40,7 @@ fun HomeQuickCardsGrid(
     budgetLimit: Double,
     thisMonthExpenses: Double,
     username: String,
+    investmentReturnPct: Double = 0.0,
     onContriClick: () -> Unit,
     onInvestmentClick: () -> Unit,
     onBankClick: () -> Unit,
@@ -51,7 +52,8 @@ fun HomeQuickCardsGrid(
         return when {
             amount < 100_000.0 -> {
                 val format = NumberFormat.getNumberInstance(Locale("en", "IN"))
-                format.maximumFractionDigits = 0
+                format.maximumFractionDigits = 2
+                format.minimumFractionDigits = 0
                 format.format(amount)
             }
             amount < 1_000_000.0 -> {
@@ -69,7 +71,6 @@ fun HomeQuickCardsGrid(
         }
     }
 
-    val invDisplayValue = if (totalInvestment > 0) "₹ ${formatSmartScaledAmount(totalInvestment)}" else "Add Details"
     val bankDisplayValue = if (totalBankBalance > 0) "₹ ${formatSmartScaledAmount(totalBankBalance)}" else "Add Details"
     
     val availAmount = maxOf(0.0, budgetLimit - thisMonthExpenses)
@@ -81,12 +82,11 @@ fun HomeQuickCardsGrid(
                 contriCount = contriCount,
                 modifier = Modifier.weight(1f).bounceClick { onContriClick() }
             ) 
-            GridCard(
-                title = "INVESTMENT", 
-                value = invDisplayValue, 
-                lineColor = Color.Transparent, 
+            InvestmentGridCard(
+                totalInvestment = totalInvestment,
+                investmentReturnPct = investmentReturnPct,
                 modifier = Modifier.weight(1f),
-                onClick = onInvestmentClick 
+                onClick = onInvestmentClick
             )
         }
         Spacer(modifier = Modifier.height(12.dp))
@@ -119,6 +119,101 @@ fun HomeQuickCardsGrid(
                 onBudgetSaved()
             }
         )
+    }
+}
+
+@Composable
+fun InvestmentGridCard(
+    totalInvestment: Double,
+    investmentReturnPct: Double = 0.0,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit = {}
+) {
+    fun formatSmartScaledAmount(amount: Double): String {
+        return when {
+            amount < 100_000.0 -> {
+                val format = NumberFormat.getNumberInstance(Locale("en", "IN"))
+                format.maximumFractionDigits = 2
+                format.minimumFractionDigits = 0
+                format.format(amount)
+            }
+            amount < 1_000_000.0 -> {
+                String.format(Locale.US, "%.2fK", amount / 1_000.0).replace(".00K", "K")
+            }
+            amount < 1_000_000_000.0 -> {
+                String.format(Locale.US, "%.2fM", amount / 1_000_000.0).replace(".00M", "M")
+            }
+            amount < 1_000_000_000_000.0 -> {
+                String.format(Locale.US, "%.2fB", amount / 1_000_000_000.0).replace(".00B", "B")
+            }
+            else -> {
+                String.format(Locale.US, "%.2fT", amount / 1_000_000_000_000.0).replace(".00T", "T")
+            }
+        }
+    }
+
+    RupeeFlowCard(
+        modifier = modifier.bounceClick { onClick() }
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(
+                text = "INVESTMENT",
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+
+            if (totalInvestment > 0) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.Bottom
+                ) {
+                    Text(
+                        text = "₹ ${formatSmartScaledAmount(totalInvestment)}",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    
+                    val returnColor = when {
+                        investmentReturnPct > 0 -> Color(0xFF00E676)
+                        investmentReturnPct < 0 -> MaterialTheme.colorScheme.error
+                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                    }
+                    val returnPrefix = if (investmentReturnPct > 0) "+" else ""
+
+                    Text(
+                        text = "(${returnPrefix}${String.format(Locale.US, "%.1f", investmentReturnPct)}%)",
+                        fontSize = 12.sp,
+                        color = returnColor,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        softWrap = false
+                    )
+                }
+            } else {
+                Text(
+                    text = "Add Details",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF1976D2),
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+        }
     }
 }
 
