@@ -38,7 +38,6 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import com.kartikey.rupeeflow.UI_Screens.QR.CustomDownloadIcon
-import com.kartikey.rupeeflow.UI_Screens.QR.CustomShareExportIcon
 import com.kartikey.rupeeflow.UI_Screens.QR.saveQRToGallery
 import com.kartikey.rupeeflow.UI_Screens.QR.shareQRCode
 import com.kartikey.rupeeflow.UI_Screens.bounceClick 
@@ -261,7 +260,7 @@ fun ContriScreen(
     }
 
     // ==========================================
-    // QR DISPLAY DIALOG WITH DIRECTIONAL-ROUNDED QR
+    // QR DISPLAY DIALOG WITH BUILT-IN OPENINNEW ICON
     // ==========================================
     if (qrRoomToDisplay != null) {
         val qrPayload = "${qrRoomToDisplay!!.roomCode}|${qrRoomToDisplay!!.pin}|${qrRoomToDisplay!!.roomName}"
@@ -295,7 +294,7 @@ fun ContriScreen(
                     
                     Spacer(modifier = Modifier.height(20.dp))
                     
-                    // Parallel Directional-Rounded Jet-Black QR Code
+                    // Pure Solid Black QR Code
                     com.kartikey.rupeeflow.UI_Screens.QR.PremiumQRCode(
                         data = qrPayload,
                         size = 185.dp,
@@ -316,7 +315,7 @@ fun ContriScreen(
                     HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f), thickness = 1.dp)
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Bottom Action Bar: Download (Left) & Minimal Export/Share (Right)
+                    // Bottom Action Bar: Download (Left) & Official OpenInNew/Share (Right)
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -339,7 +338,7 @@ fun ContriScreen(
                             )
                         }
 
-                        // Export / Share Button (Right)
+                        // Built-in OpenInNew / Share Button (Right)
                         Box(
                             modifier = Modifier
                                 .size(48.dp)
@@ -356,9 +355,11 @@ fun ContriScreen(
                                 },
                             contentAlignment = Alignment.Center
                         ) {
-                            CustomShareExportIcon(
-                                modifier = Modifier.size(22.dp),
-                                tint = MaterialTheme.colorScheme.onSurface
+                            Icon(
+                                imageVector = Icons.Outlined.OpenInNew,
+                                contentDescription = "Share",
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(22.dp)
                             )
                         }
                     }
