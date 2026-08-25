@@ -171,9 +171,9 @@ fun AssetsScreen(
             val hasFD = fdList.isNotEmpty()
 
             val cashTitle = "CASH"
-            val bankTitle = if (hasBank) "BANK BALANCE (${bankList.size})" else "BANK BALANCE"
+            val bankTitle = if (hasBank) "BANK A/C (${bankList.size})" else "BANK A/C"
             val ccTitle = if (hasCC) "CREDIT CARD (${ccList.size})" else "CREDIT CARD"
-            val fdTitle = if (hasFD) "FD (${fdList.size})" else "FD : FIXED DEPOSIT"
+            val fdTitle = if (hasFD) "FD: FIXED DEPOSIT (${fdList.size})" else "FD: FIXED DEPOSIT"
 
             Column(modifier = Modifier.fillMaxWidth()) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
