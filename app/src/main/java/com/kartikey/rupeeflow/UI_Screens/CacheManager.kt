@@ -47,6 +47,7 @@ data class AppData(
     val userMobile: String,
     val profilePicUrl: String, 
     val userDob: String,
+    val isVerified: Boolean,
     val todayExpenses: Double,
     val thisMonthExpenses: Double,
     val thisYearExpenses: Double,
@@ -154,6 +155,7 @@ object CacheManager {
                     put("mobile", data.userMobile)
                     put("prfl", data.profilePicUrl)
                     put("dob", data.userDob)
+                    put("verify", data.isVerified)
                 })
                 put("budget_limit", data.budgetLimit)
 
@@ -546,7 +548,6 @@ object CacheManager {
                 val userDoc = userQuery.documents[0]
                 val userRef = userDoc.reference
 
-                // Write exact 'ver' String (e.g. "1.00.012") and 'lst_opn' (Timestamp) on backend data fetch
                 try {
                     val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
                     val currentVersionName = packageInfo.versionName ?: "1.00.000"
@@ -567,6 +568,7 @@ object CacheManager {
                     put("email", userDoc.getString("email") ?: "")
                     put("mobile", userDoc.getString("mobile_no_") ?: userDoc.getString("mobile") ?: "")
                     put("prfl", userDoc.getString("prfl") ?: "")
+                    put("verify", userDoc.getBoolean("verify") ?: false)
                     
                     val rawDob = userDoc.get("dob")
                     val formattedDob = when (rawDob) {
@@ -859,7 +861,6 @@ object CacheManager {
                     }
                 }
 
-                // ⚡ FETCH LIVE MARKET QUOTES VIA ISOLATED MARKET ENGINE ⚡
                 val investMap = userDoc.get("invest") as? Map<String, Any> ?: emptyMap()
                 val symbolsToFetch = mutableListOf<String>()
                 for ((_, value) in investMap) {
@@ -1001,6 +1002,7 @@ object CacheManager {
         val tempMobile = profileObj?.optString("mobile", "") ?: ""
         val tempPrfl = profileObj?.optString("prfl", "") ?: ""
         val tempDob = profileObj?.optString("dob", "") ?: ""
+        val tempVerify = profileObj?.optBoolean("verify", false) ?: false
 
         val expensesArray = jsonResponse.optJSONArray("expenses")
         var tempTotal = 0.0
@@ -1211,6 +1213,7 @@ object CacheManager {
             userMobile = tempMobile,
             profilePicUrl = tempPrfl, 
             userDob = tempDob,
+            isVerified = tempVerify,
             todayExpenses = tempToday,
             thisMonthExpenses = tempMonth,
             thisYearExpenses = tempYear,
