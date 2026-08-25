@@ -25,6 +25,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -245,6 +246,7 @@ private fun ProfileMainContent(
                         onCheckedChange = { newState ->
                             authenticateAndToggleLock(newState)
                         },
+                        modifier = Modifier.scale(0.8f),
                         colors = SwitchDefaults.colors(
                             checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
                             checkedTrackColor = MaterialTheme.colorScheme.primary,
@@ -449,7 +451,6 @@ private fun ProfileMainContent(
     }
 }
 
-// UNIVERSAL PROFILE AVATAR WITH CUT-OUT DESIGN
 @Composable
 fun ProfileAvatar(
     name: String,
