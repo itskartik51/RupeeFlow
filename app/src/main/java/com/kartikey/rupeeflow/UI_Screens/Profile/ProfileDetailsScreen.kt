@@ -205,13 +205,20 @@ fun ProfileDetailsScreen(
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
                             .offset(x = 2.dp, y = 2.dp)
-                            .size(34.dp)
+                            .size(30.dp)
                             .graphicsLayer {
                                 rotationY = badgeRotation
                                 cameraDistance = 12f * density
                             }
-                            .clip(CircleShape)
-                            .background(if (badgeRotation <= 90f) Color(0xFF1D9BF0) else Color(0xFF00E676))
+                            .then(
+                                if (badgeRotation > 90f) {
+                                    Modifier
+                                        .clip(CircleShape)
+                                        .background(Color(0xFF00E676))
+                                } else {
+                                    Modifier
+                                }
+                            )
                             .bounceClick {
                                 if (!isBadgeFlipped) {
                                     isBadgeFlipped = true
@@ -225,8 +232,8 @@ fun ProfileDetailsScreen(
                             Icon(
                                 imageVector = Icons.Default.Verified,
                                 contentDescription = "Verified Badge",
-                                tint = Color.White,
-                                modifier = Modifier.size(18.dp)
+                                tint = Color(0xFF1D9BF0),
+                                modifier = Modifier.size(30.dp)
                             )
                         } else {
                             Icon(
@@ -234,7 +241,7 @@ fun ProfileDetailsScreen(
                                 contentDescription = "Change Photo",
                                 tint = Color.Black,
                                 modifier = Modifier
-                                    .size(18.dp)
+                                    .size(17.dp)
                                     .graphicsLayer { rotationY = 180f }
                             )
                         }
