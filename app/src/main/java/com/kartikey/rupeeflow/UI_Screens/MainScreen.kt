@@ -72,6 +72,7 @@ fun MainScreen(
     var userMobile by remember { mutableStateOf("") }
     var profilePicUrl by remember { mutableStateOf("") } 
     var userDob by remember { mutableStateOf("") }
+    var isVerified by remember { mutableStateOf(false) }
 
     var todayExpenses by remember { mutableDoubleStateOf(0.0) } 
     var thisMonthExpenses by remember { mutableDoubleStateOf(0.0) }
@@ -134,6 +135,7 @@ fun MainScreen(
             userMobile = cachedData.userMobile
             profilePicUrl = cachedData.profilePicUrl 
             userDob = cachedData.userDob
+            isVerified = cachedData.isVerified
             todayExpenses = cachedData.todayExpenses 
             thisMonthExpenses = cachedData.thisMonthExpenses
             thisYearExpenses = cachedData.thisYearExpenses
@@ -156,6 +158,7 @@ fun MainScreen(
                     userMobile = freshData.userMobile
                     profilePicUrl = freshData.profilePicUrl 
                     userDob = freshData.userDob
+                    isVerified = freshData.isVerified
                     todayExpenses = freshData.todayExpenses 
                     thisMonthExpenses = freshData.thisMonthExpenses
                     thisYearExpenses = freshData.thisYearExpenses
@@ -314,6 +317,7 @@ fun MainScreen(
                                 username = username, 
                                 userFullName = userFullName, 
                                 profilePicUrl = profilePicUrl, 
+                                isVerified = isVerified,
                                 paddingValues = paddingValues, 
                                 todayExpenses = todayExpenses, 
                                 thisMonthExpenses = thisMonthExpenses, 
@@ -348,7 +352,9 @@ fun MainScreen(
                         4 -> ProfileScreen(
                             username = username, name = userFullName, email = userEmail, mobile = userMobile, 
                             profilePicUrl = profilePicUrl, 
-                            dob = userDob, paddingValues = paddingValues, 
+                            dob = userDob, 
+                            isVerified = isVerified,
+                            paddingValues = paddingValues, 
                             themeMode = themeMode, onThemeChange = onThemeChange, 
                             isUpdateAvailable = isUpdateAvailable,
                             onLogout = onLogout, onProfileRefresh = { refreshTrigger++ },
