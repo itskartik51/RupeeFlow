@@ -388,6 +388,7 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
                                     "prfl" to googlePhotoUrl, 
                                     "dob" to null,
                                     "budget_limit" to 0.0,
+                                    "verify" to false,
                                     "created_at" to FieldValue.serverTimestamp()
                                 )
 
