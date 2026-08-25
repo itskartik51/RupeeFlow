@@ -104,7 +104,7 @@ fun InsideContriScreen(
         if (isSyncing || actionProcessing) {
             while (true) {
                 delay(16)
-                currentRotation += 8f
+                currentRotation -= 8f // Inverted for true clockwise visual spin when mirrored
             }
         } else {
             currentRotation = 0f
@@ -287,7 +287,7 @@ fun InsideContriScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 6.dp),
                 shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                 elevation = CardDefaults.cardElevation(0.dp)
             ) {
                 Row(
@@ -532,7 +532,6 @@ fun InsideContriScreen(
                                 val memberIds = (doc.get("member_ids") as? List<*>)?.map { it.toString() } ?: emptyList()
                                 val remainingMembers = memberIds.filter { it != targetUserId }
 
-                                // Delete room permanently from Firebase if last member removed
                                 if (remainingMembers.isEmpty()) {
                                     doc.reference.delete().await()
                                 } else {
@@ -632,7 +631,6 @@ fun InsideContriScreen(
                                 val memberIds = (doc.get("member_ids") as? List<*>)?.map { it.toString() } ?: emptyList()
                                 val remainingMembers = memberIds.filter { it != currentUserId }
 
-                                // Delete room permanently from Firebase if last member left
                                 if (remainingMembers.isEmpty()) {
                                     doc.reference.delete().await()
                                 } else {
