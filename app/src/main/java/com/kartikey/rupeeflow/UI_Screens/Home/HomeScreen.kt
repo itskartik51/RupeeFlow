@@ -26,6 +26,7 @@ fun HomeDashboardDesign(
     username: String, 
     userFullName: String, 
     profilePicUrl: String, 
+    isVerified: Boolean = false,
     paddingValues: PaddingValues, 
     todayExpenses: Double, 
     thisMonthExpenses: Double, 
@@ -79,13 +80,15 @@ fun HomeDashboardDesign(
                             color = MaterialTheme.colorScheme.onSurfaceVariant, 
                             fontSize = 13.sp
                         )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Icon(
-                            imageVector = Icons.Default.Verified,
-                            contentDescription = "Verified User",
-                            tint = Color(0xFF1D9BF0),
-                            modifier = Modifier.size(13.dp)
-                        )
+                        if (isVerified) {
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Icon(
+                                imageVector = Icons.Default.Verified,
+                                contentDescription = "Verified User",
+                                tint = Color(0xFF1D9BF0),
+                                modifier = Modifier.size(13.dp)
+                            )
+                        }
                     }
                 }
                 
