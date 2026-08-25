@@ -305,21 +305,33 @@ fun MainScreen(
                 } else {
                     when (currentTab) {
                         0 -> {
+                            val totalInvested = investmentList.sumOf { it.quantity * it.avgBuyPrice }
                             val totalInv = investmentList.sumOf { it.quantity * it.currentPrice }
+                            val totalReturnPct = if (totalInvested > 0) ((totalInv - totalInvested) / totalInvested) * 100 else 0.0
                             val totalBank = bankList.sumOf { it.currentBalance }
                             
                             HomeDashboardDesign(
-                                username = username, userFullName = userFullName, 
+                                username = username, 
+                                userFullName = userFullName, 
                                 profilePicUrl = profilePicUrl, 
                                 paddingValues = paddingValues, 
                                 todayExpenses = todayExpenses, 
-                                thisMonthExpenses = thisMonthExpenses, thisYearExpenses = thisYearExpenses, budgetLimit = budgetLimit,
-                                transactionList = transactionList, // 🚀 NEW DATA PASSED HERE
-                                isLoadingExpenses = isLoadingExpenses, dNavState = dNavState, dBackPresses = dBackPresses, 
-                                onLogout = onLogout, onRefreshExpenses = { refreshTrigger++ },
-                                onExpenseCardClick = { showExpenseHistory = true }, onContriClick = { showContriScreen = true },
+                                thisMonthExpenses = thisMonthExpenses, 
+                                thisYearExpenses = thisYearExpenses, 
+                                budgetLimit = budgetLimit,
+                                transactionList = transactionList,
+                                isLoadingExpenses = isLoadingExpenses, 
+                                dNavState = dNavState, 
+                                dBackPresses = dBackPresses, 
+                                onLogout = onLogout, 
+                                onRefreshExpenses = { refreshTrigger++ },
+                                onExpenseCardClick = { showExpenseHistory = true }, 
+                                onContriClick = { showContriScreen = true },
                                 onAvatarClick = { selectedTab = 4; openProfileDetails = true },
-                                contriCount = contriRoomsList.size, totalInvestment = totalInv, totalBankBalance = totalBank,
+                                contriCount = contriRoomsList.size, 
+                                totalInvestment = totalInv, 
+                                investmentReturnPct = totalReturnPct,
+                                totalBankBalance = totalBank,
                                 onInvestmentClick = { assetsCurrentView = "InvestmentDetails"; selectedTab = 1 },
                                 onBankClick = { assetsCurrentView = "DirectBankAccounts"; selectedTab = 1 },
                                 onBudgetSaved = { refreshTrigger++ } 
