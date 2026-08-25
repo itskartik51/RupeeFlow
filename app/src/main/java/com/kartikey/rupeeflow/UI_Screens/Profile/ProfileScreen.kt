@@ -47,6 +47,7 @@ fun ProfileScreen(
     mobile: String,
     profilePicUrl: String, 
     dob: String, 
+    isVerified: Boolean = false,
     paddingValues: PaddingValues, 
     themeMode: Int,                     
     onThemeChange: (Int) -> Unit,
@@ -78,6 +79,7 @@ fun ProfileScreen(
                     email = email,
                     mobile = mobile,
                     profilePicUrl = profilePicUrl,
+                    isVerified = isVerified,
                     paddingValues = paddingValues,
                     themeMode = themeMode,
                     onThemeChange = onThemeChange,
@@ -94,6 +96,7 @@ fun ProfileScreen(
                     mobile = mobile,
                     profilePicUrl = profilePicUrl, 
                     dob = dob,
+                    isVerified = isVerified,
                     onBackClick = { currentProfileView = "Main" },
                     onProfileUpdated = { onProfileRefresh() }
                 )
@@ -109,6 +112,7 @@ private fun ProfileMainContent(
     email: String,
     mobile: String,
     profilePicUrl: String,
+    isVerified: Boolean,
     paddingValues: PaddingValues,
     themeMode: Int,
     onThemeChange: (Int) -> Unit,
@@ -194,7 +198,7 @@ private fun ProfileMainContent(
         val displayUsername = username.ifBlank { "N/A" }
         val displayMobile = mobile.ifBlank { "N/A" }
 
-        // 1. Profile Avatar (Bounce Removed -> Smooth Clickable)
+        // 1. Profile Avatar
         ProfileAvatar(
             name = displayName,
             profilePicUrl = profilePicUrl,
@@ -205,7 +209,7 @@ private fun ProfileMainContent(
         
         Spacer(modifier = Modifier.height(16.dp))
         
-        // 2. Name with Verified Blue Tick (Exact 22dp Match & Bounce Removed)
+        // 2. Name with Verified Blue Tick (Conditional based on isVerified)
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.clickable { onNameClick() }
@@ -216,16 +220,18 @@ private fun ProfileMainContent(
                 fontSize = 22.sp,
                 color = MaterialTheme.colorScheme.onBackground
             )
-            Spacer(modifier = Modifier.width(6.dp))
-            Icon(
-                imageVector = Icons.Default.Verified,
-                contentDescription = "Verified User",
-                tint = Color(0xFF1D9BF0),
-                modifier = Modifier.size(22.dp)
-            )
+            if (isVerified) {
+                Spacer(modifier = Modifier.width(6.dp))
+                Icon(
+                    imageVector = Icons.Default.Verified,
+                    contentDescription = "Verified User",
+                    tint = Color(0xFF1D9BF0),
+                    modifier = Modifier.size(22.dp)
+                )
+            }
         }
         
-        // 3. Mobile Number (Formatted as +91 9876543210 & Bounce Removed)
+        // 3. Mobile Number
         Text(
             text = displayMobileFormatted, 
             color = MaterialTheme.colorScheme.onSurfaceVariant, 
@@ -473,7 +479,6 @@ private fun ProfileMainContent(
     }
 }
 
-// UNIVERSAL PROFILE AVATAR WITH CUT-OUT DESIGN
 @Composable
 fun ProfileAvatar(
     name: String,
@@ -511,7 +516,6 @@ fun ProfileAvatar(
     }
 
     Box(modifier = Modifier.size(size)) {
-        // Main Avatar Circle (Clean click without bounce if not editable)
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -537,7 +541,6 @@ fun ProfileAvatar(
             }
         }
         
-        // SMART CUT-OUT CAMERA ICON
         if (isEditable) {
             Box(
                 modifier = Modifier
