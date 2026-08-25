@@ -195,7 +195,6 @@ fun ProfileDetailsScreen(
                         size = 110.dp,
                         fontSize = 42.sp,
                         isEditable = false,
-                        onClick = { isBadgeFlipped = !isBadgeFlipped },
                         forceUpdateTrigger = imageUpdateTrigger
                     )
 
@@ -219,7 +218,7 @@ fun ProfileDetailsScreen(
                         if (badgeRotation <= 90f) {
                             Box(
                                 modifier = Modifier
-                                    .size(14.dp)
+                                    .size(20.dp)
                                     .clip(CircleShape)
                                     .background(Color.White)
                             )
