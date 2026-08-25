@@ -182,11 +182,7 @@ fun ProfileDetailsScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Box(
-                    modifier = Modifier
-                        .size(110.dp)
-                        .bounceClick {
-                            isBadgeFlipped = !isBadgeFlipped
-                        },
+                    modifier = Modifier.size(110.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     ProfileAvatar(
@@ -196,6 +192,15 @@ fun ProfileDetailsScreen(
                         fontSize = 42.sp,
                         isEditable = false,
                         forceUpdateTrigger = imageUpdateTrigger
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .clip(CircleShape)
+                            .bounceClick {
+                                isBadgeFlipped = !isBadgeFlipped
+                            }
                     )
 
                     Box(
