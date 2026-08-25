@@ -11,6 +11,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -110,7 +112,22 @@ fun HomeDashboardDesign(
                 
                 Column(modifier = Modifier.weight(1f)) {
                     Text("RupeeFlow", fontWeight = FontWeight.ExtraBold, fontSize = 22.sp, color = MaterialTheme.colorScheme.onSurface)
-                    Text("Hi, $username", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Hi, $username", 
+                            color = MaterialTheme.colorScheme.onSurfaceVariant, 
+                            fontSize = 13.sp
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(
+                            imageVector = Icons.Default.Verified,
+                            contentDescription = "Verified User",
+                            tint = Color(0xFF1D9BF0),
+                            modifier = Modifier.size(13.dp)
+                        )
+                    }
                 }
                 
                 ProfileAvatar(
