@@ -42,6 +42,7 @@ fun HomeDashboardDesign(
     onAvatarClick: () -> Unit, 
     contriCount: Int = 0,
     totalInvestment: Double,
+    investmentReturnPct: Double = 0.0,
     totalBankBalance: Double,
     onInvestmentClick: () -> Unit,
     onBankClick: () -> Unit,
@@ -121,6 +122,7 @@ fun HomeDashboardDesign(
             HomeQuickCardsGrid(
                 contriCount = contriCount,
                 totalInvestment = totalInvestment,
+                investmentReturnPct = investmentReturnPct,
                 totalBankBalance = totalBankBalance,
                 budgetLimit = budgetLimit,
                 thisMonthExpenses = thisMonthExpenses,
