@@ -1,17 +1,22 @@
 package com.kartikey.rupeeflow.UI_Screens.Assets.Finance
 
+import android.widget.Toast
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.outlined.CreditCard
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Refresh
@@ -21,19 +26,28 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.kartikey.rupeeflow.Cloud_Database.Constants
-import com.kartikey.rupeeflow.UI_Screens.QuickUpdateCCDialog
+import com.kartikey.rupeeflow.UI_Screens.CacheManager
+import com.kartikey.rupeeflow.UI_Screens.RFActionRow
+import com.kartikey.rupeeflow.UI_Screens.RFDialogCard
+import com.kartikey.rupeeflow.UI_Screens.RFTextField
 import com.kartikey.rupeeflow.UI_Screens.bounceClick
 import java.util.Locale
 
 data class CreditCardItem(
-    val firebaseKey: String = "", // Added to fix the compiler error
+    val firebaseKey: String = "",
     val issuer: String,
     val cardNo: String,
     val type: String,
@@ -58,8 +72,9 @@ fun CreditCardsScreen(
     ccList: List<CreditCardItem>,
     isLoading: Boolean,
     onRefreshClick: () -> Unit,
-    onEditCCClick: (CreditCardItem) -> Unit
+    onEditCCClick: ((CreditCardItem) -> Unit)? = null
 ) {
+    var cardToEdit by remember { mutableStateOf<CreditCardItem?>(null) }
     val infiniteTransition = rememberInfiniteTransition(label = "refresh")
     val angle by infiniteTransition.animateFloat(
         initialValue = 0f, targetValue = 360f,
@@ -97,17 +112,56 @@ fun CreditCardsScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 items(ccList) { cc ->
-                    CCDetailCard(cc = cc, username = username, onEditClick = onEditCCClick, onRefreshRequest = onRefreshClick)
+                    CCDetailCard(
+                        cc = cc, 
+                        username = username, 
+                        onEditClick = { target ->
+                            if (onEditCCClick != null) onEditCCClick(target)
+                            else cardToEdit = target
+                        }, 
+                        onRefreshRequest = onRefreshClick
+                    )
                 }
             }
+        }
+
+        if (cardToEdit != null) {
+            EditCreditCardDialog(
+                cc = cardToEdit!!,
+                username = username,
+                onDismiss = { cardToEdit = null },
+                onUpdateSuccess = {
+                    cardToEdit = null
+                    onRefreshClick()
+                }
+            )
         }
     }
 }
 
 @Composable
-fun CCDetailCard(cc: CreditCardItem, username: String, onEditClick: (CreditCardItem) -> Unit, onRefreshRequest: () -> Unit) {
+fun CCDetailCard(
+    cc: CreditCardItem, 
+    username: String, 
+    onEditClick: (CreditCardItem) -> Unit, 
+    onRefreshRequest: () -> Unit
+) {
     var showQuickUpdate by remember { mutableStateOf(false) }
     val logoRes = Constants.BankLogoMap[cc.issuer]
+    val neonGreenColor = Color(0xFF00E676)
+
+    val targetProgress = (cc.utilization / 100.0).toFloat().coerceIn(0f, 1f)
+    var animationTrigger by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        animationTrigger = true
+    }
+
+    val animatedProgress by animateFloatAsState(
+        targetValue = if (animationTrigger) targetProgress else 0f,
+        animationSpec = tween(durationMillis = 850, easing = FastOutSlowInEasing),
+        label = "CCProgressAnimation"
+    )
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -138,7 +192,7 @@ fun CCDetailCard(cc: CreditCardItem, username: String, onEditClick: (CreditCardI
                     Text(text = "Card: ${cc.cardNo} | ${cc.type}", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, letterSpacing = 1.sp)
                 }
                 
-                IconButton(onClick = { /* TODO: Notification Settings */ }, modifier = Modifier.bounceClick()) {
+                IconButton(onClick = { /* Reminders */ }, modifier = Modifier.bounceClick()) {
                     Icon(Icons.Outlined.Notifications, contentDescription = "Reminders", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(22.dp))
                 }
                 IconButton(onClick = { onEditClick(cc) }, modifier = Modifier.bounceClick()) {
@@ -162,17 +216,25 @@ fun CCDetailCard(cc: CreditCardItem, username: String, onEditClick: (CreditCardI
                 }
             }
             
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(14.dp))
             
-            val progressVal = (cc.utilization / 100f).toFloat().coerceIn(0f, 1f)
-            LinearProgressIndicator(
-                progress = { progressVal },
-                modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
-                color = Color(0xFF1976D2),
-                trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(6.dp)
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .fillMaxWidth(animatedProgress)
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(neonGreenColor)
+                )
+            }
             
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             
             Text(
                 text = String.format(Locale.US, "%.2f%%", cc.utilization),
@@ -212,7 +274,154 @@ fun CCDetailCard(cc: CreditCardItem, username: String, onEditClick: (CreditCardI
             cc = cc,
             username = username,
             onDismiss = { showQuickUpdate = false },
-            onSuccess = { showQuickUpdate = false; onRefreshRequest() }
+            onSuccess = { 
+                showQuickUpdate = false
+                onRefreshRequest() 
+            }
         )
+    }
+}
+
+@Composable
+fun MetricItem(label: String, value: String, valueColor: Color, alignment: Alignment.Horizontal) {
+    Column(horizontalAlignment = alignment) {
+        Text(text = value, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = valueColor)
+        Text(text = label, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun QuickUpdateCCDialog(cc: CreditCardItem, username: String, onDismiss: () -> Unit, onSuccess: () -> Unit) {
+    var updateAmount by remember { mutableStateOf("") }
+    val context = LocalContext.current
+    
+    Dialog(
+        onDismissRequest = { onDismiss() },
+        properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = false, usePlatformDefaultWidth = false)
+    ) {
+        RFDialogCard(modifier = Modifier.fillMaxWidth(0.9f).imePadding()) {
+            Column(modifier = Modifier.padding(24.dp)) {
+                Text("Update Outstanding", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = MaterialTheme.colorScheme.onSurface)
+                Text("Add spend (+) or pay bill (-) on ${cc.issuer}", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+                
+                Spacer(modifier = Modifier.height(20.dp))
+                
+                RFTextField(
+                    value = updateAmount,
+                    onValueChange = { updateAmount = it },
+                    label = "Amount (+ or -)",
+                    prefix = { Text("₹ ", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                RFActionRow(
+                    onCancel = { onDismiss() },
+                    onConfirm = {
+                        val amountEntered = updateAmount.trim().toDoubleOrNull()
+                        if (amountEntered != null && amountEntered != 0.0) {
+                            CacheManager.quickUpdateCCOutstanding(
+                                context = context,
+                                username = username,
+                                cardNo = cc.cardNo,
+                                amountDiff = amountEntered
+                            )
+                            Toast.makeText(context, "Outstanding updated!", Toast.LENGTH_SHORT).show()
+                            onSuccess()
+                        } else { 
+                            Toast.makeText(context, "Enter a valid amount", Toast.LENGTH_SHORT).show() 
+                        }
+                    },
+                    confirmText = "Update"
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun EditCreditCardDialog(cc: CreditCardItem, username: String, onDismiss: () -> Unit, onUpdateSuccess: () -> Unit) {
+    var limit by remember { mutableStateOf(cc.limit.toString()) }
+    var billingDay by remember { mutableStateOf(cc.billingDay.toString()) }
+    var dueDay by remember { mutableStateOf(cc.dueDay.toString()) }
+    var annualFee by remember { mutableStateOf(cc.annualFee.toString()) }
+    
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            containerColor = MaterialTheme.colorScheme.surface,
+            title = { Text("Remove Card", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
+            text = { Text("Are you sure you want to permanently delete this Credit Card record?", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showDeleteConfirm = false
+                        CacheManager.deleteCreditCard(context, username, cc.cardNo)
+                        Toast.makeText(context, "Card deleted!", Toast.LENGTH_SHORT).show()
+                        onUpdateSuccess()
+                    }, 
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) { Text("Delete", color = MaterialTheme.colorScheme.onError) }
+            }, 
+            dismissButton = { 
+                TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant) } 
+            }
+        )
+    }
+
+    Dialog(onDismissRequest = { onDismiss() }, properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = false)) {
+        RFDialogCard(modifier = Modifier.fillMaxWidth().padding(8.dp)) {
+            Column(modifier = Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Text("Edit Credit Card", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onSurface)
+                    IconButton(onClick = { showDeleteConfirm = true }) { 
+                        Icon(Icons.Outlined.Delete, contentDescription = "Delete CC", tint = MaterialTheme.colorScheme.error) 
+                    }
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                RFTextField(value = limit, onValueChange = { limit = it }, label = "Total Limit", keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    RFTextField(value = billingDay, onValueChange = { billingDay = it }, label = "Bill Day (1-31)", keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f))
+                    RFTextField(value = dueDay, onValueChange = { dueDay = it }, label = "Due Day (1-31)", keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f))
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                RFTextField(value = annualFee, onValueChange = { annualFee = it }, label = "Annual Fee", keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
+                
+                Spacer(modifier = Modifier.height(28.dp))
+                RFActionRow(
+                    onCancel = { onDismiss() },
+                    onConfirm = {
+                        val newLimit = limit.toDoubleOrNull()
+                        if (newLimit != null) {
+                            CacheManager.editCreditCard(
+                                context = context,
+                                username = username,
+                                cardNo = cc.cardNo,
+                                newLimit = newLimit,
+                                billDay = billingDay.toIntOrNull() ?: 0,
+                                dueDay = dueDay.toIntOrNull() ?: 0,
+                                annualFee = annualFee.toDoubleOrNull() ?: 0.0
+                            )
+                            Toast.makeText(context, "Card details updated!", Toast.LENGTH_SHORT).show()
+                            onUpdateSuccess()
+                        } else { 
+                            Toast.makeText(context, "Check inputs!", Toast.LENGTH_SHORT).show() 
+                        }
+                    },
+                    confirmText = "Save"
+                )
+            }
+        }
     }
 }
