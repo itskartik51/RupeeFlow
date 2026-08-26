@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Redo
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -35,9 +36,41 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.fragment.app.FragmentActivity
 import com.kartikey.rupeeflow.UI_Screens.bounceClick
 import kotlinx.coroutines.launch
+import java.io.File
+
+fun shareAppApk(context: Context) {
+    try {
+        val appInfo = context.applicationInfo
+        val originalApk = File(appInfo.sourceDir)
+        val tempFile = File(context.cacheDir, "RupeeFlow.apk")
+        
+        if (!tempFile.exists() || tempFile.length() != originalApk.length()) {
+            originalApk.copyTo(tempFile, overwrite = true)
+        }
+
+        val apkUri: Uri = FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.provider",
+            tempFile
+        )
+
+        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+            type = "application/vnd.android.package-archive"
+            putExtra(Intent.EXTRA_STREAM, apkUri)
+            putExtra(Intent.EXTRA_SUBJECT, "RupeeFlow App")
+            putExtra(Intent.EXTRA_TEXT, "Here is the RupeeFlow App! Install and manage your finances smoothly.")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+
+        context.startActivity(Intent.createChooser(shareIntent, "Share RupeeFlow via"))
+    } catch (e: Exception) {
+        Toast.makeText(context, "Unable to share app: ${e.message}", Toast.LENGTH_SHORT).show()
+    }
+}
 
 @Composable
 fun ProfileScreen(
@@ -447,12 +480,33 @@ private fun ProfileMainContent(
 
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment = Alignment.CenterVertically
         ) {
+            Surface(
+                modifier = Modifier.bounceClick { shareAppApk(context) },
+                color = MaterialTheme.colorScheme.surfaceVariant, 
+                shape = RoundedCornerShape(50)
+            ) {
+                Box(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.Redo,
+                        contentDescription = "Share App",
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(10.dp))
+
             Surface(
                 modifier = Modifier.bounceClick { onLogout() },
                 color = MaterialTheme.colorScheme.surfaceVariant, 
-                shape = RoundedCornerShape(50), 
+                shape = RoundedCornerShape(50)
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
