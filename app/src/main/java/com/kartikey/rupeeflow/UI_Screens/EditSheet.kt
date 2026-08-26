@@ -6,6 +6,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -20,7 +21,6 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -496,204 +496,6 @@ fun EditBankDialog(bank: BankAccountItem, username: String, onDismiss: () -> Uni
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun QuickUpdateCCDialog(cc: CreditCardItem, username: String, onDismiss: () -> Unit, onSuccess: () -> Unit) {
-    var updateAmount by remember { mutableStateOf("") }
-    val context = LocalContext.current
-    
-    Dialog(
-        onDismissRequest = { onDismiss() },
-        properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = false, usePlatformDefaultWidth = false)
-    ) {
-        RFDialogCard(modifier = Modifier.fillMaxWidth(0.9f).imePadding()) {
-            Column(modifier = Modifier.padding(24.dp)) {
-                Text("Update Outstanding", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = MaterialTheme.colorScheme.onSurface)
-                Text("Add spend (+) or pay bill (-) on ${cc.issuer}", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
-                
-                Spacer(modifier = Modifier.height(20.dp))
-                
-                RFTextField(
-                    value = updateAmount,
-                    onValueChange = { updateAmount = it },
-                    label = "Amount (+ or -)",
-                    prefix = { Text("₹ ", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth()
-                )
-                
-                Spacer(modifier = Modifier.height(24.dp))
-                
-                RFActionRow(
-                    onCancel = { onDismiss() },
-                    onConfirm = {
-                        val amountEntered = updateAmount.toDoubleOrNull()
-                        if (amountEntered != null && amountEntered != 0.0) {
-                            val newCalculatedOutstanding = cc.outstanding + amountEntered 
-                            
-                            onDismiss()
-                            Toast.makeText(context, "Updating card...", Toast.LENGTH_SHORT).show()
-                            
-                            val cachedData = CacheManager.getCachedData(context, username)
-                            if (cachedData != null) {
-                                val updatedList = cachedData.ccList.map { 
-                                    if (it.cardNo == cc.cardNo) it.copy(outstanding = newCalculatedOutstanding) else it 
-                                }
-                                CacheManager.updateOptimisticCache(context, username, cachedData.copy(ccList = updatedList))
-                                onSuccess() 
-                            }
-                            
-                            CoroutineScope(Dispatchers.IO).launch {
-                                try {
-                                    val db = FirebaseFirestore.getInstance()
-                                    val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
-                                    if (!userQuery.isEmpty) {
-                                        val userRef = userQuery.documents[0].reference
-                                        userRef.collection("Finances").document("CC FD").update(
-                                            FieldPath.of("CC", cc.firebaseKey, "outstanding"), newCalculatedOutstanding
-                                        ).await()
-                                    }
-                                } catch (e: Exception) {}
-                            }
-                        } else { Toast.makeText(context, "Enter a valid amount", Toast.LENGTH_SHORT).show() }
-                    },
-                    confirmText = "Update"
-                )
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun EditCreditCardDialog(cc: CreditCardItem, username: String, onDismiss: () -> Unit, onUpdateSuccess: () -> Unit) {
-    var limit by remember { mutableStateOf(cc.limit.toString()) }
-    var billingDay by remember { mutableStateOf(cc.billingDay.toString()) }
-    var dueDay by remember { mutableStateOf(cc.dueDay.toString()) }
-    var annualFee by remember { mutableStateOf(cc.annualFee.toString()) }
-    
-    var showDeleteConfirm by remember { mutableStateOf(false) }
-    val context = LocalContext.current
-
-    if (showDeleteConfirm) {
-        AlertDialog(
-            onDismissRequest = { showDeleteConfirm = false },
-            containerColor = MaterialTheme.colorScheme.surface,
-            title = { Text("Remove Card", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
-            text = { Text("Are you sure you want to permanently delete this Credit Card record?", color = MaterialTheme.colorScheme.onSurfaceVariant) },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        showDeleteConfirm = false
-                        onDismiss()
-                        Toast.makeText(context, "Deleting card...", Toast.LENGTH_SHORT).show()
-                        
-                        val cachedData = CacheManager.getCachedData(context, username)
-                        if (cachedData != null) {
-                            val updatedList = cachedData.ccList.filter { it.cardNo != cc.cardNo }
-                            CacheManager.updateOptimisticCache(context, username, cachedData.copy(ccList = updatedList))
-                            onUpdateSuccess() 
-                        }
-                        
-                        CoroutineScope(Dispatchers.IO).launch {
-                            try {
-                                val db = FirebaseFirestore.getInstance()
-                                val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
-                                if (!userQuery.isEmpty) {
-                                    val userRef = userQuery.documents[0].reference
-                                    userRef.collection("Finances").document("CC FD").update(
-                                        FieldPath.of("CC", cc.firebaseKey), FieldValue.delete()
-                                    ).await()
-                                }
-                            } catch (e: Exception) {}
-                        }
-                    }, 
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                ) { Text("Delete", color = MaterialTheme.colorScheme.onError) }
-            }, 
-            dismissButton = { 
-                TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant) } 
-            }
-        )
-    }
-
-    Dialog(onDismissRequest = { onDismiss() }, properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = false)) {
-        RFDialogCard(modifier = Modifier.fillMaxWidth().padding(8.dp)) {
-            Column(modifier = Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text("Edit Credit Card", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onSurface)
-                    IconButton(onClick = { showDeleteConfirm = true }) { 
-                        Icon(Icons.Outlined.Delete, contentDescription = "Delete CC", tint = MaterialTheme.colorScheme.error) 
-                    }
-                }
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                RFTextField(value = limit, onValueChange = { limit = it }, label = "Total Limit", keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
-                Spacer(modifier = Modifier.height(12.dp))
-                
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    RFTextField(value = billingDay, onValueChange = { billingDay = it }, label = "Bill Day (1-31)", keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f))
-                    RFTextField(value = dueDay, onValueChange = { dueDay = it }, label = "Due Day (1-31)", keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f))
-                }
-                Spacer(modifier = Modifier.height(12.dp))
-                
-                RFTextField(value = annualFee, onValueChange = { annualFee = it }, label = "Annual Fee", keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
-                
-                Spacer(modifier = Modifier.height(28.dp))
-                RFActionRow(
-                    onCancel = { onDismiss() },
-                    onConfirm = {
-                        val newLimit = limit.toDoubleOrNull()
-                        if (newLimit != null) {
-                            onDismiss()
-                            Toast.makeText(context, "Updating card...", Toast.LENGTH_SHORT).show()
-                            
-                            val cachedData = CacheManager.getCachedData(context, username)
-                            if (cachedData != null) {
-                                val updatedList = cachedData.ccList.map { 
-                                    if (it.cardNo == cc.cardNo) {
-                                        it.copy(limit = newLimit, billingDay = billingDay.toIntOrNull() ?: 0, dueDay = dueDay.toIntOrNull() ?: 0, annualFee = annualFee.toDoubleOrNull() ?: 0.0)
-                                    } else it 
-                                }
-                                CacheManager.updateOptimisticCache(context, username, cachedData.copy(ccList = updatedList))
-                                onUpdateSuccess() 
-                            }
-                            
-                            CoroutineScope(Dispatchers.IO).launch {
-                                try {
-                                    val db = FirebaseFirestore.getInstance()
-                                    val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
-                                    if (!userQuery.isEmpty) {
-                                        val userRef = userQuery.documents[0].reference
-                                        val updatedAnnFee = annualFee.toDoubleOrNull() ?: 0.0
-                                        
-                                        if (updatedAnnFee > 0.0) {
-                                            userRef.collection("Finances").document("CC FD").update(
-                                                FieldPath.of("CC", cc.firebaseKey, "limit"), newLimit,
-                                                FieldPath.of("CC", cc.firebaseKey, "billing"), billingDay.toIntOrNull() ?: 0,
-                                                FieldPath.of("CC", cc.firebaseKey, "due"), dueDay.toIntOrNull() ?: 0,
-                                                FieldPath.of("CC", cc.firebaseKey, "yr fee"), updatedAnnFee
-                                            ).await()
-                                        } else {
-                                            userRef.collection("Finances").document("CC FD").update(
-                                                FieldPath.of("CC", cc.firebaseKey, "limit"), newLimit,
-                                                FieldPath.of("CC", cc.firebaseKey, "billing"), billingDay.toIntOrNull() ?: 0,
-                                                FieldPath.of("CC", cc.firebaseKey, "due"), dueDay.toIntOrNull() ?: 0,
-                                                FieldPath.of("CC", cc.firebaseKey, "yr fee"), FieldValue.delete()
-                                            ).await()
-                                        }
-                                    }
-                                } catch (e: Exception) {}
-                            }
-                        } else { Toast.makeText(context, "Check inputs!", Toast.LENGTH_SHORT).show() }
-                    },
-                    confirmText = "Save"
-                )
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
 fun EditFDDialog(fd: FDItem, username: String, onDismiss: () -> Unit, onUpdateSuccess: () -> Unit) {
     var showDeleteConfirm by remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -784,7 +586,6 @@ fun DeleteExpenseDialog(
                     onDismiss()
                     Toast.makeText(context, "Deleting expense...", Toast.LENGTH_SHORT).show()
                     
-                    // ⚡ 1. INSTANT OPTIMISTIC CACHE UPDATE (REFUND) ⚡
                     val cachedData = CacheManager.getCachedData(context, username)
                     if (cachedData != null) {
                         val updatedBanks = cachedData.bankList.map {
@@ -820,10 +621,8 @@ fun DeleteExpenseDialog(
                         )
                     }
                     
-                    // ⚡ Trigger UI Instant Recompose ⚡
                     onSuccess()
 
-                    // ⚡ 2. FIRESTORE BACKGROUND DELETE & REFUND ⚡
                     CoroutineScope(Dispatchers.IO).launch {
                         try {
                             val db = FirebaseFirestore.getInstance()
@@ -870,7 +669,6 @@ fun DeleteExpenseDialog(
                                     expensesDocRef.update(updates).await()
                                 }
 
-                                // REFUND FINANCE SOURCE
                                 refundFinanceSource(userRef, expense.sourceType, expense.sourceId, expense.amount)
                                 updateBudgetUsage(userRef, -expense.amount)
                             }
@@ -1167,7 +965,6 @@ fun EditExpenseDialog(
                             onDismiss()
                             Toast.makeText(context, "Updating expense...", Toast.LENGTH_SHORT).show()
 
-                            // ⚡ 1. INSTANT OPTIMISTIC CACHE UPDATE ⚡
                             val cachedData = CacheManager.getCachedData(context, username)
                             if (cachedData != null) {
                                 var updatedBanks = cachedData.bankList
@@ -1231,10 +1028,8 @@ fun EditExpenseDialog(
                                 )
                             }
                             
-                            // ⚡ Trigger UI Instant Recompose ⚡
                             onSuccess()
 
-                            // ⚡ 2. FIRESTORE TWO-WAY LEDGER BACKGROUND SYNC ⚡
                             CoroutineScope(Dispatchers.IO).launch {
                                 try {
                                     val db = FirebaseFirestore.getInstance()
@@ -1325,7 +1120,6 @@ fun EditExpenseDialog(
                                             }
                                         }
 
-                                        // ⚡ TWO-WAY LEDGER FINANCIAL ADJUSTMENT ⚡
                                         if (expense.sourceType == selectedSourceType && expense.sourceId == selectedSourceId) {
                                             if (diff > 0) {
                                                 deductFinanceSource(userRef, selectedSourceType, selectedSourceId, diff)
