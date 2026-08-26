@@ -311,7 +311,6 @@ fun QuickUpdateDialog(bank: BankAccountItem, username: String, onDismiss: () -> 
                                     onSuccess() 
                                 }
 
-                                // 🔥 ULTIMATE MASTERSTROKE: USING FIELDPATH TO BYPASS DOT (.) ISSUE 🔥
                                 CoroutineScope(Dispatchers.IO).launch {
                                     try {
                                         val db = FirebaseFirestore.getInstance()
@@ -350,13 +349,5 @@ fun QuickUpdateDialog(bank: BankAccountItem, username: String, onDismiss: () -> 
                 }
             }
         }
-    }
-}
-
-@Composable
-fun MetricItem(label: String, value: String, valueColor: Color, alignment: Alignment.Horizontal) {
-    Column(horizontalAlignment = alignment) {
-        Text(text = label, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
-        Text(text = value, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = valueColor)
     }
 }
