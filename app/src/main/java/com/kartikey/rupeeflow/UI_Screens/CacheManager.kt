@@ -1094,9 +1094,17 @@ object CacheManager {
                     val roomStr = roomItem.toString()
                     val parts = roomStr.split("_")
                     if (parts.size >= 3) {
-                        val rName = parts[2]
+                        var rName = parts[2]
                         val rCode = parts[1]
                         val rPin = if (parts.size >= 4) parts[3] else "123456"
+
+                        if (rName.contains("_")) {
+                            val suffix = rName.substringAfterLast("_")
+                            if (suffix.length == 6 && suffix.all { it.isDigit() }) {
+                                rName = rName.substringBeforeLast("_")
+                            }
+                        }
+
                         val cObj = JSONObject().apply {
                             put("room_name", rName)
                             put("room_code", rCode)
@@ -1336,9 +1344,17 @@ object CacheManager {
         if (contriArray != null) {
             for (i in 0 until contriArray.length()) {
                 val item = contriArray.getJSONObject(i)
-                val rName = item.optString("room_name", "")
+                var rName = item.optString("room_name", "")
                 val rCode = item.optString("room_code", "")
                 val rPin = item.optString("passkey", "123456") 
+
+                if (rName.contains("_")) {
+                    val suffix = rName.substringAfterLast("_")
+                    if (suffix.length == 6 && suffix.all { it.isDigit() }) {
+                        rName = rName.substringBeforeLast("_")
+                    }
+                }
+
                 val expArray = item.optJSONArray("expenses")
                 var lastDate = ""
                 if (expArray != null && expArray.length() > 0) {
