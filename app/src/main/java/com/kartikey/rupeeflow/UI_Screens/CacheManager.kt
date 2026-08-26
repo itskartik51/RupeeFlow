@@ -3,6 +3,7 @@ package com.kartikey.rupeeflow.UI_Screens
 import android.content.Context
 import android.net.Uri
 import com.google.firebase.Timestamp
+import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
@@ -292,6 +293,160 @@ object CacheManager {
 
         } catch (e: Exception) {
             e.printStackTrace()
+        }
+    }
+
+    fun quickUpdateCCOutstanding(context: Context, username: String, cardNo: String, amountDiff: Double) {
+        val cached = getCachedData(context, username) ?: return
+        val targetCC = cached.ccList.find { it.cardNo == cardNo || it.firebaseKey == cardNo } ?: return
+        val newOut = targetCC.outstanding + amountDiff
+        val newAvail = (targetCC.limit - newOut).coerceAtLeast(0.0)
+        val newUtil = if (targetCC.limit > 0) (newOut / targetCC.limit) * 100.0 else 0.0
+        val newCibil = if (newUtil <= 30.0) "Safe" else "High Risk"
+
+        val updatedCC = targetCC.copy(
+            outstanding = newOut,
+            available = newAvail,
+            utilization = newUtil,
+            cibilStatus = newCibil
+        )
+        val updatedList = cached.ccList.map {
+            if (it.cardNo == cardNo || it.firebaseKey == cardNo) updatedCC else it
+        }
+        val updatedData = cached.copy(ccList = updatedList)
+        updateOptimisticCache(context, username, updatedData)
+
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val db = FirebaseFirestore.getInstance()
+                val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
+                if (!userQuery.isEmpty) {
+                    val userDoc = userQuery.documents[0]
+                    val userRef = userDoc.reference
+                    val ccDocRef = userRef.collection("Finances").document("CC FD")
+                    val ccDoc = ccDocRef.get().await()
+                    val ccMap = (ccDoc.get("CC") as? Map<*, *>) ?: emptyMap<String, Any>()
+                    
+                    var matchingKey = targetCC.firebaseKey.ifEmpty { targetCC.cardNo }
+                    for ((k, v) in ccMap) {
+                        if (v is Map<*, *>) {
+                            if (v["card no."]?.toString() == cardNo || k.toString() == cardNo || k.toString() == targetCC.firebaseKey) {
+                                matchingKey = k.toString()
+                                break
+                            }
+                        }
+                    }
+
+                    ccDocRef.update(
+                        FieldPath.of("CC", matchingKey, "outstanding"), newOut
+                    ).await()
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    fun editCreditCard(context: Context, username: String, cardNo: String, newLimit: Double, billDay: Int, dueDay: Int, annualFee: Double) {
+        val cached = getCachedData(context, username) ?: return
+        val targetCC = cached.ccList.find { it.cardNo == cardNo || it.firebaseKey == cardNo } ?: return
+        val newAvail = (newLimit - targetCC.outstanding).coerceAtLeast(0.0)
+        val newUtil = if (newLimit > 0) (targetCC.outstanding / newLimit) * 100.0 else 0.0
+        val newCibil = if (newUtil <= 30.0) "Safe" else "High Risk"
+
+        val updatedCC = targetCC.copy(
+            limit = newLimit,
+            available = newAvail,
+            utilization = newUtil,
+            cibilStatus = newCibil,
+            billingDay = billDay,
+            dueDay = dueDay,
+            annualFee = annualFee
+        )
+        val updatedList = cached.ccList.map {
+            if (it.cardNo == cardNo || it.firebaseKey == cardNo) updatedCC else it
+        }
+        val updatedData = cached.copy(ccList = updatedList)
+        updateOptimisticCache(context, username, updatedData)
+
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val db = FirebaseFirestore.getInstance()
+                val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
+                if (!userQuery.isEmpty) {
+                    val userDoc = userQuery.documents[0]
+                    val userRef = userDoc.reference
+                    val ccDocRef = userRef.collection("Finances").document("CC FD")
+                    val ccDoc = ccDocRef.get().await()
+                    val ccMap = (ccDoc.get("CC") as? Map<*, *>) ?: emptyMap<String, Any>()
+                    
+                    var matchingKey = targetCC.firebaseKey.ifEmpty { targetCC.cardNo }
+                    for ((k, v) in ccMap) {
+                        if (v is Map<*, *>) {
+                            if (v["card no."]?.toString() == cardNo || k.toString() == cardNo || k.toString() == targetCC.firebaseKey) {
+                                matchingKey = k.toString()
+                                break
+                            }
+                        }
+                    }
+
+                    if (annualFee > 0.0) {
+                        ccDocRef.update(
+                            FieldPath.of("CC", matchingKey, "limit"), newLimit,
+                            FieldPath.of("CC", matchingKey, "billing"), billDay,
+                            FieldPath.of("CC", matchingKey, "due"), dueDay,
+                            FieldPath.of("CC", matchingKey, "yr fee"), annualFee
+                        ).await()
+                    } else {
+                        ccDocRef.update(
+                            FieldPath.of("CC", matchingKey, "limit"), newLimit,
+                            FieldPath.of("CC", matchingKey, "billing"), billDay,
+                            FieldPath.of("CC", matchingKey, "due"), dueDay,
+                            FieldPath.of("CC", matchingKey, "yr fee"), FieldValue.delete()
+                        ).await()
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    fun deleteCreditCard(context: Context, username: String, cardNo: String) {
+        val cached = getCachedData(context, username) ?: return
+        val targetCC = cached.ccList.find { it.cardNo == cardNo || it.firebaseKey == cardNo }
+        val updatedList = cached.ccList.filterNot { it.cardNo == cardNo || it.firebaseKey == cardNo }
+        val updatedData = cached.copy(ccList = updatedList)
+        updateOptimisticCache(context, username, updatedData)
+
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val db = FirebaseFirestore.getInstance()
+                val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
+                if (!userQuery.isEmpty) {
+                    val userDoc = userQuery.documents[0]
+                    val userRef = userDoc.reference
+                    val ccDocRef = userRef.collection("Finances").document("CC FD")
+                    val ccDoc = ccDocRef.get().await()
+                    val ccMap = (ccDoc.get("CC") as? Map<*, *>) ?: emptyMap<String, Any>()
+                    
+                    var matchingKey = targetCC?.firebaseKey?.ifEmpty { targetCC.cardNo } ?: cardNo
+                    for ((k, v) in ccMap) {
+                        if (v is Map<*, *>) {
+                            if (v["card no."]?.toString() == cardNo || k.toString() == cardNo || (targetCC != null && k.toString() == targetCC.firebaseKey)) {
+                                matchingKey = k.toString()
+                                break
+                            }
+                        }
+                    }
+
+                    ccDocRef.update(
+                        FieldPath.of("CC", matchingKey), FieldValue.delete()
+                    ).await()
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 
@@ -1149,10 +1304,13 @@ object CacheManager {
         if (ccArray != null) {
             for (i in 0 until ccArray.length()) { 
                 val item = ccArray.getJSONObject(i)
+                val rawKey = item.optString("firebase_key", "")
+                val rawCardNo = item.optString("card_no", "")
                 fetchedCCList.add(
                     CreditCardItem(
+                        firebaseKey = if (rawKey.isNotBlank()) rawKey else rawCardNo, 
                         issuer = item.optString("issuer", ""), 
-                        cardNo = item.optString("card_no", ""), 
+                        cardNo = rawCardNo, 
                         type = item.optString("type", ""), 
                         limit = item.optDouble("limit", 0.0), 
                         outstanding = item.optDouble("outstanding", 0.0), 
