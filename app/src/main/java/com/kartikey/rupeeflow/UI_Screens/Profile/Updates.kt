@@ -17,6 +17,9 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -28,7 +31,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -129,6 +132,14 @@ fun AppUpdateRow(isUpdateAvailableBadge: Boolean) {
     var updateInfo by remember { mutableStateOf<UpdateInfo?>(null) }
     var downloadProgress by remember { mutableFloatStateOf(0f) }
     var downloadedApkUri by remember { mutableStateOf<Uri?>(null) }
+
+    val neonGreenColor = Color(0xFF00E676)
+
+    val animatedDownloadProgress by animateFloatAsState(
+        targetValue = downloadProgress.coerceIn(0f, 1f),
+        animationSpec = tween(durationMillis = 140, easing = FastOutSlowInEasing),
+        label = "SnappyDownloadAnim"
+    )
 
     val packageInfo = remember { context.packageManager.getPackageInfo(context.packageName, 0) }
     val currentVersionCode = remember {
@@ -294,6 +305,7 @@ fun AppUpdateRow(isUpdateAvailableBadge: Boolean) {
                                     Button(
                                         onClick = {
                                             checkState = "DOWNLOADING"
+                                            downloadProgress = 0f
                                             val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
                                             val uri = Uri.parse(updateInfo?.apkUrl)
                                             val fileName = "RupeeFlow_Update_${updateInfo?.versionCode}.apk"
@@ -333,6 +345,10 @@ fun AppUpdateRow(isUpdateAvailableBadge: Boolean) {
                                                                 .apply()
 
                                                             withContext(Dispatchers.Main) {
+                                                                downloadProgress = 1f
+                                                            }
+                                                            delay(120)
+                                                            withContext(Dispatchers.Main) {
                                                                 downloadedApkUri = finalUri
                                                                 checkState = "READY"
                                                                 showUpdateReadyNotification(context, finalUri)
@@ -347,12 +363,14 @@ fun AppUpdateRow(isUpdateAvailableBadge: Boolean) {
                                                             val bytesDownloaded = cursor.getLong(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR))
                                                             val bytesTotal = cursor.getLong(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES))
                                                             if (bytesTotal > 0) {
-                                                                withContext(Dispatchers.Main) { downloadProgress = bytesDownloaded.toFloat() / bytesTotal.toFloat() }
+                                                                withContext(Dispatchers.Main) { 
+                                                                    downloadProgress = bytesDownloaded.toFloat() / bytesTotal.toFloat() 
+                                                                }
                                                             }
                                                         }
                                                     }
                                                     cursor?.close()
-                                                    if (isDownloading) delay(500)
+                                                    if (isDownloading) delay(250)
                                                 }
                                             }
                                         },
@@ -371,16 +389,30 @@ fun AppUpdateRow(isUpdateAvailableBadge: Boolean) {
                                     }
                                     Spacer(modifier = Modifier.height(8.dp))
                                     Box(modifier = Modifier.height(18.dp), contentAlignment = Alignment.Center) {
-                                        LinearProgressIndicator(
-                                            progress = { downloadProgress },
-                                            modifier = Modifier.fillMaxWidth().padding(end = 16.dp).height(6.dp),
-                                            color = MaterialTheme.colorScheme.primary,
-                                            trackColor = MaterialTheme.colorScheme.surfaceVariant,
-                                            strokeCap = StrokeCap.Round 
-                                        )
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(end = 16.dp)
+                                                .height(6.dp)
+                                                .clip(RoundedCornerShape(3.dp))
+                                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxHeight()
+                                                    .fillMaxWidth(animatedDownloadProgress)
+                                                    .clip(RoundedCornerShape(3.dp))
+                                                    .background(neonGreenColor)
+                                            )
+                                        }
                                     }
                                     Box(modifier = Modifier.height(16.dp), contentAlignment = Alignment.Center) {
-                                        Text("${(downloadProgress * 100).toInt()}%", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        Text(
+                                            text = "${(animatedDownloadProgress * 100).toInt()}%", 
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant, 
+                                            fontSize = 11.sp, 
+                                            fontWeight = FontWeight.Bold
+                                        )
                                     }
                                 }
                             }
