@@ -211,43 +211,7 @@ fun ContriScreen(
                         ActiveRoomCard(
                             room = room, 
                             onClick = { openedRoom = room }, 
-                            onQrClick = { 
-                                if (room.pin.isNotBlank() && room.pin != "123456") {
-                                    qrRoomToDisplay = room
-                                } else {
-                                    coroutineScope.launch(Dispatchers.IO) {
-                                        try {
-                                            val db = FirebaseFirestore.getInstance()
-                                            val q = db.collection("Contri")
-                                                .whereEqualTo("contri_code", room.roomCode)
-                                                .get()
-                                                .await()
-                                            val doc = q.documents.firstOrNull()
-                                            val realPin = doc?.getString("passkey") ?: room.pin
-
-                                            val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
-                                            if (!userQuery.isEmpty) {
-                                                val userDoc = userQuery.documents[0]
-                                                val currentRooms = userDoc.get("rooms") as? List<*> ?: emptyList<Any>()
-                                                val oldEntry = currentRooms.filterIsInstance<String>().firstOrNull { it.contains(room.roomCode) }
-                                                if (oldEntry != null && oldEntry.split("_").size < 4) {
-                                                    val newEntry = "${oldEntry}_$realPin"
-                                                    userDoc.reference.update("rooms", FieldValue.arrayRemove(oldEntry)).await()
-                                                    userDoc.reference.update("rooms", FieldValue.arrayUnion(newEntry)).await()
-                                                }
-                                            }
-
-                                            withContext(Dispatchers.Main) {
-                                                qrRoomToDisplay = room.copy(pin = realPin)
-                                            }
-                                        } catch (e: Exception) {
-                                            withContext(Dispatchers.Main) {
-                                                qrRoomToDisplay = room
-                                            }
-                                        }
-                                    }
-                                }
-                            }
+                            onQrClick = { qrRoomToDisplay = room }
                         )
                         Spacer(modifier = Modifier.height(12.dp))
                     }
