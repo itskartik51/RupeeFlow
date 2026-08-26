@@ -1092,12 +1092,15 @@ object CacheManager {
 
                 for (roomItem in roomsArray) {
                     val roomStr = roomItem.toString()
-                    val parts = roomStr.split("_", limit = 3)
+                    val parts = roomStr.split("_")
                     if (parts.size >= 3) {
+                        val rName = parts[2]
+                        val rCode = parts[1]
+                        val rPin = if (parts.size >= 4) parts[3] else "123456"
                         val cObj = JSONObject().apply {
-                            put("room_name", parts[2])
-                            put("room_code", parts[1])
-                            put("passkey", "123456")
+                            put("room_name", rName)
+                            put("room_code", rCode)
+                            put("passkey", rPin)
                             put("expenses", JSONArray()) 
                         }
                         contriArray.put(cObj)
