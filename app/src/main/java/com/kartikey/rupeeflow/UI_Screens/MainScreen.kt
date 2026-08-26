@@ -58,7 +58,6 @@ fun MainScreen(
     var assetsCurrentView by remember { mutableStateOf("Main") }
 
     var bankToEdit by remember { mutableStateOf<BankAccountItem?>(null) }
-    var ccToEdit by remember { mutableStateOf<CreditCardItem?>(null) }
     var fdToEdit by remember { mutableStateOf<FDItem?>(null) }
     
     var expenseToEdit by remember { mutableStateOf<TransactionModel?>(null) }
@@ -100,21 +99,20 @@ fun MainScreen(
         isUpdateAvailable = checkIsUpdateAvailable(context)
     }
 
-    LaunchedEffect(selectedTab, showExpenseHistory, showContriScreen, isLoadingExpenses, transactionList.size, bankToEdit, ccToEdit, fdToEdit, showAddMenu) {
+    LaunchedEffect(selectedTab, showExpenseHistory, showContriScreen, isLoadingExpenses, transactionList.size, bankToEdit, fdToEdit, showAddMenu) {
         if (showAddMenu) dNavState = "Add Menu Open"
-        else if (bankToEdit != null || ccToEdit != null || fdToEdit != null || expenseToEdit != null) dNavState = "Editing Vault"
+        else if (bankToEdit != null || fdToEdit != null || expenseToEdit != null) dNavState = "Editing Vault"
         else if (showContriScreen) dNavState = "Contri Hub"
         else if (showExpenseHistory) dNavState = "Expense History"
         else dNavState = if (isLoadingExpenses) "Syncing Data... ⏳" else "Tab $selectedTab ✅"
     }
 
-    BackHandler(enabled = showContriScreen || showExpenseHistory || selectedTab != 0 || assetsCurrentView != "Main" || bankToEdit != null || ccToEdit != null || fdToEdit != null || expenseToEdit != null || expenseToDelete != null) {
+    BackHandler(enabled = showContriScreen || showExpenseHistory || selectedTab != 0 || assetsCurrentView != "Main" || bankToEdit != null || fdToEdit != null || expenseToEdit != null || expenseToDelete != null) {
         dBackPresses++ 
         when {
             expenseToDelete != null -> expenseToDelete = null
             expenseToEdit != null -> expenseToEdit = null
             bankToEdit != null -> bankToEdit = null 
-            ccToEdit != null -> ccToEdit = null
             fdToEdit != null -> fdToEdit = null
             showContriScreen -> showContriScreen = false
             showExpenseHistory -> showExpenseHistory = false 
@@ -346,7 +344,7 @@ fun MainScreen(
                             bankList = bankList, fdList = fdList, ccList = ccList, cashData = cashData, 
                             isLoading = isLoadingExpenses, onRefreshClick = { refreshTrigger++ },
                             currentView = assetsCurrentView, onViewChange = { assetsCurrentView = it }, 
-                            onEditBankClick = { bankToEdit = it }, onEditCCClick = { ccToEdit = it }, onEditFDClick = { fdToEdit = it }
+                            onEditBankClick = { bankToEdit = it }, onEditCCClick = { }, onEditFDClick = { fdToEdit = it }
                         )
                         3 -> AnalyticsScreen(paddingValues = paddingValues)
                         4 -> ProfileScreen(
@@ -373,7 +371,6 @@ fun MainScreen(
         )
 
         if (bankToEdit != null) { EditBankDialog(bank = bankToEdit!!, username = username, onDismiss = { bankToEdit = null }, onUpdateSuccess = { bankToEdit = null; refreshTrigger++ }) }
-        if (ccToEdit != null) { EditCreditCardDialog(cc = ccToEdit!!, username = username, onDismiss = { ccToEdit = null }, onUpdateSuccess = { ccToEdit = null; refreshTrigger++ }) }
         if (fdToEdit != null) { EditFDDialog(fd = fdToEdit!!, username = username, onDismiss = { fdToEdit = null }, onUpdateSuccess = { fdToEdit = null; refreshTrigger++ }) }
         if (expenseToDelete != null) { 
             DeleteExpenseDialog(
