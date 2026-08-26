@@ -282,14 +282,6 @@ fun CCDetailCard(
     }
 }
 
-@Composable
-private fun MetricItem(label: String, value: String, valueColor: Color, alignment: Alignment.Horizontal) {
-    Column(horizontalAlignment = alignment) {
-        Text(text = value, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = valueColor)
-        Text(text = label, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
-    }
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun QuickUpdateCCDialog(cc: CreditCardItem, username: String, onDismiss: () -> Unit, onSuccess: () -> Unit) {
