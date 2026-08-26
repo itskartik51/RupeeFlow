@@ -19,8 +19,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Redo
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -62,7 +62,7 @@ fun shareAppApk(context: Context) {
             type = "application/vnd.android.package-archive"
             putExtra(Intent.EXTRA_STREAM, apkUri)
             putExtra(Intent.EXTRA_SUBJECT, "RupeeFlow App")
-            putExtra(Intent.EXTRA_TEXT, "Here is the RupeeFlow App! Install and manage your finances smoothly.")
+            putExtra(Intent.EXTRA_TEXT, "Track expenses, bank accounts, and investments seamlessly with RupeeFlow!")
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
 
@@ -242,7 +242,7 @@ private fun ProfileMainContent(
         
         Spacer(modifier = Modifier.height(16.dp))
         
-        // 2. Name with Verified Blue Tick (Conditional based on isVerified)
+        // 2. Name with Verified Blue Tick
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.clickable { onNameClick() }
@@ -483,25 +483,21 @@ private fun ProfileMainContent(
             horizontalArrangement = Arrangement.End,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Surface(
-                modifier = Modifier.bounceClick { shareAppApk(context) },
-                color = MaterialTheme.colorScheme.surfaceVariant, 
-                shape = RoundedCornerShape(50)
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .bounceClick { shareAppApk(context) },
+                contentAlignment = Alignment.Center
             ) {
-                Box(
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.Redo,
-                        contentDescription = "Share App",
-                        tint = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
+                Icon(
+                    imageVector = Icons.Outlined.Share,
+                    contentDescription = "Share App",
+                    tint = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.size(22.dp)
+                )
             }
 
-            Spacer(modifier = Modifier.width(10.dp))
+            Spacer(modifier = Modifier.width(8.dp))
 
             Surface(
                 modifier = Modifier.bounceClick { onLogout() },
