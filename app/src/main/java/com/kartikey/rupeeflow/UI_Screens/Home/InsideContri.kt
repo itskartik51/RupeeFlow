@@ -2,8 +2,11 @@ package com.kartikey.rupeeflow.UI_Screens.Home
 
 import android.content.Context
 import android.widget.Toast
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.*
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -119,7 +122,7 @@ fun InsideContriScreen(
         if (isSyncing || actionProcessing) {
             while (true) {
                 delay(16)
-                currentRotation -= 8f // Inverted for true clockwise visual spin when mirrored
+                currentRotation -= 8f 
             }
         } else {
             currentRotation = 0f
@@ -160,8 +163,6 @@ fun InsideContriScreen(
                     }
 
                     val membersMap = mutableMapOf<String, MemberLedger>()
-                    
-                    // Fetching entire room data from Master Map "expenses_data"
                     val expensesData = contriDoc.get("expenses_data") as? Map<String, Any> ?: emptyMap()
 
                     for (mId in memberIds) {
@@ -172,7 +173,6 @@ fun InsideContriScreen(
                         var userSpent = 0.0
                         val expList = mutableListOf<ContriExpense>()
                         
-                        // Sorting Keys (000A, 000B...) so sequence remains intact
                         val sortedKeys = userExpMap.keys.sorted()
                         
                         for (key in sortedKeys) {
@@ -205,7 +205,6 @@ fun InsideContriScreen(
                         membersMap[mId] = MemberLedger(mId, actualName, userSpent, expList)
                     }
 
-                    // Smart Column Sorting: 1. You, 2. Admin (if not you), 3. Sequential additions
                     val sortedLedgers = mutableListOf<MemberLedger>()
                     membersMap[currentUserId]?.let { sortedLedgers.add(it) }
                     
@@ -619,8 +618,9 @@ fun InsideContriScreen(
         }
 
         if (showSettleDialog) {
-            val myDisplayName = ledgers.find { it.userId == currentUserId }?.memberName ?: username
-            SettleUpDialog(myName = myDisplayName, ledgers = ledgers, totalExpense = totalGroupExpense, onDismiss = { showSettleDialog = false })
+            val allNames = ledgers.map { it.memberName }
+            val myRealName = ledgers.find { it.userId == currentUserId }?.memberName ?: username
+            SettleUpDialog(myName = myRealName, allMemberNames = allNames, ledgers = ledgers, totalExpense = totalGroupExpense, onDismiss = { showSettleDialog = false })
         }
 
         if (showNewCycleDialog) {
@@ -963,6 +963,7 @@ fun AdminSettingsDialog(
                         .clip(RoundedCornerShape(12.dp))
                         .background(MaterialTheme.colorScheme.background)
                 ) {
+                    val allNames = ledgers.map { it.memberName }
                     if (ledgers.isNotEmpty()) {
                         LazyColumn {
                             itemsIndexed(ledgers) { index, member ->
@@ -971,7 +972,8 @@ fun AdminSettingsDialog(
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    val dispName = if (member.memberName.length > 10) member.memberName.take(10) + "..." else member.memberName
+                                    val rawName = if (member.userId == currentUserId) "You" else formatMemberDisplayName(member.memberName, allNames)
+                                    val dispName = if (rawName.length > 12) rawName.take(12) + "..." else rawName
                                     Text(text = dispName, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onBackground)
                                     
                                     if (member.userId == currentUserId) {
@@ -1087,21 +1089,25 @@ fun DynamicLedgerView(
     val isScrollable = memberCount > 3
     val fixedColumnWidth = 110.dp
     var revealedExpenseKey by remember { mutableStateOf<String?>(null) }
+    val allFullNames = ledgers.map { it.memberName }
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .let { if (isScrollable) it.horizontalScroll(rememberScrollState()) else it }
+            .then(if (isScrollable) Modifier.horizontalScroll(rememberScrollState()) else Modifier)
             .padding(horizontal = 16.dp)
     ) {
         Row(modifier = if (!isScrollable) Modifier.fillMaxWidth() else Modifier) {
             ledgers.forEach { ledger ->
+                val isCurrentUser = ledger.userId == currentUserId
+                val displayName = if (isCurrentUser) "You" else formatMemberDisplayName(ledger.memberName, allFullNames)
+
                 Column(
                     modifier = if (isScrollable) Modifier.width(fixedColumnWidth) else Modifier.weight(1f),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text = ledger.memberName, 
+                        text = displayName, 
                         fontSize = 15.sp, 
                         fontWeight = FontWeight.ExtraBold, 
                         color = MaterialTheme.colorScheme.onBackground,
@@ -1131,13 +1137,9 @@ fun DynamicLedgerView(
                 ) {
                     ledger.expenses.forEach { expense ->
                         val isRevealed = revealedExpenseKey == expense.key
-                        val offsetX by animateDpAsState(
-                            targetValue = if (isRevealed && isCurrentUser) (-74).dp else 0.dp,
-                            animationSpec = tween(220, easing = FastOutSlowInEasing),
-                            label = "ExpenseSlide"
-                        )
 
-                        Box(
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(bottom = 12.dp)
@@ -1145,85 +1147,82 @@ fun DynamicLedgerView(
                                 .clickable(enabled = isCurrentUser) {
                                     revealedExpenseKey = if (isRevealed) null else expense.key
                                 }
+                                .padding(vertical = 2.dp)
                         ) {
-                            if (isCurrentUser) {
-                                Row(
-                                    modifier = Modifier
-                                        .align(Alignment.CenterEnd)
-                                        .padding(end = 2.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(32.dp)
-                                            .clip(CircleShape)
-                                            .background(MaterialTheme.colorScheme.surfaceVariant)
-                                            .bounceClick {
-                                                revealedExpenseKey = null
-                                                onEditExpense(expense)
-                                            },
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Outlined.Edit,
-                                            contentDescription = "Edit",
-                                            tint = MaterialTheme.colorScheme.onSurface,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                    }
-
-                                    Box(
-                                        modifier = Modifier
-                                            .size(32.dp)
-                                            .clip(CircleShape)
-                                            .background(Color(0xFFFF5252).copy(alpha = 0.15f))
-                                            .bounceClick {
-                                                revealedExpenseKey = null
-                                                onDeleteExpense(expense)
-                                            },
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Outlined.Delete,
-                                            contentDescription = "Delete",
-                                            tint = Color(0xFFFF5252),
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                    }
-                                }
+                            Text(
+                                text = expense.itemName, 
+                                fontSize = 17.sp, 
+                                fontWeight = FontWeight.Bold, 
+                                color = MaterialTheme.colorScheme.onBackground, 
+                                maxLines = 1, 
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "₹${expense.amount.toInt()}", 
+                                    fontSize = 13.sp, 
+                                    fontWeight = FontWeight.Bold, 
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = expense.date, 
+                                    fontSize = 11.sp, 
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant, 
+                                    fontWeight = FontWeight.Medium
+                                )
                             }
 
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .offset(x = offsetX)
-                                    .background(MaterialTheme.colorScheme.background)
-                            ) {
-                                Text(
-                                    text = expense.itemName, 
-                                    fontSize = 17.sp, 
-                                    fontWeight = FontWeight.Bold, 
-                                    color = MaterialTheme.colorScheme.onBackground, 
-                                    maxLines = 1, 
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(
-                                        text = "₹${expense.amount.toInt()}", 
-                                        fontSize = 13.sp, 
-                                        fontWeight = FontWeight.Bold, 
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = expense.date, 
-                                        fontSize = 11.sp, 
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant, 
-                                        fontWeight = FontWeight.Medium
-                                    )
+                            if (isCurrentUser) {
+                                AnimatedVisibility(
+                                    visible = isRevealed,
+                                    enter = fadeIn(tween(150)),
+                                    exit = fadeOut(tween(150))
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(top = 6.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(30.dp)
+                                                .clip(CircleShape)
+                                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                                                .bounceClick {
+                                                    revealedExpenseKey = null
+                                                    onEditExpense(expense)
+                                                },
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Outlined.Edit,
+                                                contentDescription = "Edit",
+                                                tint = MaterialTheme.colorScheme.onSurface,
+                                                modifier = Modifier.size(15.dp)
+                                            )
+                                        }
+
+                                        Box(
+                                            modifier = Modifier
+                                                .size(30.dp)
+                                                .clip(CircleShape)
+                                                .background(Color(0xFFFF5252).copy(alpha = 0.15f))
+                                                .bounceClick {
+                                                    revealedExpenseKey = null
+                                                    onDeleteExpense(expense)
+                                                },
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Outlined.Delete,
+                                                contentDescription = "Delete",
+                                                tint = Color(0xFFFF5252),
+                                                modifier = Modifier.size(15.dp)
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -1285,12 +1284,13 @@ fun calculateUserSettlements(ledgers: List<MemberLedger>, totalExpense: Double):
 }
 
 @Composable
-fun SettleUpDialog(myName: String, ledgers: List<MemberLedger>, totalExpense: Double, onDismiss: () -> Unit) {
+fun SettleUpDialog(myName: String, allMemberNames: List<String>, ledgers: List<MemberLedger>, totalExpense: Double, onDismiss: () -> Unit) {
     val (_, allSettlements) = calculateUserSettlements(ledgers, totalExpense)
     
-    val allMemberNames = ledgers.map { it.memberName }
     val formattedNameMap = ledgers.associate { ledger ->
-        ledger.memberName to formatMemberDisplayName(ledger.memberName, allMemberNames)
+        val isMe = ledger.memberName == myName
+        val disp = if (isMe) "You" else formatMemberDisplayName(ledger.memberName, allMemberNames)
+        ledger.memberName to disp
     }
 
     val sortedSettlements = allSettlements.sortedWith(
@@ -1313,8 +1313,8 @@ fun SettleUpDialog(myName: String, ledgers: List<MemberLedger>, totalExpense: Do
                         Text("No pending payments.", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
                     } else {
                         sortedSettlements.forEach { settlement ->
-                            val fromText = if (settlement.from == myName) "You" else (formattedNameMap[settlement.from] ?: settlement.from)
-                            val toText = if (settlement.to == myName) "You" else (formattedNameMap[settlement.to] ?: settlement.to)
+                            val fromText = formattedNameMap[settlement.from] ?: settlement.from
+                            val toText = formattedNameMap[settlement.to] ?: settlement.to
                             val actionWord = if (fromText == "You") "Pay" else "Pays"
 
                             Row(
