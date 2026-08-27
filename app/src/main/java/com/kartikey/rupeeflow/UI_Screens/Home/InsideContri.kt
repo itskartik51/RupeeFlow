@@ -5,8 +5,10 @@ import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.*
+import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -1138,8 +1140,7 @@ fun DynamicLedgerView(
                     ledger.expenses.forEach { expense ->
                         val isRevealed = revealedExpenseKey == expense.key
 
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
+                        Box(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(bottom = 12.dp)
@@ -1147,80 +1148,91 @@ fun DynamicLedgerView(
                                 .clickable(enabled = isCurrentUser) {
                                     revealedExpenseKey = if (isRevealed) null else expense.key
                                 }
-                                .padding(vertical = 2.dp)
+                                .padding(vertical = 2.dp),
+                            contentAlignment = Alignment.Center
                         ) {
-                            Text(
-                                text = expense.itemName, 
-                                fontSize = 17.sp, 
-                                fontWeight = FontWeight.Bold, 
-                                color = MaterialTheme.colorScheme.onBackground, 
-                                maxLines = 1, 
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = "₹${expense.amount.toInt()}", 
-                                    fontSize = 13.sp, 
-                                    fontWeight = FontWeight.Bold, 
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = expense.date, 
-                                    fontSize = 11.sp, 
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant, 
-                                    fontWeight = FontWeight.Medium
-                                )
-                            }
-
-                            if (isCurrentUser) {
-                                AnimatedVisibility(
-                                    visible = isRevealed,
-                                    enter = fadeIn(tween(150)),
-                                    exit = fadeOut(tween(150))
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center,
+                                modifier = Modifier.animateContentSize()
+                            ) {
+                                Column(
+                                    horizontalAlignment = if (isRevealed && isCurrentUser) Alignment.Start else Alignment.CenterHorizontally
                                 ) {
-                                    Row(
-                                        modifier = Modifier.padding(top = 6.dp),
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                        verticalAlignment = Alignment.CenterVertically
+                                    Text(
+                                        text = expense.itemName, 
+                                        fontSize = 17.sp, 
+                                        fontWeight = FontWeight.Bold, 
+                                        color = MaterialTheme.colorScheme.onBackground, 
+                                        maxLines = 1, 
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            text = "₹${expense.amount.toInt()}", 
+                                            fontSize = 13.sp, 
+                                            fontWeight = FontWeight.Bold, 
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = expense.date, 
+                                            fontSize = 11.sp, 
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant, 
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
+                                }
+
+                                if (isCurrentUser) {
+                                    AnimatedVisibility(
+                                        visible = isRevealed,
+                                        enter = expandHorizontally(expandFrom = Alignment.Start) + fadeIn(tween(150)),
+                                        exit = shrinkHorizontally(shrinkTowards = Alignment.Start) + fadeOut(tween(150))
                                     ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(30.dp)
-                                                .clip(CircleShape)
-                                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                                        Row(
+                                            modifier = Modifier.padding(start = 8.dp),
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(30.dp)
+                                                    .clip(CircleShape)
+                                                    .background(MaterialTheme.colorScheme.surfaceVariant)
                                                 .bounceClick {
                                                     revealedExpenseKey = null
                                                     onEditExpense(expense)
                                                 },
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Outlined.Edit,
-                                                contentDescription = "Edit",
-                                                tint = MaterialTheme.colorScheme.onSurface,
-                                                modifier = Modifier.size(15.dp)
-                                            )
-                                        }
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Outlined.Edit,
+                                                    contentDescription = "Edit",
+                                                    tint = MaterialTheme.colorScheme.onSurface,
+                                                    modifier = Modifier.size(15.dp)
+                                                )
+                                            }
 
-                                        Box(
-                                            modifier = Modifier
-                                                .size(30.dp)
-                                                .clip(CircleShape)
-                                                .background(Color(0xFFFF5252).copy(alpha = 0.15f))
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(30.dp)
+                                                    .clip(CircleShape)
+                                                    .background(Color(0xFFFF5252).copy(alpha = 0.15f))
                                                 .bounceClick {
                                                     revealedExpenseKey = null
                                                     onDeleteExpense(expense)
                                                 },
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Outlined.Delete,
-                                                contentDescription = "Delete",
-                                                tint = Color(0xFFFF5252),
-                                                modifier = Modifier.size(15.dp)
-                                            )
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Outlined.Delete,
+                                                    contentDescription = "Delete",
+                                                    tint = Color(0xFFFF5252),
+                                                    modifier = Modifier.size(15.dp)
+                                                )
+                                            }
                                         }
                                     }
                                 }
