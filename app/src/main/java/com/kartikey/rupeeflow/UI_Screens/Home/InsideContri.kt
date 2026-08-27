@@ -56,8 +56,21 @@ import kotlin.math.abs
 // ==========================================
 // DATA MODELS
 // ==========================================
-data class ContriExpense(val itemName: String, val amount: Double, val date: String)
-data class MemberLedger(val userId: String, val memberName: String, val totalSpent: Double, val expenses: List<ContriExpense>)
+data class ContriExpense(
+    val key: String,
+    val itemName: String,
+    val amount: Double,
+    val date: String,
+    val rawDateMillis: Long
+)
+
+data class MemberLedger(
+    val userId: String,
+    val memberName: String,
+    val totalSpent: Double,
+    val expenses: List<ContriExpense>
+)
+
 data class Settlement(val from: String, val to: String, val amount: Double)
 data class PastCycle(val dateRange: String, val totalAmount: String)
 
@@ -92,6 +105,8 @@ fun InsideContriScreen(
     var showNewCycleDialog by remember { mutableStateOf(false) }
     var showSettingsDialog by remember { mutableStateOf(false) }
     
+    var expenseToEdit by remember { mutableStateOf<ContriExpense?>(null) }
+    var expenseToDelete by remember { mutableStateOf<ContriExpense?>(null) }
     var memberToRemove by remember { mutableStateOf<MemberLedger?>(null) }
 
     val expandedState = remember { mutableStateMapOf<String, Boolean>() }
@@ -167,22 +182,41 @@ fun InsideContriScreen(
                             val amt = if (rawAmt is Number) rawAmt.toDouble() else 0.0
                             
                             val rawDate = expObj["date"]
+                            var rawMillis = System.currentTimeMillis()
                             val formattedDate = if (rawDate is com.google.firebase.Timestamp) {
+                                rawMillis = rawDate.toDate().time
                                 SimpleDateFormat("dd MMMM", Locale.getDefault()).format(rawDate.toDate())
                             } else if (rawDate is String) {
                                 try {
                                     val parsed = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).parse(rawDate)
-                                    if (parsed != null) SimpleDateFormat("dd MMMM", Locale.getDefault()).format(parsed) else rawDate
+                                    if (parsed != null) {
+                                        rawMillis = parsed.time
+                                        SimpleDateFormat("dd MMMM", Locale.getDefault()).format(parsed)
+                                    } else rawDate
                                 } catch (e: Exception) { rawDate.toString() }
                             } else {
                                 ""
                             }
                             
                             userSpent += amt
-                            expList.add(ContriExpense(item, amt, formattedDate))
+                            expList.add(ContriExpense(key, item, amt, formattedDate, rawMillis))
                         }
                         
                         membersMap[mId] = MemberLedger(mId, actualName, userSpent, expList)
+                    }
+
+                    // Smart Column Sorting: 1. You, 2. Admin (if not you), 3. Sequential additions
+                    val sortedLedgers = mutableListOf<MemberLedger>()
+                    membersMap[currentUserId]?.let { sortedLedgers.add(it) }
+                    
+                    if (adminId != currentUserId && membersMap.containsKey(adminId)) {
+                        membersMap[adminId]?.let { sortedLedgers.add(it) }
+                    }
+                    
+                    for (mId in memberIds) {
+                        if (mId != currentUserId && mId != adminId) {
+                            membersMap[mId]?.let { sortedLedgers.add(it) }
+                        }
                     }
 
                     val cyclesList = mutableListOf<PastCycle>()
@@ -197,7 +231,7 @@ fun InsideContriScreen(
                     }
 
                     withContext(Dispatchers.Main) {
-                        ledgers = membersMap.values.toList()
+                        ledgers = sortedLedgers
                         pastCycles = cyclesList
                         isLoading = false
                         isSyncing = false
@@ -401,7 +435,12 @@ fun InsideContriScreen(
                     Text("No members yet.", color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f), fontWeight = FontWeight.Medium)
                 }
             } else {
-                DynamicLedgerView(ledgers)
+                DynamicLedgerView(
+                    currentUserId = currentUserId,
+                    ledgers = ledgers,
+                    onEditExpense = { expense -> expenseToEdit = expense },
+                    onDeleteExpense = { expense -> expenseToDelete = expense }
+                )
             }
 
             if (pastCycles.isNotEmpty()) {
@@ -465,7 +504,12 @@ fun InsideContriScreen(
                                     if (cycleLedger != null && cycleLedger.isNotEmpty()) {
                                         HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f), thickness = 0.5.dp)
                                         Spacer(modifier = Modifier.height(12.dp))
-                                        DynamicLedgerView(cycleLedger)
+                                        DynamicLedgerView(
+                                            currentUserId = currentUserId,
+                                            ledgers = cycleLedger,
+                                            onEditExpense = {},
+                                            onDeleteExpense = {}
+                                        )
                                         Spacer(modifier = Modifier.height(12.dp))
                                     } else if (!isFetching) {
                                         Text("No data available.", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.fillMaxWidth().padding(16.dp), textAlign = TextAlign.Center)
@@ -729,6 +773,93 @@ fun InsideContriScreen(
                 }
             )
         }
+
+        if (expenseToEdit != null) {
+            EditContriExpenseDialog(
+                expense = expenseToEdit!!,
+                onDismiss = { expenseToEdit = null },
+                onUpdate = { newTitle, newDateMillis, newAmount ->
+                    val targetExpense = expenseToEdit!!
+                    expenseToEdit = null
+                    actionProcessing = true
+                    Toast.makeText(context, "Updating expense...", Toast.LENGTH_SHORT).show()
+
+                    coroutineScope.launch(Dispatchers.IO) {
+                        try {
+                            val db = FirebaseFirestore.getInstance()
+                            val q = db.collection("Contri").whereEqualTo("contri_code", room.roomCode).get().await()
+                            if (!q.isEmpty) {
+                                val doc = q.documents[0]
+                                val ref = doc.reference
+                                val amountDiff = newAmount - targetExpense.amount
+
+                                val transData = mapOf(
+                                    "itm" to newTitle,
+                                    "amnt" to newAmount,
+                                    "date" to com.google.firebase.Timestamp(Date(newDateMillis))
+                                )
+
+                                val updates = hashMapOf<String, Any>(
+                                    "expenses_data.$currentUserId.${targetExpense.key}" to transData,
+                                    "total_group_expense" to FieldValue.increment(amountDiff)
+                                )
+
+                                ref.update(updates).await()
+                                withContext(Dispatchers.Main) {
+                                    actionProcessing = false
+                                    refreshTrigger++
+                                }
+                            }
+                        } catch (e: Exception) {
+                            withContext(Dispatchers.Main) {
+                                actionProcessing = false
+                                Toast.makeText(context, "Update Error: ${e.message}", Toast.LENGTH_LONG).show()
+                            }
+                        }
+                    }
+                }
+            )
+        }
+
+        if (expenseToDelete != null) {
+            DeleteExpenseConfirmationDialog(
+                expense = expenseToDelete!!,
+                onDismiss = { expenseToDelete = null },
+                onConfirm = {
+                    val targetExpense = expenseToDelete!!
+                    expenseToDelete = null
+                    actionProcessing = true
+                    Toast.makeText(context, "Deleting expense...", Toast.LENGTH_SHORT).show()
+
+                    coroutineScope.launch(Dispatchers.IO) {
+                        try {
+                            val db = FirebaseFirestore.getInstance()
+                            val q = db.collection("Contri").whereEqualTo("contri_code", room.roomCode).get().await()
+                            if (!q.isEmpty) {
+                                val doc = q.documents[0]
+                                val ref = doc.reference
+
+                                val updates = hashMapOf<String, Any>(
+                                    "expenses_data.$currentUserId.${targetExpense.key}" to FieldValue.delete(),
+                                    "total_group_expense" to FieldValue.increment(-targetExpense.amount)
+                                )
+
+                                ref.update(updates).await()
+                                withContext(Dispatchers.Main) {
+                                    actionProcessing = false
+                                    refreshTrigger++
+                                }
+                            }
+                        } catch (e: Exception) {
+                            withContext(Dispatchers.Main) {
+                                actionProcessing = false
+                                Toast.makeText(context, "Delete Error: ${e.message}", Toast.LENGTH_LONG).show()
+                            }
+                        }
+                    }
+                }
+            )
+        }
     }
 }
 
@@ -946,10 +1077,16 @@ fun LeaveRoomDialog(onDismiss: () -> Unit, onConfirm: () -> Unit) {
 // REUSABLE UI COMPONENT: DYNAMIC LEDGER VIEW
 // ==========================================
 @Composable
-fun DynamicLedgerView(ledgers: List<MemberLedger>) {
+fun DynamicLedgerView(
+    currentUserId: String,
+    ledgers: List<MemberLedger>,
+    onEditExpense: (ContriExpense) -> Unit,
+    onDeleteExpense: (ContriExpense) -> Unit
+) {
     val memberCount = ledgers.size
     val isScrollable = memberCount > 3
     val fixedColumnWidth = 110.dp
+    var revealedExpenseKey by remember { mutableStateOf<String?>(null) }
 
     Column(
         modifier = Modifier
@@ -987,18 +1124,107 @@ fun DynamicLedgerView(ledgers: List<MemberLedger>) {
 
         Row(modifier = if (!isScrollable) Modifier.fillMaxWidth() else Modifier) {
             ledgers.forEach { ledger ->
+                val isCurrentUser = ledger.userId == currentUserId
                 Column(
                     modifier = if (isScrollable) Modifier.width(fixedColumnWidth) else Modifier.weight(1f),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     ledger.expenses.forEach { expense ->
-                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(bottom = 12.dp)) {
-                            Text(text = expense.itemName, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(text = "₹${expense.amount.toInt()}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(text = expense.date, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Medium)
+                        val isRevealed = revealedExpenseKey == expense.key
+                        val offsetX by animateDpAsState(
+                            targetValue = if (isRevealed && isCurrentUser) (-74).dp else 0.dp,
+                            animationSpec = tween(220, easing = FastOutSlowInEasing),
+                            label = "ExpenseSlide"
+                        )
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 12.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable(enabled = isCurrentUser) {
+                                    revealedExpenseKey = if (isRevealed) null else expense.key
+                                }
+                        ) {
+                            if (isCurrentUser) {
+                                Row(
+                                    modifier = Modifier
+                                        .align(Alignment.CenterEnd)
+                                        .padding(end = 2.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(32.dp)
+                                            .clip(CircleShape)
+                                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                                            .bounceClick {
+                                                revealedExpenseKey = null
+                                                onEditExpense(expense)
+                                            },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Outlined.Edit,
+                                            contentDescription = "Edit",
+                                            tint = MaterialTheme.colorScheme.onSurface,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+
+                                    Box(
+                                        modifier = Modifier
+                                            .size(32.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(0xFFFF5252).copy(alpha = 0.15f))
+                                            .bounceClick {
+                                                revealedExpenseKey = null
+                                                onDeleteExpense(expense)
+                                            },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Outlined.Delete,
+                                            contentDescription = "Delete",
+                                            tint = Color(0xFFFF5252),
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+                            }
+
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .offset(x = offsetX)
+                                    .background(MaterialTheme.colorScheme.background)
+                            ) {
+                                Text(
+                                    text = expense.itemName, 
+                                    fontSize = 17.sp, 
+                                    fontWeight = FontWeight.Bold, 
+                                    color = MaterialTheme.colorScheme.onBackground, 
+                                    maxLines = 1, 
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = "₹${expense.amount.toInt()}", 
+                                        fontSize = 13.sp, 
+                                        fontWeight = FontWeight.Bold, 
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = expense.date, 
+                                        fontSize = 11.sp, 
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant, 
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
                             }
                         }
                     }
@@ -1206,6 +1432,185 @@ fun AddContriExpenseDialog(onDismiss: () -> Unit, onAdd: (String, Long, Double) 
                         contentAlignment = Alignment.Center
                     ) { 
                         Text("Add Expense", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold) 
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ==========================================
+// EDIT EXPENSE POPUP (PRE-FILLED)
+// ==========================================
+@Composable
+fun EditContriExpenseDialog(
+    expense: ContriExpense,
+    onDismiss: () -> Unit,
+    onUpdate: (String, Long, Double) -> Unit
+) {
+    var expenseTitle by remember { mutableStateOf(expense.itemName) }
+    var amount by remember { 
+        mutableStateOf(
+            if (expense.amount % 1.0 == 0.0) expense.amount.toInt().toString() else expense.amount.toString()
+        ) 
+    }
+    var dateMillis by remember { mutableStateOf<Long?>(expense.rawDateMillis) }
+
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(dismissOnClickOutside = false)) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            elevation = CardDefaults.cardElevation(8.dp)
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Text("Edit Expense", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onSurface)
+                Spacer(modifier = Modifier.height(16.dp))
+
+                OutlinedTextField(
+                    value = expenseTitle,
+                    onValueChange = { expenseTitle = it.replaceFirstChar { char -> if (char.isLowerCase()) char.titlecase() else char.toString() } },
+                    label = { Text("Expense Title", fontSize = 13.sp) },
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary, 
+                        focusedLabelColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface
+                    )
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    com.kartikey.rupeeflow.UI_Screens.CustomDatePicker(
+                        label = "Date", 
+                        selectedDateMillis = dateMillis, 
+                        onDateSelected = { dateMillis = it }, 
+                        modifier = Modifier.weight(1f)
+                    )
+                    OutlinedTextField(
+                        value = amount,
+                        onValueChange = { if (it.isEmpty() || it.matches(Regex("^\\d*\\.?\\d*$"))) amount = it },
+                        label = { Text("Amount", fontSize = 13.sp) },
+                        prefix = { Text("₹ ", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MaterialTheme.colorScheme.primary, 
+                            focusedLabelColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            focusedTextColor = MaterialTheme.colorScheme.onSurface
+                        )
+                    )
+                }
+                Spacer(modifier = Modifier.height(20.dp))
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "Cancel", 
+                        color = MaterialTheme.colorScheme.onSurfaceVariant, 
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.bounceClick { onDismiss() }.padding(8.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    
+                    Box(
+                        modifier = Modifier
+                            .bounceClick { 
+                                val amt = amount.toDoubleOrNull()
+                                if (expenseTitle.isNotBlank() && amt != null && dateMillis != null) {
+                                    onUpdate(expenseTitle, dateMillis!!, amt)
+                                }
+                            }
+                            .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(10.dp))
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                        contentAlignment = Alignment.Center
+                    ) { 
+                        Text("Save Changes", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold) 
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ==========================================
+// DELETE CONFIRMATION DIALOG
+// ==========================================
+@Composable
+fun DeleteExpenseConfirmationDialog(
+    expense: ContriExpense,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    val displayAmount = if (expense.amount % 1.0 == 0.0) expense.amount.toInt().toString() else expense.amount.toString()
+    
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            elevation = CardDefaults.cardElevation(8.dp)
+        ) {
+            Column(modifier = Modifier.padding(24.dp)) {
+                Text(
+                    text = "Delete Expense?", 
+                    fontSize = 20.sp, 
+                    fontWeight = FontWeight.ExtraBold, 
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                Text(
+                    text = "Are you sure you want to delete this ₹$displayAmount expense? This amount will be deducted from the Contri total.",
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    lineHeight = 20.sp
+                )
+                
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.padding(end = 8.dp)
+                    ) {
+                        Text(
+                            text = "Cancel",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp
+                        )
+                    }
+                    
+                    Surface(
+                        modifier = Modifier.bounceClick { onConfirm() },
+                        color = Color(0xFFFF5252),
+                        shape = RoundedCornerShape(50)
+                    ) {
+                        Box(
+                            modifier = Modifier.padding(horizontal = 22.dp, vertical = 10.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "Delete",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp
+                            )
+                        }
                     }
                 }
             }
