@@ -23,6 +23,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ExitToApp
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -73,7 +74,8 @@ data class MemberLedger(
     val userId: String,
     val memberName: String,
     val totalSpent: Double,
-    val expenses: List<ContriExpense>
+    val expenses: List<ContriExpense>,
+    val isVerified: Boolean = false
 )
 
 data class Settlement(val from: String, val to: String, val amount: Double)
@@ -170,6 +172,7 @@ fun InsideContriScreen(
                     for (mId in memberIds) {
                         val uDoc = db.collection("Users").document(mId).get().await()
                         val actualName = uDoc.getString("name") ?: uDoc.getString("username") ?: "Unknown User"
+                        val userVerified = uDoc.getBoolean("verify") ?: false
                         
                         val userExpMap = expensesData[mId] as? Map<String, Any> ?: emptyMap()
                         var userSpent = 0.0
@@ -204,7 +207,7 @@ fun InsideContriScreen(
                             expList.add(ContriExpense(key, item, amt, formattedDate, rawMillis))
                         }
                         
-                        membersMap[mId] = MemberLedger(mId, actualName, userSpent, expList)
+                        membersMap[mId] = MemberLedger(mId, actualName, userSpent, expList, userVerified)
                     }
 
                     val sortedLedgers = mutableListOf<MemberLedger>()
@@ -976,7 +979,19 @@ fun AdminSettingsDialog(
                                 ) {
                                     val rawName = if (member.userId == currentUserId) "You" else formatMemberDisplayName(member.memberName, allNames)
                                     val dispName = if (rawName.length > 12) rawName.take(12) + "..." else rawName
-                                    Text(text = dispName, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onBackground)
+                                    
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(text = dispName, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onBackground)
+                                        if (member.isVerified) {
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Icon(
+                                                imageVector = Icons.Filled.CheckCircle,
+                                                contentDescription = "Verified",
+                                                tint = Color(0xFF1DA1F2),
+                                                modifier = Modifier.size(15.dp)
+                                            )
+                                        }
+                                    }
                                     
                                     if (member.userId == currentUserId) {
                                         Text("Admin", fontSize = 12.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
@@ -1108,14 +1123,28 @@ fun DynamicLedgerView(
                     modifier = if (isScrollable) Modifier.width(fixedColumnWidth) else Modifier.weight(1f),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(
-                        text = displayName, 
-                        fontSize = 15.sp, 
-                        fontWeight = FontWeight.ExtraBold, 
-                        color = MaterialTheme.colorScheme.onBackground,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            text = displayName, 
+                            fontSize = 15.sp, 
+                            fontWeight = FontWeight.ExtraBold, 
+                            color = MaterialTheme.colorScheme.onBackground,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        if (ledger.isVerified) {
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Icon(
+                                imageVector = Icons.Filled.CheckCircle,
+                                contentDescription = "Verified",
+                                tint = Color(0xFF1DA1F2),
+                                modifier = Modifier.size(15.dp)
+                            )
+                        }
+                    }
                     Spacer(modifier = Modifier.height(1.dp))
                     Text(
                         text = "₹${ledger.totalSpent.toInt()}", 
@@ -1201,10 +1230,10 @@ fun DynamicLedgerView(
                                                     .size(30.dp)
                                                     .clip(CircleShape)
                                                     .background(MaterialTheme.colorScheme.surfaceVariant)
-                                                .bounceClick {
-                                                    revealedExpenseKey = null
-                                                    onEditExpense(expense)
-                                                },
+                                                    .bounceClick {
+                                                        revealedExpenseKey = null
+                                                        onEditExpense(expense)
+                                                    },
                                                 contentAlignment = Alignment.Center
                                             ) {
                                                 Icon(
@@ -1220,10 +1249,10 @@ fun DynamicLedgerView(
                                                     .size(30.dp)
                                                     .clip(CircleShape)
                                                     .background(Color(0xFFFF5252).copy(alpha = 0.15f))
-                                                .bounceClick {
-                                                    revealedExpenseKey = null
-                                                    onDeleteExpense(expense)
-                                                },
+                                                    .bounceClick {
+                                                        revealedExpenseKey = null
+                                                        onDeleteExpense(expense)
+                                                    },
                                                 contentAlignment = Alignment.Center
                                             ) {
                                                 Icon(
