@@ -13,8 +13,8 @@ android {
         applicationId = "com.kartikey.rupeeflow"
         minSdk = 24
         targetSdk = 34
-        versionCode = 13
-        versionName = "1.2405.013"
+        versionCode = 14
+        versionName = "1.2405.014"
         
         // OPTIMIZATION: Removes 80+ unused languages (Spanish, French, etc.) added by Firebase/Google Play Services
         resourceConfigurations += listOf("en", "hi")
