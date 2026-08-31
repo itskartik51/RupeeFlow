@@ -2,8 +2,11 @@ package com.kartikey.rupeeflow.UI_Screens.Home.Contri.InContri
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -18,6 +21,27 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.kartikey.rupeeflow.UI_Screens.CustomDatePicker
 import com.kartikey.rupeeflow.UI_Screens.bounceClick
+
+// ==========================================
+// PREMIUM BOUNCE FLOATING BUTTON (+)
+// ==========================================
+@Composable
+fun PremiumFloatingButton(onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(56.dp)
+            .bounceClick { onClick() }
+            .background(MaterialTheme.colorScheme.primary, shape = CircleShape),
+        contentAlignment = Alignment.Center
+    ) { 
+        Icon(
+            imageVector = Icons.Outlined.Add, 
+            contentDescription = "Add Expense", 
+            tint = MaterialTheme.colorScheme.onPrimary, 
+            modifier = Modifier.size(28.dp)
+        ) 
+    }
+}
 
 // ==========================================
 // ADD EXPENSE POPUP DIALOG
