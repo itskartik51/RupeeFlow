@@ -15,7 +15,7 @@ import com.kartikey.rupeeflow.UI_Screens.Assets.BankAccountItem
 import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.CashItem
 import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.CreditCardItem
 import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.FDItem
-import com.kartikey.rupeeflow.UI_Screens.Home.ContriRoomModel
+import com.kartikey.rupeeflow.UI_Screens.Home.Contri.ContriRoomModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
