@@ -300,8 +300,8 @@ fun InsideContriScreen(
                 DynamicLedgerView(
                     currentUserId = currentUserId,
                     ledgers = ledgers,
-                    onEditExpense = { expense -> expenseToEdit = expense },
-                    onDeleteExpense = { expense -> expenseToDelete = expense }
+                    onEditExpense = { expense: ContriExpense -> expenseToEdit = expense },
+                    onDeleteExpense = { expense: ContriExpense -> expenseToDelete = expense }
                 )
             }
 
@@ -396,7 +396,7 @@ fun InsideContriScreen(
                 ledgers = ledgers,
                 currentUserId = currentUserId,
                 onDismiss = { showSettingsDialog = false },
-                onSave = { newName, newPin ->
+                onSave = { newName: String, newPin: String ->
                     showSettingsDialog = false
                     Toast.makeText(context, "Saving settings...", Toast.LENGTH_SHORT).show()
                     coroutineScope.launch(Dispatchers.IO) {
@@ -413,7 +413,7 @@ fun InsideContriScreen(
                         } catch (e: Exception) {}
                     }
                 },
-                onRemoveMemberClick = { member -> memberToRemove = member }
+                onRemoveMemberClick = { member: MemberLedger -> memberToRemove = member }
             )
         }
 
@@ -589,7 +589,7 @@ fun InsideContriScreen(
         if (showAddExpenseDialog) {
             AddContriExpenseDialog(
                 onDismiss = { showAddExpenseDialog = false },
-                onAdd = { title, dateMillis, amount ->
+                onAdd = { title: String, dateMillis: Long, amount: Double ->
                     showAddExpenseDialog = false
                     actionProcessing = true
                     Toast.makeText(context, "Adding expense...", Toast.LENGTH_SHORT).show()
@@ -609,13 +609,13 @@ fun InsideContriScreen(
                                 val nextIndex = userExpMap.size
                                 val expenseId = generateExpenseId(nextIndex)
 
-                                val transData = mapOf(
+                                val transData = mapOf<String, Any>(
                                     "itm" to title,
                                     "amnt" to amount,
                                     "date" to com.google.firebase.Timestamp(Date(dateMillis))
                                 )
                                 
-                                val updates = hashMapOf<String, Any>(
+                                val updates: Map<String, Any> = mapOf(
                                     "expenses_data.$currentUserId.$expenseId" to transData,
                                     "total_group_expense" to FieldValue.increment(amount)
                                 )
@@ -647,7 +647,7 @@ fun InsideContriScreen(
             EditContriExpenseDialog(
                 expense = expenseToEdit!!,
                 onDismiss = { expenseToEdit = null },
-                onUpdate = { newTitle, newDateMillis, newAmount ->
+                onUpdate = { newTitle: String, newDateMillis: Long, newAmount: Double ->
                     val targetExpense = expenseToEdit!!
                     expenseToEdit = null
                     actionProcessing = true
@@ -662,13 +662,13 @@ fun InsideContriScreen(
                                 val ref = doc.reference
                                 val amountDiff = newAmount - targetExpense.amount
 
-                                val transData = mapOf(
+                                val transData = mapOf<String, Any>(
                                     "itm" to newTitle,
                                     "amnt" to newAmount,
                                     "date" to com.google.firebase.Timestamp(Date(newDateMillis))
                                 )
 
-                                val updates = hashMapOf<String, Any>(
+                                val updates: Map<String, Any> = mapOf(
                                     "expenses_data.$currentUserId.${targetExpense.key}" to transData,
                                     "total_group_expense" to FieldValue.increment(amountDiff)
                                 )
@@ -708,7 +708,7 @@ fun InsideContriScreen(
                                 val doc = q.documents[0]
                                 val ref = doc.reference
 
-                                val updates = hashMapOf<String, Any>(
+                                val updates: Map<String, Any> = mapOf(
                                     "expenses_data.$currentUserId.${targetExpense.key}" to FieldValue.delete(),
                                     "total_group_expense" to FieldValue.increment(-targetExpense.amount)
                                 )
