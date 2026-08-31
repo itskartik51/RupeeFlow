@@ -53,14 +53,14 @@ fun InsideContriScreen(
     var refreshTrigger by remember { mutableIntStateOf(0) }
     var actionProcessing by remember { mutableStateOf(false) }
     
-    var showAddExpenseDialog by remember { mutableStateOf(false) }
+    var expenseFormTarget by remember { mutableStateOf<ContriExpense?>(null) }
+    var showExpenseForm by remember { mutableStateOf(false) }
+    var expenseToDelete by remember { mutableStateOf<ContriExpense?>(null) }
+    
     var showLeaveDialog by remember { mutableStateOf(false) }
     var showSettleDialog by remember { mutableStateOf(false) }
     var showNewCycleDialog by remember { mutableStateOf(false) }
     var showSettingsDialog by remember { mutableStateOf(false) }
-    
-    var expenseToEdit by remember { mutableStateOf<ContriExpense?>(null) }
-    var expenseToDelete by remember { mutableStateOf<ContriExpense?>(null) }
     var memberToRemove by remember { mutableStateOf<MemberLedger?>(null) }
 
     val expandedState = remember { mutableStateMapOf<String, Boolean>() }
@@ -169,7 +169,12 @@ fun InsideContriScreen(
             }
         },
         floatingActionButton = {
-            PremiumFloatingButton(onClick = { showAddExpenseDialog = true })
+            PremiumFloatingButton(
+                onClick = { 
+                    expenseFormTarget = null
+                    showExpenseForm = true 
+                }
+            )
         },
         containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
@@ -203,7 +208,10 @@ fun InsideContriScreen(
                 DynamicLedgerView(
                     currentUserId = currentUserId,
                     ledgers = ledgers,
-                    onEditExpense = { expense: ContriExpense -> expenseToEdit = expense },
+                    onEditExpense = { expense: ContriExpense -> 
+                        expenseFormTarget = expense
+                        showExpenseForm = true
+                    },
                     onDeleteExpense = { expense: ContriExpense -> expenseToDelete = expense }
                 )
             }
@@ -289,8 +297,48 @@ fun InsideContriScreen(
         }
 
         // ==========================================
-        // DIALOG TRIGGERS 
+        // DIALOGS & ACTIONS
         // ==========================================
+
+        if (showExpenseForm) {
+            ContriExpenseFormDialog(
+                expense = expenseFormTarget,
+                onDismiss = { showExpenseForm = false },
+                onSave = { title: String, dateMillis: Long, amount: Double ->
+                    val target = expenseFormTarget
+                    showExpenseForm = false
+                    actionProcessing = true
+
+                    coroutineScope.launch {
+                        val success = if (target == null) {
+                            addContriExpense(room.roomCode, currentUserId, title, dateMillis, amount)
+                        } else {
+                            updateContriExpense(room.roomCode, currentUserId, target, title, dateMillis, amount)
+                        }
+                        actionProcessing = false
+                        if (success) refreshTrigger++
+                    }
+                }
+            )
+        }
+
+        if (expenseToDelete != null) {
+            DeleteExpenseConfirmationDialog(
+                expense = expenseToDelete!!,
+                onDismiss = { expenseToDelete = null },
+                onConfirm = {
+                    val target = expenseToDelete!!
+                    expenseToDelete = null
+                    actionProcessing = true
+
+                    coroutineScope.launch {
+                        val success = deleteContriExpense(room.roomCode, currentUserId, target)
+                        actionProcessing = false
+                        if (success) refreshTrigger++
+                    }
+                }
+            )
+        }
 
         if (showSettingsDialog) {
             AdminSettingsDialog(
@@ -301,7 +349,6 @@ fun InsideContriScreen(
                 onDismiss = { showSettingsDialog = false },
                 onSave = { newName: String, newPin: String ->
                     showSettingsDialog = false
-                    Toast.makeText(context, "Saving settings...", Toast.LENGTH_SHORT).show()
                     coroutineScope.launch {
                         val success = updateRoomDetails(room.roomCode, newName, newPin)
                         if (success) refreshTrigger++
@@ -320,8 +367,7 @@ fun InsideContriScreen(
                     memberToRemove = null
                     showSettingsDialog = false
                     actionProcessing = true
-                    Toast.makeText(context, "Removing member...", Toast.LENGTH_SHORT).show()
-                    
+
                     coroutineScope.launch {
                         val success = removeMemberFromContri(room.roomCode, targetUserId)
                         actionProcessing = false
@@ -349,8 +395,7 @@ fun InsideContriScreen(
                 onConfirm = {
                     showNewCycleDialog = false
                     actionProcessing = true
-                    Toast.makeText(context, "Starting new cycle...", Toast.LENGTH_SHORT).show()
-                    
+
                     coroutineScope.launch {
                         val success = startNewContriCycle(room.roomCode)
                         actionProcessing = false
@@ -366,78 +411,11 @@ fun InsideContriScreen(
                 onConfirm = {
                     showLeaveDialog = false
                     actionProcessing = true
-                    Toast.makeText(context, "Leaving room...", Toast.LENGTH_SHORT).show()
-                    
+
                     coroutineScope.launch {
                         val success = leaveContriRoom(room.roomCode, currentUserId)
                         actionProcessing = false
                         if (success) onLeaveClick()
-                    }
-                }
-            )
-        }
-
-        if (showAddExpenseDialog) {
-            AddContriExpenseDialog(
-                onDismiss = { showAddExpenseDialog = false },
-                onAdd = { title: String, dateMillis: Long, amount: Double ->
-                    showAddExpenseDialog = false
-                    actionProcessing = true
-                    Toast.makeText(context, "Adding expense...", Toast.LENGTH_SHORT).show()
-                    
-                    coroutineScope.launch {
-                        val success = addContriExpense(room.roomCode, currentUserId, title, dateMillis, amount)
-                        actionProcessing = false
-                        if (success) {
-                            refreshTrigger++
-                        } else {
-                            Toast.makeText(context, "Error saving expense", Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                }
-            )
-        }
-
-        if (expenseToEdit != null) {
-            EditContriExpenseDialog(
-                expense = expenseToEdit!!,
-                onDismiss = { expenseToEdit = null },
-                onUpdate = { newTitle: String, newDateMillis: Long, newAmount: Double ->
-                    val targetExpense = expenseToEdit!!
-                    expenseToEdit = null
-                    actionProcessing = true
-                    Toast.makeText(context, "Updating expense...", Toast.LENGTH_SHORT).show()
-
-                    coroutineScope.launch {
-                        val success = updateContriExpense(
-                            roomCode = room.roomCode,
-                            currentUserId = currentUserId,
-                            targetExpense = targetExpense,
-                            newTitle = newTitle,
-                            newDateMillis = newDateMillis,
-                            newAmount = newAmount
-                        )
-                        actionProcessing = false
-                        if (success) refreshTrigger++
-                    }
-                }
-            )
-        }
-
-        if (expenseToDelete != null) {
-            DeleteExpenseConfirmationDialog(
-                expense = expenseToDelete!!,
-                onDismiss = { expenseToDelete = null },
-                onConfirm = {
-                    val targetExpense = expenseToDelete!!
-                    expenseToDelete = null
-                    actionProcessing = true
-                    Toast.makeText(context, "Deleting expense...", Toast.LENGTH_SHORT).show()
-
-                    coroutineScope.launch {
-                        val success = deleteContriExpense(room.roomCode, currentUserId, targetExpense)
-                        actionProcessing = false
-                        if (success) refreshTrigger++
                     }
                 }
             )
