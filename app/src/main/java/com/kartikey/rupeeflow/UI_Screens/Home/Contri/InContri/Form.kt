@@ -44,16 +44,24 @@ fun PremiumFloatingButton(onClick: () -> Unit) {
 }
 
 // ==========================================
-// ADD EXPENSE POPUP DIALOG
+// UNIFIED ADD & EDIT EXPENSE POPUP DIALOG
 // ==========================================
 @Composable
-fun AddContriExpenseDialog(
-    onDismiss: () -> Unit, 
-    onAdd: (String, Long, Double) -> Unit
+fun ContriExpenseFormDialog(
+    expense: ContriExpense? = null,
+    onDismiss: () -> Unit,
+    onSave: (title: String, dateMillis: Long, amount: Double) -> Unit
 ) {
-    var expenseTitle by remember { mutableStateOf("") }
-    var amount by remember { mutableStateOf("") }
-    var dateMillis by remember { mutableStateOf<Long?>(System.currentTimeMillis()) }
+    val isEditMode = expense != null
+    var expenseTitle by remember { mutableStateOf(expense?.itemName ?: "") }
+    var amount by remember { 
+        mutableStateOf(
+            if (expense != null) {
+                if (expense.amount % 1.0 == 0.0) expense.amount.toInt().toString() else expense.amount.toString()
+            } else ""
+        ) 
+    }
+    var dateMillis by remember { mutableStateOf<Long?>(expense?.rawDateMillis ?: System.currentTimeMillis()) }
 
     Dialog(
         onDismissRequest = onDismiss, 
@@ -67,7 +75,7 @@ fun AddContriExpenseDialog(
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
                 Text(
-                    text = "Add New Expense", 
+                    text = if (isEditMode) "Edit Expense" else "Add New Expense", 
                     fontSize = 18.sp, 
                     fontWeight = FontWeight.ExtraBold, 
                     color = MaterialTheme.colorScheme.onSurface
@@ -144,135 +152,18 @@ fun AddContriExpenseDialog(
                             .bounceClick { 
                                 val amt = amount.toDoubleOrNull()
                                 if (expenseTitle.isNotBlank() && amt != null && dateMillis != null) {
-                                    onAdd(expenseTitle, dateMillis!!, amt)
+                                    onSave(expenseTitle, dateMillis!!, amt)
                                 }
                             }
                             .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(10.dp))
                             .padding(horizontal = 16.dp, vertical = 10.dp),
                         contentAlignment = Alignment.Center
                     ) { 
-                        Text("Add Expense", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold) 
-                    }
-                }
-            }
-        }
-    }
-}
-
-// ==========================================
-// EDIT EXPENSE POPUP DIALOG
-// ==========================================
-@Composable
-fun EditContriExpenseDialog(
-    expense: ContriExpense,
-    onDismiss: () -> Unit,
-    onUpdate: (String, Long, Double) -> Unit
-) {
-    var expenseTitle by remember { mutableStateOf(expense.itemName) }
-    var amount by remember { 
-        mutableStateOf(
-            if (expense.amount % 1.0 == 0.0) expense.amount.toInt().toString() else expense.amount.toString()
-        ) 
-    }
-    var dateMillis by remember { mutableStateOf<Long?>(expense.rawDateMillis) }
-
-    Dialog(
-        onDismissRequest = onDismiss, 
-        properties = DialogProperties(dismissOnClickOutside = false)
-    ) {
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            elevation = CardDefaults.cardElevation(8.dp)
-        ) {
-            Column(modifier = Modifier.padding(20.dp)) {
-                Text(
-                    text = "Edit Expense", 
-                    fontSize = 18.sp, 
-                    fontWeight = FontWeight.ExtraBold, 
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-
-                OutlinedTextField(
-                    value = expenseTitle,
-                    onValueChange = { 
-                        expenseTitle = it.replaceFirstChar { char -> 
-                            if (char.isLowerCase()) char.titlecase() else char.toString() 
-                        } 
-                    },
-                    label = { Text("Expense Title", fontSize = 13.sp) },
-                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.primary, 
-                        focusedLabelColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                        focusedTextColor = MaterialTheme.colorScheme.onSurface
-                    )
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(), 
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    CustomDatePicker(
-                        label = "Date", 
-                        selectedDateMillis = dateMillis, 
-                        onDateSelected = { dateMillis = it }, 
-                        modifier = Modifier.weight(1f)
-                    )
-                    OutlinedTextField(
-                        value = amount,
-                        onValueChange = { if (it.isEmpty() || it.matches(Regex("^\\d*\\.?\\d*$"))) amount = it },
-                        label = { Text("Amount", fontSize = 13.sp) },
-                        prefix = { Text("₹ ", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        singleLine = true,
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = MaterialTheme.colorScheme.primary, 
-                            focusedLabelColor = MaterialTheme.colorScheme.primary,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                            focusedTextColor = MaterialTheme.colorScheme.onSurface
-                        )
-                    )
-                }
-                Spacer(modifier = Modifier.height(20.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(), 
-                    horizontalArrangement = Arrangement.End, 
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Cancel", 
-                        color = MaterialTheme.colorScheme.onSurfaceVariant, 
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.bounceClick { onDismiss() }.padding(8.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    
-                    Box(
-                        modifier = Modifier
-                            .bounceClick { 
-                                val amt = amount.toDoubleOrNull()
-                                if (expenseTitle.isNotBlank() && amt != null && dateMillis != null) {
-                                    onUpdate(expenseTitle, dateMillis!!, amt)
-                                }
-                            }
-                            .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(10.dp))
-                            .padding(horizontal = 16.dp, vertical = 10.dp),
-                        contentAlignment = Alignment.Center
-                    ) { 
-                        Text("Save Changes", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold) 
+                        Text(
+                            text = if (isEditMode) "Save Changes" else "Add Expense", 
+                            color = MaterialTheme.colorScheme.onPrimary, 
+                            fontWeight = FontWeight.Bold
+                        ) 
                     }
                 }
             }
