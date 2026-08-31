@@ -23,7 +23,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ExitToApp
-import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.zIndex
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.kartikey.rupeeflow.UI_Screens.bounceClick
@@ -985,7 +986,7 @@ fun AdminSettingsDialog(
                                         if (member.isVerified) {
                                             Spacer(modifier = Modifier.width(4.dp))
                                             Icon(
-                                                imageVector = Icons.Filled.CheckCircle,
+                                                imageVector = Icons.Filled.Verified,
                                                 contentDescription = "Verified",
                                                 tint = Color(0xFF1DA1F2),
                                                 modifier = Modifier.size(15.dp)
@@ -1138,7 +1139,7 @@ fun DynamicLedgerView(
                         if (ledger.isVerified) {
                             Spacer(modifier = Modifier.width(4.dp))
                             Icon(
-                                imageVector = Icons.Filled.CheckCircle,
+                                imageVector = Icons.Filled.Verified,
                                 contentDescription = "Verified",
                                 tint = Color(0xFF1DA1F2),
                                 modifier = Modifier.size(15.dp)
@@ -1180,87 +1181,100 @@ fun DynamicLedgerView(
                                 .padding(vertical = 2.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.Center,
-                                modifier = Modifier.animateContentSize()
+                            // 1. Text Details (100% Fixed & Centered, Never shifts)
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally
                             ) {
-                                Column(
-                                    horizontalAlignment = if (isRevealed && isCurrentUser) Alignment.Start else Alignment.CenterHorizontally
-                                ) {
+                                Text(
+                                    text = expense.itemName, 
+                                    fontSize = 17.sp, 
+                                    fontWeight = FontWeight.Bold, 
+                                    color = MaterialTheme.colorScheme.onBackground, 
+                                    maxLines = 1, 
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(
-                                        text = expense.itemName, 
-                                        fontSize = 17.sp, 
+                                        text = "₹${expense.amount.toInt()}", 
+                                        fontSize = 13.sp, 
                                         fontWeight = FontWeight.Bold, 
-                                        color = MaterialTheme.colorScheme.onBackground, 
-                                        maxLines = 1, 
-                                        overflow = TextOverflow.Ellipsis
+                                        color = MaterialTheme.colorScheme.primary
                                     )
-                                    Spacer(modifier = Modifier.height(2.dp))
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text(
-                                            text = "₹${expense.amount.toInt()}", 
-                                            fontSize = 13.sp, 
-                                            fontWeight = FontWeight.Bold, 
-                                            color = MaterialTheme.colorScheme.primary
-                                        )
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text(
-                                            text = expense.date, 
-                                            fontSize = 11.sp, 
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant, 
-                                            fontWeight = FontWeight.Medium
-                                        )
-                                    }
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = expense.date, 
+                                        fontSize = 11.sp, 
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant, 
+                                        fontWeight = FontWeight.Medium
+                                    )
                                 }
+                            }
 
-                                if (isCurrentUser) {
+                            // 2. Floating Overlapping Action Capsule (Smooth Rightward Slide, Solid Surface)
+                            if (isCurrentUser) {
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.CenterEnd)
+                                        .zIndex(10f)
+                                ) {
                                     AnimatedVisibility(
                                         visible = isRevealed,
-                                        enter = expandHorizontally(expandFrom = Alignment.Start) + fadeIn(tween(150)),
-                                        exit = shrinkHorizontally(shrinkTowards = Alignment.Start) + fadeOut(tween(150))
+                                        enter = expandHorizontally(expandFrom = Alignment.Start) + fadeIn(tween(180)),
+                                        exit = shrinkHorizontally(shrinkTowards = Alignment.Start) + fadeOut(tween(180))
                                     ) {
-                                        Row(
-                                            modifier = Modifier.padding(start = 8.dp),
-                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                            verticalAlignment = Alignment.CenterVertically
+                                        Surface(
+                                            shape = RoundedCornerShape(50),
+                                            color = MaterialTheme.colorScheme.surface,
+                                            shadowElevation = 4.dp,
+                                            border = androidx.compose.foundation.BorderStroke(
+                                                1.dp, 
+                                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f)
+                                            ),
+                                            modifier = Modifier.padding(start = 6.dp)
                                         ) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(30.dp)
-                                                    .clip(CircleShape)
-                                                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                                                    .bounceClick {
-                                                        revealedExpenseKey = null
-                                                        onEditExpense(expense)
-                                                    },
-                                                contentAlignment = Alignment.Center
+                                            Row(
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                verticalAlignment = Alignment.CenterVertically
                                             ) {
-                                                Icon(
-                                                    imageVector = Icons.Outlined.Edit,
-                                                    contentDescription = "Edit",
-                                                    tint = MaterialTheme.colorScheme.onSurface,
-                                                    modifier = Modifier.size(15.dp)
-                                                )
-                                            }
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(28.dp)
+                                                        .clip(CircleShape)
+                                                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                                                        .bounceClick {
+                                                            revealedExpenseKey = null
+                                                            onEditExpense(expense)
+                                                        },
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Outlined.Edit,
+                                                        contentDescription = "Edit",
+                                                        tint = MaterialTheme.colorScheme.onSurface,
+                                                        modifier = Modifier.size(15.dp)
+                                                    )
+                                                }
 
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(30.dp)
-                                                    .clip(CircleShape)
-                                                    .background(Color(0xFFFF5252).copy(alpha = 0.15f))
-                                                    .bounceClick {
-                                                        revealedExpenseKey = null
-                                                        onDeleteExpense(expense)
-                                                    },
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Outlined.Delete,
-                                                    contentDescription = "Delete",
-                                                    tint = Color(0xFFFF5252),
-                                                    modifier = Modifier.size(15.dp)
-                                                )
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(28.dp)
+                                                        .clip(CircleShape)
+                                                        .background(Color(0xFFFF5252).copy(alpha = 0.15f))
+                                                        .bounceClick {
+                                                            revealedExpenseKey = null
+                                                            onDeleteExpense(expense)
+                                                        },
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Outlined.Delete,
+                                                        contentDescription = "Delete",
+                                                        tint = Color(0xFFFF5252),
+                                                        modifier = Modifier.size(15.dp)
+                                                    )
+                                                }
                                             }
                                         }
                                     }
