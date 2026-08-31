@@ -24,7 +24,16 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.google.firebase.Timestamp
+import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.FirebaseFirestore
 import com.kartikey.rupeeflow.UI_Screens.bounceClick
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 // ==========================================
 // CORE DATA MODELS
@@ -48,6 +57,16 @@ data class MemberLedger(
 data class Settlement(val from: String, val to: String, val amount: Double)
 data class PastCycle(val dateRange: String, val totalAmount: String)
 
+data class RoomDataResult(
+    val roomName: String,
+    val roomPin: String,
+    val isAdmin: Boolean,
+    val totalGroupExpense: Double,
+    val ledgers: List<MemberLedger>,
+    val pastCycles: List<PastCycle>,
+    val currentUserId: String
+)
+
 // ==========================================
 // BASE-26 EXPENSE ID GENERATOR
 // ==========================================
@@ -59,6 +78,334 @@ fun generateExpenseId(index: Int): String {
         n = (n / 26) - 1
     }
     return result.padStart(4, '0')
+}
+
+// ==========================================
+// FIRESTORE ENGINE & BACKEND OPERATIONS
+// ==========================================
+suspend fun fetchContriRoomData(
+    username: String,
+    roomCode: String,
+    defaultRoomName: String,
+    defaultRoomPin: String
+): RoomDataResult? = withContext(Dispatchers.IO) {
+    try {
+        val db = FirebaseFirestore.getInstance()
+        var currentUserId = ""
+
+        val myUserQuery = db.collection("Users").whereEqualTo("username", username).get().await()
+        if (!myUserQuery.isEmpty) {
+            currentUserId = myUserQuery.documents[0].id
+        }
+
+        val contriQuery = db.collection("Contri").whereEqualTo("contri_code", roomCode).get().await()
+        if (contriQuery.isEmpty) return@withContext null
+
+        val contriDoc = contriQuery.documents[0]
+        val adminId = contriDoc.getString("admin_id") ?: ""
+        val roomName = contriDoc.getString("contri_name") ?: defaultRoomName
+        val roomPin = contriDoc.getString("passkey") ?: defaultRoomPin
+        val isAdmin = adminId == currentUserId
+
+        val totalExpRaw = contriDoc.get("total_group_expense")
+        val totalGroupExpense = if (totalExpRaw is Number) totalExpRaw.toDouble() else 0.0
+
+        val memberIds = (contriDoc.get("member_ids") as? List<*>)?.map { it.toString() } ?: emptyList()
+        val membersMap = mutableMapOf<String, MemberLedger>()
+        val expensesData = contriDoc.get("expenses_data") as? Map<String, Any> ?: emptyMap()
+
+        for (mId in memberIds) {
+            val uDoc = db.collection("Users").document(mId).get().await()
+            val actualName = uDoc.getString("name") ?: uDoc.getString("username") ?: "Unknown User"
+            val userVerified = uDoc.getBoolean("verify") ?: false
+
+            val userExpMap = expensesData[mId] as? Map<String, Any> ?: emptyMap()
+            var userSpent = 0.0
+            val expList = mutableListOf<ContriExpense>()
+
+            val sortedKeys = userExpMap.keys.sorted()
+            for (key in sortedKeys) {
+                val expObj = userExpMap[key] as? Map<String, Any> ?: continue
+                val item = expObj["itm"]?.toString() ?: "Unknown"
+                val rawAmt = expObj["amnt"]
+                val amt = if (rawAmt is Number) rawAmt.toDouble() else 0.0
+
+                val rawDate = expObj["date"]
+                var rawMillis = System.currentTimeMillis()
+                val formattedDate = if (rawDate is Timestamp) {
+                    rawMillis = rawDate.toDate().time
+                    SimpleDateFormat("dd MMMM", Locale.getDefault()).format(rawDate.toDate())
+                } else if (rawDate is String) {
+                    try {
+                        val parsed = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).parse(rawDate)
+                        if (parsed != null) {
+                            rawMillis = parsed.time
+                            SimpleDateFormat("dd MMMM", Locale.getDefault()).format(parsed)
+                        } else rawDate
+                    } catch (e: Exception) {
+                        rawDate.toString()
+                    }
+                } else {
+                    ""
+                }
+
+                userSpent += amt
+                expList.add(ContriExpense(key, item, amt, formattedDate, rawMillis))
+            }
+
+            membersMap[mId] = MemberLedger(mId, actualName, userSpent, expList, userVerified)
+        }
+
+        val sortedLedgers = mutableListOf<MemberLedger>()
+        membersMap[currentUserId]?.let { sortedLedgers.add(it) }
+
+        if (adminId != currentUserId && membersMap.containsKey(adminId)) {
+            membersMap[adminId]?.let { sortedLedgers.add(it) }
+        }
+
+        for (mId in memberIds) {
+            if (mId != currentUserId && mId != adminId) {
+                membersMap[mId]?.let { sortedLedgers.add(it) }
+            }
+        }
+
+        val cyclesList = mutableListOf<PastCycle>()
+        val cycleDocs = contriDoc.reference.collection("Past_Cycles").get().await()
+        for (c in cycleDocs) {
+            cyclesList.add(
+                PastCycle(
+                    dateRange = c.getString("date_range") ?: "",
+                    totalAmount = c.getString("total_amount") ?: "₹0"
+                )
+            )
+        }
+
+        RoomDataResult(
+            roomName = roomName,
+            roomPin = roomPin,
+            isAdmin = isAdmin,
+            totalGroupExpense = totalGroupExpense,
+            ledgers = sortedLedgers,
+            pastCycles = cyclesList,
+            currentUserId = currentUserId
+        )
+    } catch (e: Exception) {
+        null
+    }
+}
+
+suspend fun updateRoomDetails(roomCode: String, newName: String, newPin: String): Boolean = withContext(Dispatchers.IO) {
+    try {
+        val db = FirebaseFirestore.getInstance()
+        val q = db.collection("Contri").whereEqualTo("contri_code", roomCode).get().await()
+        if (!q.isEmpty) {
+            q.documents[0].reference.update(
+                "contri_name", newName,
+                "passkey", newPin
+            ).await()
+            true
+        } else false
+    } catch (e: Exception) {
+        false
+    }
+}
+
+suspend fun removeMemberFromContri(roomCode: String, targetUserId: String): Boolean = withContext(Dispatchers.IO) {
+    try {
+        val db = FirebaseFirestore.getInstance()
+        val q = db.collection("Contri").whereEqualTo("contri_code", roomCode).get().await()
+        if (!q.isEmpty) {
+            val doc = q.documents[0]
+            val memberIds = (doc.get("member_ids") as? List<*>)?.map { it.toString() } ?: emptyList()
+            val remainingMembers = memberIds.filter { it != targetUserId }
+
+            if (remainingMembers.isEmpty()) {
+                doc.reference.delete().await()
+            } else {
+                val expensesData = doc.get("expenses_data") as? Map<String, Any> ?: emptyMap()
+                val userExpMap = expensesData[targetUserId] as? Map<String, Any> ?: emptyMap()
+
+                var amountToDeduct = 0.0
+                for ((_, expObj) in userExpMap) {
+                    val mapObj = expObj as? Map<String, Any> ?: continue
+                    val amt = (mapObj["amnt"] as? Number)?.toDouble() ?: 0.0
+                    amountToDeduct += amt
+                }
+
+                doc.reference.update(
+                    "total_group_expense", FieldValue.increment(-amountToDeduct),
+                    "member_ids", FieldValue.arrayRemove(targetUserId),
+                    "expenses_data.$targetUserId", FieldValue.delete()
+                ).await()
+            }
+
+            val targetUserDocRef = db.collection("Users").document(targetUserId)
+            val targetData = targetUserDocRef.get().await().data ?: emptyMap<String, Any>()
+            val roomsArray = targetData["rooms"] as? List<String> ?: emptyList()
+            val targetRoomString = roomsArray.find { it.contains(roomCode, ignoreCase = true) }
+
+            if (targetRoomString != null) {
+                targetUserDocRef.update("rooms", FieldValue.arrayRemove(targetRoomString)).await()
+            }
+            true
+        } else false
+    } catch (e: Exception) {
+        false
+    }
+}
+
+suspend fun leaveContriRoom(roomCode: String, currentUserId: String): Boolean = withContext(Dispatchers.IO) {
+    try {
+        val db = FirebaseFirestore.getInstance()
+        val q = db.collection("Contri").whereEqualTo("contri_code", roomCode).get().await()
+        if (!q.isEmpty) {
+            val doc = q.documents[0]
+            val memberIds = (doc.get("member_ids") as? List<*>)?.map { it.toString() } ?: emptyList()
+            val remainingMembers = memberIds.filter { it != currentUserId }
+
+            if (remainingMembers.isEmpty()) {
+                doc.reference.delete().await()
+            } else {
+                val expensesData = doc.get("expenses_data") as? Map<String, Any> ?: emptyMap()
+                val userExpMap = expensesData[currentUserId] as? Map<String, Any> ?: emptyMap()
+
+                var amountToDeduct = 0.0
+                for ((_, expObj) in userExpMap) {
+                    val mapObj = expObj as? Map<String, Any> ?: continue
+                    val amt = (mapObj["amnt"] as? Number)?.toDouble() ?: 0.0
+                    amountToDeduct += amt
+                }
+
+                doc.reference.update(
+                    "total_group_expense", FieldValue.increment(-amountToDeduct),
+                    "member_ids", FieldValue.arrayRemove(currentUserId),
+                    "expenses_data.$currentUserId", FieldValue.delete()
+                ).await()
+            }
+
+            val currentUserDocRef = db.collection("Users").document(currentUserId)
+            val userData = currentUserDocRef.get().await().data ?: emptyMap<String, Any>()
+            val roomsArray = userData["rooms"] as? List<String> ?: emptyList()
+            val targetRoomString = roomsArray.find { it.contains(roomCode, ignoreCase = true) }
+
+            if (targetRoomString != null) {
+                currentUserDocRef.update("rooms", FieldValue.arrayRemove(targetRoomString)).await()
+            }
+            true
+        } else false
+    } catch (e: Exception) {
+        false
+    }
+}
+
+suspend fun startNewContriCycle(roomCode: String): Boolean = withContext(Dispatchers.IO) {
+    try {
+        val db = FirebaseFirestore.getInstance()
+        val q = db.collection("Contri").whereEqualTo("contri_code", roomCode).get().await()
+        if (!q.isEmpty) {
+            q.documents[0].reference.update(
+                "total_group_expense", 0.0,
+                "expenses_data", emptyMap<String, Any>()
+            ).await()
+            true
+        } else false
+    } catch (e: Exception) {
+        false
+    }
+}
+
+suspend fun addContriExpense(
+    roomCode: String,
+    currentUserId: String,
+    title: String,
+    dateMillis: Long,
+    amount: Double
+): Boolean = withContext(Dispatchers.IO) {
+    try {
+        val db = FirebaseFirestore.getInstance()
+        val q = db.collection("Contri").whereEqualTo("contri_code", roomCode).get().await()
+        if (!q.isEmpty) {
+            val doc = q.documents[0]
+            val expensesData = doc.get("expenses_data") as? Map<String, Any> ?: emptyMap()
+            val userExpMap = expensesData[currentUserId] as? Map<String, Any> ?: emptyMap()
+
+            val nextIndex = userExpMap.size
+            val expenseId = generateExpenseId(nextIndex)
+
+            val transData = mapOf<String, Any>(
+                "itm" to title,
+                "amnt" to amount,
+                "date" to Timestamp(Date(dateMillis))
+            )
+
+            val updates: Map<String, Any> = mapOf(
+                "expenses_data.$currentUserId.$expenseId" to transData,
+                "total_group_expense" to FieldValue.increment(amount)
+            )
+
+            doc.reference.update(updates).await()
+            true
+        } else false
+    } catch (e: Exception) {
+        false
+    }
+}
+
+suspend fun updateContriExpense(
+    roomCode: String,
+    currentUserId: String,
+    targetExpense: ContriExpense,
+    newTitle: String,
+    newDateMillis: Long,
+    newAmount: Double
+): Boolean = withContext(Dispatchers.IO) {
+    try {
+        val db = FirebaseFirestore.getInstance()
+        val q = db.collection("Contri").whereEqualTo("contri_code", roomCode).get().await()
+        if (!q.isEmpty) {
+            val doc = q.documents[0]
+            val amountDiff = newAmount - targetExpense.amount
+
+            val transData = mapOf<String, Any>(
+                "itm" to newTitle,
+                "amnt" to newAmount,
+                "date" to Timestamp(Date(newDateMillis))
+            )
+
+            val updates: Map<String, Any> = mapOf(
+                "expenses_data.$currentUserId.${targetExpense.key}" to transData,
+                "total_group_expense" to FieldValue.increment(amountDiff)
+            )
+
+            doc.reference.update(updates).await()
+            true
+        } else false
+    } catch (e: Exception) {
+        false
+    }
+}
+
+suspend fun deleteContriExpense(
+    roomCode: String,
+    currentUserId: String,
+    targetExpense: ContriExpense
+): Boolean = withContext(Dispatchers.IO) {
+    try {
+        val db = FirebaseFirestore.getInstance()
+        val q = db.collection("Contri").whereEqualTo("contri_code", roomCode).get().await()
+        if (!q.isEmpty) {
+            val doc = q.documents[0]
+            val updates: Map<String, Any> = mapOf(
+                "expenses_data.$currentUserId.${targetExpense.key}" to FieldValue.delete(),
+                "total_group_expense" to FieldValue.increment(-targetExpense.amount)
+            )
+
+            doc.reference.update(updates).await()
+            true
+        } else false
+    } catch (e: Exception) {
+        false
+    }
 }
 
 // ==========================================
