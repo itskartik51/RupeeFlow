@@ -22,18 +22,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.google.firebase.firestore.FieldValue
-import com.google.firebase.firestore.FirebaseFirestore
 import com.kartikey.rupeeflow.UI_Screens.Home.Contri.ContriRoomModel
 import com.kartikey.rupeeflow.UI_Screens.bounceClick
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 @Composable
 fun InsideContriScreen(
@@ -93,119 +87,28 @@ fun InsideContriScreen(
             isSyncing = true
         }
 
-        withContext(Dispatchers.IO) {
-            try {
-                val db = FirebaseFirestore.getInstance()
-                
-                val myUserQuery = db.collection("Users").whereEqualTo("username", username).get().await()
-                if (!myUserQuery.isEmpty) {
-                    currentUserId = myUserQuery.documents[0].id
-                }
+        val result = fetchContriRoomData(
+            username = username,
+            roomCode = room.roomCode,
+            defaultRoomName = room.roomName,
+            defaultRoomPin = room.pin
+        )
 
-                val contriQuery = db.collection("Contri").whereEqualTo("contri_code", room.roomCode).get().await()
-                
-                if (!contriQuery.isEmpty) {
-                    val contriDoc = contriQuery.documents[0]
-                    val adminId = contriDoc.getString("admin_id") ?: ""
-                    
-                    val memberIds = (contriDoc.get("member_ids") as? List<*>)?.map { it.toString() } ?: emptyList()
-                    
-                    withContext(Dispatchers.Main) {
-                        localRoomName = contriDoc.getString("contri_name") ?: room.roomName
-                        localRoomPin = contriDoc.getString("passkey") ?: room.pin
-                        isAdmin = adminId == currentUserId
-                        
-                        val totalExpRaw = contriDoc.get("total_group_expense")
-                        totalGroupExpense = if (totalExpRaw is Number) totalExpRaw.toDouble() else 0.0
-                    }
-
-                    val membersMap = mutableMapOf<String, MemberLedger>()
-                    val expensesData = contriDoc.get("expenses_data") as? Map<String, Any> ?: emptyMap()
-
-                    for (mId in memberIds) {
-                        val uDoc = db.collection("Users").document(mId).get().await()
-                        val actualName = uDoc.getString("name") ?: uDoc.getString("username") ?: "Unknown User"
-                        val userVerified = uDoc.getBoolean("verify") ?: false
-                        
-                        val userExpMap = expensesData[mId] as? Map<String, Any> ?: emptyMap()
-                        var userSpent = 0.0
-                        val expList = mutableListOf<ContriExpense>()
-                        
-                        val sortedKeys = userExpMap.keys.sorted()
-                        
-                        for (key in sortedKeys) {
-                            val expObj = userExpMap[key] as? Map<String, Any> ?: continue
-                            val item = expObj["itm"]?.toString() ?: "Unknown"
-                            val rawAmt = expObj["amnt"]
-                            val amt = if (rawAmt is Number) rawAmt.toDouble() else 0.0
-                            
-                            val rawDate = expObj["date"]
-                            var rawMillis = System.currentTimeMillis()
-                            val formattedDate = if (rawDate is com.google.firebase.Timestamp) {
-                                rawMillis = rawDate.toDate().time
-                                SimpleDateFormat("dd MMMM", Locale.getDefault()).format(rawDate.toDate())
-                            } else if (rawDate is String) {
-                                try {
-                                    val parsed = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).parse(rawDate)
-                                    if (parsed != null) {
-                                        rawMillis = parsed.time
-                                        SimpleDateFormat("dd MMMM", Locale.getDefault()).format(parsed)
-                                    } else rawDate
-                                } catch (e: Exception) { rawDate.toString() }
-                            } else {
-                                ""
-                            }
-                            
-                            userSpent += amt
-                            expList.add(ContriExpense(key, item, amt, formattedDate, rawMillis))
-                        }
-                        
-                        membersMap[mId] = MemberLedger(mId, actualName, userSpent, expList, userVerified)
-                    }
-
-                    val sortedLedgers = mutableListOf<MemberLedger>()
-                    membersMap[currentUserId]?.let { sortedLedgers.add(it) }
-                    
-                    if (adminId != currentUserId && membersMap.containsKey(adminId)) {
-                        membersMap[adminId]?.let { sortedLedgers.add(it) }
-                    }
-                    
-                    for (mId in memberIds) {
-                        if (mId != currentUserId && mId != adminId) {
-                            membersMap[mId]?.let { sortedLedgers.add(it) }
-                        }
-                    }
-
-                    val cyclesList = mutableListOf<PastCycle>()
-                    val cycleDocs = contriDoc.reference.collection("Past_Cycles").get().await()
-                    for (c in cycleDocs) {
-                        cyclesList.add(
-                            PastCycle(
-                                dateRange = c.getString("date_range") ?: "", 
-                                totalAmount = c.getString("total_amount") ?: "₹0"
-                            )
-                        )
-                    }
-
-                    withContext(Dispatchers.Main) {
-                        ledgers = sortedLedgers
-                        pastCycles = cyclesList
-                        isLoading = false
-                        isSyncing = false
-                    }
-                } else {
-                    withContext(Dispatchers.Main) { 
-                        isLoading = false
-                        isSyncing = false
-                        Toast.makeText(context, "Error: Room details not found in database.", Toast.LENGTH_LONG).show()
-                    }
-                }
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) { 
-                    isLoading = false
-                    isSyncing = false
-                    Toast.makeText(context, "Data Error: ${e.message}", Toast.LENGTH_LONG).show()
-                }
+        withContext(Dispatchers.Main) {
+            if (result != null) {
+                localRoomName = result.roomName
+                localRoomPin = result.roomPin
+                isAdmin = result.isAdmin
+                totalGroupExpense = result.totalGroupExpense
+                ledgers = result.ledgers
+                pastCycles = result.pastCycles
+                currentUserId = result.currentUserId
+                isLoading = false
+                isSyncing = false
+            } else {
+                isLoading = false
+                isSyncing = false
+                Toast.makeText(context, "Error: Room details not found in database.", Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -399,18 +302,9 @@ fun InsideContriScreen(
                 onSave = { newName: String, newPin: String ->
                     showSettingsDialog = false
                     Toast.makeText(context, "Saving settings...", Toast.LENGTH_SHORT).show()
-                    coroutineScope.launch(Dispatchers.IO) {
-                        try {
-                            val db = FirebaseFirestore.getInstance()
-                            val q = db.collection("Contri").whereEqualTo("contri_code", room.roomCode).get().await()
-                            if (!q.isEmpty) {
-                                q.documents[0].reference.update(
-                                    "contri_name", newName,
-                                    "passkey", newPin
-                                ).await()
-                                withContext(Dispatchers.Main) { refreshTrigger++ }
-                            }
-                        } catch (e: Exception) {}
+                    coroutineScope.launch {
+                        val success = updateRoomDetails(room.roomCode, newName, newPin)
+                        if (success) refreshTrigger++
                     }
                 },
                 onRemoveMemberClick = { member: MemberLedger -> memberToRemove = member }
@@ -428,53 +322,10 @@ fun InsideContriScreen(
                     actionProcessing = true
                     Toast.makeText(context, "Removing member...", Toast.LENGTH_SHORT).show()
                     
-                    coroutineScope.launch(Dispatchers.IO) {
-                        try {
-                            val db = FirebaseFirestore.getInstance()
-                            val q = db.collection("Contri").whereEqualTo("contri_code", room.roomCode).get().await()
-                            if (!q.isEmpty) {
-                                val doc = q.documents[0]
-                                
-                                val memberIds = (doc.get("member_ids") as? List<*>)?.map { it.toString() } ?: emptyList()
-                                val remainingMembers = memberIds.filter { it != targetUserId }
-
-                                if (remainingMembers.isEmpty()) {
-                                    doc.reference.delete().await()
-                                } else {
-                                    val expensesData = doc.get("expenses_data") as? Map<String, Any> ?: emptyMap()
-                                    val userExpMap = expensesData[targetUserId] as? Map<String, Any> ?: emptyMap()
-                                    
-                                    var amountToDeduct = 0.0
-                                    for ((_, expObj) in userExpMap) {
-                                        val mapObj = expObj as? Map<String, Any> ?: continue
-                                        val amt = (mapObj["amnt"] as? Number)?.toDouble() ?: 0.0
-                                        amountToDeduct += amt
-                                    }
-
-                                    doc.reference.update(
-                                        "total_group_expense", FieldValue.increment(-amountToDeduct),
-                                        "member_ids", FieldValue.arrayRemove(targetUserId),
-                                        "expenses_data.$targetUserId", FieldValue.delete()
-                                    ).await()
-                                }
-                                
-                                val targetUserDocRef = db.collection("Users").document(targetUserId)
-                                val targetData = targetUserDocRef.get().await().data ?: emptyMap<String, Any>()
-                                val roomsArray = targetData["rooms"] as? List<String> ?: emptyList()
-                                val targetRoomString = roomsArray.find { it.contains(room.roomCode, ignoreCase = true) }
-                                
-                                if (targetRoomString != null) {
-                                    targetUserDocRef.update("rooms", FieldValue.arrayRemove(targetRoomString)).await()
-                                }
-
-                                withContext(Dispatchers.Main) { 
-                                    actionProcessing = false
-                                    refreshTrigger++ 
-                                }
-                            }
-                        } catch (e: Exception) {
-                            withContext(Dispatchers.Main) { actionProcessing = false }
-                        }
+                    coroutineScope.launch {
+                        val success = removeMemberFromContri(room.roomCode, targetUserId)
+                        actionProcessing = false
+                        if (success) refreshTrigger++
                     }
                 }
             )
@@ -500,27 +351,10 @@ fun InsideContriScreen(
                     actionProcessing = true
                     Toast.makeText(context, "Starting new cycle...", Toast.LENGTH_SHORT).show()
                     
-                    coroutineScope.launch(Dispatchers.IO) {
-                        try {
-                            val db = FirebaseFirestore.getInstance()
-                            val q = db.collection("Contri").whereEqualTo("contri_code", room.roomCode).get().await()
-                            if (!q.isEmpty) {
-                                val doc = q.documents[0]
-                                val ref = doc.reference
-                                
-                                ref.update(
-                                    "total_group_expense", 0.0,
-                                    "expenses_data", emptyMap<String, Any>()
-                                ).await()
-                                
-                                withContext(Dispatchers.Main) { 
-                                    actionProcessing = false
-                                    refreshTrigger++ 
-                                }
-                            }
-                        } catch (e: Exception) {
-                            withContext(Dispatchers.Main) { actionProcessing = false }
-                        }
+                    coroutineScope.launch {
+                        val success = startNewContriCycle(room.roomCode)
+                        actionProcessing = false
+                        if (success) refreshTrigger++
                     }
                 }
             )
@@ -534,53 +368,10 @@ fun InsideContriScreen(
                     actionProcessing = true
                     Toast.makeText(context, "Leaving room...", Toast.LENGTH_SHORT).show()
                     
-                    coroutineScope.launch(Dispatchers.IO) {
-                        try {
-                            val db = FirebaseFirestore.getInstance()
-                            val q = db.collection("Contri").whereEqualTo("contri_code", room.roomCode).get().await()
-                            if (!q.isEmpty) {
-                                val doc = q.documents[0]
-                                
-                                val memberIds = (doc.get("member_ids") as? List<*>)?.map { it.toString() } ?: emptyList()
-                                val remainingMembers = memberIds.filter { it != currentUserId }
-
-                                if (remainingMembers.isEmpty()) {
-                                    doc.reference.delete().await()
-                                } else {
-                                    val expensesData = doc.get("expenses_data") as? Map<String, Any> ?: emptyMap()
-                                    val userExpMap = expensesData[currentUserId] as? Map<String, Any> ?: emptyMap()
-                                    
-                                    var amountToDeduct = 0.0
-                                    for ((_, expObj) in userExpMap) {
-                                        val mapObj = expObj as? Map<String, Any> ?: continue
-                                        val amt = (mapObj["amnt"] as? Number)?.toDouble() ?: 0.0
-                                        amountToDeduct += amt
-                                    }
-
-                                    doc.reference.update(
-                                        "total_group_expense", FieldValue.increment(-amountToDeduct),
-                                        "member_ids", FieldValue.arrayRemove(currentUserId),
-                                        "expenses_data.$currentUserId", FieldValue.delete()
-                                    ).await()
-                                }
-                                
-                                val currentUserDocRef = db.collection("Users").document(currentUserId)
-                                val userData = currentUserDocRef.get().await().data ?: emptyMap<String, Any>()
-                                val roomsArray = userData["rooms"] as? List<String> ?: emptyList()
-                                val targetRoomString = roomsArray.find { it.contains(room.roomCode, ignoreCase = true) }
-                                
-                                if (targetRoomString != null) {
-                                    currentUserDocRef.update("rooms", FieldValue.arrayRemove(targetRoomString)).await()
-                                }
-
-                                withContext(Dispatchers.Main) { 
-                                    actionProcessing = false
-                                    onLeaveClick() 
-                                }
-                            }
-                        } catch (e: Exception) {
-                            withContext(Dispatchers.Main) { actionProcessing = false }
-                        }
+                    coroutineScope.launch {
+                        val success = leaveContriRoom(room.roomCode, currentUserId)
+                        actionProcessing = false
+                        if (success) onLeaveClick()
                     }
                 }
             )
@@ -594,49 +385,13 @@ fun InsideContriScreen(
                     actionProcessing = true
                     Toast.makeText(context, "Adding expense...", Toast.LENGTH_SHORT).show()
                     
-                    coroutineScope.launch(Dispatchers.IO) {
-                        try {
-                            val db = FirebaseFirestore.getInstance()
-                            val q = db.collection("Contri").whereEqualTo("contri_code", room.roomCode).get().await()
-                            
-                            if (!q.isEmpty) {
-                                val doc = q.documents[0]
-                                val ref = doc.reference
-                                
-                                val expensesData = doc.get("expenses_data") as? Map<String, Any> ?: emptyMap()
-                                val userExpMap = expensesData[currentUserId] as? Map<String, Any> ?: emptyMap()
-                                
-                                val nextIndex = userExpMap.size
-                                val expenseId = generateExpenseId(nextIndex)
-
-                                val transData = mapOf<String, Any>(
-                                    "itm" to title,
-                                    "amnt" to amount,
-                                    "date" to com.google.firebase.Timestamp(Date(dateMillis))
-                                )
-                                
-                                val updates: Map<String, Any> = mapOf(
-                                    "expenses_data.$currentUserId.$expenseId" to transData,
-                                    "total_group_expense" to FieldValue.increment(amount)
-                                )
-                                
-                                ref.update(updates).await()
-                                
-                                withContext(Dispatchers.Main) { 
-                                    actionProcessing = false
-                                    refreshTrigger++ 
-                                }
-                            } else {
-                                withContext(Dispatchers.Main) { 
-                                    actionProcessing = false
-                                    Toast.makeText(context, "Error: Room not found", Toast.LENGTH_LONG).show() 
-                                }
-                            }
-                        } catch (e: Exception) {
-                            withContext(Dispatchers.Main) { 
-                                actionProcessing = false
-                                Toast.makeText(context, "Save Error: ${e.message}", Toast.LENGTH_LONG).show() 
-                            }
+                    coroutineScope.launch {
+                        val success = addContriExpense(room.roomCode, currentUserId, title, dateMillis, amount)
+                        actionProcessing = false
+                        if (success) {
+                            refreshTrigger++
+                        } else {
+                            Toast.makeText(context, "Error saving expense", Toast.LENGTH_SHORT).show()
                         }
                     }
                 }
@@ -653,38 +408,17 @@ fun InsideContriScreen(
                     actionProcessing = true
                     Toast.makeText(context, "Updating expense...", Toast.LENGTH_SHORT).show()
 
-                    coroutineScope.launch(Dispatchers.IO) {
-                        try {
-                            val db = FirebaseFirestore.getInstance()
-                            val q = db.collection("Contri").whereEqualTo("contri_code", room.roomCode).get().await()
-                            if (!q.isEmpty) {
-                                val doc = q.documents[0]
-                                val ref = doc.reference
-                                val amountDiff = newAmount - targetExpense.amount
-
-                                val transData = mapOf<String, Any>(
-                                    "itm" to newTitle,
-                                    "amnt" to newAmount,
-                                    "date" to com.google.firebase.Timestamp(Date(newDateMillis))
-                                )
-
-                                val updates: Map<String, Any> = mapOf(
-                                    "expenses_data.$currentUserId.${targetExpense.key}" to transData,
-                                    "total_group_expense" to FieldValue.increment(amountDiff)
-                                )
-
-                                ref.update(updates).await()
-                                withContext(Dispatchers.Main) {
-                                    actionProcessing = false
-                                    refreshTrigger++
-                                }
-                            }
-                        } catch (e: Exception) {
-                            withContext(Dispatchers.Main) {
-                                actionProcessing = false
-                                Toast.makeText(context, "Update Error: ${e.message}", Toast.LENGTH_LONG).show()
-                            }
-                        }
+                    coroutineScope.launch {
+                        val success = updateContriExpense(
+                            roomCode = room.roomCode,
+                            currentUserId = currentUserId,
+                            targetExpense = targetExpense,
+                            newTitle = newTitle,
+                            newDateMillis = newDateMillis,
+                            newAmount = newAmount
+                        )
+                        actionProcessing = false
+                        if (success) refreshTrigger++
                     }
                 }
             )
@@ -700,55 +434,13 @@ fun InsideContriScreen(
                     actionProcessing = true
                     Toast.makeText(context, "Deleting expense...", Toast.LENGTH_SHORT).show()
 
-                    coroutineScope.launch(Dispatchers.IO) {
-                        try {
-                            val db = FirebaseFirestore.getInstance()
-                            val q = db.collection("Contri").whereEqualTo("contri_code", room.roomCode).get().await()
-                            if (!q.isEmpty) {
-                                val doc = q.documents[0]
-                                val ref = doc.reference
-
-                                val updates: Map<String, Any> = mapOf(
-                                    "expenses_data.$currentUserId.${targetExpense.key}" to FieldValue.delete(),
-                                    "total_group_expense" to FieldValue.increment(-targetExpense.amount)
-                                )
-
-                                ref.update(updates).await()
-                                withContext(Dispatchers.Main) {
-                                    actionProcessing = false
-                                    refreshTrigger++
-                                }
-                            }
-                        } catch (e: Exception) {
-                            withContext(Dispatchers.Main) {
-                                actionProcessing = false
-                                Toast.makeText(context, "Delete Error: ${e.message}", Toast.LENGTH_LONG).show()
-                            }
-                        }
+                    coroutineScope.launch {
+                        val success = deleteContriExpense(room.roomCode, currentUserId, targetExpense)
+                        actionProcessing = false
+                        if (success) refreshTrigger++
                     }
                 }
             )
         }
-    }
-}
-
-// ==========================================
-// PREMIUM BOUNCE FLOATING BUTTON (+)
-// ==========================================
-@Composable
-fun PremiumFloatingButton(onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .size(56.dp)
-            .bounceClick { onClick() }
-            .background(MaterialTheme.colorScheme.primary, shape = CircleShape),
-        contentAlignment = Alignment.Center
-    ) { 
-        Icon(
-            imageVector = Icons.Outlined.Add, 
-            contentDescription = "Add Expense", 
-            tint = MaterialTheme.colorScheme.onPrimary, 
-            modifier = Modifier.size(28.dp)
-        ) 
     }
 }
