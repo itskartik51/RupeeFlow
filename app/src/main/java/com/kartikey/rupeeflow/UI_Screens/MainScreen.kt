@@ -28,6 +28,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.kartikey.rupeeflow.UI_Screens.Home.HomeDashboardDesign
+import com.kartikey.rupeeflow.UI_Screens.Home.Contri.ContriScreen
+import com.kartikey.rupeeflow.UI_Screens.Home.Contri.ContriRoomModel
 import com.kartikey.rupeeflow.UI_Screens.Add.AddScreen 
 import com.kartikey.rupeeflow.UI_Screens.Add.TransactionModel
 import com.kartikey.rupeeflow.UI_Screens.Assets.AssetsScreen
@@ -85,7 +87,7 @@ fun MainScreen(
     var fdList by remember { mutableStateOf(emptyList<FDItem>()) }
     var ccList by remember { mutableStateOf(emptyList<CreditCardItem>()) }
     var cashData by remember { mutableStateOf(CashItem(0.0, "")) }
-    var contriRoomsList by remember { mutableStateOf(emptyList<com.kartikey.rupeeflow.UI_Screens.Home.ContriRoomModel>()) }
+    var contriRoomsList by remember { mutableStateOf(emptyList<ContriRoomModel>()) }
     
     var dNavState by remember { mutableStateOf("Connecting to Sheet...") }
     var dBackPresses by remember { mutableIntStateOf(0) }
@@ -293,7 +295,7 @@ fun MainScreen(
             ) { state ->
                 val (currentTab, isHistoryVisible, isContriVisible) = state
                 if (isContriVisible) {
-                    com.kartikey.rupeeflow.UI_Screens.Home.ContriScreen(
+                    ContriScreen(
                         username = username, contriRooms = contriRoomsList, paddingValues = paddingValues,
                         onBackClick = { showContriScreen = false }, onRefresh = { forceFetchNext = true; refreshTrigger++ } 
                     )
