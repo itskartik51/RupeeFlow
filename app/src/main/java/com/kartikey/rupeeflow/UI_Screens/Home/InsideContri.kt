@@ -48,8 +48,8 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.zIndex
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.kartikey.rupeeflow.UI_Screens.Home.Contri.ContriRoomModel
 import com.kartikey.rupeeflow.UI_Screens.bounceClick
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -1050,7 +1050,7 @@ fun RemoveMemberDialog(memberName: String, onDismiss: () -> Unit, onConfirm: () 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Remove Member?", fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onSurface) },
-        text = { Text("Are you sure you want to kick '${memberName}'? This will deduct their expenses from the total.", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+        text = { Text("Are you sure you want to kick '$memberName'? This will deduct their expenses from the total.", color = MaterialTheme.colorScheme.onSurfaceVariant) },
         containerColor = MaterialTheme.colorScheme.surface,
         confirmButton = {
             TextButton(onClick = onConfirm) { Text("Remove", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold) }
@@ -1213,7 +1213,7 @@ fun DynamicLedgerView(
 
                             // 2. Floating Overlapping Action Capsule (Smooth Rightward Slide, Solid Surface)
                             if (isCurrentUser) {
-                                Box(
+                                Row(
                                     modifier = Modifier
                                         .align(Alignment.CenterEnd)
                                         .zIndex(10f)
@@ -1299,7 +1299,8 @@ fun formatMemberDisplayName(fullName: String, allFullNames: List<String>): Strin
     val lastName = if (parts.size > 1) parts.last() else ""
 
     val sameFirstNameCount = allFullNames.count { name ->
-        val otherFirst = name.trim().split("\\s+".toRegex()).firstOrNull() ?: name.trim()
+        val nameParts = name.trim().split("\\s+".toRegex())
+        val otherFirst = nameParts.firstOrNull() ?: name.trim()
         otherFirst.equals(firstName, ignoreCase = true)
     }
 
@@ -1324,16 +1325,19 @@ fun calculateUserSettlements(ledgers: List<MemberLedger>, totalExpense: Double):
     while (debtors.isNotEmpty() && creditors.isNotEmpty()) {
         val debtor = debtors.keys.first()
         val creditor = creditors.keys.first()
-        val debtAmount = abs(debtors[debtor]!!)
-        val creditAmount = creditors[creditor]!!
+        val debtAmount = abs(debtors[debtor] ?: 0.0)
+        val creditAmount = creditors[creditor] ?: 0.0
         val settledAmount = minOf(debtAmount, creditAmount)
         
         settlements.add(Settlement(from = debtor, to = creditor, amount = settledAmount))
         
-        debtors[debtor] = debtors[debtor]!! + settledAmount
-        if (debtors[debtor]!! > -0.01) debtors.remove(debtor)
-        creditors[creditor] = creditors[creditor]!! - settledAmount
-        if (creditors[creditor]!! < 0.01) creditors.remove(creditor)
+        val newDebt = (debtors[debtor] ?: 0.0) + settledAmount
+        debtors[debtor] = newDebt
+        if (newDebt > -0.01) debtors.remove(debtor)
+
+        val newCredit = (creditors[creditor] ?: 0.0) - settledAmount
+        creditors[creditor] = newCredit
+        if (newCredit < 0.01) creditors.remove(creditor)
     }
     return Pair(myNetBalance, settlements)
 }
@@ -1429,7 +1433,9 @@ fun AddContriExpenseDialog(onDismiss: () -> Unit, onAdd: (String, Long, Double) 
 
                 OutlinedTextField(
                     value = expenseTitle,
-                    onValueChange = { expenseTitle = it.replaceFirstChar { char -> if (char.isLowerCase()) char.titlecase() else char.toString() } },
+                    onValueChange = { 
+                        expenseTitle = it.replaceFirstChar { char -> if (char.isLowerCase()) char.titlecase() else char.toString() } 
+                    },
                     label = { Text("Expense Title", fontSize = 13.sp) },
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
                     singleLine = true,
@@ -1524,7 +1530,9 @@ fun EditContriExpenseDialog(
 
                 OutlinedTextField(
                     value = expenseTitle,
-                    onValueChange = { expenseTitle = it.replaceFirstChar { char -> if (char.isLowerCase()) char.titlecase() else char.toString() } },
+                    onValueChange = { 
+                        expenseTitle = it.replaceFirstChar { char -> if (char.isLowerCase()) char.titlecase() else char.toString() } 
+                    },
                     label = { Text("Expense Title", fontSize = 13.sp) },
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
                     singleLine = true,
