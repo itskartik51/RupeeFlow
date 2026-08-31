@@ -23,7 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import com.kartikey.rupeeflow.UI_Screens.Home.InsideContriScreen
+import com.kartikey.rupeeflow.UI_Screens.Home.Contri.InContri.InsideContriScreen
 import com.kartikey.rupeeflow.UI_Screens.bounceClick
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
