@@ -115,48 +115,49 @@ fun DynamicLedgerView(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(bottom = 12.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .clickable(enabled = isCurrentUser) {
-                                    revealedExpenseKey = if (isRevealed) null else expense.key
-                                }
-                                .padding(vertical = 2.dp),
+                                .zIndex(if (isRevealed) 50f else 1f),
                             contentAlignment = Alignment.Center
                         ) {
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable(enabled = isCurrentUser) {
+                                        revealedExpenseKey = if (isRevealed) null else expense.key
+                                    }
+                                    .padding(horizontal = 4.dp, vertical = 2.dp)
                             ) {
-                                Text(
-                                    text = expense.itemName, 
-                                    fontSize = 17.sp, 
-                                    fontWeight = FontWeight.Bold, 
-                                    color = MaterialTheme.colorScheme.onBackground, 
-                                    maxLines = 1, 
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(
-                                        text = "₹${expense.amount.toInt()}", 
-                                        fontSize = 13.sp, 
-                                        fontWeight = FontWeight.Bold, 
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = expense.date, 
-                                        fontSize = 11.sp, 
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant, 
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                }
-                            }
-
-                            if (isCurrentUser) {
-                                Row(
-                                    modifier = Modifier
-                                        .align(Alignment.CenterEnd)
-                                        .zIndex(10f)
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally
                                 ) {
+                                    Text(
+                                        text = expense.itemName, 
+                                        fontSize = 17.sp, 
+                                        fontWeight = FontWeight.Bold, 
+                                        color = MaterialTheme.colorScheme.onBackground, 
+                                        maxLines = 1, 
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            text = "₹${expense.amount.toInt()}", 
+                                            fontSize = 13.sp, 
+                                            fontWeight = FontWeight.Bold, 
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = expense.date, 
+                                            fontSize = 11.sp, 
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant, 
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
+                                }
+
+                                if (isCurrentUser) {
                                     AnimatedVisibility(
                                         visible = isRevealed,
                                         enter = expandHorizontally(expandFrom = Alignment.Start) + fadeIn(tween(180)),
@@ -165,7 +166,7 @@ fun DynamicLedgerView(
                                         Surface(
                                             shape = RoundedCornerShape(50),
                                             color = MaterialTheme.colorScheme.surface,
-                                            shadowElevation = 4.dp,
+                                            shadowElevation = 6.dp,
                                             border = androidx.compose.foundation.BorderStroke(
                                                 1.dp, 
                                                 MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f)
