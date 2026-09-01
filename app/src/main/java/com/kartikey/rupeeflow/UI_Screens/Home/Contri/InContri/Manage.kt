@@ -1,5 +1,7 @@
 package com.kartikey.rupeeflow.UI_Screens.Home.Contri.InContri
 
+import android.content.Context
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -28,7 +30,9 @@ import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.kartikey.rupeeflow.UI_Screens.bounceClick
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
@@ -405,6 +409,158 @@ suspend fun deleteContriExpense(
         } else false
     } catch (e: Exception) {
         false
+    }
+}
+
+// ==========================================
+// UNIFIED DIALOG CONTROLLER & HOST
+// ==========================================
+@Composable
+fun ContriDialogController(
+    roomCode: String,
+    username: String,
+    currentUserId: String,
+    localRoomName: String,
+    localRoomPin: String,
+    totalGroupExpense: Double,
+    ledgers: List<MemberLedger>,
+    coroutineScope: CoroutineScope,
+    context: Context,
+    // Dialog States
+    showExpenseForm: Boolean,
+    onDismissExpenseForm: () -> Unit,
+    expenseFormTarget: ContriExpense?,
+    expenseToDelete: ContriExpense?,
+    onDismissDeleteExpense: () -> Unit,
+    showSettingsDialog: Boolean,
+    onDismissSettings: () -> Unit,
+    memberToRemove: MemberLedger?,
+    onDismissRemoveMember: () -> Unit,
+    onSelectRemoveMember: (MemberLedger) -> Unit,
+    showSettleDialog: Boolean,
+    onDismissSettle: () -> Unit,
+    showNewCycleDialog: Boolean,
+    onDismissNewCycle: () -> Unit,
+    showLeaveDialog: Boolean,
+    onDismissLeave: () -> Unit,
+    onActionStart: () -> Unit,
+    onActionEnd: () -> Unit,
+    onRefreshNeeded: () -> Unit,
+    onLeaveSuccess: () -> Unit
+) {
+    if (showExpenseForm) {
+        ContriExpenseFormDialog(
+            expense = expenseFormTarget,
+            onDismiss = onDismissExpenseForm,
+            onSave = { title: String, dateMillis: Long, amount: Double ->
+                onDismissExpenseForm()
+                onActionStart()
+                coroutineScope.launch {
+                    val success = if (expenseFormTarget == null) {
+                        addContriExpense(roomCode, currentUserId, title, dateMillis, amount)
+                    } else {
+                        updateContriExpense(roomCode, currentUserId, expenseFormTarget, title, dateMillis, amount)
+                    }
+                    onActionEnd()
+                    if (success) onRefreshNeeded()
+                }
+            }
+        )
+    }
+
+    if (expenseToDelete != null) {
+        DeleteExpenseConfirmationDialog(
+            expense = expenseToDelete,
+            onDismiss = onDismissDeleteExpense,
+            onConfirm = {
+                val target = expenseToDelete
+                onDismissDeleteExpense()
+                onActionStart()
+                coroutineScope.launch {
+                    val success = deleteContriExpense(roomCode, currentUserId, target)
+                    onActionEnd()
+                    if (success) onRefreshNeeded()
+                }
+            }
+        )
+    }
+
+    if (showSettingsDialog) {
+        AdminSettingsDialog(
+            initialName = localRoomName,
+            initialPin = localRoomPin,
+            ledgers = ledgers,
+            currentUserId = currentUserId,
+            onDismiss = onDismissSettings,
+            onSave = { newName: String, newPin: String ->
+                onDismissSettings()
+                coroutineScope.launch {
+                    val success = updateRoomDetails(roomCode, newName, newPin)
+                    if (success) onRefreshNeeded()
+                }
+            },
+            onRemoveMemberClick = onSelectRemoveMember
+        )
+    }
+
+    if (memberToRemove != null) {
+        RemoveMemberDialog(
+            memberName = memberToRemove.memberName,
+            onDismiss = onDismissRemoveMember,
+            onConfirm = {
+                val targetUserId = memberToRemove.userId
+                onDismissRemoveMember()
+                onDismissSettings()
+                onActionStart()
+                coroutineScope.launch {
+                    val success = removeMemberFromContri(roomCode, targetUserId)
+                    onActionEnd()
+                    if (success) onRefreshNeeded()
+                }
+            }
+        )
+    }
+
+    if (showSettleDialog) {
+        val allNames = ledgers.map { it.memberName }
+        val myRealName = ledgers.find { it.userId == currentUserId }?.memberName ?: username
+        SettleUpDialog(
+            myName = myRealName,
+            allMemberNames = allNames,
+            ledgers = ledgers,
+            totalExpense = totalGroupExpense,
+            onDismiss = onDismissSettle
+        )
+    }
+
+    if (showNewCycleDialog) {
+        NewCycleDialog(
+            onDismiss = onDismissNewCycle,
+            onConfirm = {
+                onDismissNewCycle()
+                onActionStart()
+                coroutineScope.launch {
+                    val success = startNewContriCycle(roomCode)
+                    onActionEnd()
+                    if (success) onRefreshNeeded()
+                }
+            }
+        )
+    }
+
+    if (showLeaveDialog) {
+        LeaveRoomDialog(
+            onDismiss = onDismissLeave,
+            onConfirm = {
+                onDismissLeave()
+                onActionStart()
+                coroutineScope.launch {
+                    val success = leaveContriRoom(roomCode, currentUserId)
+                    onActionEnd()
+                    if (success) onLeaveSuccess()
+                }
+            }
+        )
     }
 }
 
