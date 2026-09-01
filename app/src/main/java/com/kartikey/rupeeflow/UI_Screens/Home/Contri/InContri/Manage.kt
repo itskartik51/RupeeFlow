@@ -336,22 +336,6 @@ suspend fun leaveContriRoom(roomCode: String, currentUserId: String): Boolean = 
     }
 }
 
-suspend fun startNewContriCycle(roomCode: String): Boolean = withContext(Dispatchers.IO) {
-    try {
-        val db = FirebaseFirestore.getInstance()
-        val q = db.collection("Contri").whereEqualTo("contri_code", roomCode).get().await()
-        if (!q.isEmpty) {
-            q.documents[0].reference.update(
-                "total_group_expense", 0.0,
-                "expenses_data", emptyMap<String, Any>()
-            ).await()
-            true
-        } else false
-    } catch (e: Exception) {
-        false
-    }
-}
-
 suspend fun addContriExpense(
     roomCode: String,
     currentUserId: String,
