@@ -203,10 +203,42 @@ suspend fun updateRoomDetails(roomCode: String, newName: String, newPin: String)
         val db = FirebaseFirestore.getInstance()
         val q = db.collection("Contri").whereEqualTo("contri_code", roomCode).get().await()
         if (!q.isEmpty) {
-            q.documents[0].reference.update(
+            val contriDoc = q.documents[0]
+            
+            // 1. Update Contri document
+            contriDoc.reference.update(
                 "contri_name", newName,
                 "passkey", newPin
             ).await()
+
+            // 2. Update rooms array in all members' user documents
+            val memberIds = (contriDoc.get("member_ids") as? List<*>)?.map { it.toString() } ?: emptyList()
+            for (mId in memberIds) {
+                val userDocRef = db.collection("Users").document(mId)
+                val userDoc = userDocRef.get().await()
+                if (userDoc.exists()) {
+                    val userData = userDoc.data ?: emptyMap<String, Any>()
+                    val roomsArray = (userData["rooms"] as? List<*>)?.map { it.toString() } ?: emptyList()
+                    val oldRoomString = roomsArray.find { it.contains(roomCode, ignoreCase = true) }
+                    
+                    if (oldRoomString != null) {
+                        val prefix = if (oldRoomString.contains("_${roomCode}")) {
+                            oldRoomString.substringBefore("_${roomCode}")
+                        } else {
+                            oldRoomString.split("_").firstOrNull() ?: ""
+                        }
+                        
+                        val newRoomString = if (prefix.isNotBlank()) {
+                            "${prefix}_${roomCode}_${newName}_${newPin}"
+                        } else {
+                            "${roomCode}_${newName}_${newPin}"
+                        }
+                        
+                        userDocRef.update("rooms", FieldValue.arrayRemove(oldRoomString)).await()
+                        userDocRef.update("rooms", FieldValue.arrayUnion(newRoomString)).await()
+                    }
+                }
+            }
             true
         } else false
     } catch (e: Exception) {
