@@ -42,7 +42,6 @@ fun InsideContriScreen(
 
     var currentUserId by remember { mutableStateOf("") }
     var ledgers by remember { mutableStateOf<List<MemberLedger>>(emptyList()) }
-    var pastCycles by remember { mutableStateOf<List<PastCycle>>(emptyList()) }
     var totalGroupExpense by remember { mutableDoubleStateOf(0.0) }
     var isAdmin by remember { mutableStateOf(false) } 
     var isSyncing by remember { mutableStateOf(false) } 
@@ -83,7 +82,6 @@ fun InsideContriScreen(
                 isAdmin = result.isAdmin
                 totalGroupExpense = result.totalGroupExpense
                 ledgers = result.ledgers
-                pastCycles = result.pastCycles
                 currentUserId = result.currentUserId
             } else {
                 Toast.makeText(context, "Error: Room not found", Toast.LENGTH_SHORT).show()
@@ -166,10 +164,13 @@ fun InsideContriScreen(
                 )
             }
 
-            PastCyclesSection(pastCycles = pastCycles, currentUserId = currentUserId)
+            PastCyclesSection(
+                roomCode = room.roomCode,
+                currentUserId = currentUserId,
+                refreshTrigger = refreshTrigger
+            )
         }
 
-        // Dedicated Dialog Manager from Manage.kt
         ContriDialogController(
             roomCode = room.roomCode,
             username = username,
