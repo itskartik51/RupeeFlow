@@ -13,6 +13,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
 import com.kartikey.rupeeflow.UI_Screens.bounceClick
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -23,115 +24,99 @@ import java.util.Date
 import java.util.Locale
 
 // ==========================================
-// CYCLE BACKEND ENGINE (ARCHIVE & RESTORE)
+// HISTORY CYCLE KEY GENERATOR (0A -> ZZ)
 // ==========================================
+fun generateHistoryCycleKey(index: Int): String {
+    return if (index < 26) {
+        "0" + ('A' + index)
+    } else {
+        val adjusted = index - 26
+        val firstChar = 'A' + (adjusted / 26)
+        val secondChar = 'A' + (adjusted % 26)
+        "$firstChar$secondChar"
+    }
+}
 
+// ==========================================
+// CYCLE ARCHIVE ENGINE (HISTORY/1 WRITE)
+// ==========================================
 suspend fun startNewContriCycle(roomCode: String): Boolean = withContext(Dispatchers.IO) {
     try {
         val db = FirebaseFirestore.getInstance()
         val q = db.collection("Contri").whereEqualTo("contri_code", roomCode).get().await()
-        if (!q.isEmpty) {
-            val doc = q.documents[0]
-            val startDate = doc.getString("contri_date") ?: "Start"
-            val currentDate = SimpleDateFormat("dd-MM-yyyy", Locale.getDefault()).format(Date())
-            val totalExp = (doc.get("total_group_expense") as? Number)?.toDouble() ?: 0.0
-            val expensesData = doc.get("expenses_data") as? Map<String, Any> ?: emptyMap()
-            val memberIds = (doc.get("member_ids") as? List<*>)?.map { it.toString() } ?: emptyList()
+        if (q.isEmpty) return@withContext false
 
-            val dateRangeStr = "$startDate - $currentDate"
-            val totalAmtStr = "₹${totalExp.toInt()}"
+        val doc = q.documents[0]
+        val startDate = doc.getString("contri_date") ?: "Start"
+        val currentDate = SimpleDateFormat("dd-MM-yyyy", Locale.getDefault()).format(Date())
+        val totalExp = (doc.get("total_group_expense") as? Number)?.toDouble() ?: 0.0
+        val expensesData = doc.get("expenses_data") as? Map<String, Any> ?: emptyMap()
 
-            // 1. Archive current cycle snapshot to Past_Cycles subcollection
-            val archiveData = hashMapOf(
-                "date_range" to dateRangeStr,
-                "total_amount" to totalAmtStr,
-                "expenses_data" to expensesData,
-                "member_ids" to memberIds,
-                "archived_at" to Timestamp.now()
-            )
-            doc.reference.collection("Past_Cycles").add(archiveData).await()
+        val historyDocRef = doc.reference.collection("History").document("1")
+        val historySnap = historyDocRef.get().await()
+        val existingMap = historySnap.data ?: emptyMap<String, Any>()
+        val nextKey = generateHistoryCycleKey(existingMap.size)
 
-            // 2. Reset live cycle data to zero
-            doc.reference.update(
-                "total_group_expense", 0.0,
-                "expenses_data", emptyMap<String, Any>(),
-                "contri_date", currentDate
-            ).await()
+        val cyclePayload = mapOf<String, Any>(
+            "name" to "$startDate - $currentDate",
+            "date" to Timestamp.now(),
+            "ttl" to totalExp,
+            "expenses_data" to expensesData
+        )
 
-            true
-        } else false
+        historyDocRef.set(mapOf(nextKey to cyclePayload), SetOptions.merge()).await()
+
+        doc.reference.update(
+            "total_group_expense", 0.0,
+            "expenses_data", emptyMap<String, Any>(),
+            "contri_date", currentDate
+        ).await()
+
+        true
     } catch (e: Exception) {
         false
     }
 }
 
-suspend fun fetchPastCycleLedgers(roomCode: String, cycleDateRange: String): List<MemberLedger> = withContext(Dispatchers.IO) {
-    try {
-        val db = FirebaseFirestore.getInstance()
-        val q = db.collection("Contri").whereEqualTo("contri_code", roomCode).get().await()
-        if (q.isEmpty) return@withContext emptyList()
-
-        val contriDoc = q.documents[0]
-        val cycleDocs = contriDoc.reference.collection("Past_Cycles")
-            .whereEqualTo("date_range", cycleDateRange)
-            .get().await()
-        if (cycleDocs.isEmpty) return@withContext emptyList()
-
-        val cycleDoc = cycleDocs.documents[0]
-        val memberIds = (cycleDoc.get("member_ids") as? List<*>)?.map { it.toString() } ?: emptyList()
-        val expensesData = cycleDoc.get("expenses_data") as? Map<String, Any> ?: emptyMap()
-
-        val ledgers = mutableListOf<MemberLedger>()
-        for (mId in memberIds) {
-            val uDoc = db.collection("Users").document(mId).get().await()
-            val actualName = uDoc.getString("name") ?: uDoc.getString("username") ?: "Unknown User"
-            val userVerified = uDoc.getBoolean("verify") ?: false
-
-            val userExpMap = expensesData[mId] as? Map<String, Any> ?: emptyMap()
-            var userSpent = 0.0
-            val expList = mutableListOf<ContriExpense>()
-
-            val sortedKeys = userExpMap.keys.sorted()
-            for (key in sortedKeys) {
-                val expObj = userExpMap[key] as? Map<String, Any> ?: continue
-                val item = expObj["itm"]?.toString() ?: "Unknown"
-                val rawAmt = expObj["amnt"]
-                val amt = if (rawAmt is Number) rawAmt.toDouble() else 0.0
-
-                val rawDate = expObj["date"]
-                var rawMillis = System.currentTimeMillis()
-                val formattedDate = if (rawDate is Timestamp) {
-                    rawMillis = rawDate.toDate().time
-                    SimpleDateFormat("dd MMMM", Locale.getDefault()).format(rawDate.toDate())
-                } else if (rawDate is String) {
-                    try {
-                        val parsed = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).parse(rawDate)
-                        if (parsed != null) {
-                            rawMillis = parsed.time
-                            SimpleDateFormat("dd MMMM", Locale.getDefault()).format(parsed)
-                        } else rawDate
-                    } catch (e: Exception) {
-                        rawDate.toString()
-                    }
-                } else {
-                    ""
-                }
-
-                userSpent += amt
-                expList.add(ContriExpense(key, item, amt, formattedDate, rawMillis))
+// ==========================================
+// START NEW CYCLE WARNING DIALOG
+// ==========================================
+@Composable
+fun NewCycleDialog(onDismiss: () -> Unit, onConfirm: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { 
+            Text(
+                text = "Start New Cycle?", 
+                fontWeight = FontWeight.ExtraBold, 
+                color = MaterialTheme.colorScheme.onSurface
+            ) 
+        },
+        text = { 
+            Text(
+                text = "Once a new cycle is started, all current expenses will be permanently archived to History and can no longer be edited or deleted. Active balances and room calculations will reset to zero.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 14.sp,
+                lineHeight = 20.sp
+            ) 
+        },
+        containerColor = MaterialTheme.colorScheme.surface,
+        confirmButton = {
+            TextButton(onClick = onConfirm) { 
+                Text("Start New", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold) 
             }
-            ledgers.add(MemberLedger(mId, actualName, userSpent, expList, userVerified))
+        },
+        dismissButton = { 
+            TextButton(onClick = onDismiss) { 
+                Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold) 
+            } 
         }
-        ledgers
-    } catch (e: Exception) {
-        emptyList()
-    }
+    )
 }
 
 // ==========================================
-// PAST CYCLES EXPANDABLE ACCORDION UI
+// PAST CYCLES ACCORDION SECTION UI
 // ==========================================
-
 @Composable
 fun PastCyclesSection(
     roomCode: String,
@@ -140,10 +125,7 @@ fun PastCyclesSection(
 ) {
     if (pastCycles.isEmpty()) return
 
-    val coroutineScope = rememberCoroutineScope()
     val expandedState = remember { mutableStateMapOf<String, Boolean>() }
-    val loadingState = remember { mutableStateMapOf<String, Boolean>() }
-    val fetchedCycleData = remember { mutableStateMapOf<String, List<MemberLedger>>() }
 
     Spacer(modifier = Modifier.height(24.dp))
     Text(
@@ -158,8 +140,6 @@ fun PastCyclesSection(
     Column(modifier = Modifier.padding(horizontal = 16.dp)) {
         pastCycles.forEach { cycle ->
             val isExpanded = expandedState[cycle.dateRange] == true
-            val isFetching = loadingState[cycle.dateRange] == true
-            val cycleLedger = fetchedCycleData[cycle.dateRange]
 
             Card(
                 modifier = Modifier
@@ -167,21 +147,7 @@ fun PastCyclesSection(
                     .padding(bottom = 8.dp)
                     .animateContentSize() 
                     .bounceClick {
-                        if (isExpanded) {
-                            expandedState[cycle.dateRange] = false
-                        } else {
-                            expandedState[cycle.dateRange] = true
-                            if (cycleLedger == null) {
-                                loadingState[cycle.dateRange] = true
-                                coroutineScope.launch {
-                                    val data = fetchPastCycleLedgers(roomCode, cycle.dateRange)
-                                    withContext(Dispatchers.Main) {
-                                        loadingState[cycle.dateRange] = false
-                                        fetchedCycleData[cycle.dateRange] = data
-                                    }
-                                }
-                            }
-                        }
+                        expandedState[cycle.dateRange] = !isExpanded
                     },
                 shape = RoundedCornerShape(12.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -201,48 +167,12 @@ fun PastCyclesSection(
                             fontWeight = FontWeight.Medium, 
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            if (isFetching) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(16.dp), 
-                                    color = MaterialTheme.colorScheme.primary, 
-                                    strokeWidth = 2.dp
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                            }
-                            Text(
-                                text = cycle.totalAmount, 
-                                fontSize = 15.sp, 
-                                fontWeight = FontWeight.ExtraBold, 
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    }
-
-                    if (isExpanded) {
-                        if (cycleLedger != null && cycleLedger.isNotEmpty()) {
-                            HorizontalDivider(
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f), 
-                                thickness = 0.5.dp
-                            )
-                            Spacer(modifier = Modifier.height(12.dp))
-                            DynamicLedgerView(
-                                currentUserId = currentUserId,
-                                ledgers = cycleLedger,
-                                onEditExpense = {},
-                                onDeleteExpense = {}
-                            )
-                            Spacer(modifier = Modifier.height(12.dp))
-                        } else if (!isFetching) {
-                            Text(
-                                text = "No details available for this cycle.", 
-                                color = MaterialTheme.colorScheme.onSurfaceVariant, 
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp), 
-                                textAlign = TextAlign.Center
-                            )
-                        }
+                        Text(
+                            text = cycle.totalAmount, 
+                            fontSize = 15.sp, 
+                            fontWeight = FontWeight.ExtraBold, 
+                            color = MaterialTheme.colorScheme.primary
+                        )
                     }
                 }
             }
