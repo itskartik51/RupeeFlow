@@ -24,7 +24,6 @@ import com.kartikey.rupeeflow.UI_Screens.Home.Contri.ContriRoomModel
 import com.kartikey.rupeeflow.UI_Screens.bounceClick
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @Composable
@@ -51,17 +50,16 @@ fun InsideContriScreen(
     var refreshTrigger by remember { mutableIntStateOf(0) }
     var actionProcessing by remember { mutableStateOf(false) }
     
-    var expenseFormTarget by remember { mutableStateOf<ContriExpense?>(null) }
+    // Dialog triggers
     var showExpenseForm by remember { mutableStateOf(false) }
+    var expenseFormTarget by remember { mutableStateOf<ContriExpense?>(null) }
     var expenseToDelete by remember { mutableStateOf<ContriExpense?>(null) }
-    
     var showLeaveDialog by remember { mutableStateOf(false) }
     var showSettleDialog by remember { mutableStateOf(false) }
     var showNewCycleDialog by remember { mutableStateOf(false) }
     var showSettingsDialog by remember { mutableStateOf(false) }
     var memberToRemove by remember { mutableStateOf<MemberLedger?>(null) }
 
-    // ROTATION ANIMATION FOR SYNC WHEEL
     var currentRotation by remember { mutableFloatStateOf(0f) }
     LaunchedEffect(isSyncing || actionProcessing) {
         if (isSyncing || actionProcessing) {
@@ -75,18 +73,8 @@ fun InsideContriScreen(
     }
 
     LaunchedEffect(room.roomCode, refreshTrigger) {
-        if (ledgers.isEmpty()) {
-            isLoading = true
-        } else {
-            isSyncing = true
-        }
-
-        val result = fetchContriRoomData(
-            username = username,
-            roomCode = room.roomCode,
-            defaultRoomName = room.roomName,
-            defaultRoomPin = room.pin
-        )
+        if (ledgers.isEmpty()) isLoading = true else isSyncing = true
+        val result = fetchContriRoomData(username, room.roomCode, room.roomName, room.pin)
 
         withContext(Dispatchers.Main) {
             if (result != null) {
@@ -97,13 +85,11 @@ fun InsideContriScreen(
                 ledgers = result.ledgers
                 pastCycles = result.pastCycles
                 currentUserId = result.currentUserId
-                isLoading = false
-                isSyncing = false
             } else {
-                isLoading = false
-                isSyncing = false
-                Toast.makeText(context, "Error: Room details not found in database.", Toast.LENGTH_LONG).show()
+                Toast.makeText(context, "Error: Room not found", Toast.LENGTH_SHORT).show()
             }
+            isLoading = false
+            isSyncing = false
         }
     }
 
@@ -117,58 +103,31 @@ fun InsideContriScreen(
                     .statusBarsPadding(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(
-                    modifier = Modifier.size(40.dp).clip(CircleShape).bounceClick { onBackClick() },
-                    contentAlignment = Alignment.Center
-                ) {
+                Box(modifier = Modifier.size(40.dp).clip(CircleShape).bounceClick { onBackClick() }, contentAlignment = Alignment.Center) {
                     Icon(Icons.Outlined.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.onSurface)
                 }
-                
                 Spacer(modifier = Modifier.width(4.dp))
-                
                 Text(text = formattedName, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp, color = MaterialTheme.colorScheme.onSurface)
-                
                 Spacer(modifier = Modifier.width(8.dp))
                 Box(
-                    modifier = Modifier
-                        .border(1.2.dp, MaterialTheme.colorScheme.onSurfaceVariant, RoundedCornerShape(50))
-                        .padding(horizontal = 8.dp, vertical = 2.dp),
+                    modifier = Modifier.border(1.2.dp, MaterialTheme.colorScheme.onSurfaceVariant, RoundedCornerShape(50)).padding(horizontal = 8.dp, vertical = 2.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = if (isAdmin) "Admin" else "Member", 
-                        fontSize = 10.sp, 
-                        color = MaterialTheme.colorScheme.onSurfaceVariant, 
-                        fontWeight = FontWeight.SemiBold
-                    )
+                    Text(text = if (isAdmin) "Admin" else "Member", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.SemiBold)
                 }
-                
                 Spacer(modifier = Modifier.weight(1f))
-                
                 if (isAdmin) {
-                    Box(
-                        modifier = Modifier.size(40.dp).clip(CircleShape).bounceClick { showSettingsDialog = true },
-                        contentAlignment = Alignment.Center
-                    ) {
+                    Box(modifier = Modifier.size(40.dp).clip(CircleShape).bounceClick { showSettingsDialog = true }, contentAlignment = Alignment.Center) {
                         Icon(imageVector = Icons.Outlined.Settings, contentDescription = "Settings", tint = MaterialTheme.colorScheme.onSurface)
                     }
                 }
-                
-                Box(
-                    modifier = Modifier.size(40.dp).clip(CircleShape).bounceClick { showLeaveDialog = true },
-                    contentAlignment = Alignment.Center
-                ) {
+                Box(modifier = Modifier.size(40.dp).clip(CircleShape).bounceClick { showLeaveDialog = true }, contentAlignment = Alignment.Center) {
                     Icon(imageVector = Icons.AutoMirrored.Outlined.ExitToApp, contentDescription = "Leave Room", tint = MaterialTheme.colorScheme.error)
                 }
             }
         },
         floatingActionButton = {
-            PremiumFloatingButton(
-                onClick = { 
-                    expenseFormTarget = null
-                    showExpenseForm = true 
-                }
-            )
+            PremiumFloatingButton(onClick = { expenseFormTarget = null; showExpenseForm = true })
         },
         containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
@@ -202,143 +161,45 @@ fun InsideContriScreen(
                 DynamicLedgerView(
                     currentUserId = currentUserId,
                     ledgers = ledgers,
-                    onEditExpense = { expense: ContriExpense -> 
-                        expenseFormTarget = expense
-                        showExpenseForm = true
-                    },
-                    onDeleteExpense = { expense: ContriExpense -> expenseToDelete = expense }
+                    onEditExpense = { expense -> expenseFormTarget = expense; showExpenseForm = true },
+                    onDeleteExpense = { expense -> expenseToDelete = expense }
                 )
             }
 
-            PastCyclesSection(
-                pastCycles = pastCycles,
-                currentUserId = currentUserId
-            )
+            PastCyclesSection(pastCycles = pastCycles, currentUserId = currentUserId)
         }
 
-        // ==========================================
-        // DIALOGS & ACTIONS
-        // ==========================================
-
-        if (showExpenseForm) {
-            ContriExpenseFormDialog(
-                expense = expenseFormTarget,
-                onDismiss = { showExpenseForm = false },
-                onSave = { title: String, dateMillis: Long, amount: Double ->
-                    val target = expenseFormTarget
-                    showExpenseForm = false
-                    actionProcessing = true
-
-                    coroutineScope.launch {
-                        val success = if (target == null) {
-                            addContriExpense(room.roomCode, currentUserId, title, dateMillis, amount)
-                        } else {
-                            updateContriExpense(room.roomCode, currentUserId, target, title, dateMillis, amount)
-                        }
-                        actionProcessing = false
-                        if (success) refreshTrigger++
-                    }
-                }
-            )
-        }
-
-        if (expenseToDelete != null) {
-            DeleteExpenseConfirmationDialog(
-                expense = expenseToDelete!!,
-                onDismiss = { expenseToDelete = null },
-                onConfirm = {
-                    val target = expenseToDelete!!
-                    expenseToDelete = null
-                    actionProcessing = true
-
-                    coroutineScope.launch {
-                        val success = deleteContriExpense(room.roomCode, currentUserId, target)
-                        actionProcessing = false
-                        if (success) refreshTrigger++
-                    }
-                }
-            )
-        }
-
-        if (showSettingsDialog) {
-            AdminSettingsDialog(
-                initialName = localRoomName,
-                initialPin = localRoomPin,
-                ledgers = ledgers,
-                currentUserId = currentUserId,
-                onDismiss = { showSettingsDialog = false },
-                onSave = { newName: String, newPin: String ->
-                    showSettingsDialog = false
-                    coroutineScope.launch {
-                        val success = updateRoomDetails(room.roomCode, newName, newPin)
-                        if (success) refreshTrigger++
-                    }
-                },
-                onRemoveMemberClick = { member: MemberLedger -> memberToRemove = member }
-            )
-        }
-
-        if (memberToRemove != null) {
-            RemoveMemberDialog(
-                memberName = memberToRemove!!.memberName,
-                onDismiss = { memberToRemove = null },
-                onConfirm = {
-                    val targetUserId = memberToRemove!!.userId
-                    memberToRemove = null
-                    showSettingsDialog = false
-                    actionProcessing = true
-
-                    coroutineScope.launch {
-                        val success = removeMemberFromContri(room.roomCode, targetUserId)
-                        actionProcessing = false
-                        if (success) refreshTrigger++
-                    }
-                }
-            )
-        }
-
-        if (showSettleDialog) {
-            val allNames = ledgers.map { it.memberName }
-            val myRealName = ledgers.find { it.userId == currentUserId }?.memberName ?: username
-            SettleUpDialog(
-                myName = myRealName, 
-                allMemberNames = allNames, 
-                ledgers = ledgers, 
-                totalExpense = totalGroupExpense, 
-                onDismiss = { showSettleDialog = false }
-            )
-        }
-
-        if (showNewCycleDialog) {
-            NewCycleDialog(
-                onDismiss = { showNewCycleDialog = false },
-                onConfirm = {
-                    showNewCycleDialog = false
-                    actionProcessing = true
-
-                    coroutineScope.launch {
-                        val success = startNewContriCycle(room.roomCode)
-                        actionProcessing = false
-                        if (success) refreshTrigger++
-                    }
-                }
-            )
-        }
-
-        if (showLeaveDialog) {
-            LeaveRoomDialog(
-                onDismiss = { showLeaveDialog = false },
-                onConfirm = {
-                    showLeaveDialog = false
-                    actionProcessing = true
-
-                    coroutineScope.launch {
-                        val success = leaveContriRoom(room.roomCode, currentUserId)
-                        actionProcessing = false
-                        if (success) onLeaveClick()
-                    }
-                }
-            )
-        }
+        // Dedicated Dialog Manager from Manage.kt
+        ContriDialogController(
+            roomCode = room.roomCode,
+            username = username,
+            currentUserId = currentUserId,
+            localRoomName = localRoomName,
+            localRoomPin = localRoomPin,
+            totalGroupExpense = totalGroupExpense,
+            ledgers = ledgers,
+            coroutineScope = coroutineScope,
+            context = context,
+            showExpenseForm = showExpenseForm,
+            onDismissExpenseForm = { showExpenseForm = false },
+            expenseFormTarget = expenseFormTarget,
+            expenseToDelete = expenseToDelete,
+            onDismissDeleteExpense = { expenseToDelete = null },
+            showSettingsDialog = showSettingsDialog,
+            onDismissSettings = { showSettingsDialog = false },
+            memberToRemove = memberToRemove,
+            onDismissRemoveMember = { memberToRemove = null },
+            onSelectRemoveMember = { member -> memberToRemove = member },
+            showSettleDialog = showSettleDialog,
+            onDismissSettle = { showSettleDialog = false },
+            showNewCycleDialog = showNewCycleDialog,
+            onDismissNewCycle = { showNewCycleDialog = false },
+            showLeaveDialog = showLeaveDialog,
+            onDismissLeave = { showLeaveDialog = false },
+            onActionStart = { actionProcessing = true },
+            onActionEnd = { actionProcessing = false },
+            onRefreshNeeded = { refreshTrigger++ },
+            onLeaveSuccess = onLeaveClick
+        )
     }
 }
