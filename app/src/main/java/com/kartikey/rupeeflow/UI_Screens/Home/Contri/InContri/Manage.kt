@@ -203,41 +203,36 @@ suspend fun updateRoomDetails(roomCode: String, newName: String, newPin: String)
         val db = FirebaseFirestore.getInstance()
         val q = db.collection("Contri").whereEqualTo("contri_code", roomCode).get().await()
         if (!q.isEmpty) {
-            val contriDoc = q.documents[0]
-            
-            // 1. Update Contri document
-            contriDoc.reference.update(
+            val doc = q.documents[0]
+            doc.reference.update(
                 "contri_name", newName,
                 "passkey", newPin
             ).await()
 
-            // 2. Update rooms array in all members' user documents
-            val memberIds = (contriDoc.get("member_ids") as? List<*>)?.map { it.toString() } ?: emptyList()
+            val memberIds = (doc.get("member_ids") as? List<*>)?.map { it.toString() } ?: emptyList()
             for (mId in memberIds) {
-                val userDocRef = db.collection("Users").document(mId)
-                val userDoc = userDocRef.get().await()
-                if (userDoc.exists()) {
-                    val userData = userDoc.data ?: emptyMap<String, Any>()
-                    val roomsArray = (userData["rooms"] as? List<*>)?.map { it.toString() } ?: emptyList()
-                    val oldRoomString = roomsArray.find { it.contains(roomCode, ignoreCase = true) }
-                    
-                    if (oldRoomString != null) {
-                        val prefix = if (oldRoomString.contains("_${roomCode}")) {
-                            oldRoomString.substringBefore("_${roomCode}")
-                        } else {
-                            oldRoomString.split("_").firstOrNull() ?: ""
-                        }
+                try {
+                    val userRef = db.collection("Users").document(mId)
+                    val userDoc = userRef.get().await()
+                    if (userDoc.exists()) {
+                        val roomsList = (userDoc.get("rooms") as? List<*>)?.map { it.toString() }?.toMutableList() ?: mutableListOf()
+                        val targetIndex = roomsList.indexOfFirst { it.contains(roomCode, ignoreCase = true) }
                         
-                        val newRoomString = if (prefix.isNotBlank()) {
-                            "${prefix}_${roomCode}_${newName}_${newPin}"
-                        } else {
-                            "${roomCode}_${newName}_${newPin}"
+                        if (targetIndex != -1) {
+                            val oldRoomStr = roomsList[targetIndex]
+                            val parts = oldRoomStr.split("_")
+                            val prefix = if (parts.isNotEmpty()) parts[0] else ""
+                            val newRoomStr = if (prefix.isNotBlank()) {
+                                "${prefix}_${roomCode}_${newName}_${newPin}"
+                            } else {
+                                "${roomCode}_${newName}_${newPin}"
+                            }
+                            
+                            roomsList[targetIndex] = newRoomStr
+                            userRef.update("rooms", roomsList).await()
                         }
-                        
-                        userDocRef.update("rooms", FieldValue.arrayRemove(oldRoomString)).await()
-                        userDocRef.update("rooms", FieldValue.arrayUnion(newRoomString)).await()
                     }
-                }
+                } catch (e: Exception) {}
             }
             true
         } else false
@@ -296,6 +291,7 @@ suspend fun leaveContriRoom(roomCode: String, currentUserId: String): Boolean = 
         val q = db.collection("Contri").whereEqualTo("contri_code", roomCode).get().await()
         if (!q.isEmpty) {
             val doc = q.documents[0]
+            val adminId = doc.getString("admin_id") ?: ""
             val memberIds = (doc.get("member_ids") as? List<*>)?.map { it.toString() } ?: emptyList()
             val remainingMembers = memberIds.filter { it != currentUserId }
 
@@ -312,16 +308,22 @@ suspend fun leaveContriRoom(roomCode: String, currentUserId: String): Boolean = 
                     amountToDeduct += amt
                 }
 
-                doc.reference.update(
-                    "total_group_expense", FieldValue.increment(-amountToDeduct),
-                    "member_ids", FieldValue.arrayRemove(currentUserId),
-                    "expenses_data.$currentUserId", FieldValue.delete()
-                ).await()
+                val updates = hashMapOf<String, Any>(
+                    "total_group_expense" to FieldValue.increment(-amountToDeduct),
+                    "member_ids" to FieldValue.arrayRemove(currentUserId),
+                    "expenses_data.$currentUserId" to FieldValue.delete()
+                )
+
+                if (adminId == currentUserId && remainingMembers.isNotEmpty()) {
+                    updates["admin_id"] = remainingMembers.first()
+                }
+
+                doc.reference.update(updates as Map<String, Any>).await()
             }
 
             val currentUserDocRef = db.collection("Users").document(currentUserId)
             val userData = currentUserDocRef.get().await().data ?: emptyMap<String, Any>()
-            val roomsArray = userData["rooms"] as? List<String> ?: emptyList()
+            val roomsArray = (userData["rooms"] as? List<*>)?.map { it.toString() } ?: emptyList()
             val targetRoomString = roomsArray.find { it.contains(roomCode, ignoreCase = true) }
 
             if (targetRoomString != null) {
