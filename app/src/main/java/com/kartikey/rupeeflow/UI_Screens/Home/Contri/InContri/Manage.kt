@@ -1,7 +1,6 @@
 package com.kartikey.rupeeflow.UI_Screens.Home.Contri.InContri
 
 import android.content.Context
-import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -59,7 +58,6 @@ data class MemberLedger(
 )
 
 data class Settlement(val from: String, val to: String, val amount: Double)
-data class PastCycle(val dateRange: String, val totalAmount: String)
 
 data class RoomDataResult(
     val roomName: String,
@@ -67,7 +65,6 @@ data class RoomDataResult(
     val isAdmin: Boolean,
     val totalGroupExpense: Double,
     val ledgers: List<MemberLedger>,
-    val pastCycles: List<PastCycle>,
     val currentUserId: String
 )
 
@@ -173,24 +170,12 @@ suspend fun fetchContriRoomData(
             }
         }
 
-        val cyclesList = mutableListOf<PastCycle>()
-        val cycleDocs = contriDoc.reference.collection("Past_Cycles").get().await()
-        for (c in cycleDocs) {
-            cyclesList.add(
-                PastCycle(
-                    dateRange = c.getString("date_range") ?: "",
-                    totalAmount = c.getString("total_amount") ?: "₹0"
-                )
-            )
-        }
-
         RoomDataResult(
             roomName = roomName,
             roomPin = roomPin,
             isAdmin = isAdmin,
             totalGroupExpense = totalGroupExpense,
             ledgers = sortedLedgers,
-            pastCycles = cyclesList,
             currentUserId = currentUserId
         )
     } catch (e: Exception) {
@@ -769,22 +754,6 @@ fun RemoveMemberDialog(memberName: String, onDismiss: () -> Unit, onConfirm: () 
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold) }
-        }
-    )
-}
-
-@Composable
-fun NewCycleDialog(onDismiss: () -> Unit, onConfirm: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Start New Cycle?", fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onSurface) },
-        text = { Text("Once created, calculations will restart from zero.", color = MaterialTheme.colorScheme.onSurfaceVariant) },
-        containerColor = MaterialTheme.colorScheme.surface,
-        confirmButton = {
-            TextButton(onClick = onConfirm) { Text("New", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold) }
-        },
-        dismissButton = { 
-            TextButton(onClick = onDismiss) { Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold) } 
         }
     )
 }
