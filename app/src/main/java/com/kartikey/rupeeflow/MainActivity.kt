@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import com.google.firebase.FirebaseApp
+import com.kartikey.rupeeflow.UI_Screens.CacheManager
 import com.kartikey.rupeeflow.UI_Screens.MainScreen
 import com.kartikey.rupeeflow.UI_Screens.LoginScreen
 import com.kartikey.rupeeflow.UI_Screens.Profile.cleanOldUpdateApks
@@ -126,7 +127,7 @@ class MainActivity : FragmentActivity() {
                                 Spacer(modifier = Modifier.height(24.dp))
                                 Button(
                                     onClick = { triggerBiometricAuth() },
-                                    modifier = Modifier.bounceClick(),
+                                    modifier = Modifier.bounceClick(scaleDown = 0.94f),
                                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                                     shape = RoundedCornerShape(12.dp)
                                 ) {
@@ -147,6 +148,7 @@ class MainActivity : FragmentActivity() {
                                     themeMode = newMode
                                 },
                                 onLogout = {
+                                    CacheManager.stopAllSnapshots()
                                     sharedPreferences.edit().clear().apply()
                                     isLoggedIn = false
                                     currentUser = ""
