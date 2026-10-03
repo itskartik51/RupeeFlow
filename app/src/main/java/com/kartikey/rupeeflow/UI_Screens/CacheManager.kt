@@ -72,6 +72,8 @@ object CacheManager {
 
     private var bankSnapshotRegistration: ListenerRegistration? = null
     private var expensesSnapshotRegistration: ListenerRegistration? = null
+    private var ccfdSnapshotRegistration: ListenerRegistration? = null
+    private var userDocSnapshotRegistration: ListenerRegistration? = null
 
     private fun evaluateDatePeriods(dateStr: String, targetDay: Int, targetMonth: Int, targetYear: Int): Triple<Boolean, Boolean, Boolean> {
         val cleanDate = dateStr.trim().split(" ")[0]
@@ -523,9 +525,283 @@ object CacheManager {
         expensesSnapshotRegistration = null
     }
 
+    // ========================================================
+    // ⚡ REAL-TIME SNAPSHOT LISTENER: FINANCES / CC FD ⚡
+    // ========================================================
+    fun startCCFDSnapshot(context: Context, username: String) {
+        if (ccfdSnapshotRegistration != null) return
+
+        val db = FirebaseFirestore.getInstance()
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
+                if (!userQuery.isEmpty) {
+                    val userRef = userQuery.documents[0].reference
+                    val ccFdDocRef = userRef.collection("Finances").document("CC FD")
+
+                    ccfdSnapshotRegistration = ccFdDocRef.addSnapshotListener { snapshot, error ->
+                        if (error != null || snapshot == null || !snapshot.exists()) return@addSnapshotListener
+
+                        val currentData = _appDataState.value ?: getCachedData(context, username) ?: return@addSnapshotListener
+                        val dataMap = snapshot.data ?: return@addSnapshotListener
+
+                        val newCCList = mutableListOf<CreditCardItem>()
+                        val newFDList = mutableListOf<FDItem>()
+                        val todayMillis = System.currentTimeMillis()
+
+                        val ccMap = dataMap["CC"] as? Map<*, *>
+                        ccMap?.forEach { (key, rawCc) ->
+                            if (rawCc is Map<*, *>) {
+                                val issuer = rawCc["issuer"]?.toString() ?: ""
+                                val cardNo = rawCc["card no."]?.toString() ?: ""
+                                val type = rawCc["type"]?.toString() ?: ""
+                                val limit = (rawCc["limit"] as? Number)?.toDouble() ?: 0.0
+                                val outstanding = (rawCc["outstanding"] as? Number)?.toDouble() ?: 0.0
+
+                                val avail = limit - outstanding
+                                val util = if (limit > 0) (outstanding / limit) * 100.0 else 0.0
+                                val cibilStatus = if (util <= 30.0) "Safe" else "High Risk"
+
+                                newCCList.add(
+                                    CreditCardItem(
+                                        firebaseKey = key.toString(),
+                                        issuer = issuer,
+                                        cardNo = cardNo,
+                                        type = type,
+                                        limit = limit,
+                                        outstanding = outstanding,
+                                        available = avail,
+                                        utilization = util,
+                                        cibilStatus = cibilStatus,
+                                        billingDay = (rawCc["billing"] as? Number)?.toInt() ?: 0,
+                                        dueDay = (rawCc["due"] as? Number)?.toInt() ?: 0,
+                                        reminderDay = (rawCc["rmndr"] as? Number)?.toInt() ?: 0,
+                                        annualFee = (rawCc["yr fee"] as? Number)?.toDouble() ?: 0.0,
+                                        joiningFee = (rawCc["join fee"] as? Number)?.toDouble() ?: 0.0,
+                                        lastUsed = (rawCc["last use"] as? Timestamp)?.let {
+                                            SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(it.toDate())
+                                        } ?: ""
+                                    )
+                                )
+                            }
+                        }
+
+                        val fdMap = dataMap["FD"] as? Map<*, *>
+                        fdMap?.forEach { (key, rawFd) ->
+                            if (rawFd is Map<*, *>) {
+                                val bank = rawFd["bank"]?.toString() ?: ""
+                                val accNo = rawFd["fd ac"]?.toString() ?: ""
+                                val amnt = (rawFd["amnt"] as? Number)?.toDouble() ?: 0.0
+                                val rate = (rawFd["int % yr"] as? Number)?.toDouble() ?: 0.0
+
+                                val createTs = rawFd["create"] as? Timestamp
+                                val maturTs = rawFd["matur"] as? Timestamp
+
+                                val createStr = createTs?.let { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(it.toDate()) } ?: ""
+                                val maturStr = maturTs?.let { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(it.toDate()) } ?: ""
+
+                                var daysToMat = 0
+                                var matVal = amnt
+                                var accVal = amnt
+                                var accInt = 0.0
+                                var oneDayInt = 0.0
+
+                                if (createTs != null && maturTs != null) {
+                                    val createMillis = createTs.toDate().time
+                                    val maturMillis = maturTs.toDate().time
+
+                                    val totalDays = maxOf(0L, (maturMillis - createMillis) / (1000 * 60 * 60 * 24))
+                                    daysToMat = maxOf(0L, (maturMillis - todayMillis) / (1000 * 60 * 60 * 24)).toInt()
+                                    val daysPassed = maxOf(0L, (minOf(todayMillis, maturMillis) - createMillis) / (1000 * 60 * 60 * 24))
+
+                                    matVal = amnt * Math.pow(1 + (rate / 100.0), totalDays / 365.0)
+                                    accVal = amnt * Math.pow(1 + (rate / 100.0), daysPassed / 365.0)
+                                    accInt = accVal - amnt
+
+                                    oneDayInt = if (todayMillis >= maturMillis || todayMillis < createMillis) 0.0 else (accVal * (rate / 100.0)) / 365.0
+                                }
+
+                                newFDList.add(
+                                    FDItem(
+                                        firebaseKey = key.toString(),
+                                        bankName = bank,
+                                        accountNo = accNo,
+                                        createDate = createStr,
+                                        maturityDate = maturStr,
+                                        daysToMaturity = daysToMat,
+                                        investedAmt = amnt,
+                                        interestRate = rate,
+                                        maturityValue = matVal,
+                                        accruedValue = accVal,
+                                        accruedInt = accInt,
+                                        oneDayInt = oneDayInt
+                                    )
+                                )
+                            }
+                        }
+
+                        val updatedData = currentData.copy(ccList = newCCList, fdList = newFDList)
+                        updateOptimisticCache(context, username, updatedData)
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    fun stopCCFDSnapshot() {
+        ccfdSnapshotRegistration?.remove()
+        ccfdSnapshotRegistration = null
+    }
+
+    // =========================================================================
+    // ⚡ REAL-TIME SNAPSHOT LISTENER: USER DOCUMENT (PROFILE & INVESTMENTS) ⚡
+    // =========================================================================
+    fun startUserDocSnapshot(context: Context, username: String) {
+        if (userDocSnapshotRegistration != null) return
+
+        val db = FirebaseFirestore.getInstance()
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
+                if (!userQuery.isEmpty) {
+                    val userRef = userQuery.documents[0].reference
+
+                    userDocSnapshotRegistration = userRef.addSnapshotListener { snapshot, error ->
+                        if (error != null || snapshot == null || !snapshot.exists()) return@addSnapshotListener
+
+                        val currentData = _appDataState.value ?: getCachedData(context, username) ?: return@addSnapshotListener
+
+                        val tempName = snapshot.getString("name") ?: currentData.userFullName
+                        val tempEmail = snapshot.getString("email") ?: currentData.userEmail
+                        val tempMobile = snapshot.getString("mobile_no_") ?: snapshot.getString("mobile") ?: currentData.userMobile
+                        val tempPrfl = snapshot.getString("prfl") ?: currentData.profilePicUrl
+                        val tempVerify = snapshot.getBoolean("verify") ?: currentData.isVerified
+
+                        val rawDob = snapshot.get("dob")
+                        val formattedDob = when (rawDob) {
+                            is Timestamp -> SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(rawDob.toDate())
+                            is String -> rawDob
+                            else -> currentData.userDob
+                        }
+
+                        val budgetLimit = snapshot.getDouble("budget_limit") ?: currentData.budgetLimit
+
+                        val ntworthMap = mutableMapOf<String, List<Double>>()
+                        val rawNtworth = snapshot.get("ntworth") as? Map<*, *> ?: emptyMap<Any, Any>()
+                        rawNtworth.forEach { (k, v) ->
+                            if (v is List<*>) {
+                                val arr = mutableListOf<Double>()
+                                v.forEach { num -> arr.add((num as? Number)?.toDouble() ?: 0.0) }
+                                ntworthMap[k.toString()] = arr
+                            }
+                        }
+
+                        val contriList = mutableListOf<ContriRoomModel>()
+                        val roomsArray = snapshot.get("rooms") as? List<*> ?: emptyList<Any>()
+                        for (roomItem in roomsArray) {
+                            val roomStr = roomItem.toString()
+                            val parts = roomStr.split("_")
+                            if (parts.size >= 3) {
+                                var rName = parts[2]
+                                val rCode = parts[1]
+                                val rPin = if (parts.size >= 4) parts[3] else "123456"
+
+                                if (rName.contains("_")) {
+                                    val suffix = rName.substringAfterLast("_")
+                                    if (suffix.length == 6 && suffix.all { it.isDigit() }) {
+                                        rName = rName.substringBeforeLast("_")
+                                    }
+                                }
+                                contriList.add(ContriRoomModel(rName, rCode, "", rPin))
+                            }
+                        }
+
+                        val investMap = snapshot.get("invest") as? Map<String, Any> ?: emptyMap()
+                        val existingQuotes = currentData.investmentList.associateBy({ it.assetName.uppercase() }, { it.currentPrice to it.oneDayChangePrice })
+                        val fetchedInvList = mutableListOf<InvestmentItem>()
+
+                        for ((_, value) in investMap) {
+                            val itemData = value as? Map<String, Any>
+                            if (itemData != null) {
+                                val dbName = itemData["name"]?.toString()?.trim()?.uppercase() ?: ""
+                                val buyPrice = (itemData["avg"] as? Number)?.toDouble() ?: 0.0
+                                val cachedPrices = existingQuotes[dbName]
+                                val currentPrice = cachedPrices?.first ?: buyPrice
+                                val oneDayChange = cachedPrices?.second ?: 0.0
+
+                                val parsedHistoryList = mutableListOf<InvestmentHistoryItem>()
+                                val historyMapRaw = itemData["history"] as? Map<String, Any>
+                                if (historyMapRaw != null) {
+                                    for ((_, hVal) in historyMapRaw) {
+                                        val hData = hVal as? Map<String, Any>
+                                        if (hData != null) {
+                                            val rawDt = hData["dt"]
+                                            val dtStr = when (rawDt) {
+                                                is Timestamp -> SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(rawDt.toDate())
+                                                is String -> rawDt
+                                                else -> ""
+                                            }
+                                            parsedHistoryList.add(
+                                                InvestmentHistoryItem(
+                                                    date = dtStr,
+                                                    quantity = (hData["qnt"] as? Number)?.toDouble() ?: 0.0,
+                                                    price = (hData["prc"] as? Number)?.toDouble() ?: 0.0,
+                                                    amount = (hData["amnt"] as? Number)?.toDouble() ?: 0.0,
+                                                    brokerage = (hData["brkrg"] as? Number)?.toDouble() ?: 0.0
+                                                )
+                                            )
+                                        }
+                                    }
+                                }
+
+                                fetchedInvList.add(
+                                    InvestmentItem(
+                                        assetName = dbName,
+                                        assetType = itemData["type"]?.toString() ?: "Stock",
+                                        quantity = (itemData["qnt"] as? Number)?.toDouble() ?: 0.0,
+                                        avgBuyPrice = buyPrice,
+                                        currentPrice = currentPrice,
+                                        oneDayChangePrice = oneDayChange,
+                                        history = parsedHistoryList
+                                    )
+                                )
+                            }
+                        }
+
+                        val updatedData = currentData.copy(
+                            userFullName = tempName,
+                            userEmail = tempEmail,
+                            userMobile = tempMobile,
+                            profilePicUrl = tempPrfl,
+                            userDob = formattedDob,
+                            isVerified = tempVerify,
+                            budgetLimit = budgetLimit,
+                            networthHistory = if (ntworthMap.isNotEmpty()) ntworthMap else currentData.networthHistory,
+                            contriRoomsList = if (contriList.isNotEmpty()) contriList else currentData.contriRoomsList,
+                            investmentList = fetchedInvList
+                        )
+
+                        updateOptimisticCache(context, username, updatedData)
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    fun stopUserDocSnapshot() {
+        userDocSnapshotRegistration?.remove()
+        userDocSnapshotRegistration = null
+    }
+
     fun stopAllSnapshots() {
         stopBankSnapshot()
         stopExpensesSnapshot()
+        stopCCFDSnapshot()
+        stopUserDocSnapshot()
     }
 
     fun quickUpdateCCOutstanding(context: Context, username: String, cardNo: String, amountDiff: Double) {
@@ -1286,6 +1562,8 @@ object CacheManager {
 
                 startBankSnapshot(context, username)
                 startExpensesSnapshot(context, username)
+                startCCFDSnapshot(context, username)
+                startUserDocSnapshot(context, username)
 
                 return@withContext finalParsed
 
@@ -1426,6 +1704,7 @@ object CacheManager {
                 val item = fdArray.getJSONObject(i)
                 fetchedFDList.add(
                     FDItem(
+                        firebaseKey = item.optString("firebase_key", ""),
                         bankName = item.optString("bank_name", ""), 
                         accountNo = item.optString("account_no", ""), 
                         createDate = item.optString("create_date", ""), 
