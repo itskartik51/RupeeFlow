@@ -21,6 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import com.kartikey.rupeeflow.Cloud_Database.Constants
@@ -30,22 +31,20 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
-import kotlinx.coroutines.withContext 
-import java.text.SimpleDateFormat
+import kotlinx.coroutines.withContext
 import java.util.Calendar
 import java.util.Date
-import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -> Unit) { 
+fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -> Unit) {
     val financeTypes = listOf("Cash", "Bank Account", "FD : Fixed Deposit", "Credit Card")
-    
+
     var selectedType by remember { mutableStateOf("") }
     var expandedType by remember { mutableStateOf(false) }
 
-    val dynamicBankList = remember { 
-        (Constants.IndianBanksList + "Utkarsh Small Finance Bank").distinct().sorted() 
+    val dynamicBankList = remember {
+        (Constants.IndianBanksList + "Utkarsh Small Finance Bank").distinct().sorted()
     }
 
     var bankName by remember { mutableStateOf("") }
@@ -53,13 +52,13 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
     var bankAccountNo by remember { mutableStateOf("") }
     var currentBalance by remember { mutableStateOf("") }
     var bankInterestRate by remember { mutableStateOf("") }
-    
+
     var fdAccountNo by remember { mutableStateOf("") }
     var fdAmount by remember { mutableStateOf("") }
     var fdInterestRate by remember { mutableStateOf("") }
     var createDateMillis by remember { mutableStateOf<Long?>(null) }
     var maturityDateMillis by remember { mutableStateOf<Long?>(null) }
-    
+
     var cashAmount by remember { mutableStateOf("") }
 
     var ccIssuer by remember { mutableStateOf("") }
@@ -67,17 +66,17 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
     var ccCardNo by remember { mutableStateOf("") }
     var ccAnnualFee by remember { mutableStateOf("") }
     var ccJoiningFee by remember { mutableStateOf("") }
-    
+
     var ccSecurity by remember { mutableStateOf("") }
     var expandedSecurity by remember { mutableStateOf(false) }
     val securityOptions = listOf("Secured", "Unsecured")
-    
+
     var ccNetwork by remember { mutableStateOf("") }
     var expandedNetwork by remember { mutableStateOf(false) }
     val networkOptions = listOf("RuPay", "Visa", "Mastercard")
-    
+
     var ccLimit by remember { mutableStateOf("") }
-    
+
     val daysList = (1..31).map { it.toString() }
     var ccBillingDay by remember { mutableStateOf("") }
     var expandedBilling by remember { mutableStateOf(false) }
@@ -93,18 +92,16 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
     val filteredCCIssuers = if (ccIssuer.isNotBlank()) {
         dynamicBankList.filter { it.contains(ccIssuer, ignoreCase = true) && !it.equals(ccIssuer, ignoreCase = true) }
     } else emptyList()
-    
+
     val context = LocalContext.current
 
     val submitBankAccount = {
         val bal = currentBalance.toDoubleOrNull() ?: 0.0
         val rateYr = bankInterestRate.toDoubleOrNull() ?: 0.0
-        
+
         if (bankName.isBlank() || bankAccountNo.length != 3 || bal <= 0) {
             Toast.makeText(context, "Fill details correctly (Acc No. must be 3 digits)", Toast.LENGTH_SHORT).show()
         } else {
-            // Strict Validation removed here. User can add ANY bank name.
-            val formattedAcc = "XXXXX$bankAccountNo"
             onFinanceAdded()
             onDismiss()
 
@@ -114,108 +111,88 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                     val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
                     if (!userQuery.isEmpty) {
                         val userRef = userQuery.documents[0].reference
-                        
-                        val rateQtr = rateYr / 4.0
-                        val oneDayInt = (bal * (rateYr / 100.0)) / 365.0
-                        
-                        val expQtrInt = bal * (rateQtr / 100.0)
-                        val expYrInt = bal * (rateYr / 100.0)
-                        
+
                         val cal = Calendar.getInstance()
-                        val todayReset = Calendar.getInstance().apply { set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }
-
-                        val startOfQtr = Calendar.getInstance().apply { set(Calendar.MONTH, (cal.get(Calendar.MONTH) / 3) * 3); set(Calendar.DAY_OF_MONTH, 1); set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }
-                        val diffQtr = todayReset.timeInMillis - startOfQtr.timeInMillis
-                        val daysPassedQtr = (diffQtr / (1000 * 60 * 60 * 24)).toInt() + 1
-                        val accruedQtr = expQtrInt * (daysPassedQtr / 90.0)
-
-                        val startOfYear = Calendar.getInstance().apply { set(Calendar.MONTH, Calendar.JANUARY); set(Calendar.DAY_OF_MONTH, 1); set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }
-                        val diffYr = todayReset.timeInMillis - startOfYear.timeInMillis
-                        val daysPassedYr = (diffYr / (1000 * 60 * 60 * 24)).toInt() + 1
-                        val accruedYr = expYrInt * (daysPassedYr / 365.0)
-
                         val day = cal.get(Calendar.DAY_OF_MONTH)
-                        val month = cal.get(Calendar.MONTH) 
-                        val qtr = (month / 3) + 1
+                        val month = cal.get(Calendar.MONTH) // 0..11
 
-                        val dayKey = if (day == 31) "31" else {
-                            when (day % 6) {
-                                1 -> "01, 07, 13, 19, 25"
-                                2 -> "02, 08, 14, 20, 26"
-                                3 -> "03, 09, 15, 21, 27"
-                                4 -> "04, 10, 16, 22, 28"
-                                5 -> "05, 11, 17, 23, 29"
-                                else -> "06, 12, 18, 24, 30"
-                            }
+                        val blockIndex = when {
+                            day <= 6 -> 0
+                            day <= 12 -> 1
+                            day <= 18 -> 2
+                            day <= 24 -> 3
+                            else -> 4
                         }
-                        
-                        val avg6dKey = when {
-                            day <= 6 -> "01-06"
-                            day <= 12 -> "07-12"
-                            day <= 18 -> "13-18"
-                            day <= 24 -> "19-24"
-                            else -> "25-31"
+                        val dayIndexInBlock = when {
+                            day <= 6 -> day - 1
+                            day <= 12 -> day - 7
+                            day <= 18 -> day - 13
+                            day <= 24 -> day - 19
+                            else -> day - 25
                         }
+                        val monthInQtr = month % 3
+                        val qtrIndex = month / 3
 
-                        val monthKey = when (month) {
-                            0, 3, 6, 9 -> "jan, april, july, oct"
-                            1, 4, 7, 10 -> "feb, may, aug, nov"
-                            else -> "march, june, sep, dec"
+                        // 6D Bal array (6 entries, or 7 if created on 31st)
+                        val targetBalSize = if (day == 31) 7 else 6
+                        val list6dBal = MutableList(targetBalSize) { 0.0 }
+                        if (dayIndexInBlock < list6dBal.size) {
+                            list6dBal[dayIndexInBlock] = bal
                         }
 
-                        val avg6D = hashMapOf(avg6dKey to bal)
-                        val balBlock6D = hashMapOf(dayKey to bal)
-                        val monthlyAvg = hashMapOf(monthKey to bal)
-                        val qtrAvg = hashMapOf("q$qtr" to bal)
-                        val yrAvg = hashMapOf("cur" to bal)
+                        // 6D Avg array (5 slots for month)
+                        val list6dAvg = MutableList(5) { 0.0 }
+                        list6dAvg[blockIndex] = bal
 
-                        val bankMap = hashMapOf<String, Any>(
-                            "1d int" to oneDayInt,
-                            "6D avg." to avg6D,
-                            "6D bal. Block" to balBlock6D,
-                            "account no." to formattedAcc,
-                            "accrued qtr" to accruedQtr,
-                            "accrued yr" to accruedYr,
-                            "bank" to bankName,
-                            "current bal." to bal,
-                            "exp qtr int" to expQtrInt,
-                            "exp yr int" to expYrInt,
-                            "intrest % (qtr)" to rateQtr,
-                            "intrest % (yr)" to rateYr,
-                            "monthly avg." to monthlyAvg,
-                            "qtr. avg." to qtrAvg,
+                        // Month Avg array (3 slots for quarter)
+                        val listMonthAvg = MutableList(3) { 0.0 }
+                        listMonthAvg[monthInQtr] = bal
+
+                        // Qtr Avg array (4 slots for year)
+                        val listQtrAvg = MutableList(4) { 0.0 }
+                        listQtrAvg[qtrIndex] = bal
+
+                        val yrAvg = bal
+
+                        val pbook = hashMapOf<String, Any>(
+                            "6d bal" to list6dBal,
+                            "6d avg" to list6dAvg,
+                            "month avg" to listMonthAvg,
+                            "qtr avg" to listQtrAvg,
                             "yr avg" to yrAvg
                         )
-                        
+
+                        val bankMap = hashMapOf<String, Any>(
+                            "bank" to bankName,
+                            "ac" to bankAccountNo,
+                            "bal" to bal,
+                            "int %" to rateYr,
+                            "pbook" to pbook
+                        )
+
                         val bankDocRef = userRef.collection("Finances").document("Bank")
                         val bankDoc = bankDocRef.get().await()
-                        
+
                         var nextId = 1
-                        var needsLastUpdated = true
-                        
                         if (bankDoc.exists()) {
                             val data = bankDoc.data ?: emptyMap()
-                            if (data.containsKey("last_updated")) {
-                                needsLastUpdated = false
-                            }
                             val existingIds = data.keys.mapNotNull { it.toIntOrNull() }
                             if (existingIds.isNotEmpty()) {
                                 nextId = existingIds.maxOrNull()!! + 1
                             }
                         }
-                        
+
                         val updateData = hashMapOf<String, Any>(
-                            nextId.toString() to bankMap
+                            nextId.toString() to bankMap,
+                            "last_updated" to Timestamp.now()
                         )
-                        
-                        if (needsLastUpdated) {
-                            updateData["last_updated"] = com.google.firebase.Timestamp.now()
-                        }
-                        
+
                         bankDocRef.set(updateData, SetOptions.merge()).await()
                     }
                 } catch (e: Exception) {
-                    withContext(Dispatchers.Main) { Toast.makeText(context, "Network Error", Toast.LENGTH_SHORT).show() }
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(context, "Network Error", Toast.LENGTH_SHORT).show()
+                    }
                 }
             }
         }
@@ -224,11 +201,10 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
     val submitFixedDeposit = {
         val invAmt = fdAmount.toDoubleOrNull() ?: 0.0
         val rate = fdInterestRate.toDoubleOrNull() ?: 0.0
-        
+
         if (bankName.isBlank() || fdAccountNo.isBlank() || invAmt <= 0 || createDateMillis == null || maturityDateMillis == null) {
             Toast.makeText(context, "Check details and select both dates.", Toast.LENGTH_LONG).show()
         } else {
-            // Strict Validation removed here too.
             onFinanceAdded()
             onDismiss()
 
@@ -238,16 +214,16 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                     val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
                     if (!userQuery.isEmpty) {
                         val userRef = userQuery.documents[0].reference
-                        
+
                         val fdMap = hashMapOf<String, Any>(
                             "bank" to bankName,
                             "fd ac" to fdAccountNo,
                             "amnt" to invAmt,
                             "int % yr" to rate,
-                            "create" to com.google.firebase.Timestamp(Date(createDateMillis!!)),
-                            "matur" to com.google.firebase.Timestamp(Date(maturityDateMillis!!))
+                            "create" to Timestamp(Date(createDateMillis!!)),
+                            "matur" to Timestamp(Date(maturityDateMillis!!))
                         )
-                        
+
                         userRef.collection("Finances").document("CC FD").set(mapOf("FD" to mapOf(fdAccountNo to fdMap)), SetOptions.merge()).await()
                     }
                 } catch (e: Exception) {}
@@ -271,17 +247,17 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                         val userRef = userQuery.documents[0].reference
                         val bankDocRef = userRef.collection("Finances").document("Bank")
                         val bankDoc = bankDocRef.get().await()
-                        
+
                         var existingCash = 0.0
                         if (bankDoc.exists()) {
                             val cashMap = bankDoc.get("cash") as? Map<*, *>
                             existingCash = (cashMap?.get("amnt") as? Number)?.toDouble() ?: 0.0
                         }
-                        
+
                         val updateMap = hashMapOf<String, Any>(
                             "cash" to hashMapOf(
                                 "amnt" to existingCash + cAmt,
-                                "last update" to com.google.firebase.Timestamp.now()
+                                "last update" to Timestamp.now()
                             )
                         )
                         bankDocRef.set(updateMap, SetOptions.merge()).await()
@@ -298,7 +274,7 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
         val remindD = ccReminderDay.toIntOrNull() ?: 0
         val annFee = ccAnnualFee.toDoubleOrNull() ?: 0.0
         val joinFee = ccJoiningFee.toDoubleOrNull() ?: 0.0
-        
+
         if (ccIssuer.isBlank() || ccCardNo.isBlank() || ccSecurity.isBlank() || ccNetwork.isBlank() || limitAmt <= 0 || billDay == 0 || dueD == 0) {
             Toast.makeText(context, "Please fill all required card details properly.", Toast.LENGTH_LONG).show()
         } else {
@@ -306,14 +282,14 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
             val formattedCardNo = "XXXXX$ccCardNo"
             onFinanceAdded()
             onDismiss()
-            
+
             CoroutineScope(Dispatchers.IO).launch {
                 try {
                     val db = FirebaseFirestore.getInstance()
                     val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
                     if (!userQuery.isEmpty) {
                         val userRef = userQuery.documents[0].reference
-                        
+
                         val ccMap = hashMapOf<String, Any>(
                             "issuer" to ccIssuer,
                             "card no." to formattedCardNo,
@@ -323,11 +299,11 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                             "billing" to billDay,
                             "due" to dueD,
                             "rmndr" to remindD,
-                            "last use" to com.google.firebase.Timestamp.now()
+                            "last use" to Timestamp.now()
                         )
                         if (annFee > 0.0) ccMap["yr fee"] = annFee
                         if (joinFee > 0.0) ccMap["join fee"] = joinFee
-                        
+
                         userRef.collection("Finances").document("CC FD").set(mapOf("CC" to mapOf(formattedCardNo to ccMap)), SetOptions.merge()).await()
                     }
                 } catch (e: Exception) {}
@@ -336,13 +312,13 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
     }
 
     Card(
-        modifier = Modifier.fillMaxWidth(), 
+        modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(0.dp),
         shape = RoundedCornerShape(16.dp)
     ) {
         Column(modifier = Modifier.padding(20.dp).verticalScroll(rememberScrollState())) {
-            
+
             Text(text = "Choose Finance Type", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(4.dp))
             ExposedDropdownMenuBox(expanded = expandedType, onExpandedChange = { expandedType = it }) {
@@ -350,9 +326,9 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                     value = if (selectedType.isEmpty()) "Select Finance Type" else selectedType,
                     onValueChange = { }, readOnly = true, modifier = Modifier.fillMaxWidth().menuAnchor(), shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.primary, 
-                        unfocusedBorderColor = if (selectedType.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), 
-                        focusedTextColor = MaterialTheme.colorScheme.onSurface, 
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = if (selectedType.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
                         unfocusedTextColor = MaterialTheme.colorScheme.onSurface
                     )
                 )
@@ -382,17 +358,17 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                         }
                     }
                     Spacer(modifier = Modifier.height(10.dp))
-                    
+
                     OutlinedTextField(
-                        value = bankAccountNo, 
+                        value = bankAccountNo,
                         onValueChange = { if (it.length <= 3 && it.all { char -> char.isDigit() }) bankAccountNo = it },
-                        label = { Text("Account No. (Last 3 Digits)") }, 
+                        label = { Text("Account No. (Last 3 Digits)") },
                         prefix = { Text("XXXXX", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, letterSpacing = 2.sp) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), 
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.fillMaxWidth(), singleLine = true, shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary, focusedLabelColor = MaterialTheme.colorScheme.primary, focusedTextColor = MaterialTheme.colorScheme.onSurface, unfocusedTextColor = MaterialTheme.colorScheme.onSurface)
                     )
-                    
+
                     Spacer(modifier = Modifier.height(10.dp))
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedTextField(
@@ -556,7 +532,7 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                         }
                         ExposedDropdownMenuBox(expanded = expandedReminder, onExpandedChange = { expandedReminder = it }, modifier = Modifier.weight(1f)) {
                             OutlinedTextField(
-                                value = ccReminderDay, onValueChange = {}, readOnly = true, label = { Text("Remind") }, 
+                                value = ccReminderDay, onValueChange = {}, readOnly = true, label = { Text("Remind") },
                                 modifier = Modifier.fillMaxWidth().menuAnchor(), singleLine = true, shape = RoundedCornerShape(12.dp),
                                 colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary, focusedLabelColor = MaterialTheme.colorScheme.primary, focusedTextColor = MaterialTheme.colorScheme.onSurface, unfocusedTextColor = MaterialTheme.colorScheme.onSurface)
                             )
@@ -578,15 +554,15 @@ fun AddFinanceForm(username: String, onFinanceAdded: () -> Unit, onDismiss: () -
                             "Credit Card" -> submitCreditCard()
                         }
                     },
-                    modifier = Modifier.fillMaxWidth().height(56.dp).bounceClick(),
+                    modifier = Modifier.fillMaxWidth().height(56.dp).bounceClick(scaleDown = 0.94f),
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                     shape = RoundedCornerShape(12.dp)
                 ) {
-                    val btnText = when (selectedType) { 
+                    val btnText = when (selectedType) {
                         "Bank Account" -> "Add to Vault"
                         "Cash" -> "Add Cash"
                         "Credit Card" -> "Add Card"
-                        else -> "Create FD" 
+                        else -> "Create FD"
                     }
                     Text(btnText, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onPrimary)
                 }
