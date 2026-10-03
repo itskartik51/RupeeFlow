@@ -610,6 +610,42 @@ object CacheManager {
         }
     }
 
+    // =========================================================================
+    // ⚡ SILENT MARKET QUOTES REFRESH (ZERO FIRESTORE READS) ⚡
+    // =========================================================================
+
+    suspend fun refreshInvestmentQuotes(context: Context, username: String): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                val currentData = _appDataState.value ?: getCachedData(context, username) ?: return@withContext false
+                if (currentData.investmentList.isEmpty()) return@withContext false
+
+                val symbols = currentData.investmentList.map { it.assetName.trim() }.filter { it.isNotEmpty() }
+                val liveQuotesMap = MarketEngine.fetchQuotes(symbols)
+
+                val updatedInvestments = currentData.investmentList.map { inv ->
+                    val sym = inv.assetName.uppercase()
+                    val liveQuote = liveQuotesMap[sym] ?: liveQuotesMap[sym.replace(".NS", "").replace(".BO", "")]
+                    if (liveQuote != null && liveQuote.currentPrice > 0.0) {
+                        inv.copy(
+                            currentPrice = liveQuote.currentPrice,
+                            oneDayChangePrice = liveQuote.oneDayChangePrice
+                        )
+                    } else {
+                        inv
+                    }
+                }
+
+                val updatedData = currentData.copy(investmentList = updatedInvestments)
+                updateOptimisticCache(context, username, updatedData)
+                true
+            } catch (e: Exception) {
+                e.printStackTrace()
+                false
+            }
+        }
+    }
+
     // ========================================================
     // ⚡ REAL-TIME SNAPSHOT LISTENERS ⚡
     // ========================================================
