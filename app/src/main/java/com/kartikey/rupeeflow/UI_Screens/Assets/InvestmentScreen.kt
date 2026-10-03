@@ -45,12 +45,30 @@ import com.kartikey.rupeeflow.UI_Screens.CacheManager
 import com.kartikey.rupeeflow.UI_Screens.CustomDatePicker
 import com.kartikey.rupeeflow.UI_Screens.RupeeFlowCard
 import com.kartikey.rupeeflow.UI_Screens.bounceClick
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import java.util.TimeZone
 import kotlin.math.roundToInt
+
+fun isIndianMarketOpen(): Boolean {
+    val tz = TimeZone.getTimeZone("Asia/Kolkata")
+    val cal = Calendar.getInstance(tz)
+    val dayOfWeek = cal.get(Calendar.DAY_OF_WEEK)
+    if (dayOfWeek == Calendar.SATURDAY || dayOfWeek == Calendar.SUNDAY) {
+        return false
+    }
+    val hour = cal.get(Calendar.HOUR_OF_DAY)
+    val minute = cal.get(Calendar.MINUTE)
+    val currentMinutes = hour * 60 + minute
+    val marketOpen = 9 * 60 + 15   // 09:15 AM
+    val marketClose = 15 * 60 + 30 // 03:30 PM
+    return currentMinutes in marketOpen..marketClose
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -62,10 +80,33 @@ fun InvestmentScreen(
     onRefreshClick: () -> Unit = {}
 ) { 
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     var isHidden by remember { mutableStateOf(false) }
+    var isRefreshingQuotes by remember { mutableStateOf(false) }
+
     var editingLotInfo by remember { mutableStateOf<Triple<InvestmentItem, Int, InvestmentHistoryItem>?>(null) }
     var deletingAssetTarget by remember { mutableStateOf<InvestmentItem?>(null) }
     var deletingLotTarget by remember { mutableStateOf<Pair<InvestmentItem, Int>?>(null) }
+
+    fun triggerQuoteRefresh() {
+        if (isRefreshingQuotes) return
+        coroutineScope.launch {
+            isRefreshingQuotes = true
+            CacheManager.refreshInvestmentQuotes(context, username)
+            isRefreshingQuotes = false
+        }
+    }
+
+    // Active Screen Lifecycle: 8-second polling strictly during market hours
+    LaunchedEffect(Unit) {
+        triggerQuoteRefresh()
+        while (true) {
+            delay(8000L)
+            if (isIndianMarketOpen()) {
+                triggerQuoteRefresh()
+            }
+        }
+    }
 
     val totalInvested = investmentList.sumOf { it.quantity * it.avgBuyPrice }
     val totalCurrent = investmentList.sumOf { it.quantity * it.currentPrice }
@@ -79,7 +120,7 @@ fun InvestmentScreen(
             TopAppBar(
                 title = { Text("My Investments", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
                 navigationIcon = {
-                    IconButton(onClick = onBackClick, modifier = Modifier.bounceClick()) { 
+                    IconButton(onClick = onBackClick, modifier = Modifier.bounceClick(scaleDown = 0.94f)) { 
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.onSurface) 
                     }
                 },
@@ -106,10 +147,10 @@ fun InvestmentScreen(
                     totalReturn = totalReturn,
                     totalReturnPercent = totalReturnPercent,
                     totalInvested = totalInvested,
-                    isLoading = isLoading, 
+                    isLoading = isLoading || isRefreshingQuotes, 
                     isHidden = isHidden,
                     onToggleVisibility = { isHidden = !isHidden },
-                    onRefreshClick = onRefreshClick
+                    onRefreshClick = { triggerQuoteRefresh() }
                 )
                 Spacer(modifier = Modifier.height(24.dp))
                 
@@ -148,13 +189,13 @@ fun InvestmentScreen(
                         }
                         deletingAssetTarget = null
                     },
-                    modifier = Modifier.bounceClick()
+                    modifier = Modifier.bounceClick(scaleDown = 0.94f)
                 ) {
                     Text("Delete", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { deletingAssetTarget = null }, modifier = Modifier.bounceClick()) {
+                TextButton(onClick = { deletingAssetTarget = null }, modifier = Modifier.bounceClick(scaleDown = 0.94f)) {
                     Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             },
@@ -177,13 +218,13 @@ fun InvestmentScreen(
                         }
                         deletingLotTarget = null
                     },
-                    modifier = Modifier.bounceClick()
+                    modifier = Modifier.bounceClick(scaleDown = 0.94f)
                 ) {
                     Text("Delete", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { deletingLotTarget = null }, modifier = Modifier.bounceClick()) {
+                TextButton(onClick = { deletingLotTarget = null }, modifier = Modifier.bounceClick(scaleDown = 0.94f)) {
                     Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             },
@@ -246,16 +287,14 @@ fun InvestmentSummaryCard(
                     letterSpacing = 1.sp
                 )
                 
-                // Circular Action Pods
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    // Eye Visibility Toggle
                     Box(
                         modifier = Modifier
                             .size(34.dp)
                             .clip(CircleShape)
                             .background(MaterialTheme.colorScheme.outlineVariant) 
                             .clickable { onToggleVisibility() }
-                            .bounceClick(),
+                            .bounceClick(scaleDown = 0.94f),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
@@ -266,14 +305,13 @@ fun InvestmentSummaryCard(
                         )
                     }
 
-                    // Refresh Button with Spin Animation
                     Box(
                         modifier = Modifier
                             .size(34.dp)
                             .clip(CircleShape)
                             .background(MaterialTheme.colorScheme.outlineVariant)
                             .clickable { onRefreshClick() }
-                            .bounceClick(),
+                            .bounceClick(scaleDown = 0.94f),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
@@ -286,14 +324,13 @@ fun InvestmentSummaryCard(
                         )
                     }
 
-                    // 3-Dots More Options
                     Box(
                         modifier = Modifier
                             .size(34.dp)
                             .clip(CircleShape)
                             .background(MaterialTheme.colorScheme.outlineVariant)
                             .clickable { }
-                            .bounceClick(),
+                            .bounceClick(scaleDown = 0.94f),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
@@ -399,13 +436,11 @@ fun InvestmentListItem(
     val oneDayPriceDisplay = if (isHidden) "•••••" else "$oneDaySign${String.format(Locale.US, "%.2f", item.oneDayChangePrice)}"
 
     Column(modifier = Modifier.fillMaxWidth()) {
-        // Main Stock Row (Banner) with Swipe-to-Delete Action Reveal
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(8.dp))
         ) {
-            // Background Action (Delete Bin)
             Box(
                 modifier = Modifier
                     .matchParentSize()
@@ -419,7 +454,7 @@ fun InvestmentListItem(
                     },
                     modifier = Modifier
                         .padding(end = 12.dp)
-                        .bounceClick()
+                        .bounceClick(scaleDown = 0.94f)
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.Delete,
@@ -429,7 +464,6 @@ fun InvestmentListItem(
                 }
             }
 
-            // Foreground Main Stock Banner Row
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -489,7 +523,6 @@ fun InvestmentListItem(
             }
         }
 
-        // Expandable Sub-Banner (Purchase History) with RupeeFlowCard Master Frame
         AnimatedVisibility(
             visible = expanded,
             enter = expandVertically() + fadeIn(),
@@ -505,7 +538,6 @@ fun InvestmentListItem(
                         .fillMaxWidth()
                         .padding(horizontal = 12.dp, vertical = 10.dp)
                 ) {
-                    // Sub-Table Headers
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
                         Text(
                             text = "Date",
@@ -544,7 +576,6 @@ fun InvestmentListItem(
                     HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), thickness = 0.8.dp)
                     Spacer(modifier = Modifier.height(6.dp))
 
-                    // History Rows with Swipe Actions
                     item.history.forEachIndexed { lotIdx, historyEntry ->
                         SubBannerHistoryRow(
                             lotIdx = lotIdx,
@@ -595,7 +626,6 @@ fun SubBannerHistoryRow(
             .clip(RoundedCornerShape(6.dp))
             .padding(vertical = 3.dp)
     ) {
-        // Actions Background (Edit + Delete)
         Row(
             modifier = Modifier
                 .matchParentSize()
@@ -610,7 +640,7 @@ fun SubBannerHistoryRow(
                 },
                 modifier = Modifier
                     .size(38.dp)
-                    .bounceClick()
+                    .bounceClick(scaleDown = 0.94f)
             ) {
                 Icon(
                     imageVector = Icons.Outlined.Edit,
@@ -626,7 +656,7 @@ fun SubBannerHistoryRow(
                 },
                 modifier = Modifier
                     .size(38.dp)
-                    .bounceClick()
+                    .bounceClick(scaleDown = 0.94f)
             ) {
                 Icon(
                     imageVector = Icons.Outlined.Delete,
@@ -637,7 +667,6 @@ fun SubBannerHistoryRow(
             }
         }
 
-        // Foreground Lot Row
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -669,7 +698,6 @@ fun SubBannerHistoryRow(
                 .padding(vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Date Column
             Column(modifier = Modifier.weight(0.7f)) {
                 Text(
                     text = dateLine1,
@@ -688,7 +716,6 @@ fun SubBannerHistoryRow(
                 }
             }
 
-            // Price (Qty) & (Invested)
             Column(modifier = Modifier.weight(1.35f), horizontalAlignment = Alignment.End) {
                 Text(
                     text = "${formatRupee(historyEntry.price)} ($trancheQtyDisplay)",
@@ -705,7 +732,6 @@ fun SubBannerHistoryRow(
                 )
             }
 
-            // Brkg Column
             Column(modifier = Modifier.weight(0.65f), horizontalAlignment = Alignment.End) {
                 Text(
                     text = if (historyEntry.brokerage > 0) formatRupee(historyEntry.brokerage) else "₹0",
@@ -715,7 +741,6 @@ fun SubBannerHistoryRow(
                 )
             }
 
-            // P/L (%) & (Current)
             Column(modifier = Modifier.weight(1.6f), horizontalAlignment = Alignment.End) {
                 Text(
                     text = "$tranchePLDisplay ($plSign${String.format(Locale.US, "%.2f", tranchePct)}%)",
@@ -760,7 +785,6 @@ fun EditHistoryLotDialog(
                     .padding(20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Row 1: Quantity & Buy Price
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -791,7 +815,6 @@ fun EditHistoryLotDialog(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Row 2: Date (60%) & Brokerage (40%)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -824,7 +847,6 @@ fun EditHistoryLotDialog(
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // Save Investment Button
                 Button(
                     onClick = {
                         val parsedQty = qtyText.toDoubleOrNull() ?: initialLot.quantity
@@ -842,7 +864,7 @@ fun EditHistoryLotDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(50.dp)
-                        .bounceClick(),
+                        .bounceClick(scaleDown = 0.94f),
                     shape = RoundedCornerShape(14.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Color(0xFF22C55E),
