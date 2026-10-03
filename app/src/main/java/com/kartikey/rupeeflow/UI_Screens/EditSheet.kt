@@ -60,21 +60,172 @@ suspend fun updateBudgetUsage(userRef: DocumentReference, diff: Double) {
         val limitVal = userDoc.getDouble("budget_limit") ?: 0.0
         val usedStr = budgetDoc.getString("used") ?: "0"
         val currentUsed = usedStr.substringBefore(" ").toDoubleOrNull() ?: 0.0
-        
+
         val newUsed = (currentUsed + diff).coerceAtLeast(0.0)
         val usedPct = if (limitVal > 0) (newUsed / limitVal) * 100 else 0.0
         val availAmtCalc = maxOf(0.0, limitVal - newUsed)
         val availPctStr = if (limitVal > 0) (availAmtCalc / limitVal) * 100 else 0.0
-        
+
         val formatVal = { amt: Double, pct: Double ->
             "${amt.toInt()} (${String.format(Locale.US, "%.1f", pct)}%)"
         }
-        
+
         budgetDocRef.set(hashMapOf(
             "used" to formatVal(newUsed, usedPct),
             "available" to formatVal(availAmtCalc, availPctStr)
         ), SetOptions.merge()).await()
     }
+}
+
+private suspend fun applyBankAdjustmentAndPbook(
+    userRef: DocumentReference,
+    targetBankKey: String,
+    newCalculatedBalance: Double
+) {
+    val bankDocRef = userRef.collection("Finances").document("Bank")
+    val bankDoc = bankDocRef.get().await()
+    if (!bankDoc.exists()) return
+
+    val bankDataMap = bankDoc.get(targetBankKey) as? Map<*, *> ?: return
+    val existingPbook = (bankDataMap["pbook"] as? Map<*, *>) ?: emptyMap<String, Any>()
+    val lastUpdatedTs = bankDoc.get("last_updated") as? Timestamp
+
+    val cal = Calendar.getInstance()
+    val day = cal.get(Calendar.DAY_OF_MONTH)
+    val month = cal.get(Calendar.MONTH)
+    val currentYear = cal.get(Calendar.YEAR)
+
+    val blockIndex = when {
+        day <= 6 -> 0
+        day <= 12 -> 1
+        day <= 18 -> 2
+        day <= 24 -> 3
+        else -> 4
+    }
+    val dayIndexInBlock = when {
+        day <= 6 -> day - 1
+        day <= 12 -> day - 7
+        day <= 18 -> day - 13
+        day <= 24 -> day - 19
+        else -> day - 25
+    }
+    val monthInQtr = month % 3
+    val qtrIndex = month / 3
+
+    var isNewMonth = false
+    var isNewQtr = false
+    var isNewYear = false
+    var isNewBlock = false
+
+    if (lastUpdatedTs != null) {
+        val calLast = Calendar.getInstance().apply { time = lastUpdatedTs.toDate() }
+        val lastYear = calLast.get(Calendar.YEAR)
+        val lastMonth = calLast.get(Calendar.MONTH)
+        val lastDay = calLast.get(Calendar.DAY_OF_MONTH)
+        val lastBlock = when {
+            lastDay <= 6 -> 0
+            lastDay <= 12 -> 1
+            lastDay <= 18 -> 2
+            lastDay <= 24 -> 3
+            else -> 4
+        }
+
+        if (currentYear != lastYear) {
+            isNewYear = true
+            isNewQtr = true
+            isNewMonth = true
+            isNewBlock = true
+        } else if (qtrIndex != (lastMonth / 3)) {
+            isNewQtr = true
+            isNewMonth = true
+            isNewBlock = true
+        } else if (month != lastMonth) {
+            isNewMonth = true
+            isNewBlock = true
+        } else if (blockIndex != lastBlock) {
+            isNewBlock = true
+        }
+    }
+
+    val raw6dBal = (existingPbook["6d bal"] as? List<*>)?.mapNotNull { (it as? Number)?.toDouble() } ?: emptyList()
+    val raw6dAvg = (existingPbook["6d avg"] as? List<*>)?.mapNotNull { (it as? Number)?.toDouble() } ?: emptyList()
+    val rawMonthAvg = (existingPbook["month avg"] as? List<*>)?.mapNotNull { (it as? Number)?.toDouble() } ?: emptyList()
+    val rawQtrAvg = (existingPbook["qtr avg"] as? List<*>)?.mapNotNull { (it as? Number)?.toDouble() } ?: emptyList()
+    var yrAvgVal = (existingPbook["yr avg"] as? Number)?.toDouble() ?: 0.0
+
+    val targetBalSize = if (day == 31) 7 else 6
+    val list6dBal = if (isNewBlock || raw6dBal.isEmpty()) {
+        MutableList(targetBalSize) { 0.0 }
+    } else {
+        val m = raw6dBal.toMutableList()
+        while (m.size < targetBalSize) m.add(0.0)
+        m
+    }
+    if (dayIndexInBlock < list6dBal.size) {
+        list6dBal[dayIndexInBlock] = newCalculatedBalance
+    }
+
+    val list6dAvg = if (isNewMonth || raw6dAvg.isEmpty()) {
+        MutableList(5) { 0.0 }
+    } else {
+        val m = raw6dAvg.toMutableList()
+        while (m.size < 5) m.add(0.0)
+        m
+    }
+    val activeDaysInBlock = list6dBal.subList(0, minOf(dayIndexInBlock + 1, list6dBal.size))
+        .filterIndexed { idx, v -> idx == dayIndexInBlock || v > 0.0 }
+    val blockAvg = if (activeDaysInBlock.isNotEmpty()) {
+        activeDaysInBlock.sum() / activeDaysInBlock.size.toDouble()
+    } else newCalculatedBalance
+    list6dAvg[blockIndex] = blockAvg
+
+    val listMonthAvg = if (isNewQtr || rawMonthAvg.isEmpty()) {
+        MutableList(3) { 0.0 }
+    } else {
+        val m = rawMonthAvg.toMutableList()
+        while (m.size < 3) m.add(0.0)
+        m
+    }
+    val activeBlocksInMonth = list6dAvg.subList(0, minOf(blockIndex + 1, list6dAvg.size))
+        .filterIndexed { idx, v -> idx == blockIndex || v > 0.0 }
+    val monthAvgCalc = if (activeBlocksInMonth.isNotEmpty()) {
+        activeBlocksInMonth.sum() / activeBlocksInMonth.size.toDouble()
+    } else blockAvg
+    listMonthAvg[monthInQtr] = monthAvgCalc
+
+    val listQtrAvg = if (isNewYear || rawQtrAvg.isEmpty()) {
+        MutableList(4) { 0.0 }
+    } else {
+        val m = rawQtrAvg.toMutableList()
+        while (m.size < 4) m.add(0.0)
+        m
+    }
+    val activeMonthsInQtr = listMonthAvg.subList(0, minOf(monthInQtr + 1, listMonthAvg.size))
+        .filterIndexed { idx, v -> idx == monthInQtr || v > 0.0 }
+    val qtrAvgCalc = if (activeMonthsInQtr.isNotEmpty()) {
+        activeMonthsInQtr.sum() / activeMonthsInQtr.size.toDouble()
+    } else monthAvgCalc
+    listQtrAvg[qtrIndex] = qtrAvgCalc
+
+    val activeQtrsInYear = listQtrAvg.subList(0, minOf(qtrIndex + 1, listQtrAvg.size))
+        .filterIndexed { idx, v -> idx == qtrIndex || v > 0.0 }
+    yrAvgVal = if (activeQtrsInYear.isNotEmpty()) {
+        activeQtrsInYear.sum() / activeQtrsInYear.size.toDouble()
+    } else qtrAvgCalc
+
+    val updatedPbook = hashMapOf<String, Any>(
+        "6d bal" to list6dBal,
+        "6d avg" to list6dAvg,
+        "month avg" to listMonthAvg,
+        "qtr avg" to listQtrAvg,
+        "yr avg" to yrAvgVal
+    )
+
+    bankDocRef.update(
+        "${targetBankKey}.bal", newCalculatedBalance,
+        "${targetBankKey}.pbook", updatedPbook,
+        "last_updated", FieldValue.serverTimestamp()
+    ).await()
 }
 
 suspend fun refundFinanceSource(userRef: DocumentReference, sourceType: String, sourceId: String, amount: Double) {
@@ -96,81 +247,25 @@ suspend fun refundFinanceSource(userRef: DocumentReference, sourceType: String, 
                 val bankDoc = userRef.collection("Finances").document("Bank").get().await()
                 var targetBankKey: String? = null
                 val bData = bankDoc.data ?: emptyMap()
-                
+
                 for ((key, rawB) in bData) {
                     if (key != "last_updated" && key != "cash" && rawB is Map<*, *>) {
-                        if (rawB["account no."]?.toString() == sourceId) {
+                        val ac = rawB["ac"]?.toString() ?: ""
+                        val oldAc = rawB["account no."]?.toString() ?: ""
+                        if (ac == sourceId || oldAc == sourceId || oldAc.endsWith(sourceId) || sourceId.endsWith(ac)) {
                             targetBankKey = key
                             break
                         }
                     }
                 }
-                
+
                 if (targetBankKey != null) {
                     val bankDataMap = bankDoc.get(targetBankKey) as? Map<*, *>
-                    val curBal = (bankDataMap?.get("current bal.") as? Number)?.toDouble() ?: 0.0
-                    val rateYr = (bankDataMap?.get("intrest % (yr)") as? Number)?.toDouble() ?: 0.0
-                    
+                    val curBal = (bankDataMap?.get("bal") as? Number)?.toDouble()
+                        ?: (bankDataMap?.get("current bal.") as? Number)?.toDouble() ?: 0.0
+
                     val newCalculatedBalance = curBal + amount
-                    
-                    val cal = Calendar.getInstance()
-                    val day = cal.get(Calendar.DAY_OF_MONTH)
-                    val month = cal.get(Calendar.MONTH)
-                    val qtr = (month / 3) + 1
-
-                    val dayKey = if (day == 31) "31" else {
-                        when (day % 6) {
-                            1 -> "01, 07, 13, 19, 25"
-                            2 -> "02, 08, 14, 20, 26"
-                            3 -> "03, 09, 15, 21, 27"
-                            4 -> "04, 10, 16, 22, 28"
-                            5 -> "05, 11, 17, 23, 29"
-                            else -> "06, 12, 18, 24, 30"
-                        }
-                    }
-                    val avg6dKey = when {
-                        day <= 6 -> "01-06"
-                        day <= 12 -> "07-12"
-                        day <= 18 -> "13-18"
-                        day <= 24 -> "19-24"
-                        else -> "25-31"
-                    }
-                    val monthKey = when (month) {
-                        0, 3, 6, 9 -> "jan, april, july, oct"
-                        1, 4, 7, 10 -> "feb, may, aug, nov"
-                        else -> "march, june, sep, dec"
-                    }
-                    val qtrKey = "q$qtr"
-
-                    val rateQtr = rateYr / 4.0
-                    val oneDayInt = (newCalculatedBalance * (rateYr / 100.0)) / 365.0
-                    val expQtrInt = newCalculatedBalance * (rateQtr / 100.0)
-                    val expYrInt = newCalculatedBalance * (rateYr / 100.0)
-
-                    val todayReset = Calendar.getInstance().apply { set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }
-                    val startOfQtr = Calendar.getInstance().apply { set(Calendar.MONTH, (cal.get(Calendar.MONTH) / 3) * 3); set(Calendar.DAY_OF_MONTH, 1); set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }
-                    val diffQtr = todayReset.timeInMillis - startOfQtr.timeInMillis
-                    val daysPassedQtr = (diffQtr / (1000 * 60 * 60 * 24)).toInt() + 1
-                    val accruedQtr = expQtrInt * (daysPassedQtr / 90.0)
-
-                    val startOfYear = Calendar.getInstance().apply { set(Calendar.MONTH, Calendar.JANUARY); set(Calendar.DAY_OF_MONTH, 1); set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }
-                    val diffYr = todayReset.timeInMillis - startOfYear.timeInMillis
-                    val daysPassedYr = (diffYr / (1000 * 60 * 60 * 24)).toInt() + 1
-                    val accruedYr = expYrInt * (daysPassedYr / 365.0)
-
-                    userRef.collection("Finances").document("Bank").update(
-                        FieldPath.of(targetBankKey, "current bal."), newCalculatedBalance,
-                        FieldPath.of(targetBankKey, "6D bal. Block", dayKey), newCalculatedBalance,
-                        FieldPath.of(targetBankKey, "6D avg.", avg6dKey), newCalculatedBalance,
-                        FieldPath.of(targetBankKey, "monthly avg.", monthKey), newCalculatedBalance,
-                        FieldPath.of(targetBankKey, "qtr. avg.", qtrKey), newCalculatedBalance,
-                        FieldPath.of(targetBankKey, "yr avg", "cur"), newCalculatedBalance,
-                        FieldPath.of(targetBankKey, "1d int"), oneDayInt,
-                        FieldPath.of(targetBankKey, "exp qtr int"), expQtrInt,
-                        FieldPath.of(targetBankKey, "accrued qtr"), accruedQtr,
-                        FieldPath.of(targetBankKey, "exp yr int"), expYrInt,
-                        FieldPath.of(targetBankKey, "accrued yr"), accruedYr
-                    ).await()
+                    applyBankAdjustmentAndPbook(userRef, targetBankKey, newCalculatedBalance)
                 }
             }
         }
@@ -196,7 +291,7 @@ suspend fun refundFinanceSource(userRef: DocumentReference, sourceType: String, 
                     val newOut = (curOut - amount).coerceAtLeast(0.0)
                     val avail = (limit - newOut).coerceAtLeast(0.0)
                     val util = if (limit > 0) (newOut / limit) * 100.0 else 0.0
-                    
+
                     userRef.collection("Finances").document("CC FD").update(
                         FieldPath.of("CC", targetCCKey, "outstanding"), newOut,
                         FieldPath.of("CC", targetCCKey, "available"), avail,
@@ -228,81 +323,25 @@ suspend fun deductFinanceSource(userRef: DocumentReference, sourceType: String, 
                 val bankDoc = userRef.collection("Finances").document("Bank").get().await()
                 var targetBankKey: String? = null
                 val bData = bankDoc.data ?: emptyMap()
-                
+
                 for ((key, rawB) in bData) {
                     if (key != "last_updated" && key != "cash" && rawB is Map<*, *>) {
-                        if (rawB["account no."]?.toString() == sourceId) {
+                        val ac = rawB["ac"]?.toString() ?: ""
+                        val oldAc = rawB["account no."]?.toString() ?: ""
+                        if (ac == sourceId || oldAc == sourceId || oldAc.endsWith(sourceId) || sourceId.endsWith(ac)) {
                             targetBankKey = key
                             break
                         }
                     }
                 }
-                
+
                 if (targetBankKey != null) {
                     val bankDataMap = bankDoc.get(targetBankKey) as? Map<*, *>
-                    val curBal = (bankDataMap?.get("current bal.") as? Number)?.toDouble() ?: 0.0
-                    val rateYr = (bankDataMap?.get("intrest % (yr)") as? Number)?.toDouble() ?: 0.0
-                    
+                    val curBal = (bankDataMap?.get("bal") as? Number)?.toDouble()
+                        ?: (bankDataMap?.get("current bal.") as? Number)?.toDouble() ?: 0.0
+
                     val newCalculatedBalance = (curBal - amount).coerceAtLeast(0.0)
-                    
-                    val cal = Calendar.getInstance()
-                    val day = cal.get(Calendar.DAY_OF_MONTH)
-                    val month = cal.get(Calendar.MONTH)
-                    val qtr = (month / 3) + 1
-
-                    val dayKey = if (day == 31) "31" else {
-                        when (day % 6) {
-                            1 -> "01, 07, 13, 19, 25"
-                            2 -> "02, 08, 14, 20, 26"
-                            3 -> "03, 09, 15, 21, 27"
-                            4 -> "04, 10, 16, 22, 28"
-                            5 -> "05, 11, 17, 23, 29"
-                            else -> "06, 12, 18, 24, 30"
-                        }
-                    }
-                    val avg6dKey = when {
-                        day <= 6 -> "01-06"
-                        day <= 12 -> "07-12"
-                        day <= 18 -> "13-18"
-                        day <= 24 -> "19-24"
-                        else -> "25-31"
-                    }
-                    val monthKey = when (month) {
-                        0, 3, 6, 9 -> "jan, april, july, oct"
-                        1, 4, 7, 10 -> "feb, may, aug, nov"
-                        else -> "march, june, sep, dec"
-                    }
-                    val qtrKey = "q$qtr"
-
-                    val rateQtr = rateYr / 4.0
-                    val oneDayInt = (newCalculatedBalance * (rateYr / 100.0)) / 365.0
-                    val expQtrInt = newCalculatedBalance * (rateQtr / 100.0)
-                    val expYrInt = newCalculatedBalance * (rateYr / 100.0)
-
-                    val todayReset = Calendar.getInstance().apply { set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }
-                    val startOfQtr = Calendar.getInstance().apply { set(Calendar.MONTH, (cal.get(Calendar.MONTH) / 3) * 3); set(Calendar.DAY_OF_MONTH, 1); set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }
-                    val diffQtr = todayReset.timeInMillis - startOfQtr.timeInMillis
-                    val daysPassedQtr = (diffQtr / (1000 * 60 * 60 * 24)).toInt() + 1
-                    val accruedQtr = expQtrInt * (daysPassedQtr / 90.0)
-
-                    val startOfYear = Calendar.getInstance().apply { set(Calendar.MONTH, Calendar.JANUARY); set(Calendar.DAY_OF_MONTH, 1); set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }
-                    val diffYr = todayReset.timeInMillis - startOfYear.timeInMillis
-                    val daysPassedYr = (diffYr / (1000 * 60 * 60 * 24)).toInt() + 1
-                    val accruedYr = expYrInt * (daysPassedYr / 365.0)
-
-                    userRef.collection("Finances").document("Bank").update(
-                        FieldPath.of(targetBankKey, "current bal."), newCalculatedBalance,
-                        FieldPath.of(targetBankKey, "6D bal. Block", dayKey), newCalculatedBalance,
-                        FieldPath.of(targetBankKey, "6D avg.", avg6dKey), newCalculatedBalance,
-                        FieldPath.of(targetBankKey, "monthly avg.", monthKey), newCalculatedBalance,
-                        FieldPath.of(targetBankKey, "qtr. avg.", qtrKey), newCalculatedBalance,
-                        FieldPath.of(targetBankKey, "yr avg", "cur"), newCalculatedBalance,
-                        FieldPath.of(targetBankKey, "1d int"), oneDayInt,
-                        FieldPath.of(targetBankKey, "exp qtr int"), expQtrInt,
-                        FieldPath.of(targetBankKey, "accrued qtr"), accruedQtr,
-                        FieldPath.of(targetBankKey, "exp yr int"), expYrInt,
-                        FieldPath.of(targetBankKey, "accrued yr"), accruedYr
-                    ).await()
+                    applyBankAdjustmentAndPbook(userRef, targetBankKey, newCalculatedBalance)
                 }
             }
         }
@@ -328,7 +367,7 @@ suspend fun deductFinanceSource(userRef: DocumentReference, sourceType: String, 
                     val newOut = curOut + amount
                     val avail = (limit - newOut).coerceAtLeast(0.0)
                     val util = if (limit > 0) (newOut / limit) * 100.0 else 0.0
-                    
+
                     userRef.collection("Finances").document("CC FD").update(
                         FieldPath.of("CC", targetCCKey, "outstanding"), newOut,
                         FieldPath.of("CC", targetCCKey, "available"), avail,
@@ -347,13 +386,13 @@ fun EditBankDialog(bank: BankAccountItem, username: String, onDismiss: () -> Uni
     var bankBalance by remember { mutableStateOf(bank.currentBalance.toString()) }
     var interestRate by remember { mutableStateOf(bank.interestRate.toString()) }
     var expanded by remember { mutableStateOf(false) }
-    
+
     val filteredBanks = if (bankName.isNotBlank()) Constants.IndianBanksList.filter { it.contains(bankName, ignoreCase = true) && !it.equals(bankName, ignoreCase = true) } else emptyList()
     val showDropdown = expanded && filteredBanks.isNotEmpty()
-    
+
     var showDeleteConfirm by remember { mutableStateOf(false) }
     val context = LocalContext.current
-    
+
     var isUpdatePressed by remember { mutableStateOf(false) }
     val updateButtonScale by animateFloatAsState(targetValue = if (isUpdatePressed) 0.95f else 1f, label = "UpdateAnim")
     var isCancelPressed by remember { mutableStateOf(false) }
@@ -371,14 +410,14 @@ fun EditBankDialog(bank: BankAccountItem, username: String, onDismiss: () -> Uni
                         showDeleteConfirm = false
                         onDismiss()
                         Toast.makeText(context, "Deleting bank...", Toast.LENGTH_SHORT).show()
-                        
+
                         val cachedData = CacheManager.getCachedData(context, username)
                         if (cachedData != null) {
                             val updatedList = cachedData.bankList.filter { it.firebaseKey != bank.firebaseKey }
                             CacheManager.updateOptimisticCache(context, username, cachedData.copy(bankList = updatedList))
-                            onUpdateSuccess() 
+                            onUpdateSuccess()
                         }
-                        
+
                         CoroutineScope(Dispatchers.IO).launch {
                             try {
                                 val db = FirebaseFirestore.getInstance()
@@ -390,14 +429,14 @@ fun EditBankDialog(bank: BankAccountItem, username: String, onDismiss: () -> Uni
                                 }
                             } catch (e: Exception) {}
                         }
-                    }, 
+                    },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                 ) { Text("Delete", color = MaterialTheme.colorScheme.onError, fontWeight = FontWeight.Bold) }
-            }, 
-            dismissButton = { 
-                TextButton(onClick = { showDeleteConfirm = false }) { 
-                    Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold) 
-                } 
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) {
+                    Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold)
+                }
             }
         )
     }
@@ -407,42 +446,42 @@ fun EditBankDialog(bank: BankAccountItem, username: String, onDismiss: () -> Uni
             Column(modifier = Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Text(text = "Edit Bank Details", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onSurface)
-                    IconButton(onClick = { showDeleteConfirm = true }) { 
-                        Icon(Icons.Outlined.Delete, contentDescription = "Delete Bank", tint = MaterialTheme.colorScheme.error) 
+                    IconButton(onClick = { showDeleteConfirm = true }) {
+                        Icon(Icons.Outlined.Delete, contentDescription = "Delete Bank", tint = MaterialTheme.colorScheme.error)
                     }
                 }
                 Spacer(modifier = Modifier.height(16.dp))
                 ExposedDropdownMenuBox(expanded = showDropdown, onExpandedChange = { expanded = it }) {
                     RFTextField(
-                        value = bankName, 
-                        onValueChange = { bankName = it; expanded = true }, 
-                        label = "Bank Name", 
+                        value = bankName,
+                        onValueChange = { bankName = it; expanded = true },
+                        label = "Bank Name",
                         modifier = Modifier.fillMaxWidth().menuAnchor()
                     )
-                    if (showDropdown) { 
-                        ExposedDropdownMenu(expanded = showDropdown, onDismissRequest = { expanded = false }, modifier = Modifier.background(MaterialTheme.colorScheme.surface)) { 
-                            filteredBanks.forEach { selectionOption -> 
-                                DropdownMenuItem(text = { Text(selectionOption, color = MaterialTheme.colorScheme.onSurface) }, onClick = { bankName = selectionOption; expanded = false }) 
-                            } 
-                        } 
+                    if (showDropdown) {
+                        ExposedDropdownMenu(expanded = showDropdown, onDismissRequest = { expanded = false }, modifier = Modifier.background(MaterialTheme.colorScheme.surface)) {
+                            filteredBanks.forEach { selectionOption ->
+                                DropdownMenuItem(text = { Text(selectionOption, color = MaterialTheme.colorScheme.onSurface) }, onClick = { bankName = selectionOption; expanded = false })
+                            }
+                        }
                     }
                 }
                 Spacer(modifier = Modifier.height(16.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     RFTextField(
-                        value = bankBalance, 
-                        onValueChange = { bankBalance = it }, 
-                        label = "Balance", 
-                        prefix = { Text("₹ ", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) }, 
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), 
+                        value = bankBalance,
+                        onValueChange = { bankBalance = it },
+                        label = "Balance",
+                        prefix = { Text("₹ ", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.weight(1f)
                     )
                     RFTextField(
-                        value = interestRate, 
-                        onValueChange = { interestRate = it }, 
-                        label = "Interest (Yr)", 
-                        suffix = { Text("%") }, 
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), 
+                        value = interestRate,
+                        onValueChange = { interestRate = it },
+                        label = "Interest (Yr)",
+                        suffix = { Text("%") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -453,19 +492,19 @@ fun EditBankDialog(bank: BankAccountItem, username: String, onDismiss: () -> Uni
                         val newBal = bankBalance.toDoubleOrNull()
                         val newRate = interestRate.toDoubleOrNull()
                         if (bankName.isNotBlank() && newBal != null && newRate != null) {
-                            
+
                             onDismiss()
                             Toast.makeText(context, "Updating bank...", Toast.LENGTH_SHORT).show()
-                            
+
                             val cachedData = CacheManager.getCachedData(context, username)
                             if (cachedData != null) {
-                                val updatedList = cachedData.bankList.map { 
-                                    if (it.firebaseKey == bank.firebaseKey) it.copy(bankName = bankName, currentBalance = newBal, interestRate = newRate) else it 
+                                val updatedList = cachedData.bankList.map {
+                                    if (it.firebaseKey == bank.firebaseKey) it.copy(bankName = bankName, currentBalance = newBal, interestRate = newRate) else it
                                 }
                                 CacheManager.updateOptimisticCache(context, username, cachedData.copy(bankList = updatedList))
-                                onUpdateSuccess() 
+                                onUpdateSuccess()
                             }
-                            
+
                             CoroutineScope(Dispatchers.IO).launch {
                                 try {
                                     val db = FirebaseFirestore.getInstance()
@@ -473,16 +512,17 @@ fun EditBankDialog(bank: BankAccountItem, username: String, onDismiss: () -> Uni
                                     if (!userQuery.isEmpty) {
                                         val userRef = userQuery.documents[0].reference
                                         val bankDocRef = userRef.collection("Finances").document("Bank")
-                                        
+
                                         bankDocRef.update(
-                                            FieldPath.of(bank.firebaseKey, "bank"), bankName,
-                                            FieldPath.of(bank.firebaseKey, "current bal."), newBal,
-                                            FieldPath.of(bank.firebaseKey, "intrest % (yr)"), newRate
+                                            "${bank.firebaseKey}.bank", bankName,
+                                            "${bank.firebaseKey}.int %", newRate
                                         ).await()
+
+                                        applyBankAdjustmentAndPbook(userRef, bank.firebaseKey, newBal)
                                     }
                                 } catch (e: Exception) {}
                             }
-                            
+
                         } else { Toast.makeText(context, "Please enter valid details", Toast.LENGTH_SHORT).show() }
                     },
                     confirmText = "Update",
@@ -512,14 +552,14 @@ fun EditFDDialog(fd: FDItem, username: String, onDismiss: () -> Unit, onUpdateSu
                         showDeleteConfirm = false
                         onDismiss()
                         Toast.makeText(context, "Deleting FD...", Toast.LENGTH_SHORT).show()
-                        
+
                         val cachedData = CacheManager.getCachedData(context, username)
                         if (cachedData != null) {
                             val updatedList = cachedData.fdList.filter { it.accountNo != fd.accountNo }
                             CacheManager.updateOptimisticCache(context, username, cachedData.copy(fdList = updatedList))
-                            onUpdateSuccess() 
+                            onUpdateSuccess()
                         }
-                        
+
                         CoroutineScope(Dispatchers.IO).launch {
                             try {
                                 val db = FirebaseFirestore.getInstance()
@@ -532,12 +572,12 @@ fun EditFDDialog(fd: FDItem, username: String, onDismiss: () -> Unit, onUpdateSu
                                 }
                             } catch (e: Exception) {}
                         }
-                    }, 
+                    },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                 ) { Text("Delete", color = MaterialTheme.colorScheme.onError) }
-            }, 
-            dismissButton = { 
-                TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant) } 
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant) }
             }
         )
     }
@@ -547,16 +587,16 @@ fun EditFDDialog(fd: FDItem, username: String, onDismiss: () -> Unit, onUpdateSu
             Column(modifier = Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Text("FD Settings", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onSurface)
-                    IconButton(onClick = { showDeleteConfirm = true }) { 
-                        Icon(Icons.Outlined.Delete, contentDescription = "Delete FD", tint = MaterialTheme.colorScheme.error) 
+                    IconButton(onClick = { showDeleteConfirm = true }) {
+                        Icon(Icons.Outlined.Delete, contentDescription = "Delete FD", tint = MaterialTheme.colorScheme.error)
                     }
                 }
                 Spacer(modifier = Modifier.height(16.dp))
                 Text("Fixed Deposit records cannot be freely edited to maintain interest accuracy. If you need to make changes, please Delete this record and recreate a new FD.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
                 Spacer(modifier = Modifier.height(28.dp))
                 OutlinedButton(
-                    onClick = { onDismiss() }, 
-                    modifier = Modifier.fillMaxWidth().height(50.dp), 
+                    onClick = { onDismiss() },
+                    modifier = Modifier.fillMaxWidth().height(50.dp),
                     shape = RoundedCornerShape(12.dp),
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface)
@@ -585,11 +625,12 @@ fun DeleteExpenseDialog(
                 onClick = {
                     onDismiss()
                     Toast.makeText(context, "Deleting expense...", Toast.LENGTH_SHORT).show()
-                    
+
                     val cachedData = CacheManager.getCachedData(context, username)
                     if (cachedData != null) {
                         val updatedBanks = cachedData.bankList.map {
-                            if (expense.sourceType == "Bank" && it.accountNo == expense.sourceId) {
+                            val match = it.accountNo == expense.sourceId || it.accountNo.endsWith(expense.sourceId) || expense.sourceId.endsWith(it.accountNo)
+                            if (expense.sourceType == "Bank" && match) {
                                 it.copy(currentBalance = it.currentBalance + expense.amount)
                             } else it
                         }
@@ -620,7 +661,7 @@ fun DeleteExpenseDialog(
                             )
                         )
                     }
-                    
+
                     onSuccess()
 
                     CoroutineScope(Dispatchers.IO).launch {
@@ -629,15 +670,15 @@ fun DeleteExpenseDialog(
                             val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
                             if (!userQuery.isEmpty) {
                                 val userRef = userQuery.documents[0].reference
-                                
+
                                 val expDateOnly = expense.date.split(" ")[0]
                                 val targetDate = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).parse(expDateOnly) ?: Date()
                                 val docId = SimpleDateFormat("yyyy_MM", Locale.getDefault()).format(targetDate)
                                 val expensesDocRef = userRef.collection("Expenses").document(docId)
                                 val docSnap = expensesDocRef.get().await()
-                                
+
                                 var targetKey: String? = null
-                                
+
                                 if (docSnap.exists()) {
                                     val dataMap = docSnap.data ?: emptyMap()
                                     for ((key, value) in dataMap) {
@@ -650,9 +691,9 @@ fun DeleteExpenseDialog(
                                             }
                                             val dbAmount = ((value["amnt"] ?: value["amount"]) as? Number)?.toDouble() ?: 0.0
                                             val dbCategory = (value["cat"] ?: value["category"])?.toString() ?: ""
-                                            
+
                                             val amountMatch = Math.abs(dbAmount - expense.amount) < 0.01
-                                            
+
                                             if (dbDateStr == expDateOnly && amountMatch && dbCategory == expense.category) {
                                                 targetKey = key
                                                 break
@@ -674,12 +715,12 @@ fun DeleteExpenseDialog(
                             }
                         } catch (e: Exception) {}
                     }
-                }, 
+                },
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
             ) { Text("Delete", color = MaterialTheme.colorScheme.onError, fontWeight = FontWeight.Bold) }
-        }, 
-        dismissButton = { 
-            TextButton(onClick = { onDismiss() }) { Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold) } 
+        },
+        dismissButton = {
+            TextButton(onClick = { onDismiss() }) { Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold) }
         }
     )
 }
@@ -713,19 +754,19 @@ fun EditExpenseDialog(
     )
     val categoryNames = categories.map { it.first }
     val paymentModes = listOf("Cash", "UPI", "NEFT", "Credit Card", "Debit Card", "Net Banking")
-    
+
     var categoryText by remember { mutableStateOf(if (categoryNames.contains(expense.category)) expense.category else "Custom") }
     var customCategoryText by remember { mutableStateOf(if (!categoryNames.contains(expense.category)) expense.category else "") }
     var isCustomCategory by remember { mutableStateOf(!categoryNames.contains(expense.category)) }
-    
+
     var remark1 by remember { mutableStateOf(expense.remark1) }
     var remark2 by remember { mutableStateOf(expense.remark2) }
     var modeText by remember { mutableStateOf(expense.mode) }
-    
+
     var catExpanded by remember { mutableStateOf(false) }
     var modeExpanded by remember { mutableStateOf(false) }
     var paidByExpanded by remember { mutableStateOf(false) }
-    
+
     var amount by remember { mutableStateOf(expense.amount.toString()) }
 
     var expenseDateMillis by remember {
@@ -740,24 +781,24 @@ fun EditExpenseDialog(
 
     var selectedSourceType by remember { mutableStateOf(expense.sourceType) }
     var selectedSourceId by remember { mutableStateOf(expense.sourceId) }
-    
+
     val initialLogo = remember {
         if (expense.sourceType == "Bank") {
-            val b = bankList.find { it.accountNo == expense.sourceId }
+            val b = bankList.find { it.accountNo == expense.sourceId || it.accountNo.endsWith(expense.sourceId) || expense.sourceId.endsWith(it.accountNo) }
             b?.bankName?.let { Constants.BankLogoMap[it] }
         } else if (expense.sourceType == "Credit Card") {
             val c = ccList.find { it.cardNo == expense.sourceId }
             c?.issuer?.let { Constants.BankLogoMap[it] }
         } else null
     }
-    
+
     val initialName = remember {
         if (expense.sourceType == "Cash") "Cash in Hand"
         else if (expense.sourceType == "Bank") "• " + (expense.sourceId.takeLast(4).takeIf { it.isNotEmpty() } ?: "")
         else if (expense.sourceType == "Credit Card") "• " + (expense.sourceId.takeLast(4).takeIf { it.isNotEmpty() } ?: "")
         else ""
     }
-    
+
     var selectedSourceName by remember { mutableStateOf(initialName) }
     var selectedSourceLogo by remember { mutableStateOf(initialLogo) }
 
@@ -769,17 +810,17 @@ fun EditExpenseDialog(
                 Text("Edit Expense", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onSurface)
                 Text("Changes will automatically refund & adjust balances.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(modifier = Modifier.height(16.dp))
-                
+
                 ExposedDropdownMenuBox(expanded = catExpanded, onExpandedChange = { catExpanded = !catExpanded }, modifier = Modifier.fillMaxWidth()) {
                     RFTextField(
-                        value = if(isCustomCategory) customCategoryText else categoryText, 
-                        onValueChange = { if(isCustomCategory) customCategoryText = it }, 
+                        value = if(isCustomCategory) customCategoryText else categoryText,
+                        onValueChange = { if(isCustomCategory) customCategoryText = it },
                         readOnly = !isCustomCategory,
-                        label = "Category", 
+                        label = "Category",
                         modifier = Modifier.fillMaxWidth().menuAnchor()
                     )
                     ExposedDropdownMenu(expanded = catExpanded, onDismissRequest = { catExpanded = false }, modifier = Modifier.background(MaterialTheme.colorScheme.surface)) {
-                        categories.forEach { (name, icon) -> 
+                        categories.forEach { (name, icon) ->
                             DropdownMenuItem(
                                 text = {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -792,19 +833,19 @@ fun EditExpenseDialog(
                                         Spacer(modifier = Modifier.width(12.dp))
                                         Text(name, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface)
                                     }
-                                }, 
-                                onClick = { 
+                                },
+                                onClick = {
                                     categoryText = name
                                     isCustomCategory = (name == "Custom")
                                     if(!isCustomCategory) customCategoryText = ""
-                                    catExpanded = false 
+                                    catExpanded = false
                                 }
-                            ) 
+                            )
                         }
                     }
                 }
                 Spacer(modifier = Modifier.height(12.dp))
-                
+
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     RFTextField(value = remark1, onValueChange = { remark1 = it }, label = "Remark 1", modifier = Modifier.weight(1f))
                     RFTextField(value = remark2, onValueChange = { remark2 = it }, label = "Remark 2", modifier = Modifier.weight(1f))
@@ -824,8 +865,8 @@ fun EditExpenseDialog(
                         ) {
                             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Text(
-                                    text = if (modeText.isEmpty()) "Mode" else modeText, 
-                                    color = if (modeText.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface, 
+                                    text = if (modeText.isEmpty()) "Mode" else modeText,
+                                    color = if (modeText.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
                                     fontSize = 14.sp, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f)
                                 )
                                 Icon(Icons.Outlined.ArrowDropDown, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp).rotate(if (modeExpanded) 180f else 0f))
@@ -837,12 +878,12 @@ fun EditExpenseDialog(
                                     text = { Text(name, fontSize = 14.sp, maxLines = 1, softWrap = false, color = MaterialTheme.colorScheme.onSurface) },
                                     onClick = {
                                         modeText = name; modeExpanded = false
-                                        selectedSourceId = ""; selectedSourceName = ""; selectedSourceLogo = null 
-                                        if (name == "Cash") { 
+                                        selectedSourceId = ""; selectedSourceName = ""; selectedSourceLogo = null
+                                        if (name == "Cash") {
                                             selectedSourceType = "Cash"
                                             selectedSourceId = "Cash"
-                                            selectedSourceName = "Cash in Hand" 
-                                        } else if (name == "Credit Card") { selectedSourceType = "Credit Card" } 
+                                            selectedSourceName = "Cash in Hand"
+                                        } else if (name == "Credit Card") { selectedSourceType = "Credit Card" }
                                         else { selectedSourceType = "Bank" }
                                     }
                                 )
@@ -853,8 +894,8 @@ fun EditExpenseDialog(
                     val isPaidByActive = selectedSourceType.isNotEmpty() && selectedSourceType != "Cash"
 
                     ExposedDropdownMenuBox(
-                        expanded = paidByExpanded && isPaidByActive, 
-                        onExpandedChange = { if(isPaidByActive) paidByExpanded = !paidByExpanded }, 
+                        expanded = paidByExpanded && isPaidByActive,
+                        onExpandedChange = { if(isPaidByActive) paidByExpanded = !paidByExpanded },
                         modifier = Modifier.weight(0.65f)
                     ) {
                         Box(
@@ -867,42 +908,42 @@ fun EditExpenseDialog(
                             contentAlignment = Alignment.CenterStart
                         ) {
                             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                if (selectedSourceType.isEmpty()) { 
-                                    Text("Select Mode", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp, modifier = Modifier.weight(1f)) 
-                                } else if (selectedSourceId.isEmpty()) { 
-                                    Text(text = if(selectedSourceType == "Bank") "Choose Bank" else "Choose Card", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp, modifier = Modifier.weight(1f)) 
+                                if (selectedSourceType.isEmpty()) {
+                                    Text("Select Mode", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                                } else if (selectedSourceId.isEmpty()) {
+                                    Text(text = if(selectedSourceType == "Bank") "Choose Bank" else "Choose Card", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp, modifier = Modifier.weight(1f))
                                 } else {
                                     if (selectedSourceLogo != null && selectedSourceType != "Cash") {
                                         Image(painter = painterResource(id = selectedSourceLogo!!), contentDescription = null, modifier = Modifier.size(20.dp).clip(RoundedCornerShape(4.dp)), contentScale = ContentScale.Fit)
                                         Spacer(modifier = Modifier.width(8.dp))
                                     }
                                     Text(
-                                        text = selectedSourceName, 
-                                        color = if(selectedSourceType == "Cash") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface, 
+                                        text = selectedSourceName,
+                                        color = if(selectedSourceType == "Cash") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                                         fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f)
                                     )
                                 }
-                                if (isPaidByActive) { 
-                                    Icon(Icons.Outlined.ArrowDropDown, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp).rotate(if (paidByExpanded) 180f else 0f)) 
+                                if (isPaidByActive) {
+                                    Icon(Icons.Outlined.ArrowDropDown, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp).rotate(if (paidByExpanded) 180f else 0f))
                                 }
                             }
                         }
 
                         ExposedDropdownMenu(expanded = paidByExpanded && isPaidByActive, onDismissRequest = { paidByExpanded = false }, modifier = Modifier.background(MaterialTheme.colorScheme.surface)) {
                             if (selectedSourceType == "Bank") {
-                                if (bankList.isEmpty()) { DropdownMenuItem(text = { Text("No Banks", color = MaterialTheme.colorScheme.onSurfaceVariant) }, onClick = {}) } 
+                                if (bankList.isEmpty()) { DropdownMenuItem(text = { Text("No Banks", color = MaterialTheme.colorScheme.onSurfaceVariant) }, onClick = {}) }
                                 bankList.forEach { bank ->
                                     DropdownMenuItem(
-                                        text = { 
+                                        text = {
                                             Row(verticalAlignment = Alignment.CenterVertically) {
                                                 val logo = Constants.BankLogoMap[bank.bankName]
-                                                if (logo != null) { Image(painterResource(logo), null, modifier = Modifier.size(24.dp).clip(RoundedCornerShape(4.dp))) } 
+                                                if (logo != null) { Image(painterResource(logo), null, modifier = Modifier.size(24.dp).clip(RoundedCornerShape(4.dp))) }
                                                 else { Icon(Icons.Outlined.AccountBalance, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp)) }
                                                 Spacer(modifier = Modifier.width(12.dp))
                                                 Text(text = "• ${if (bank.accountNo.length >= 4) bank.accountNo.takeLast(4) else bank.accountNo}", maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                                             }
                                         },
-                                        onClick = { 
+                                        onClick = {
                                             selectedSourceId = bank.accountNo
                                             selectedSourceName = "• ${if (bank.accountNo.length >= 4) bank.accountNo.takeLast(4) else bank.accountNo}"
                                             selectedSourceLogo = Constants.BankLogoMap[bank.bankName]
@@ -911,19 +952,19 @@ fun EditExpenseDialog(
                                     )
                                 }
                             } else if (selectedSourceType == "Credit Card") {
-                                if (ccList.isEmpty()) { DropdownMenuItem(text = { Text("No Cards", color = MaterialTheme.colorScheme.onSurfaceVariant) }, onClick = {}) } 
+                                if (ccList.isEmpty()) { DropdownMenuItem(text = { Text("No Cards", color = MaterialTheme.colorScheme.onSurfaceVariant) }, onClick = {}) }
                                 ccList.forEach { cc ->
                                     DropdownMenuItem(
-                                        text = { 
+                                        text = {
                                             Row(verticalAlignment = Alignment.CenterVertically) {
                                                 val logo = Constants.BankLogoMap[cc.issuer]
-                                                if (logo != null) { Image(painterResource(logo), null, modifier = Modifier.size(24.dp).clip(RoundedCornerShape(4.dp))) } 
+                                                if (logo != null) { Image(painterResource(logo), null, modifier = Modifier.size(24.dp).clip(RoundedCornerShape(4.dp))) }
                                                 else { Icon(Icons.Outlined.CreditCard, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp)) }
                                                 Spacer(modifier = Modifier.width(12.dp))
                                                 Text(text = "• ${if (cc.cardNo.length >= 4) cc.cardNo.takeLast(4) else cc.cardNo}", maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                                             }
                                         },
-                                        onClick = { 
+                                        onClick = {
                                             selectedSourceId = cc.cardNo
                                             selectedSourceName = "• ${if (cc.cardNo.length >= 4) cc.cardNo.takeLast(4) else cc.cardNo}"
                                             selectedSourceLogo = Constants.BankLogoMap[cc.issuer]
@@ -942,26 +983,26 @@ fun EditExpenseDialog(
                         label = "Date", selectedDateMillis = expenseDateMillis, onDateSelected = { expenseDateMillis = it }, restrictToCurrentMonth = false, modifier = Modifier.weight(1f)
                     )
                     RFTextField(
-                        value = amount, onValueChange = { amount = it }, label = "Amount", 
-                        prefix = { Text("₹ ", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) }, 
+                        value = amount, onValueChange = { amount = it }, label = "Amount",
+                        prefix = { Text("₹ ", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f)
                     )
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
-                
+
                 RFActionRow(
                     onCancel = { onDismiss() },
                     onConfirm = {
                         val finalCategory = if(isCustomCategory) customCategoryText.trim() else categoryText.trim()
                         val newAmt = amount.toDoubleOrNull() ?: expense.amount
                         val diff = newAmt - expense.amount
-                        
+
                         if (amount.isNotBlank() && finalCategory.isNotBlank() && modeText.isNotBlank()) {
                             if (selectedSourceType.isNotEmpty() && selectedSourceId.isEmpty()) {
                                 Toast.makeText(context, "Select exact account/card!", Toast.LENGTH_SHORT).show(); return@RFActionRow
                             }
-                            
+
                             onDismiss()
                             Toast.makeText(context, "Updating expense...", Toast.LENGTH_SHORT).show()
 
@@ -970,12 +1011,14 @@ fun EditExpenseDialog(
                                 var updatedBanks = cachedData.bankList
                                 if (expense.sourceType == "Bank") {
                                     updatedBanks = updatedBanks.map {
-                                        if (it.accountNo == expense.sourceId) it.copy(currentBalance = it.currentBalance + expense.amount) else it
+                                        val match = it.accountNo == expense.sourceId || it.accountNo.endsWith(expense.sourceId) || expense.sourceId.endsWith(it.accountNo)
+                                        if (match) it.copy(currentBalance = it.currentBalance + expense.amount) else it
                                     }
                                 }
                                 if (selectedSourceType == "Bank") {
                                     updatedBanks = updatedBanks.map {
-                                        if (it.accountNo == selectedSourceId) it.copy(currentBalance = (it.currentBalance - newAmt).coerceAtLeast(0.0)) else it
+                                        val match = it.accountNo == selectedSourceId || it.accountNo.endsWith(selectedSourceId) || selectedSourceId.endsWith(it.accountNo)
+                                        if (match) it.copy(currentBalance = (it.currentBalance - newAmt).coerceAtLeast(0.0)) else it
                                     }
                                 }
 
@@ -1027,7 +1070,7 @@ fun EditExpenseDialog(
                                     )
                                 )
                             }
-                            
+
                             onSuccess()
 
                             CoroutineScope(Dispatchers.IO).launch {
@@ -1036,18 +1079,18 @@ fun EditExpenseDialog(
                                     val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
                                     if (!userQuery.isEmpty) {
                                         val userRef = userQuery.documents[0].reference
-                                        
+
                                         val expDateOnly = expense.date.split(" ")[0]
                                         val oldTargetDate = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).parse(expDateOnly) ?: Date()
                                         val oldDocId = SimpleDateFormat("yyyy_MM", Locale.getDefault()).format(oldTargetDate)
                                         val newDocId = SimpleDateFormat("yyyy_MM", Locale.getDefault()).format(Date(expenseDateMillis))
-                                        
+
                                         val paymentDetailStr = "$modeText | $selectedSourceType | $selectedSourceId"
 
                                         val oldDocRef = userRef.collection("Expenses").document(oldDocId)
                                         val oldDocSnap = oldDocRef.get().await()
                                         var targetKey: String? = null
-                                        
+
                                         if (oldDocSnap.exists()) {
                                             val dataMap = oldDocSnap.data ?: emptyMap()
                                             for ((key, value) in dataMap) {
@@ -1060,7 +1103,7 @@ fun EditExpenseDialog(
                                                     }
                                                     val dbAmount = ((value["amnt"] ?: value["amount"]) as? Number)?.toDouble() ?: 0.0
                                                     val dbCategory = (value["cat"] ?: value["category"])?.toString() ?: ""
-                                                    
+
                                                     val amountMatch = Math.abs(dbAmount - expense.amount) < 0.01
 
                                                     if (dbDateStr == expDateOnly && amountMatch && dbCategory == expense.category) {
@@ -1096,11 +1139,11 @@ fun EditExpenseDialog(
                                                         "000_total" to FieldValue.increment(-expense.amount)
                                                     )
                                                 ).await()
-                                                
+
                                                 val newDocRef = userRef.collection("Expenses").document(newDocId)
                                                 val newDocSnap = newDocRef.get().await()
                                                 var nextSeq = 1
-                                                
+
                                                 if (newDocSnap.exists()) {
                                                     val dataMap = newDocSnap.data ?: emptyMap()
                                                     val seqKeys = dataMap.keys.filter { it.matches(Regex("^\\d{3}$")) && it != "000_total" }
@@ -1110,7 +1153,7 @@ fun EditExpenseDialog(
                                                     }
                                                 }
                                                 val formattedSeq = String.format(Locale.US, "%03d", nextSeq)
-                                                
+
                                                 newDocRef.set(
                                                     mapOf(
                                                         formattedSeq to expData,
@@ -1210,17 +1253,17 @@ fun RFActionRow(
             shape = RoundedCornerShape(12.dp),
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant),
             colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface)
-        ) { 
-            Text("Cancel", fontWeight = FontWeight.Bold) 
+        ) {
+            Text("Cancel", fontWeight = FontWeight.Bold)
         }
-        
+
         Button(
             onClick = onConfirm,
             modifier = Modifier.weight(1f).height(50.dp).then(confirmModifier),
             shape = RoundedCornerShape(12.dp),
             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-        ) { 
-            Text(confirmText, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimary) 
+        ) {
+            Text(confirmText, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimary)
         }
     }
 }
