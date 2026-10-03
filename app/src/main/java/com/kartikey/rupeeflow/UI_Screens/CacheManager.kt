@@ -73,6 +73,41 @@ object CacheManager {
     private var bankSnapshotRegistration: ListenerRegistration? = null
     private var expensesSnapshotRegistration: ListenerRegistration? = null
 
+    private fun evaluateDatePeriods(dateStr: String, targetDay: Int, targetMonth: Int, targetYear: Int): Triple<Boolean, Boolean, Boolean> {
+        val cleanDate = dateStr.trim().split(" ")[0]
+        var d = 0
+        var m = 0
+        var y = 0
+
+        if (cleanDate.contains("/")) {
+            val parts = cleanDate.split("/")
+            if (parts.size == 3) {
+                d = parts[0].toIntOrNull() ?: 0
+                m = parts[1].toIntOrNull() ?: 0
+                y = parts[2].toIntOrNull() ?: 0
+            }
+        } else if (cleanDate.contains("-")) {
+            val parts = cleanDate.split("-")
+            if (parts.size == 3) {
+                if (parts[0].length == 4) {
+                    y = parts[0].toIntOrNull() ?: 0
+                    m = parts[1].toIntOrNull() ?: 0
+                    d = parts[2].toIntOrNull() ?: 0
+                } else {
+                    d = parts[0].toIntOrNull() ?: 0
+                    m = parts[1].toIntOrNull() ?: 0
+                    y = parts[2].toIntOrNull() ?: 0
+                }
+            }
+        }
+
+        val isThisYear = (y == targetYear)
+        val isThisMonth = (isThisYear && m == targetMonth)
+        val isToday = (isThisMonth && d == targetDay)
+
+        return Triple(isToday, isThisMonth, isThisYear)
+    }
+
     fun getProfilePicFile(context: Context): File {
         return File(context.cacheDir, "profile_pic.jpg")
     }
@@ -336,9 +371,9 @@ object CacheManager {
                             } else if (key != "last_updated" && key != "cash" && rawData is Map<*, *>) {
                                 val rawBank = rawData
                                 val bName = rawBank["bank"]?.toString() ?: ""
-                                val accNo = rawBank["ac"]?.toString() ?: rawBank["account no."]?.toString() ?: ""
-                                val curBal = (rawBank["bal"] as? Number)?.toDouble() ?: (rawBank["current bal."] as? Number)?.toDouble() ?: 0.0
-                                val rateYr = (rawBank["int %"] as? Number)?.toDouble() ?: (rawBank["intrest % (yr)"] as? Number)?.toDouble() ?: 0.0
+                                val accNo = rawBank["ac"]?.toString() ?: ""
+                                val curBal = (rawBank["bal"] as? Number)?.toDouble() ?: 0.0
+                                val rateYr = (rawBank["int %"] as? Number)?.toDouble() ?: 0.0
                                 val rateQtr = rateYr / 4.0
                                 val oneDayInt = (curBal * (rateYr / 100.0)) / 365.0
 
@@ -399,13 +434,6 @@ object CacheManager {
                         val currM = cal.get(Calendar.MONTH) + 1
                         val currY = cal.get(Calendar.YEAR)
 
-                        val currDayStr = String.format(Locale.US, "%02d", currD)
-                        val currMonthStr = String.format(Locale.US, "%02d", currM)
-                        val currYearStr = currY.toString()
-
-                        val todayPrefixSlash = "$currDayStr/$currMonthStr/$currYearStr"
-                        val todayPrefixDash = "$currYearStr-$currMonthStr-$currDayStr"
-
                         val tempHistory = mutableListOf<TransactionModel>()
                         var tempToday = 0.0
                         var tempMonth = 0.0
@@ -449,15 +477,15 @@ object CacheManager {
                                             )
                                         )
 
-                                        if (dateStr.startsWith(todayPrefixSlash) || dateStr.startsWith(todayPrefixDash)) {
+                                        val (isToday, isThisMonth, isThisYear) = evaluateDatePeriods(dateStr, currD, currM, currY)
+                                        if (isToday) {
                                             tempToday += amt
                                         }
-
-                                        if (dateStr.contains(currYearStr)) {
+                                        if (isThisMonth) {
+                                            tempMonth += amt
+                                        }
+                                        if (isThisYear) {
                                             tempYear += amt
-                                            if (dateStr.contains("-$currMonthStr-") || dateStr.contains("/$currMonthStr/") || dateStr.startsWith("$currMonthStr-") || dateStr.startsWith("$currMonthStr/")) {
-                                                tempMonth += amt
-                                            }
                                         }
                                     }
                                 }
@@ -1006,9 +1034,9 @@ object CacheManager {
                                 else if (key != "last_updated" && key != "cash" && rawData is Map<*, *>) {
                                     val rawBank = rawData
                                     val bName = rawBank["bank"]?.toString() ?: ""
-                                    val accNo = rawBank["ac"]?.toString() ?: rawBank["account no."]?.toString() ?: ""
-                                    val curBal = (rawBank["bal"] as? Number)?.toDouble() ?: (rawBank["current bal."] as? Number)?.toDouble() ?: 0.0
-                                    val rateYr = (rawBank["int %"] as? Number)?.toDouble() ?: (rawBank["intrest % (yr)"] as? Number)?.toDouble() ?: 0.0
+                                    val accNo = rawBank["ac"]?.toString() ?: ""
+                                    val curBal = (rawBank["bal"] as? Number)?.toDouble() ?: 0.0
+                                    val rateYr = (rawBank["int %"] as? Number)?.toDouble() ?: 0.0
                                     val rateQtr = rateYr / 4.0
                                     val oneDayInt = (curBal * (rateYr / 100.0)) / 365.0
 
@@ -1256,7 +1284,6 @@ object CacheManager {
                 val finalParsed = parseJsonToAppData(responseData)
                 _appDataState.value = finalParsed
 
-                // Auto-bind real-time snapshot listeners
                 startBankSnapshot(context, username)
                 startExpensesSnapshot(context, username)
 
@@ -1285,20 +1312,12 @@ object CacheManager {
         val tempVerify = profileObj?.optBoolean("verify", false) ?: false
 
         val expensesArray = jsonResponse.optJSONArray("expenses")
-        var tempTotal = 0.0
         var tempToday = 0.0
         var tempMonth = 0.0
         var tempYear = 0.0
         val tempHistory = mutableListOf<TransactionModel>()
 
         if (expensesArray != null && expensesArray.length() > 0) {
-            val currDayStr = String.format(Locale.US, "%02d", currD)
-            val currMonthStr = String.format(Locale.US, "%02d", currM)
-            val currYearStr = currY.toString()
-            
-            val todayPrefixSlash = "$currDayStr/$currMonthStr/$currYearStr"
-            val todayPrefixDash = "$currYearStr-$currMonthStr-$currDayStr" 
-            
             for (i in 0 until expensesArray.length()) {
                 val item = expensesArray.getJSONObject(i)
                 val rawDate = item.optString("date", "").trim()
@@ -1306,7 +1325,6 @@ object CacheManager {
                 val amt = rawAmt.replace("[^\\d.]".toRegex(), "").toDoubleOrNull() ?: item.optDouble("amount", 0.0)
                 
                 if (amt > 0.0) {
-                    tempTotal += amt 
                     tempHistory.add(
                         TransactionModel(
                             date = rawDate, 
@@ -1320,15 +1338,15 @@ object CacheManager {
                         )
                     )
                     
-                    if (rawDate.startsWith(todayPrefixSlash) || rawDate.startsWith(todayPrefixDash)) {
+                    val (isToday, isThisMonth, isThisYear) = evaluateDatePeriods(rawDate, currD, currM, currY)
+                    if (isToday) {
                         tempToday += amt
                     }
-
-                    if (rawDate.contains(currYearStr)) {
+                    if (isThisMonth) {
+                        tempMonth += amt
+                    }
+                    if (isThisYear) {
                         tempYear += amt
-                        if (rawDate.contains("-$currMonthStr-") || rawDate.contains("/$currMonthStr/") || rawDate.startsWith("$currMonthStr-") || rawDate.startsWith("$currMonthStr/")) {
-                            tempMonth += amt
-                        }
                     }
                 }
             }
