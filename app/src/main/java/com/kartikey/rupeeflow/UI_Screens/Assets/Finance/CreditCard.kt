@@ -2,10 +2,8 @@ package com.kartikey.rupeeflow.UI_Screens.Assets.Finance
 
 import android.widget.Toast
 import androidx.compose.animation.core.*
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -26,9 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -48,20 +44,20 @@ import java.util.Locale
 
 data class CreditCardItem(
     val firebaseKey: String = "",
-    val issuer: String,
-    val cardNo: String,
-    val type: String,
-    val limit: Double,
-    val outstanding: Double,
-    val available: Double,
-    val utilization: Double,
-    val cibilStatus: String,
-    val billingDay: Int,
-    val dueDay: Int,
-    val reminderDay: Int,
-    val annualFee: Double,
-    val joiningFee: Double,
-    val lastUsed: String
+    val issuer: String = "",
+    val cardNo: String = "",
+    val type: String = "",
+    val limit: Double = 0.0,
+    val outstanding: Double = 0.0,
+    val available: Double = (limit - outstanding).coerceAtLeast(0.0),
+    val utilization: Double = if (limit > 0) (outstanding / limit) * 100.0 else 0.0,
+    val cibilStatus: String = if (limit > 0 && (outstanding / limit) * 100.0 <= 30.0) "Safe" else "High Risk",
+    val billingDay: Int = 0,
+    val dueDay: Int = 0,
+    val reminderDay: Int = 0,
+    val annualFee: Double = 0.0,
+    val joiningFee: Double = 0.0,
+    val lastUsed: String = ""
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -87,12 +83,12 @@ fun CreditCardsScreen(
             TopAppBar(
                 title = { Text("Credit Cards", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
                 navigationIcon = { 
-                    IconButton(onClick = onBackClick, modifier = Modifier.bounceClick()) { 
+                    IconButton(onClick = onBackClick, modifier = Modifier.bounceClick(scaleDown = 0.94f)) { 
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.onSurface) 
                     } 
                 },
                 actions = { 
-                    IconButton(onClick = onRefreshClick, modifier = Modifier.bounceClick()) { 
+                    IconButton(onClick = onRefreshClick, modifier = Modifier.bounceClick(scaleDown = 0.94f)) { 
                         Icon(Icons.Outlined.Refresh, contentDescription = "Refresh", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.rotate(if (isLoading) angle else 0f)) 
                     } 
                 },
@@ -192,10 +188,10 @@ fun CCDetailCard(
                     Text(text = "Card: ${cc.cardNo} | ${cc.type}", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, letterSpacing = 1.sp)
                 }
                 
-                IconButton(onClick = { /* Reminders */ }, modifier = Modifier.bounceClick()) {
+                IconButton(onClick = { }, modifier = Modifier.bounceClick(scaleDown = 0.94f)) {
                     Icon(Icons.Outlined.Notifications, contentDescription = "Reminders", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(22.dp))
                 }
-                IconButton(onClick = { onEditClick(cc) }, modifier = Modifier.bounceClick()) {
+                IconButton(onClick = { onEditClick(cc) }, modifier = Modifier.bounceClick(scaleDown = 0.94f)) {
                     Icon(Icons.Outlined.Edit, contentDescription = "Edit Card", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(22.dp))
                 }
             }
@@ -210,7 +206,7 @@ fun CCDetailCard(
                 
                 IconButton(
                     onClick = { showQuickUpdate = true },
-                    modifier = Modifier.size(36.dp).bounceClick().background(MaterialTheme.colorScheme.primaryContainer, CircleShape)
+                    modifier = Modifier.size(36.dp).bounceClick(scaleDown = 0.94f).background(MaterialTheme.colorScheme.primaryContainer, CircleShape)
                 ) {
                     Icon(Icons.Default.Add, contentDescription = "Update Outstanding", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
                 }
