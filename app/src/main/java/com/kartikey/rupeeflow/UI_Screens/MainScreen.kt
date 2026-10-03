@@ -97,7 +97,6 @@ fun MainScreen(
     
     var isUpdateAvailable by remember { mutableStateOf(false) } 
 
-    // ⚡ REAL-TIME STATE SYNC FROM CACHEMANAGER SNAPSHOTS & OPTIMISTIC CACHE ⚡
     val globalAppData by CacheManager.appDataState.collectAsState()
 
     LaunchedEffect(globalAppData) {
@@ -363,7 +362,7 @@ fun MainScreen(
                                 totalBankBalance = totalBank,
                                 onInvestmentClick = { assetsCurrentView = "InvestmentDetails"; selectedTab = 1 },
                                 onBankClick = { assetsCurrentView = "DirectBankAccounts"; selectedTab = 1 },
-                                onBudgetSaved = { refreshTrigger++ } 
+                                onBudgetSaved = { /* Real-time updated via UserDoc Snapshot */ } 
                             )
                         }
                         1 -> AssetsScreen(
@@ -392,9 +391,9 @@ fun MainScreen(
 
         AddScreen(
             username = username, showMenu = showAddMenu, onToggleMenu = { showAddMenu = !showAddMenu }, 
-            onExpenseAdded = { /* Snapshot listener and optimistic cache automatically update state */ }, 
-            onInvestmentAdded = { refreshTrigger++ }, 
-            onFinanceAdded = { refreshTrigger++ }, 
+            onExpenseAdded = { /* Snapshot listener handles it */ }, 
+            onInvestmentAdded = { /* Real-time updated via UserDoc Snapshot */ }, 
+            onFinanceAdded = { /* Real-time updated via CCFD Snapshot */ }, 
             bankList = bankList, ccList = ccList, cashData = cashData
         )
 
@@ -411,7 +410,7 @@ fun MainScreen(
                 fd = fdToEdit!!, 
                 username = username, 
                 onDismiss = { fdToEdit = null }, 
-                onUpdateSuccess = { fdToEdit = null; refreshTrigger++ }
+                onUpdateSuccess = { fdToEdit = null }
             ) 
         }
         if (expenseToDelete != null) { 
