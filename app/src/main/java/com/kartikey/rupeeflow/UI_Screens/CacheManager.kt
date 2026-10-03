@@ -3,12 +3,12 @@ package com.kartikey.rupeeflow.UI_Screens
 import android.content.Context
 import android.net.Uri
 import com.google.firebase.Timestamp
+import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.SetOptions
-import com.kartikey.rupeeflow.Cloud_Database.Constants
 import com.kartikey.rupeeflow.UI_Screens.Add.TransactionModel
 import com.kartikey.rupeeflow.UI_Screens.Assets.InvestmentItem
 import com.kartikey.rupeeflow.UI_Screens.Assets.InvestmentHistoryItem
@@ -33,7 +33,6 @@ import java.io.File
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.Calendar
-import java.util.Date
 import java.util.Locale
 
 data class NetworthDataPoint(
@@ -64,6 +63,13 @@ data class AppData(
     val networthHistory: Map<String, List<Double>> = emptyMap()
 )
 
+private data class ParsedExpensesResult(
+    val transactions: List<TransactionModel>,
+    val today: Double,
+    val month: Double,
+    val year: Double
+)
+
 object CacheManager {
     private const val PREFS_NAME = "RupeeFlow_GlobalCache"
     
@@ -74,6 +80,10 @@ object CacheManager {
     private var expensesSnapshotRegistration: ListenerRegistration? = null
     private var ccfdSnapshotRegistration: ListenerRegistration? = null
     private var userDocSnapshotRegistration: ListenerRegistration? = null
+
+    // ========================================================
+    // 🛠️ REFACTORED SHARED PARSING HELPERS 🛠️
+    // ========================================================
 
     private fun evaluateDatePeriods(dateStr: String, targetDay: Int, targetMonth: Int, targetYear: Int): Triple<Boolean, Boolean, Boolean> {
         val cleanDate = dateStr.trim().split(" ")[0]
@@ -109,6 +119,312 @@ object CacheManager {
 
         return Triple(isToday, isThisMonth, isThisYear)
     }
+
+    private fun parseExpensesDocs(docs: List<DocumentSnapshot>): ParsedExpensesResult {
+        val cal = Calendar.getInstance()
+        val currD = cal.get(Calendar.DAY_OF_MONTH)
+        val currM = cal.get(Calendar.MONTH) + 1
+        val currY = cal.get(Calendar.YEAR)
+
+        val tempHistory = mutableListOf<TransactionModel>()
+        var tempToday = 0.0
+        var tempMonth = 0.0
+        var tempYear = 0.0
+
+        for (doc in docs) {
+            val dataMap = doc.data ?: continue
+            for ((key, value) in dataMap) {
+                if (key != "000_total" && value is Map<*, *>) {
+                    val rawDate = value["dt"] ?: value["date"]
+                    val dateStr = when (rawDate) {
+                        is Timestamp -> SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(rawDate.toDate())
+                        is String -> rawDate
+                        else -> ""
+                    }
+
+                    val rawAmt = value["amnt"] ?: value["amount"]
+                    val amt = (rawAmt as? Number)?.toDouble() ?: 0.0
+                    val cat = (value["cat"] ?: value["category"])?.toString() ?: "Unknown"
+                    val det1 = (value["det1"] ?: value["detail1"])?.toString() ?: ""
+                    val det2 = (value["det2"] ?: value["detail2"])?.toString() ?: ""
+
+                    val paymentDetail = (value["pay"] ?: value["mode"])?.toString() ?: ""
+                    val splitPayment = paymentDetail.split("|").map { it.trim() }
+
+                    val mode = if (splitPayment.isNotEmpty()) splitPayment[0] else ""
+                    val sourceType = if (splitPayment.size > 1) splitPayment[1] else ""
+                    val sourceId = if (splitPayment.size > 2) splitPayment[2] else ""
+
+                    if (amt > 0.0) {
+                        tempHistory.add(
+                            TransactionModel(
+                                date = dateStr,
+                                amount = amt,
+                                category = cat,
+                                remark1 = det1,
+                                remark2 = det2,
+                                mode = mode,
+                                sourceType = sourceType,
+                                sourceId = sourceId
+                            )
+                        )
+
+                        val (isToday, isThisMonth, isThisYear) = evaluateDatePeriods(dateStr, currD, currM, currY)
+                        if (isToday) tempToday += amt
+                        if (isThisMonth) tempMonth += amt
+                        if (isThisYear) tempYear += amt
+                    }
+                }
+            }
+        }
+
+        val formatWithTime = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
+        val formatOnlyDate = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+
+        val sortedHistory = tempHistory.sortedByDescending { tx ->
+            try {
+                formatWithTime.parse(tx.date)?.time ?: formatOnlyDate.parse(tx.date)?.time ?: 0L
+            } catch (e: Exception) {
+                0L
+            }
+        }
+
+        return ParsedExpensesResult(sortedHistory, tempToday, tempMonth, tempYear)
+    }
+
+    private fun parseBankAndCash(dataMap: Map<String, Any?>): Pair<List<BankAccountItem>, CashItem?> {
+        val banks = mutableListOf<BankAccountItem>()
+        var cash: CashItem? = null
+
+        dataMap.forEach { (key, rawData) ->
+            if (key == "cash" && rawData is Map<*, *>) {
+                val amnt = (rawData["amnt"] as? Number)?.toDouble() ?: 0.0
+                val lastUpd = rawData["last update"]
+                val lastUpdStr = when (lastUpd) {
+                    is Timestamp -> SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(lastUpd.toDate())
+                    is String -> lastUpd
+                    else -> ""
+                }
+                cash = CashItem(amnt, lastUpdStr)
+            } else if (key != "last_updated" && key != "cash" && rawData is Map<*, *>) {
+                val rawBank = rawData
+                val bName = rawBank["bank"]?.toString() ?: ""
+                val accNo = rawBank["ac"]?.toString() ?: ""
+                val curBal = (rawBank["bal"] as? Number)?.toDouble() ?: 0.0
+                val rateYr = (rawBank["int %"] as? Number)?.toDouble() ?: 0.0
+                val rateQtr = rateYr / 4.0
+                val oneDayInt = (curBal * (rateYr / 100.0)) / 365.0
+
+                banks.add(
+                    BankAccountItem(
+                        firebaseKey = key,
+                        bankName = bName,
+                        accountNo = accNo,
+                        currentBalance = curBal,
+                        interestRate = rateYr,
+                        qtrInterestPct = rateQtr,
+                        expQtrInt = curBal * (rateQtr / 100.0),
+                        accruedQtrInt = 0.0,
+                        expYrInt = curBal * (rateYr / 100.0),
+                        accruedYrInt = 0.0,
+                        oneDayInt = oneDayInt
+                    )
+                )
+            }
+        }
+        return Pair(banks, cash)
+    }
+
+    private fun parseCCList(ccMap: Map<*, *>?): List<CreditCardItem> {
+        val list = mutableListOf<CreditCardItem>()
+        ccMap?.forEach { (key, rawCc) ->
+            if (rawCc is Map<*, *>) {
+                val issuer = rawCc["issuer"]?.toString() ?: ""
+                val cardNo = rawCc["card no."]?.toString() ?: ""
+                val type = rawCc["type"]?.toString() ?: ""
+                val limit = (rawCc["limit"] as? Number)?.toDouble() ?: 0.0
+                val outstanding = (rawCc["outstanding"] as? Number)?.toDouble() ?: 0.0
+
+                val avail = limit - outstanding
+                val util = if (limit > 0) (outstanding / limit) * 100.0 else 0.0
+                val cibilStatus = if (util <= 30.0) "Safe" else "High Risk"
+
+                val lastUseTs = rawCc["last use"] as? Timestamp
+                val lastUseStr = lastUseTs?.let {
+                    SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(it.toDate())
+                } ?: ""
+
+                list.add(
+                    CreditCardItem(
+                        firebaseKey = key.toString(),
+                        issuer = issuer,
+                        cardNo = cardNo,
+                        type = type,
+                        limit = limit,
+                        outstanding = outstanding,
+                        available = avail,
+                        utilization = util,
+                        cibilStatus = cibilStatus,
+                        billingDay = (rawCc["billing"] as? Number)?.toInt() ?: 0,
+                        dueDay = (rawCc["due"] as? Number)?.toInt() ?: 0,
+                        reminderDay = (rawCc["rmndr"] as? Number)?.toInt() ?: 0,
+                        annualFee = (rawCc["yr fee"] as? Number)?.toDouble() ?: 0.0,
+                        joiningFee = (rawCc["join fee"] as? Number)?.toDouble() ?: 0.0,
+                        lastUsed = lastUseStr
+                    )
+                )
+            }
+        }
+        return list
+    }
+
+    private fun parseFDList(fdMap: Map<*, *>?, todayMillis: Long): List<FDItem> {
+        val list = mutableListOf<FDItem>()
+        fdMap?.forEach { (key, rawFd) ->
+            if (rawFd is Map<*, *>) {
+                val bank = rawFd["bank"]?.toString() ?: ""
+                val accNo = rawFd["fd ac"]?.toString() ?: ""
+                val amnt = (rawFd["amnt"] as? Number)?.toDouble() ?: 0.0
+                val rate = (rawFd["int % yr"] as? Number)?.toDouble() ?: 0.0
+
+                val createTs = rawFd["create"] as? Timestamp
+                val maturTs = rawFd["matur"] as? Timestamp
+
+                val createStr = createTs?.let { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(it.toDate()) } ?: ""
+                val maturStr = maturTs?.let { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(it.toDate()) } ?: ""
+
+                var daysToMat = 0
+                var matVal = amnt
+                var accVal = amnt
+                var accInt = 0.0
+                var oneDayInt = 0.0
+
+                if (createTs != null && maturTs != null) {
+                    val createMillis = createTs.toDate().time
+                    val maturMillis = maturTs.toDate().time
+
+                    val totalDays = maxOf(0L, (maturMillis - createMillis) / (1000 * 60 * 60 * 24))
+                    daysToMat = maxOf(0L, (maturMillis - todayMillis) / (1000 * 60 * 60 * 24)).toInt()
+                    val daysPassed = maxOf(0L, (minOf(todayMillis, maturMillis) - createMillis) / (1000 * 60 * 60 * 24))
+
+                    matVal = amnt * Math.pow(1 + (rate / 100.0), totalDays / 365.0)
+                    accVal = amnt * Math.pow(1 + (rate / 100.0), daysPassed / 365.0)
+                    accInt = accVal - amnt
+
+                    oneDayInt = if (todayMillis >= maturMillis || todayMillis < createMillis) 0.0 else (accVal * (rate / 100.0)) / 365.0
+                }
+
+                list.add(
+                    FDItem(
+                        firebaseKey = key.toString(),
+                        bankName = bank,
+                        accountNo = accNo,
+                        createDate = createStr,
+                        maturityDate = maturStr,
+                        daysToMaturity = daysToMat,
+                        investedAmt = amnt,
+                        interestRate = rate,
+                        maturityValue = matVal,
+                        accruedValue = accVal,
+                        accruedInt = accInt,
+                        oneDayInt = oneDayInt
+                    )
+                )
+            }
+        }
+        return list
+    }
+
+    private fun parseInvestments(
+        investMap: Map<*, *>?,
+        priceProvider: (String, Double) -> Pair<Double, Double>
+    ): List<InvestmentItem> {
+        val list = mutableListOf<InvestmentItem>()
+        if (investMap == null) return list
+
+        for ((_, value) in investMap) {
+            val itemData = value as? Map<*, *> ?: continue
+            val dbName = itemData["name"]?.toString()?.trim()?.uppercase() ?: ""
+            val buyPrice = (itemData["avg"] as? Number)?.toDouble() ?: 0.0
+            val (currentPrice, oneDayChange) = priceProvider(dbName, buyPrice)
+
+            val parsedHistoryList = mutableListOf<InvestmentHistoryItem>()
+            val historyMapRaw = itemData["history"] as? Map<*, *>
+            if (historyMapRaw != null) {
+                for ((_, hVal) in historyMapRaw) {
+                    val hData = hVal as? Map<*, *> ?: continue
+                    val rawDt = hData["dt"]
+                    val dtStr = when (rawDt) {
+                        is Timestamp -> SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(rawDt.toDate())
+                        is String -> rawDt
+                        else -> ""
+                    }
+                    parsedHistoryList.add(
+                        InvestmentHistoryItem(
+                            date = dtStr,
+                            quantity = (hData["qnt"] as? Number)?.toDouble() ?: 0.0,
+                            price = (hData["prc"] as? Number)?.toDouble() ?: 0.0,
+                            amount = (hData["amnt"] as? Number)?.toDouble() ?: 0.0,
+                            brokerage = (hData["brkrg"] as? Number)?.toDouble() ?: 0.0
+                        )
+                    )
+                }
+            }
+
+            list.add(
+                InvestmentItem(
+                    assetName = dbName,
+                    assetType = itemData["type"]?.toString() ?: "Stock",
+                    quantity = (itemData["qnt"] as? Number)?.toDouble() ?: 0.0,
+                    avgBuyPrice = buyPrice,
+                    currentPrice = currentPrice,
+                    oneDayChangePrice = oneDayChange,
+                    history = parsedHistoryList
+                )
+            )
+        }
+        return list
+    }
+
+    private fun parseContriRooms(roomsArray: List<*>?): List<ContriRoomModel> {
+        val list = mutableListOf<ContriRoomModel>()
+        if (roomsArray == null) return list
+
+        for (roomItem in roomsArray) {
+            val roomStr = roomItem.toString()
+            val parts = roomStr.split("_")
+            if (parts.size >= 3) {
+                var rName = parts[2]
+                val rCode = parts[1]
+                val rPin = if (parts.size >= 4) parts[3] else "123456"
+
+                if (rName.contains("_")) {
+                    val suffix = rName.substringAfterLast("_")
+                    if (suffix.length == 6 && suffix.all { it.isDigit() }) {
+                        rName = rName.substringBeforeLast("_")
+                    }
+                }
+                list.add(ContriRoomModel(rName, rCode, "", rPin))
+            }
+        }
+        return list
+    }
+
+    private fun parseNetworthMap(rawNtworth: Map<*, *>?): Map<String, List<Double>> {
+        val ntworthMap = mutableMapOf<String, List<Double>>()
+        rawNtworth?.forEach { (k, v) ->
+            if (v is List<*>) {
+                val arr = mutableListOf<Double>()
+                v.forEach { num -> arr.add((num as? Number)?.toDouble() ?: 0.0) }
+                ntworthMap[k.toString()] = arr
+            }
+        }
+        return ntworthMap
+    }
+
+    // ========================================================
+    // 🖼️ PROFILE PICTURE UTILITIES 🖼️
+    // ========================================================
 
     fun getProfilePicFile(context: Context): File {
         return File(context.cacheDir, "profile_pic.jpg")
@@ -170,6 +486,10 @@ object CacheManager {
             }
         }
     }
+
+    // ========================================================
+    // 💾 CACHE & STORAGE SYNCHRONIZATION 💾
+    // ========================================================
 
     fun getCachedData(context: Context, username: String): AppData? {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -338,8 +658,9 @@ object CacheManager {
     }
 
     // ========================================================
-    // ⚡ REAL-TIME SNAPSHOT LISTENER: FINANCES / BANK ⚡
+    // ⚡ REAL-TIME SNAPSHOT LISTENERS ⚡
     // ========================================================
+
     fun startBankSnapshot(context: Context, username: String) {
         if (bankSnapshotRegistration != null) return
 
@@ -355,49 +676,12 @@ object CacheManager {
                         if (error != null || snapshot == null || !snapshot.exists()) return@addSnapshotListener
 
                         val currentData = _appDataState.value ?: getCachedData(context, username) ?: return@addSnapshotListener
-                        val dataMap = snapshot.data ?: return@addSnapshotListener
+                        val (newBanks, newCash) = parseBankAndCash(snapshot.data ?: emptyMap())
 
-                        val newBanks = mutableListOf<BankAccountItem>()
-                        var newCash = currentData.cashData
-
-                        dataMap.forEach { (key, rawData) ->
-                            if (key == "cash" && rawData is Map<*, *>) {
-                                val amnt = (rawData["amnt"] as? Number)?.toDouble() ?: 0.0
-                                val lastUpd = rawData["last update"]
-                                val lastUpdStr = when (lastUpd) {
-                                    is Timestamp -> SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(lastUpd.toDate())
-                                    is String -> lastUpd
-                                    else -> ""
-                                }
-                                newCash = CashItem(amnt, lastUpdStr)
-                            } else if (key != "last_updated" && key != "cash" && rawData is Map<*, *>) {
-                                val rawBank = rawData
-                                val bName = rawBank["bank"]?.toString() ?: ""
-                                val accNo = rawBank["ac"]?.toString() ?: ""
-                                val curBal = (rawBank["bal"] as? Number)?.toDouble() ?: 0.0
-                                val rateYr = (rawBank["int %"] as? Number)?.toDouble() ?: 0.0
-                                val rateQtr = rateYr / 4.0
-                                val oneDayInt = (curBal * (rateYr / 100.0)) / 365.0
-
-                                newBanks.add(
-                                    BankAccountItem(
-                                        firebaseKey = key,
-                                        bankName = bName,
-                                        accountNo = accNo,
-                                        currentBalance = curBal,
-                                        interestRate = rateYr,
-                                        qtrInterestPct = rateQtr,
-                                        expQtrInt = curBal * (rateQtr / 100.0),
-                                        accruedQtrInt = 0.0,
-                                        expYrInt = curBal * (rateYr / 100.0),
-                                        accruedYrInt = 0.0,
-                                        oneDayInt = oneDayInt
-                                    )
-                                )
-                            }
-                        }
-
-                        val updatedData = currentData.copy(bankList = newBanks, cashData = newCash)
+                        val updatedData = currentData.copy(
+                            bankList = newBanks,
+                            cashData = newCash ?: currentData.cashData
+                        )
                         updateOptimisticCache(context, username, updatedData)
                     }
                 }
@@ -412,9 +696,6 @@ object CacheManager {
         bankSnapshotRegistration = null
     }
 
-    // ========================================================
-    // ⚡ REAL-TIME SNAPSHOT LISTENER: EXPENSES COLLECTION ⚡
-    // ========================================================
     fun startExpensesSnapshot(context: Context, username: String) {
         if (expensesSnapshotRegistration != null) return
 
@@ -430,86 +711,13 @@ object CacheManager {
                         if (error != null || snapshot == null) return@addSnapshotListener
 
                         val currentData = _appDataState.value ?: getCachedData(context, username) ?: return@addSnapshotListener
-
-                        val cal = Calendar.getInstance()
-                        val currD = cal.get(Calendar.DAY_OF_MONTH)
-                        val currM = cal.get(Calendar.MONTH) + 1
-                        val currY = cal.get(Calendar.YEAR)
-
-                        val tempHistory = mutableListOf<TransactionModel>()
-                        var tempToday = 0.0
-                        var tempMonth = 0.0
-                        var tempYear = 0.0
-
-                        for (doc in snapshot.documents) {
-                            val dataMap = doc.data ?: continue
-                            for ((key, value) in dataMap) {
-                                if (key != "000_total" && value is Map<*, *>) {
-                                    val rawDate = value["dt"] ?: value["date"]
-                                    val dateStr = when (rawDate) {
-                                        is Timestamp -> SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(rawDate.toDate())
-                                        is String -> rawDate
-                                        else -> ""
-                                    }
-
-                                    val rawAmt = value["amnt"] ?: value["amount"]
-                                    val amt = (rawAmt as? Number)?.toDouble() ?: 0.0
-                                    val cat = (value["cat"] ?: value["category"])?.toString() ?: "Unknown"
-                                    val det1 = (value["det1"] ?: value["detail1"])?.toString() ?: ""
-                                    val det2 = (value["det2"] ?: value["detail2"])?.toString() ?: ""
-
-                                    val paymentDetail = (value["pay"] ?: value["mode"])?.toString() ?: ""
-                                    val splitPayment = paymentDetail.split("|").map { it.trim() }
-
-                                    val mode = if (splitPayment.isNotEmpty()) splitPayment[0] else ""
-                                    val sourceType = if (splitPayment.size > 1) splitPayment[1] else ""
-                                    val sourceId = if (splitPayment.size > 2) splitPayment[2] else ""
-
-                                    if (amt > 0.0) {
-                                        tempHistory.add(
-                                            TransactionModel(
-                                                date = dateStr,
-                                                amount = amt,
-                                                category = cat,
-                                                remark1 = det1,
-                                                remark2 = det2,
-                                                mode = mode,
-                                                sourceType = sourceType,
-                                                sourceId = sourceId
-                                            )
-                                        )
-
-                                        val (isToday, isThisMonth, isThisYear) = evaluateDatePeriods(dateStr, currD, currM, currY)
-                                        if (isToday) {
-                                            tempToday += amt
-                                        }
-                                        if (isThisMonth) {
-                                            tempMonth += amt
-                                        }
-                                        if (isThisYear) {
-                                            tempYear += amt
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        val formatWithTime = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
-                        val formatOnlyDate = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
-
-                        val sortedHistory = tempHistory.sortedByDescending { tx ->
-                            try {
-                                formatWithTime.parse(tx.date)?.time ?: formatOnlyDate.parse(tx.date)?.time ?: 0L
-                            } catch (e: Exception) {
-                                0L
-                            }
-                        }
+                        val parsedExp = parseExpensesDocs(snapshot.documents)
 
                         val updatedData = currentData.copy(
-                            transactionList = sortedHistory,
-                            todayExpenses = tempToday,
-                            thisMonthExpenses = tempMonth,
-                            thisYearExpenses = tempYear
+                            transactionList = parsedExp.transactions,
+                            todayExpenses = parsedExp.today,
+                            thisMonthExpenses = parsedExp.month,
+                            thisYearExpenses = parsedExp.year
                         )
                         updateOptimisticCache(context, username, updatedData)
                     }
@@ -525,9 +733,6 @@ object CacheManager {
         expensesSnapshotRegistration = null
     }
 
-    // ========================================================
-    // ⚡ REAL-TIME SNAPSHOT LISTENER: FINANCES / CC FD ⚡
-    // ========================================================
     fun startCCFDSnapshot(context: Context, username: String) {
         if (ccfdSnapshotRegistration != null) return
 
@@ -543,102 +748,10 @@ object CacheManager {
                         if (error != null || snapshot == null || !snapshot.exists()) return@addSnapshotListener
 
                         val currentData = _appDataState.value ?: getCachedData(context, username) ?: return@addSnapshotListener
-                        val dataMap = snapshot.data ?: return@addSnapshotListener
-
-                        val newCCList = mutableListOf<CreditCardItem>()
-                        val newFDList = mutableListOf<FDItem>()
-                        val todayMillis = System.currentTimeMillis()
-
-                        val ccMap = dataMap["CC"] as? Map<*, *>
-                        ccMap?.forEach { (key, rawCc) ->
-                            if (rawCc is Map<*, *>) {
-                                val issuer = rawCc["issuer"]?.toString() ?: ""
-                                val cardNo = rawCc["card no."]?.toString() ?: ""
-                                val type = rawCc["type"]?.toString() ?: ""
-                                val limit = (rawCc["limit"] as? Number)?.toDouble() ?: 0.0
-                                val outstanding = (rawCc["outstanding"] as? Number)?.toDouble() ?: 0.0
-
-                                val avail = limit - outstanding
-                                val util = if (limit > 0) (outstanding / limit) * 100.0 else 0.0
-                                val cibilStatus = if (util <= 30.0) "Safe" else "High Risk"
-
-                                newCCList.add(
-                                    CreditCardItem(
-                                        firebaseKey = key.toString(),
-                                        issuer = issuer,
-                                        cardNo = cardNo,
-                                        type = type,
-                                        limit = limit,
-                                        outstanding = outstanding,
-                                        available = avail,
-                                        utilization = util,
-                                        cibilStatus = cibilStatus,
-                                        billingDay = (rawCc["billing"] as? Number)?.toInt() ?: 0,
-                                        dueDay = (rawCc["due"] as? Number)?.toInt() ?: 0,
-                                        reminderDay = (rawCc["rmndr"] as? Number)?.toInt() ?: 0,
-                                        annualFee = (rawCc["yr fee"] as? Number)?.toDouble() ?: 0.0,
-                                        joiningFee = (rawCc["join fee"] as? Number)?.toDouble() ?: 0.0,
-                                        lastUsed = (rawCc["last use"] as? Timestamp)?.let {
-                                            SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(it.toDate())
-                                        } ?: ""
-                                    )
-                                )
-                            }
-                        }
-
-                        val fdMap = dataMap["FD"] as? Map<*, *>
-                        fdMap?.forEach { (key, rawFd) ->
-                            if (rawFd is Map<*, *>) {
-                                val bank = rawFd["bank"]?.toString() ?: ""
-                                val accNo = rawFd["fd ac"]?.toString() ?: ""
-                                val amnt = (rawFd["amnt"] as? Number)?.toDouble() ?: 0.0
-                                val rate = (rawFd["int % yr"] as? Number)?.toDouble() ?: 0.0
-
-                                val createTs = rawFd["create"] as? Timestamp
-                                val maturTs = rawFd["matur"] as? Timestamp
-
-                                val createStr = createTs?.let { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(it.toDate()) } ?: ""
-                                val maturStr = maturTs?.let { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(it.toDate()) } ?: ""
-
-                                var daysToMat = 0
-                                var matVal = amnt
-                                var accVal = amnt
-                                var accInt = 0.0
-                                var oneDayInt = 0.0
-
-                                if (createTs != null && maturTs != null) {
-                                    val createMillis = createTs.toDate().time
-                                    val maturMillis = maturTs.toDate().time
-
-                                    val totalDays = maxOf(0L, (maturMillis - createMillis) / (1000 * 60 * 60 * 24))
-                                    daysToMat = maxOf(0L, (maturMillis - todayMillis) / (1000 * 60 * 60 * 24)).toInt()
-                                    val daysPassed = maxOf(0L, (minOf(todayMillis, maturMillis) - createMillis) / (1000 * 60 * 60 * 24))
-
-                                    matVal = amnt * Math.pow(1 + (rate / 100.0), totalDays / 365.0)
-                                    accVal = amnt * Math.pow(1 + (rate / 100.0), daysPassed / 365.0)
-                                    accInt = accVal - amnt
-
-                                    oneDayInt = if (todayMillis >= maturMillis || todayMillis < createMillis) 0.0 else (accVal * (rate / 100.0)) / 365.0
-                                }
-
-                                newFDList.add(
-                                    FDItem(
-                                        firebaseKey = key.toString(),
-                                        bankName = bank,
-                                        accountNo = accNo,
-                                        createDate = createStr,
-                                        maturityDate = maturStr,
-                                        daysToMaturity = daysToMat,
-                                        investedAmt = amnt,
-                                        interestRate = rate,
-                                        maturityValue = matVal,
-                                        accruedValue = accVal,
-                                        accruedInt = accInt,
-                                        oneDayInt = oneDayInt
-                                    )
-                                )
-                            }
-                        }
+                        val dataMap = snapshot.data ?: emptyMap()
+                        
+                        val newCCList = parseCCList(dataMap["CC"] as? Map<*, *>)
+                        val newFDList = parseFDList(dataMap["FD"] as? Map<*, *>, System.currentTimeMillis())
 
                         val updatedData = currentData.copy(ccList = newCCList, fdList = newFDList)
                         updateOptimisticCache(context, username, updatedData)
@@ -655,9 +768,6 @@ object CacheManager {
         ccfdSnapshotRegistration = null
     }
 
-    // =========================================================================
-    // ⚡ REAL-TIME SNAPSHOT LISTENER: USER DOCUMENT (PROFILE & INVESTMENTS) ⚡
-    // =========================================================================
     fun startUserDocSnapshot(context: Context, username: String) {
         if (userDocSnapshotRegistration != null) return
 
@@ -687,87 +797,15 @@ object CacheManager {
                         }
 
                         val budgetLimit = snapshot.getDouble("budget_limit") ?: currentData.budgetLimit
-
-                        val ntworthMap = mutableMapOf<String, List<Double>>()
-                        val rawNtworth = snapshot.get("ntworth") as? Map<*, *> ?: emptyMap<Any, Any>()
-                        rawNtworth.forEach { (k, v) ->
-                            if (v is List<*>) {
-                                val arr = mutableListOf<Double>()
-                                v.forEach { num -> arr.add((num as? Number)?.toDouble() ?: 0.0) }
-                                ntworthMap[k.toString()] = arr
-                            }
-                        }
-
-                        val contriList = mutableListOf<ContriRoomModel>()
-                        val roomsArray = snapshot.get("rooms") as? List<*> ?: emptyList<Any>()
-                        for (roomItem in roomsArray) {
-                            val roomStr = roomItem.toString()
-                            val parts = roomStr.split("_")
-                            if (parts.size >= 3) {
-                                var rName = parts[2]
-                                val rCode = parts[1]
-                                val rPin = if (parts.size >= 4) parts[3] else "123456"
-
-                                if (rName.contains("_")) {
-                                    val suffix = rName.substringAfterLast("_")
-                                    if (suffix.length == 6 && suffix.all { it.isDigit() }) {
-                                        rName = rName.substringBeforeLast("_")
-                                    }
-                                }
-                                contriList.add(ContriRoomModel(rName, rCode, "", rPin))
-                            }
-                        }
+                        val ntworthMap = parseNetworthMap(snapshot.get("ntworth") as? Map<*, *>)
+                        val contriList = parseContriRooms(snapshot.get("rooms") as? List<*>)
 
                         val investMap = snapshot.get("invest") as? Map<String, Any> ?: emptyMap()
                         val existingQuotes = currentData.investmentList.associateBy({ it.assetName.uppercase() }, { it.currentPrice to it.oneDayChangePrice })
-                        val fetchedInvList = mutableListOf<InvestmentItem>()
-
-                        for ((_, value) in investMap) {
-                            val itemData = value as? Map<String, Any>
-                            if (itemData != null) {
-                                val dbName = itemData["name"]?.toString()?.trim()?.uppercase() ?: ""
-                                val buyPrice = (itemData["avg"] as? Number)?.toDouble() ?: 0.0
-                                val cachedPrices = existingQuotes[dbName]
-                                val currentPrice = cachedPrices?.first ?: buyPrice
-                                val oneDayChange = cachedPrices?.second ?: 0.0
-
-                                val parsedHistoryList = mutableListOf<InvestmentHistoryItem>()
-                                val historyMapRaw = itemData["history"] as? Map<String, Any>
-                                if (historyMapRaw != null) {
-                                    for ((_, hVal) in historyMapRaw) {
-                                        val hData = hVal as? Map<String, Any>
-                                        if (hData != null) {
-                                            val rawDt = hData["dt"]
-                                            val dtStr = when (rawDt) {
-                                                is Timestamp -> SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(rawDt.toDate())
-                                                is String -> rawDt
-                                                else -> ""
-                                            }
-                                            parsedHistoryList.add(
-                                                InvestmentHistoryItem(
-                                                    date = dtStr,
-                                                    quantity = (hData["qnt"] as? Number)?.toDouble() ?: 0.0,
-                                                    price = (hData["prc"] as? Number)?.toDouble() ?: 0.0,
-                                                    amount = (hData["amnt"] as? Number)?.toDouble() ?: 0.0,
-                                                    brokerage = (hData["brkrg"] as? Number)?.toDouble() ?: 0.0
-                                                )
-                                            )
-                                        }
-                                    }
-                                }
-
-                                fetchedInvList.add(
-                                    InvestmentItem(
-                                        assetName = dbName,
-                                        assetType = itemData["type"]?.toString() ?: "Stock",
-                                        quantity = (itemData["qnt"] as? Number)?.toDouble() ?: 0.0,
-                                        avgBuyPrice = buyPrice,
-                                        currentPrice = currentPrice,
-                                        oneDayChangePrice = oneDayChange,
-                                        history = parsedHistoryList
-                                    )
-                                )
-                            }
+                        
+                        val fetchedInvList = parseInvestments(investMap) { dbName, buyPrice ->
+                            val cachedPrices = existingQuotes[dbName]
+                            Pair(cachedPrices?.first ?: buyPrice, cachedPrices?.second ?: 0.0)
                         }
 
                         val updatedData = currentData.copy(
@@ -803,6 +841,10 @@ object CacheManager {
         stopCCFDSnapshot()
         stopUserDocSnapshot()
     }
+
+    // ========================================================
+    // 💳 CARD MANAGEMENT METHODS 💳
+    // ========================================================
 
     fun quickUpdateCCOutstanding(context: Context, username: String, cardNo: String, amountDiff: Double) {
         val cached = getCachedData(context, username) ?: return
@@ -958,6 +1000,10 @@ object CacheManager {
         }
     }
 
+    // ========================================================
+    // 📈 NETWORTH TIMELINE & SLOTS 📈
+    // ========================================================
+
     fun getTimelineNetworth(context: Context, username: String): List<NetworthDataPoint> {
         val appData = getCachedData(context, username) ?: return emptyList()
         val timelineList = mutableListOf<NetworthDataPoint>()
@@ -1029,6 +1075,10 @@ object CacheManager {
             } catch (e: Exception) {}
         }
     }
+
+    // ========================================================
+    // 📊 INVESTMENT MANAGEMENT METHODS 📊
+    // ========================================================
 
     fun deleteInvestment(context: Context, username: String, assetName: String) {
         val cached = getCachedData(context, username) ?: return
@@ -1196,6 +1246,10 @@ object CacheManager {
         }
     }
 
+    // ========================================================
+    // 🌐 PRIMARY FETCH & CACHE ENTRY POINT 🌐
+    // ========================================================
+
     suspend fun fetchAndCacheData(context: Context, username: String, forceRefresh: Boolean = false): AppData? {
         return withContext(Dispatchers.IO) {
             try {
@@ -1226,339 +1280,88 @@ object CacheManager {
                     e.printStackTrace()
                 }
 
-                val profileObj = JSONObject().apply {
-                    put("name", userDoc.getString("name") ?: "")
-                    put("email", userDoc.getString("email") ?: "")
-                    put("mobile", userDoc.getString("mobile_no_") ?: userDoc.getString("mobile") ?: "")
-                    put("prfl", userDoc.getString("prfl") ?: "")
-                    put("verify", userDoc.getBoolean("verify") ?: false)
-                    
-                    val rawDob = userDoc.get("dob")
-                    val formattedDob = when (rawDob) {
-                        is Timestamp -> SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(rawDob.toDate())
-                        is String -> rawDob
-                        else -> ""
-                    }
-                    put("dob", formattedDob)
+                val tempName = userDoc.getString("name") ?: ""
+                val tempEmail = userDoc.getString("email") ?: ""
+                val tempMobile = userDoc.getString("mobile_no_") ?: userDoc.getString("mobile") ?: ""
+                val tempPrfl = userDoc.getString("prfl") ?: ""
+                val tempVerify = userDoc.getBoolean("verify") ?: false
+                
+                val rawDob = userDoc.get("dob")
+                val formattedDob = when (rawDob) {
+                    is Timestamp -> SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(rawDob.toDate())
+                    is String -> rawDob
+                    else -> ""
                 }
 
                 val budgetLimit = userDoc.getDouble("budget_limit") ?: 0.0
 
+                // 1. Fetch & parse Expenses
                 val expensesDocs = userRef.collection("Expenses").get().await()
-                val expensesArray = JSONArray()
+                val parsedExp = parseExpensesDocs(expensesDocs.documents)
 
-                for (doc in expensesDocs) {
-                    val dataMap = doc.data
-                    for ((key, value) in dataMap) {
-                        if (key != "000_total" && value is Map<*, *>) {
-                            val expObj = JSONObject()
-                            val rawDate = value["dt"] ?: value["date"]
-                            val dateStr = when (rawDate) {
-                                is Timestamp -> SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(rawDate.toDate())
-                                is String -> rawDate
-                                else -> ""
-                            }
-
-                            expObj.put("date", dateStr)
-                            expObj.put("amount", (value["amnt"] as? Number)?.toDouble() ?: (value["amount"] as? Number)?.toDouble() ?: 0.0)
-                            expObj.put("category", value["cat"]?.toString() ?: value["category"]?.toString() ?: "")
-                            expObj.put("detail1", value["det1"]?.toString() ?: value["detail1"]?.toString() ?: "")
-                            expObj.put("detail2", value["det2"]?.toString() ?: value["detail2"]?.toString() ?: "")
-                            
-                            val paymentDetail = value["pay"]?.toString() ?: value["mode"]?.toString() ?: ""
-                            val splitPayment = paymentDetail.split("|").map { it.trim() }
-                            
-                            expObj.put("mode", if (splitPayment.isNotEmpty()) splitPayment[0] else "")
-                            expObj.put("source_type", if (splitPayment.size > 1) splitPayment[1] else "")
-                            expObj.put("source_id", if (splitPayment.size > 2) splitPayment[2] else "")
-
-                            expensesArray.put(expObj)
-                        }
-                    }
-                }
-
+                // 2. Fetch & parse Finances (Bank, CC, FD)
                 val financesDocs = userRef.collection("Finances").get().await()
-                
-                var cashObj = JSONObject().apply {
-                    put("amount", 0.0)
-                    put("last_updated", "")
-                }
-                
-                val banksArray = JSONArray()
-                val fdArray = JSONArray()
-                val ccArray = JSONArray()
-                
+                var banks = emptyList<BankAccountItem>()
+                var cash = CashItem(0.0, "")
+                var creditCards = emptyList<CreditCardItem>()
+                var fds = emptyList<FDItem>()
                 val todayMillis = System.currentTimeMillis()
 
                 for (doc in financesDocs) {
                     when (doc.id) {
                         "Bank" -> {
-                            val dataMap = doc.data
-                            
-                            dataMap.forEach { (key, rawData) ->
-                                if (key == "cash" && rawData is Map<*, *>) {
-                                    val amnt = (rawData["amnt"] as? Number)?.toDouble() ?: 0.0
-                                    val lastUpd = rawData["last update"]
-                                    val lastUpdStr = when (lastUpd) {
-                                        is Timestamp -> SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(lastUpd.toDate())
-                                        is String -> lastUpd
-                                        else -> ""
-                                    }
-                                    cashObj.put("amount", amnt)
-                                    cashObj.put("last_updated", lastUpdStr)
-                                } 
-                                else if (key != "last_updated" && key != "cash" && rawData is Map<*, *>) {
-                                    val rawBank = rawData
-                                    val bName = rawBank["bank"]?.toString() ?: ""
-                                    val accNo = rawBank["ac"]?.toString() ?: ""
-                                    val curBal = (rawBank["bal"] as? Number)?.toDouble() ?: 0.0
-                                    val rateYr = (rawBank["int %"] as? Number)?.toDouble() ?: 0.0
-                                    val rateQtr = rateYr / 4.0
-                                    val oneDayInt = (curBal * (rateYr / 100.0)) / 365.0
-
-                                    val bObj = JSONObject().apply {
-                                        put("firebase_key", key) 
-                                        put("bank_name", bName)
-                                        put("account_no", accNo)
-                                        put("current_bal", curBal)
-                                        put("interest_rate", rateYr)
-                                        put("qtr_interest_pct", rateQtr)
-                                        put("exp_qtr_int", curBal * (rateQtr / 100.0))
-                                        put("accrued_qtr_int", 0.0)
-                                        put("exp_yr_int", curBal * (rateYr / 100.0))
-                                        put("accrued_yr_int", 0.0)
-                                        put("one_day_int", oneDayInt)
-                                    }
-                                    banksArray.put(bObj)
-                                }
-                            }
+                            val (bList, cItem) = parseBankAndCash(doc.data ?: emptyMap())
+                            banks = bList
+                            if (cItem != null) cash = cItem
                         }
-
                         "CC FD" -> {
-                            val dataMap = doc.data
-                            val ccMap = dataMap["CC"] as? Map<*, *>
-                            ccMap?.forEach { (key, rawCc) ->
-                                if (rawCc is Map<*, *>) {
-                                    val issuer = rawCc["issuer"]?.toString() ?: ""
-                                    val cardNo = rawCc["card no."]?.toString() ?: ""
-                                    val type = rawCc["type"]?.toString() ?: ""
-                                    val limit = (rawCc["limit"] as? Number)?.toDouble() ?: 0.0
-                                    val outstanding = (rawCc["outstanding"] as? Number)?.toDouble() ?: 0.0
-                                    
-                                    val avail = limit - outstanding
-                                    val util = if (limit > 0) (outstanding / limit) * 100.0 else 0.0
-                                    val cibilStatus = if (util <= 30.0) "Safe" else "High Risk"
-
-                                    val ccObj = JSONObject().apply {
-                                        put("firebase_key", key.toString())
-                                        put("issuer", issuer)
-                                        put("card_no", cardNo)
-                                        put("type", type)
-                                        put("limit", limit)
-                                        put("outstanding", outstanding)
-                                        put("available", avail)
-                                        put("utilization", util)
-                                        put("cibil_status", cibilStatus)
-                                        put("billing_day", (rawCc["billing"] as? Number)?.toInt() ?: 0)
-                                        put("due_day", (rawCc["due"] as? Number)?.toInt() ?: 0)
-                                        put("reminder_day", (rawCc["rmndr"] as? Number)?.toInt() ?: 0)
-                                        put("annual_fee", (rawCc["yr fee"] as? Number)?.toDouble() ?: 0.0)
-                                        put("joining_fee", (rawCc["join fee"] as? Number)?.toDouble() ?: 0.0)
-                                        
-                                        val lastUseTs = rawCc["last use"] as? Timestamp
-                                        val lastUseStr = lastUseTs?.let { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(it.toDate()) } ?: ""
-                                        put("last_used", lastUseStr)
-                                    }
-                                    ccArray.put(ccObj)
-                                }
-                            }
-
-                            val fdMap = dataMap["FD"] as? Map<*, *>
-                            fdMap?.forEach { (key, rawFd) ->
-                                if (rawFd is Map<*, *>) {
-                                    val bank = rawFd["bank"]?.toString() ?: ""
-                                    val accNo = rawFd["fd ac"]?.toString() ?: ""
-                                    val amnt = (rawFd["amnt"] as? Number)?.toDouble() ?: 0.0
-                                    val rate = (rawFd["int % yr"] as? Number)?.toDouble() ?: 0.0
-                                    
-                                    val createTs = rawFd["create"] as? Timestamp
-                                    val maturTs = rawFd["matur"] as? Timestamp
-                                    
-                                    val createStr = createTs?.let { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(it.toDate()) } ?: ""
-                                    val maturStr = maturTs?.let { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(it.toDate()) } ?: ""
-                                    
-                                    var daysToMat = 0
-                                    var matVal = amnt
-                                    var accVal = amnt
-                                    var accInt = 0.0
-                                    var oneDayInt = 0.0
-                                    
-                                    if (createTs != null && maturTs != null) {
-                                        val createMillis = createTs.toDate().time
-                                        val maturMillis = maturTs.toDate().time
-                                        
-                                        val totalDays = maxOf(0L, (maturMillis - createMillis) / (1000 * 60 * 60 * 24))
-                                        daysToMat = maxOf(0L, (maturMillis - todayMillis) / (1000 * 60 * 60 * 24)).toInt()
-                                        val daysPassed = maxOf(0L, (minOf(todayMillis, maturMillis) - createMillis) / (1000 * 60 * 60 * 24))
-                                        
-                                        matVal = amnt * Math.pow(1 + (rate / 100.0), totalDays / 365.0)
-                                        accVal = amnt * Math.pow(1 + (rate / 100.0), daysPassed / 365.0)
-                                        accInt = accVal - amnt
-                                        
-                                        oneDayInt = if (todayMillis >= maturMillis || todayMillis < createMillis) 0.0 else (accVal * (rate / 100.0)) / 365.0
-                                    }
-
-                                    val fdObj = JSONObject().apply {
-                                        put("firebase_key", key.toString())
-                                        put("bank_name", bank)
-                                        put("account_no", accNo)
-                                        put("create_date", createStr)
-                                        put("maturity_date", maturStr)
-                                        put("days_to_maturity", daysToMat)
-                                        put("invested_amt", amnt)
-                                        put("interest_rate", rate)
-                                        put("maturity_value", matVal)
-                                        put("accrued_value", accVal)
-                                        put("accrued_int", accInt)
-                                        put("one_day_int", oneDayInt)
-                                    }
-                                    fdArray.put(fdObj)
-                                }
-                            }
+                            val dataMap = doc.data ?: emptyMap()
+                            creditCards = parseCCList(dataMap["CC"] as? Map<*, *>)
+                            fds = parseFDList(dataMap["FD"] as? Map<*, *>, todayMillis)
                         }
                     }
                 }
 
+                // 3. Fetch & parse Investments with live quotes
                 val investMap = userDoc.get("invest") as? Map<String, Any> ?: emptyMap()
-                val symbolsToFetch = mutableListOf<String>()
-                for ((_, value) in investMap) {
-                    val itemData = value as? Map<String, Any>
-                    val sym = itemData?.get("name")?.toString()?.trim() ?: ""
-                    if (sym.isNotEmpty()) {
-                        symbolsToFetch.add(sym)
-                    }
-                }
+                val symbolsToFetch = investMap.values.mapNotNull {
+                    (it as? Map<*, *>)?.get("name")?.toString()?.trim()
+                }.filter { it.isNotEmpty() }
+                
                 val liveQuotesMap = MarketEngine.fetchQuotes(symbolsToFetch)
-
-                val invArray = JSONArray()
-                for ((key, value) in investMap) {
-                    val itemData = value as? Map<String, Any>
-                    if (itemData != null) {
-                        val dbName = itemData["name"]?.toString()?.trim()?.uppercase() ?: ""
-                        val buyPrice = (itemData["avg"] as? Number)?.toDouble() ?: 0.0
-                        
-                        val liveQuote = liveQuotesMap[dbName] ?: liveQuotesMap[dbName.replace(".NS", "").replace(".BO", "")]
-                        val currentPrice = if (liveQuote != null && liveQuote.currentPrice > 0.0) liveQuote.currentPrice else buyPrice
-                        val oneDayChange = liveQuote?.oneDayChangePrice ?: 0.0
-                        
-                        val parsedHistoryList = mutableListOf<InvestmentHistoryItem>()
-                        val historyMapRaw = itemData["history"] as? Map<String, Any>
-                        if (historyMapRaw != null) {
-                            for ((_, hVal) in historyMapRaw) {
-                                val hData = hVal as? Map<String, Any>
-                                if (hData != null) {
-                                    val rawDt = hData["dt"]
-                                    val dtStr = when (rawDt) {
-                                        is Timestamp -> SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(rawDt.toDate())
-                                        is String -> rawDt
-                                        else -> ""
-                                    }
-                                    parsedHistoryList.add(
-                                        InvestmentHistoryItem(
-                                            date = dtStr,
-                                            quantity = (hData["qnt"] as? Number)?.toDouble() ?: 0.0,
-                                            price = (hData["prc"] as? Number)?.toDouble() ?: 0.0,
-                                            amount = (hData["amnt"] as? Number)?.toDouble() ?: 0.0,
-                                            brokerage = (hData["brkrg"] as? Number)?.toDouble() ?: 0.0
-                                        )
-                                    )
-                                }
-                            }
-                        }
-                        
-                        val invObj = JSONObject().apply {
-                            put("asset_name", dbName) 
-                            put("asset_type", itemData["type"]?.toString() ?: "Stock")
-                            put("quantity", (itemData["qnt"] as? Number)?.toDouble() ?: 0.0)
-                            put("buy_price", buyPrice)
-                            put("current_price", currentPrice)
-                            put("one_day_change", oneDayChange)
-                            
-                            val hArray = JSONArray()
-                            parsedHistoryList.forEach { h ->
-                                hArray.put(JSONObject().apply {
-                                    put("date", h.date)
-                                    put("quantity", h.quantity)
-                                    put("price", h.price)
-                                    put("amount", h.amount)
-                                    put("brokerage", h.brokerage)
-                                })
-                            }
-                            put("history", hArray)
-                        }
-                        invArray.put(invObj)
-                    }
+                val investments = parseInvestments(investMap) { sym, buyPrice ->
+                    val liveQuote = liveQuotesMap[sym] ?: liveQuotesMap[sym.replace(".NS", "").replace(".BO", "")]
+                    val currentPrice = if (liveQuote != null && liveQuote.currentPrice > 0.0) liveQuote.currentPrice else buyPrice
+                    val oneDayChange = liveQuote?.oneDayChangePrice ?: 0.0
+                    Pair(currentPrice, oneDayChange)
                 }
 
-                val contriArray = JSONArray()
-                val roomsArray = userDoc.get("rooms") as? List<*> ?: emptyList<Any>()
+                // 4. Parse Rooms & Networth
+                val contriRooms = parseContriRooms(userDoc.get("rooms") as? List<*>)
+                val networth = parseNetworthMap(userDoc.get("ntworth") as? Map<*, *>)
 
-                for (roomItem in roomsArray) {
-                    val roomStr = roomItem.toString()
-                    val parts = roomStr.split("_")
-                    if (parts.size >= 3) {
-                        var rName = parts[2]
-                        val rCode = parts[1]
-                        val rPin = if (parts.size >= 4) parts[3] else "123456"
+                val finalParsed = AppData(
+                    userFullName = tempName,
+                    userEmail = tempEmail,
+                    userMobile = tempMobile,
+                    profilePicUrl = tempPrfl,
+                    userDob = formattedDob,
+                    isVerified = tempVerify,
+                    todayExpenses = parsedExp.today,
+                    thisMonthExpenses = parsedExp.month,
+                    thisYearExpenses = parsedExp.year,
+                    budgetLimit = budgetLimit,
+                    transactionList = parsedExp.transactions,
+                    investmentList = investments,
+                    bankList = banks,
+                    cashData = cash,
+                    fdList = fds,
+                    ccList = creditCards,
+                    contriRoomsList = contriRooms,
+                    networthHistory = networth
+                )
 
-                        if (rName.contains("_")) {
-                            val suffix = rName.substringAfterLast("_")
-                            if (suffix.length == 6 && suffix.all { it.isDigit() }) {
-                                rName = rName.substringBeforeLast("_")
-                            }
-                        }
-
-                        val cObj = JSONObject().apply {
-                            put("room_name", rName)
-                            put("room_code", rCode)
-                            put("passkey", rPin)
-                            put("expenses", JSONArray()) 
-                        }
-                        contriArray.put(cObj)
-                    }
-                }
-
-                val ntworthObj = JSONObject()
-                val rawNtworth = userDoc.get("ntworth") as? Map<*, *> ?: emptyMap<Any, Any>()
-                rawNtworth.forEach { (k, v) ->
-                    if (v is List<*>) {
-                        val arr = JSONArray()
-                        v.forEach { num -> arr.put((num as? Number)?.toDouble() ?: 0.0) }
-                        ntworthObj.put(k.toString(), arr)
-                    }
-                }
-
-                val masterJson = JSONObject().apply {
-                    put("status", "success")
-                    put("profile", profileObj)
-                    put("budget_limit", budgetLimit)
-                    put("expenses", expensesArray)
-                    put("cash", cashObj)
-                    put("banks", banksArray)
-                    put("fds", fdArray)
-                    put("credit_cards", ccArray)
-                    put("investments", invArray) 
-                    put("contri_rooms", contriArray)
-                    put("ntworth", ntworthObj)
-                }
-
-                val responseData = masterJson.toString()
-
-                val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                prefs.edit().putString("data_$username", responseData).apply()
-
-                val finalParsed = parseJsonToAppData(responseData)
-                _appDataState.value = finalParsed
+                updateOptimisticCache(context, username, finalParsed)
 
                 startBankSnapshot(context, username)
                 startExpensesSnapshot(context, username)
@@ -1572,6 +1375,10 @@ object CacheManager {
             }
         }
     }
+
+    // ========================================================
+    // 📂 LOCAL CACHE DISK DESERIALIZER 📂
+    // ========================================================
 
     private fun parseJsonToAppData(responseData: String): AppData {
         val jsonResponse = JSONObject(responseData)
@@ -1617,15 +1424,9 @@ object CacheManager {
                     )
                     
                     val (isToday, isThisMonth, isThisYear) = evaluateDatePeriods(rawDate, currD, currM, currY)
-                    if (isToday) {
-                        tempToday += amt
-                    }
-                    if (isThisMonth) {
-                        tempMonth += amt
-                    }
-                    if (isThisYear) {
-                        tempYear += amt
-                    }
+                    if (isToday) tempToday += amt
+                    if (isThisMonth) tempMonth += amt
+                    if (isThisYear) tempYear += amt
                 }
             }
         }
@@ -1635,7 +1436,6 @@ object CacheManager {
         if (invArray != null) {
             for (i in 0 until invArray.length()) { 
                 val item = invArray.getJSONObject(i)
-                
                 val histArray = item.optJSONArray("history")
                 val parsedHistory = mutableListOf<InvestmentHistoryItem>()
                 if (histArray != null) {
@@ -1704,7 +1504,7 @@ object CacheManager {
                 val item = fdArray.getJSONObject(i)
                 fetchedFDList.add(
                     FDItem(
-                        firebaseKey = item.optString("firebase_key", ""),
+                        firebaseKey = item.optString("firebase_key", ""), 
                         bankName = item.optString("bank_name", ""), 
                         accountNo = item.optString("account_no", ""), 
                         createDate = item.optString("create_date", ""), 
