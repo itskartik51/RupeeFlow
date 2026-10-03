@@ -16,6 +16,7 @@ import com.kartikey.rupeeflow.UI_Screens.Assets.BankAccountItem
 import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.CashItem
 import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.CreditCardItem
 import com.kartikey.rupeeflow.UI_Screens.Assets.Finance.FDItem
+import com.kartikey.rupeeflow.UI_Screens.Assets.NetworthManager
 import com.kartikey.rupeeflow.UI_Screens.Home.Contri.ContriRoomModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -82,7 +83,7 @@ object CacheManager {
     private var userDocSnapshotRegistration: ListenerRegistration? = null
 
     // ========================================================
-    // 🛠️ REFACTORED SHARED PARSING HELPERS 🛠️
+    // 🛠️ LEAN SHARED PARSING HELPERS 🛠️
     // ========================================================
 
     private fun evaluateDatePeriods(dateStr: String, targetDay: Int, targetMonth: Int, targetYear: Int): Triple<Boolean, Boolean, Boolean> {
@@ -212,8 +213,6 @@ object CacheManager {
                 val accNo = rawBank["ac"]?.toString() ?: ""
                 val curBal = (rawBank["bal"] as? Number)?.toDouble() ?: 0.0
                 val rateYr = (rawBank["int %"] as? Number)?.toDouble() ?: 0.0
-                val rateQtr = rateYr / 4.0
-                val oneDayInt = (curBal * (rateYr / 100.0)) / 365.0
 
                 banks.add(
                     BankAccountItem(
@@ -222,12 +221,12 @@ object CacheManager {
                         accountNo = accNo,
                         currentBalance = curBal,
                         interestRate = rateYr,
-                        qtrInterestPct = rateQtr,
-                        expQtrInt = curBal * (rateQtr / 100.0),
+                        qtrInterestPct = rateYr / 4.0,
+                        expQtrInt = 0.0,
                         accruedQtrInt = 0.0,
-                        expYrInt = curBal * (rateYr / 100.0),
+                        expYrInt = 0.0,
                         accruedYrInt = 0.0,
-                        oneDayInt = oneDayInt
+                        oneDayInt = 0.0
                     )
                 )
             }
@@ -245,10 +244,6 @@ object CacheManager {
                 val limit = (rawCc["limit"] as? Number)?.toDouble() ?: 0.0
                 val outstanding = (rawCc["outstanding"] as? Number)?.toDouble() ?: 0.0
 
-                val avail = limit - outstanding
-                val util = if (limit > 0) (outstanding / limit) * 100.0 else 0.0
-                val cibilStatus = if (util <= 30.0) "Safe" else "High Risk"
-
                 val lastUseTs = rawCc["last use"] as? Timestamp
                 val lastUseStr = lastUseTs?.let {
                     SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(it.toDate())
@@ -262,9 +257,6 @@ object CacheManager {
                         type = type,
                         limit = limit,
                         outstanding = outstanding,
-                        available = avail,
-                        utilization = util,
-                        cibilStatus = cibilStatus,
                         billingDay = (rawCc["billing"] as? Number)?.toInt() ?: 0,
                         dueDay = (rawCc["due"] as? Number)?.toInt() ?: 0,
                         reminderDay = (rawCc["rmndr"] as? Number)?.toInt() ?: 0,
@@ -278,7 +270,7 @@ object CacheManager {
         return list
     }
 
-    private fun parseFDList(fdMap: Map<*, *>?, todayMillis: Long): List<FDItem> {
+    private fun parseFDList(fdMap: Map<*, *>?): List<FDItem> {
         val list = mutableListOf<FDItem>()
         fdMap?.forEach { (key, rawFd) ->
             if (rawFd is Map<*, *>) {
@@ -293,27 +285,6 @@ object CacheManager {
                 val createStr = createTs?.let { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(it.toDate()) } ?: ""
                 val maturStr = maturTs?.let { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(it.toDate()) } ?: ""
 
-                var daysToMat = 0
-                var matVal = amnt
-                var accVal = amnt
-                var accInt = 0.0
-                var oneDayInt = 0.0
-
-                if (createTs != null && maturTs != null) {
-                    val createMillis = createTs.toDate().time
-                    val maturMillis = maturTs.toDate().time
-
-                    val totalDays = maxOf(0L, (maturMillis - createMillis) / (1000 * 60 * 60 * 24))
-                    daysToMat = maxOf(0L, (maturMillis - todayMillis) / (1000 * 60 * 60 * 24)).toInt()
-                    val daysPassed = maxOf(0L, (minOf(todayMillis, maturMillis) - createMillis) / (1000 * 60 * 60 * 24))
-
-                    matVal = amnt * Math.pow(1 + (rate / 100.0), totalDays / 365.0)
-                    accVal = amnt * Math.pow(1 + (rate / 100.0), daysPassed / 365.0)
-                    accInt = accVal - amnt
-
-                    oneDayInt = if (todayMillis >= maturMillis || todayMillis < createMillis) 0.0 else (accVal * (rate / 100.0)) / 365.0
-                }
-
                 list.add(
                     FDItem(
                         firebaseKey = key.toString(),
@@ -321,13 +292,8 @@ object CacheManager {
                         accountNo = accNo,
                         createDate = createStr,
                         maturityDate = maturStr,
-                        daysToMaturity = daysToMat,
                         investedAmt = amnt,
-                        interestRate = rate,
-                        maturityValue = matVal,
-                        accruedValue = accVal,
-                        accruedInt = accInt,
-                        oneDayInt = oneDayInt
+                        interestRate = rate
                     )
                 )
             }
@@ -550,11 +516,6 @@ object CacheManager {
                         put("current_bal", b.currentBalance)
                         put("interest_rate", b.interestRate)
                         put("qtr_interest_pct", b.qtrInterestPct)
-                        put("exp_qtr_int", b.expQtrInt)
-                        put("accrued_qtr_int", b.accruedQtrInt)
-                        put("exp_yr_int", b.expYrInt)
-                        put("accrued_yr_int", b.accruedYrInt)
-                        put("one_day_int", b.oneDayInt)
                     })
                 }
                 put("banks", banksArray)
@@ -567,13 +528,8 @@ object CacheManager {
                         put("account_no", fd.accountNo)
                         put("create_date", fd.createDate)
                         put("maturity_date", fd.maturityDate)
-                        put("days_to_maturity", fd.daysToMaturity)
                         put("invested_amt", fd.investedAmt)
                         put("interest_rate", fd.interestRate)
-                        put("maturity_value", fd.maturityValue)
-                        put("accrued_value", fd.accruedValue)
-                        put("accrued_int", fd.accruedInt)
-                        put("one_day_int", fd.oneDayInt)
                     })
                 }
                 put("fds", fdArray)
@@ -587,9 +543,6 @@ object CacheManager {
                         put("type", cc.type)
                         put("limit", cc.limit)
                         put("outstanding", cc.outstanding)
-                        put("available", cc.available)
-                        put("utilization", cc.utilization)
-                        put("cibil_status", cc.cibilStatus)
                         put("billing_day", cc.billingDay)
                         put("due_day", cc.dueDay)
                         put("reminder_day", cc.reminderDay)
@@ -751,7 +704,7 @@ object CacheManager {
                         val dataMap = snapshot.data ?: emptyMap()
                         
                         val newCCList = parseCCList(dataMap["CC"] as? Map<*, *>)
-                        val newFDList = parseFDList(dataMap["FD"] as? Map<*, *>, System.currentTimeMillis())
+                        val newFDList = parseFDList(dataMap["FD"] as? Map<*, *>)
 
                         val updatedData = currentData.copy(ccList = newCCList, fdList = newFDList)
                         updateOptimisticCache(context, username, updatedData)
@@ -850,15 +803,12 @@ object CacheManager {
         val cached = getCachedData(context, username) ?: return
         val targetCC = cached.ccList.find { it.cardNo == cardNo || it.firebaseKey == cardNo } ?: return
         val newOut = targetCC.outstanding + amountDiff
-        val newAvail = (targetCC.limit - newOut).coerceAtLeast(0.0)
-        val newUtil = if (targetCC.limit > 0) (newOut / targetCC.limit) * 100.0 else 0.0
-        val newCibil = if (newUtil <= 30.0) "Safe" else "High Risk"
 
         val updatedCC = targetCC.copy(
             outstanding = newOut,
-            available = newAvail,
-            utilization = newUtil,
-            cibilStatus = newCibil
+            available = (targetCC.limit - newOut).coerceAtLeast(0.0),
+            utilization = if (targetCC.limit > 0) (newOut / targetCC.limit) * 100.0 else 0.0,
+            cibilStatus = if (targetCC.limit > 0 && (newOut / targetCC.limit) * 100.0 <= 30.0) "Safe" else "High Risk"
         )
         val updatedList = cached.ccList.map {
             if (it.cardNo == cardNo || it.firebaseKey == cardNo) updatedCC else it
@@ -900,15 +850,12 @@ object CacheManager {
     fun editCreditCard(context: Context, username: String, cardNo: String, newLimit: Double, billDay: Int, dueDay: Int, annualFee: Double) {
         val cached = getCachedData(context, username) ?: return
         val targetCC = cached.ccList.find { it.cardNo == cardNo || it.firebaseKey == cardNo } ?: return
-        val newAvail = (newLimit - targetCC.outstanding).coerceAtLeast(0.0)
-        val newUtil = if (newLimit > 0) (targetCC.outstanding / newLimit) * 100.0 else 0.0
-        val newCibil = if (newUtil <= 30.0) "Safe" else "High Risk"
 
         val updatedCC = targetCC.copy(
             limit = newLimit,
-            available = newAvail,
-            utilization = newUtil,
-            cibilStatus = newCibil,
+            available = (newLimit - targetCC.outstanding).coerceAtLeast(0.0),
+            utilization = if (newLimit > 0) (targetCC.outstanding / newLimit) * 100.0 else 0.0,
+            cibilStatus = if (newLimit > 0 && (targetCC.outstanding / newLimit) * 100.0 <= 30.0) "Safe" else "High Risk",
             billingDay = billDay,
             dueDay = dueDay,
             annualFee = annualFee
@@ -1000,81 +947,15 @@ object CacheManager {
         }
     }
 
-    // ========================================================
-    // 📈 NETWORTH TIMELINE & SLOTS 📈
-    // ========================================================
+    // =========================================================================
+    // 📈 NETWORTH TIMELINE & SLOTS (DELEGATED TO NETWORTH MANAGER) 📈
+    // =========================================================================
 
-    fun getTimelineNetworth(context: Context, username: String): List<NetworthDataPoint> {
-        val appData = getCachedData(context, username) ?: return emptyList()
-        val timelineList = mutableListOf<NetworthDataPoint>()
+    fun getTimelineNetworth(context: Context, username: String): List<NetworthDataPoint> =
+        NetworthManager.getTimelineNetworth(context, username)
 
-        val monthNameFormat = SimpleDateFormat("MMM", Locale.getDefault())
-        val parseFormat = SimpleDateFormat("yy-MM", Locale.getDefault())
-
-        val sortedMonths = appData.networthHistory.keys.sorted() 
-        for (mKey in sortedMonths) {
-            val slots = appData.networthHistory[mKey] ?: continue
-            val monthDate = try { parseFormat.parse(mKey) } catch (e: Exception) { null }
-            val mName = if (monthDate != null) monthNameFormat.format(monthDate) else mKey
-
-            slots.forEachIndexed { index, amount ->
-                if (amount > 0.0) {
-                    val label = when (index) {
-                        0 -> "01-10 $mName"
-                        1 -> "11-20 $mName"
-                        else -> "21-End $mName"
-                    }
-                    timelineList.add(NetworthDataPoint(mKey, index, label, amount))
-                }
-            }
-        }
-        return timelineList
-    }
-
-    fun syncNetworthSlot(context: Context, username: String, currentNetworth: Double) {
-        if (currentNetworth <= 0.0) return
-        val cached = getCachedData(context, username) ?: return
-        
-        val cal = Calendar.getInstance()
-        val day = cal.get(Calendar.DAY_OF_MONTH)
-        val monthKey = SimpleDateFormat("yy-MM", Locale.getDefault()).format(cal.time)
-        
-        val slotIndex = when {
-            day <= 10 -> 0
-            day <= 20 -> 1
-            else -> 2
-        }
-
-        val historyMap = cached.networthHistory.toMutableMap()
-        val existingSlots = historyMap[monthKey]?.toMutableList() ?: mutableListOf(0.0, 0.0, 0.0)
-        
-        while (existingSlots.size < 3) {
-            existingSlots.add(0.0)
-        }
-
-        existingSlots[slotIndex] = currentNetworth
-        historyMap[monthKey] = existingSlots
-
-        if (historyMap.size > 6) {
-            val sortedKeys = historyMap.keys.sorted()
-            val keysToRemove = sortedKeys.take(historyMap.size - 6)
-            keysToRemove.forEach { historyMap.remove(it) }
-        }
-
-        val updatedData = cached.copy(networthHistory = historyMap)
-        updateOptimisticCache(context, username, updatedData)
-
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val db = FirebaseFirestore.getInstance()
-                val userQuery = db.collection("Users").whereEqualTo("username", username).get().await()
-                if (!userQuery.isEmpty) {
-                    val userRef = userQuery.documents[0].reference
-                    userRef.set(mapOf("ntworth" to historyMap), SetOptions.merge()).await()
-                }
-            } catch (e: Exception) {}
-        }
-    }
+    fun syncNetworthSlot(context: Context, username: String, currentNetworth: Double) =
+        NetworthManager.syncNetworthSlot(context, username, currentNetworth)
 
     // ========================================================
     // 📊 INVESTMENT MANAGEMENT METHODS 📊
@@ -1305,7 +1186,6 @@ object CacheManager {
                 var cash = CashItem(0.0, "")
                 var creditCards = emptyList<CreditCardItem>()
                 var fds = emptyList<FDItem>()
-                val todayMillis = System.currentTimeMillis()
 
                 for (doc in financesDocs) {
                     when (doc.id) {
@@ -1317,7 +1197,7 @@ object CacheManager {
                         "CC FD" -> {
                             val dataMap = doc.data ?: emptyMap()
                             creditCards = parseCCList(dataMap["CC"] as? Map<*, *>)
-                            fds = parseFDList(dataMap["FD"] as? Map<*, *>, todayMillis)
+                            fds = parseFDList(dataMap["FD"] as? Map<*, *>)
                         }
                     }
                 }
@@ -1472,19 +1352,20 @@ object CacheManager {
         if (banksArray != null) {
             for (i in 0 until banksArray.length()) { 
                 val item = banksArray.getJSONObject(i)
+                val rate = item.optDouble("interest_rate", 0.0)
                 fetchedBankList.add(
                     BankAccountItem(
                         firebaseKey = item.optString("firebase_key", ""), 
                         bankName = item.optString("bank_name", ""), 
                         accountNo = item.optString("account_no", ""), 
                         currentBalance = item.optDouble("current_bal", 0.0), 
-                        interestRate = item.optDouble("interest_rate", 0.0), 
-                        qtrInterestPct = item.optDouble("qtr_interest_pct", 0.0), 
-                        expQtrInt = item.optDouble("exp_qtr_int", 0.0), 
-                        accruedQtrInt = item.optDouble("accrued_qtr_int", 0.0), 
-                        expYrInt = item.optDouble("exp_yr_int", 0.0), 
-                        accruedYrInt = item.optDouble("accrued_yr_int", 0.0), 
-                        oneDayInt = item.optDouble("one_day_int", 0.0)
+                        interestRate = rate, 
+                        qtrInterestPct = item.optDouble("qtr_interest_pct", rate / 4.0), 
+                        expQtrInt = 0.0, 
+                        accruedQtrInt = 0.0, 
+                        expYrInt = 0.0, 
+                        accruedYrInt = 0.0, 
+                        oneDayInt = 0.0
                     )
                 ) 
             }
@@ -1509,13 +1390,8 @@ object CacheManager {
                         accountNo = item.optString("account_no", ""), 
                         createDate = item.optString("create_date", ""), 
                         maturityDate = item.optString("maturity_date", ""), 
-                        daysToMaturity = item.optInt("days_to_maturity", 0), 
                         investedAmt = item.optDouble("invested_amt", 0.0), 
-                        interestRate = item.optDouble("interest_rate", 0.0), 
-                        maturityValue = item.optDouble("maturity_value", 0.0), 
-                        accruedValue = item.optDouble("accrued_value", 0.0), 
-                        accruedInt = item.optDouble("accrued_int", 0.0), 
-                        oneDayInt = item.optDouble("one_day_int", 0.0)
+                        interestRate = item.optDouble("interest_rate", 0.0)
                     )
                 ) 
             }
@@ -1536,9 +1412,6 @@ object CacheManager {
                         type = item.optString("type", ""), 
                         limit = item.optDouble("limit", 0.0), 
                         outstanding = item.optDouble("outstanding", 0.0), 
-                        available = item.optDouble("available", 0.0), 
-                        utilization = item.optDouble("utilization", 0.0), 
-                        cibilStatus = item.optString("cibil_status", ""), 
                         billingDay = item.optInt("billing_day", 0), 
                         dueDay = item.optInt("due_day", 0), 
                         reminderDay = item.optInt("reminder_day", 0), 
