@@ -483,3 +483,172 @@ fun QuickUpdateDialog(
                                         val dayIndexInBlock = when {
                                             day <= 6 -> day - 1
                                             day <= 12 -> day - 7
+                                            day <= 18 -> day - 13
+                                            day <= 24 -> day - 19
+                                            else -> day - 25
+                                        }
+                                        val monthInQtr = month % 3
+                                        val qtrIndex = month / 3
+
+                                        val db = FirebaseFirestore.getInstance()
+                                        val userQuery = db.collection("Users")
+                                            .whereEqualTo("username", username)
+                                            .get()
+                                            .await()
+
+                                        if (!userQuery.isEmpty) {
+                                            val userRef = userQuery.documents[0].reference
+                                            val bankDocRef = userRef.collection("Finances").document("Bank")
+                                            val bankDoc = bankDocRef.get().await()
+
+                                            if (bankDoc.exists()) {
+                                                val bankData = bankDoc.get(bank.firebaseKey) as? Map<*, *>
+                                                val existingPbook = (bankData?.get("pbook") as? Map<*, *>) ?: emptyMap<String, Any>()
+
+                                                val lastUpdatedTs = bankDoc.get("last_updated") as? Timestamp
+                                                var isNewMonth = false
+                                                var isNewQtr = false
+                                                var isNewYear = false
+                                                var isNewBlock = false
+
+                                                if (lastUpdatedTs != null) {
+                                                    val calLast = Calendar.getInstance().apply { time = lastUpdatedTs.toDate() }
+                                                    val lastYear = calLast.get(Calendar.YEAR)
+                                                    val lastMonth = calLast.get(Calendar.MONTH)
+                                                    val lastDay = calLast.get(Calendar.DAY_OF_MONTH)
+                                                    val lastBlock = when {
+                                                        lastDay <= 6 -> 0
+                                                        lastDay <= 12 -> 1
+                                                        lastDay <= 18 -> 2
+                                                        lastDay <= 24 -> 3
+                                                        else -> 4
+                                                    }
+
+                                                    if (currentYear != lastYear) {
+                                                        isNewYear = true
+                                                        isNewQtr = true
+                                                        isNewMonth = true
+                                                        isNewBlock = true
+                                                    } else if (qtrIndex != (lastMonth / 3)) {
+                                                        isNewQtr = true
+                                                        isNewMonth = true
+                                                        isNewBlock = true
+                                                    } else if (month != lastMonth) {
+                                                        isNewMonth = true
+                                                        isNewBlock = true
+                                                    } else if (blockIndex != lastBlock) {
+                                                        isNewBlock = true
+                                                    }
+                                                }
+
+                                                val raw6dBal = (existingPbook["6d bal"] as? List<*>)?.mapNotNull { (it as? Number)?.toDouble() } ?: emptyList()
+                                                val raw6dAvg = (existingPbook["6d avg"] as? List<*>)?.mapNotNull { (it as? Number)?.toDouble() } ?: emptyList()
+                                                val rawMonthAvg = (existingPbook["month avg"] as? List<*>)?.mapNotNull { (it as? Number)?.toDouble() } ?: emptyList()
+                                                val rawQtrAvg = (existingPbook["qtr avg"] as? List<*>)?.mapNotNull { (it as? Number)?.toDouble() } ?: emptyList()
+                                                var yrAvgVal = (existingPbook["yr avg"] as? Number)?.toDouble() ?: 0.0
+
+                                                // 1. Current 6d Bal (Size 6, or 7 if 31st)
+                                                val targetBalSize = if (day == 31) 7 else 6
+                                                val list6dBal = if (isNewBlock || raw6dBal.isEmpty()) {
+                                                    MutableList(targetBalSize) { 0.0 }
+                                                } else {
+                                                    val m = raw6dBal.toMutableList()
+                                                    while (m.size < targetBalSize) m.add(0.0)
+                                                    m
+                                                }
+                                                if (dayIndexInBlock < list6dBal.size) {
+                                                    list6dBal[dayIndexInBlock] = newCalculatedBalance
+                                                }
+
+                                                // 2. 6d Avg (5 slots per month)
+                                                val list6dAvg = if (isNewMonth || raw6dAvg.isEmpty()) {
+                                                    MutableList(5) { 0.0 }
+                                                } else {
+                                                    val m = raw6dAvg.toMutableList()
+                                                    while (m.size < 5) m.add(0.0)
+                                                    m
+                                                }
+                                                val activeDaysInBlock = list6dBal.subList(0, minOf(dayIndexInBlock + 1, list6dBal.size))
+                                                    .filterIndexed { idx, v -> idx == dayIndexInBlock || v > 0.0 }
+                                                val blockAvg = if (activeDaysInBlock.isNotEmpty()) {
+                                                    activeDaysInBlock.sum() / activeDaysInBlock.size.toDouble()
+                                                } else newCalculatedBalance
+                                                list6dAvg[blockIndex] = blockAvg
+
+                                                // 3. Month Avg (3 months per quarter)
+                                                val listMonthAvg = if (isNewQtr || rawMonthAvg.isEmpty()) {
+                                                    MutableList(3) { 0.0 }
+                                                } else {
+                                                    val m = rawMonthAvg.toMutableList()
+                                                    while (m.size < 3) m.add(0.0)
+                                                    m
+                                                }
+                                                val activeBlocksInMonth = list6dAvg.subList(0, minOf(blockIndex + 1, list6dAvg.size))
+                                                    .filterIndexed { idx, v -> idx == blockIndex || v > 0.0 }
+                                                val monthAvgCalc = if (activeBlocksInMonth.isNotEmpty()) {
+                                                    activeBlocksInMonth.sum() / activeBlocksInMonth.size.toDouble()
+                                                } else blockAvg
+                                                listMonthAvg[monthInQtr] = monthAvgCalc
+
+                                                // 4. Qtr Avg (4 quarters per year)
+                                                val listQtrAvg = if (isNewYear || rawQtrAvg.isEmpty()) {
+                                                    MutableList(4) { 0.0 }
+                                                } else {
+                                                    val m = rawQtrAvg.toMutableList()
+                                                    while (m.size < 4) m.add(0.0)
+                                                    m
+                                                }
+                                                val activeMonthsInQtr = listMonthAvg.subList(0, minOf(monthInQtr + 1, listMonthAvg.size))
+                                                    .filterIndexed { idx, v -> idx == monthInQtr || v > 0.0 }
+                                                val qtrAvgCalc = if (activeMonthsInQtr.isNotEmpty()) {
+                                                    activeMonthsInQtr.sum() / activeMonthsInQtr.size.toDouble()
+                                                } else monthAvgCalc
+                                                listQtrAvg[qtrIndex] = qtrAvgCalc
+
+                                                // 5. Yr Avg (current year average)
+                                                val activeQtrsInYear = listQtrAvg.subList(0, minOf(qtrIndex + 1, listQtrAvg.size))
+                                                    .filterIndexed { idx, v -> idx == qtrIndex || v > 0.0 }
+                                                yrAvgVal = if (activeQtrsInYear.isNotEmpty()) {
+                                                    activeQtrsInYear.sum() / activeQtrsInYear.size.toDouble()
+                                                } else qtrAvgCalc
+
+                                                val updatedPbook = hashMapOf<String, Any>(
+                                                    "6d bal" to list6dBal,
+                                                    "6d avg" to list6dAvg,
+                                                    "month avg" to listMonthAvg,
+                                                    "qtr avg" to listQtrAvg,
+                                                    "yr avg" to yrAvgVal
+                                                )
+
+                                                // Clean Lean Firestore Write
+                                                bankDocRef.update(
+                                                    "${bank.firebaseKey}.bal", newCalculatedBalance,
+                                                    "${bank.firebaseKey}.pbook", updatedPbook,
+                                                    "last_updated", FieldValue.serverTimestamp()
+                                                ).await()
+                                            }
+                                        }
+                                    } catch (e: Exception) {
+                                        withContext(Dispatchers.Main) {
+                                            Toast.makeText(context, "Sync Failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                }
+                            } else {
+                                Toast.makeText(context, "Enter a valid amount", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(50.dp)
+                            .bounceClick(scaleDown = 0.94f),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                    ) {
+                        Text("Update", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimary)
+                    }
+                }
+            }
+        }
+    }
+}
