@@ -97,6 +97,31 @@ fun MainScreen(
     
     var isUpdateAvailable by remember { mutableStateOf(false) } 
 
+    // ⚡ REAL-TIME STATE SYNC FROM CACHEMANAGER SNAPSHOTS & OPTIMISTIC CACHE ⚡
+    val globalAppData by CacheManager.appDataState.collectAsState()
+
+    LaunchedEffect(globalAppData) {
+        globalAppData?.let { data ->
+            userFullName = data.userFullName
+            userEmail = data.userEmail
+            userMobile = data.userMobile
+            profilePicUrl = data.profilePicUrl 
+            userDob = data.userDob
+            isVerified = data.isVerified
+            todayExpenses = data.todayExpenses 
+            thisMonthExpenses = data.thisMonthExpenses
+            thisYearExpenses = data.thisYearExpenses
+            budgetLimit = data.budgetLimit
+            transactionList = data.transactionList
+            investmentList = data.investmentList
+            bankList = data.bankList
+            cashData = data.cashData
+            fdList = data.fdList
+            ccList = data.ccList
+            contriRoomsList = data.contriRoomsList
+        }
+    }
+
     LaunchedEffect(Unit) {
         isUpdateAvailable = checkIsUpdateAvailable(context)
     }
@@ -187,7 +212,7 @@ fun MainScreen(
                 ) {
                     val isHomeSelected = selectedTab == 0 && !showExpenseHistory && !showContriScreen
                     NavigationBarItem(
-                        modifier = Modifier.bounceClick(),
+                        modifier = Modifier.bounceClick(scaleDown = 0.94f),
                         selected = isHomeSelected, 
                         onClick = { selectedTab = 0; showExpenseHistory = false; showContriScreen = false }, 
                         icon = { 
@@ -206,7 +231,7 @@ fun MainScreen(
                     
                     val isAssetsSelected = selectedTab == 1
                     NavigationBarItem(
-                        modifier = Modifier.bounceClick(),
+                        modifier = Modifier.bounceClick(scaleDown = 0.94f),
                         selected = isAssetsSelected, 
                         onClick = { if (selectedTab == 1) assetsCurrentView = "Main"; selectedTab = 1; showExpenseHistory = false; showContriScreen = false }, 
                         icon = { 
@@ -224,7 +249,7 @@ fun MainScreen(
                     )
                     
                     NavigationBarItem(
-                        modifier = Modifier.bounceClick(),
+                        modifier = Modifier.bounceClick(scaleDown = 0.94f),
                         selected = false, 
                         onClick = { showAddMenu = !showAddMenu }, 
                         icon = { Spacer(modifier = Modifier.size(42.dp)) }, 
@@ -235,7 +260,7 @@ fun MainScreen(
                     
                     val isAnalyticsSelected = selectedTab == 3
                     NavigationBarItem(
-                        modifier = Modifier.bounceClick(),
+                        modifier = Modifier.bounceClick(scaleDown = 0.94f),
                         selected = isAnalyticsSelected, 
                         onClick = { selectedTab = 3; showExpenseHistory = false; showContriScreen = false }, 
                         icon = { 
@@ -254,7 +279,7 @@ fun MainScreen(
                     
                     val isProfileSelected = selectedTab == 4
                     NavigationBarItem(
-                        modifier = Modifier.bounceClick(),
+                        modifier = Modifier.bounceClick(scaleDown = 0.94f),
                         selected = isProfileSelected, 
                         onClick = { selectedTab = 4; showExpenseHistory = false; showContriScreen = false }, 
                         icon = { 
@@ -367,30 +392,55 @@ fun MainScreen(
 
         AddScreen(
             username = username, showMenu = showAddMenu, onToggleMenu = { showAddMenu = !showAddMenu }, 
-            onExpenseAdded = { newEntry -> transactionList = listOf(newEntry) + transactionList }, 
-            onInvestmentAdded = { refreshTrigger++ }, onFinanceAdded = { refreshTrigger++ }, 
+            onExpenseAdded = { /* Snapshot listener and optimistic cache automatically update state */ }, 
+            onInvestmentAdded = { refreshTrigger++ }, 
+            onFinanceAdded = { refreshTrigger++ }, 
             bankList = bankList, ccList = ccList, cashData = cashData
         )
 
-        if (bankToEdit != null) { EditBankDialog(bank = bankToEdit!!, username = username, onDismiss = { bankToEdit = null }, onUpdateSuccess = { bankToEdit = null; refreshTrigger++ }) }
-        if (fdToEdit != null) { EditFDDialog(fd = fdToEdit!!, username = username, onDismiss = { fdToEdit = null }, onUpdateSuccess = { fdToEdit = null; refreshTrigger++ }) }
+        if (bankToEdit != null) { 
+            EditBankDialog(
+                bank = bankToEdit!!, 
+                username = username, 
+                onDismiss = { bankToEdit = null }, 
+                onUpdateSuccess = { bankToEdit = null }
+            ) 
+        }
+        if (fdToEdit != null) { 
+            EditFDDialog(
+                fd = fdToEdit!!, 
+                username = username, 
+                onDismiss = { fdToEdit = null }, 
+                onUpdateSuccess = { fdToEdit = null; refreshTrigger++ }
+            ) 
+        }
         if (expenseToDelete != null) { 
             DeleteExpenseDialog(
-                expense = expenseToDelete!!, username = username, onDismiss = { expenseToDelete = null }, 
+                expense = expenseToDelete!!, 
+                username = username, 
+                onDismiss = { expenseToDelete = null }, 
                 onSuccess = { 
-                    val targetDate = expenseToDelete?.date
                     expenseToDelete = null
-                    if(targetDate != null) { transactionList = transactionList.filter { it.date != targetDate } }
-                    refreshTrigger++ 
                 }
             ) 
         }
-        if (expenseToEdit != null) { EditExpenseDialog(expense = expenseToEdit!!, username = username, bankList = bankList, ccList = ccList, onDismiss = { expenseToEdit = null }, onSuccess = { expenseToEdit = null; refreshTrigger++ }) }
+        if (expenseToEdit != null) { 
+            EditExpenseDialog(
+                expense = expenseToEdit!!, 
+                username = username, 
+                bankList = bankList, 
+                ccList = ccList, 
+                onDismiss = { expenseToEdit = null }, 
+                onSuccess = { 
+                    expenseToEdit = null 
+                }
+            ) 
+        }
     }
 }
 
 fun Modifier.bounceClick(
-    scaleDown: Float = 0.90f,
+    scaleDown: Float = 0.94f,
     onClick: (() -> Unit)? = null 
 ) = composed {
     var isPressed by remember { mutableStateOf(false) }
