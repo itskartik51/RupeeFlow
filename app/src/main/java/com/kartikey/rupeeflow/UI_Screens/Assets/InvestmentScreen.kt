@@ -82,9 +82,11 @@ fun InvestmentScreen(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     var isHidden by remember { mutableStateOf(false) }
-    var isRefreshingQuotes by remember { mutableStateOf(false) }
 
-    // Live StateFlow observation: UI instant update bina restart ke
+    // Separate spinner state for manual refresh ONLY
+    var isManualRefreshing by remember { mutableStateOf(false) }
+
+    // Live StateFlow observation for instant UI sync
     val appDataState by CacheManager.appDataState.collectAsState()
     val activeInvestmentList = appDataState?.investmentList ?: investmentList
 
@@ -92,22 +94,30 @@ fun InvestmentScreen(
     var deletingAssetTarget by remember { mutableStateOf<InvestmentItem?>(null) }
     var deletingLotTarget by remember { mutableStateOf<Pair<InvestmentItem, Int>?>(null) }
 
-    fun triggerQuoteRefresh() {
-        if (isRefreshingQuotes) return
-        coroutineScope.launch {
-            isRefreshingQuotes = true
-            CacheManager.refreshInvestmentQuotes(context, username)
-            isRefreshingQuotes = false
+    fun triggerQuoteRefresh(isManual: Boolean = false) {
+        if (isManual) {
+            if (isManualRefreshing) return
+            coroutineScope.launch {
+                isManualRefreshing = true
+                CacheManager.refreshInvestmentQuotes(context, username)
+                delay(800L) // Smooth visual spin feedback
+                isManualRefreshing = false
+            }
+        } else {
+            // Completely silent background refresh - icon will NOT rotate
+            coroutineScope.launch {
+                CacheManager.refreshInvestmentQuotes(context, username)
+            }
         }
     }
 
-    // Active Screen Lifecycle: 8-second polling strictly during market hours
+    // Active Screen Lifecycle: 20-second silent background polling strictly during market hours
     LaunchedEffect(Unit) {
-        triggerQuoteRefresh()
+        triggerQuoteRefresh(isManual = false)
         while (true) {
-            delay(8000L)
+            delay(20000L)
             if (isIndianMarketOpen()) {
-                triggerQuoteRefresh()
+                triggerQuoteRefresh(isManual = false)
             }
         }
     }
@@ -151,10 +161,10 @@ fun InvestmentScreen(
                     totalReturn = totalReturn,
                     totalReturnPercent = totalReturnPercent,
                     totalInvested = totalInvested,
-                    isLoading = isLoading || isRefreshingQuotes, 
+                    isLoading = isLoading || isManualRefreshing, 
                     isHidden = isHidden,
                     onToggleVisibility = { isHidden = !isHidden },
-                    onRefreshClick = { triggerQuoteRefresh() }
+                    onRefreshClick = { triggerQuoteRefresh(isManual = true) }
                 )
                 Spacer(modifier = Modifier.height(24.dp))
                 
