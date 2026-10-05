@@ -83,10 +83,8 @@ object MarketEngine {
                     if (sym.isNotEmpty() && (sym.endsWith(".NS") || sym.endsWith(".BO"))) {
                         if (validQuoteTypes.contains(qType)) {
 
-                            // Filter out mutual fund codes if searching for normal stocks
                             if (assetType == "Stock" && sym.startsWith("0P")) continue
 
-                            // Filter out ETF / Bees / Index keywords from standard stocks
                             if (assetType == "Stock") {
                                 val nameUpper = name.uppercase(Locale.getDefault())
                                 if (nameUpper.contains("ETF") || nameUpper.contains("BEES") ||
@@ -114,12 +112,13 @@ object MarketEngine {
                 val finalSymbolsToFetch = orderedBaseSymbols.mapNotNull { baseSymbolMap[it] }.take(15)
                 if (finalSymbolsToFetch.isEmpty()) return@withContext emptyList()
 
-                // Batch fetch live prices using Yahoo Spark endpoint
                 val symbolsParam = finalSymbolsToFetch.joinToString(",")
-                val sparkUrl = "$YAHOO_SPARK_URL?symbols=$symbolsParam"
+                val sparkUrl = "$YAHOO_SPARK_URL?symbols=$symbolsParam&_=${System.currentTimeMillis()}"
                 val sparkReq = Request.Builder()
                     .url(sparkUrl)
                     .header("User-Agent", USER_AGENT)
+                    .header("Cache-Control", "no-cache")
+                    .header("Pragma", "no-cache")
                     .get()
                     .build()
 
@@ -168,7 +167,7 @@ object MarketEngine {
 
     /**
      * Batch-fetches real-time price & 1-day change for a list of portfolio symbols/tickers.
-     * Returns a map keyed by both raw symbol and clean symbol.
+     * Prevents cache poisoning and maps multiple symbol permutations.
      */
     suspend fun fetchQuotes(symbols: List<String>): Map<String, MarketLiveQuote> {
         if (symbols.isEmpty()) return emptyMap()
@@ -189,10 +188,12 @@ object MarketEngine {
 
                 for (chunk in chunks) {
                     val symbolsParam = chunk.joinToString(",")
-                    val sparkUrl = "$YAHOO_SPARK_URL?symbols=$symbolsParam"
+                    val sparkUrl = "$YAHOO_SPARK_URL?symbols=$symbolsParam&_=${System.currentTimeMillis()}"
                     val request = Request.Builder()
                         .url(sparkUrl)
                         .header("User-Agent", USER_AGENT)
+                        .header("Cache-Control", "no-cache")
+                        .header("Pragma", "no-cache")
                         .get()
                         .build()
 
@@ -212,12 +213,10 @@ object MarketEngine {
                                 if (meta != null) {
                                     val price = meta.optDouble("regularMarketPrice", 0.0)
 
-                                    // Direct 1D change values from Yahoo meta
                                     val hasDirectChange = meta.has("regularMarketChange")
                                     val directChange = meta.optDouble("regularMarketChange", 0.0)
                                     val directChangePercent = meta.optDouble("regularMarketChangePercent", 0.0)
 
-                                    // Accurate previous close hierarchy
                                     val prevClose = when {
                                         meta.has("regularMarketPreviousClose") -> meta.optDouble("regularMarketPreviousClose", price)
                                         meta.has("previousClose") -> meta.optDouble("previousClose", price)
@@ -250,6 +249,8 @@ object MarketEngine {
                                     val cleanKey = returnedSym.replace(".NS", "").replace(".BO", "")
                                     resultMap[returnedSym] = quote
                                     resultMap[cleanKey] = quote
+                                    resultMap["$cleanKey.NS"] = quote
+                                    resultMap["$cleanKey.BO"] = quote
                                 }
                             }
                         }
