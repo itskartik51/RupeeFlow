@@ -84,6 +84,10 @@ fun InvestmentScreen(
     var isHidden by remember { mutableStateOf(false) }
     var isRefreshingQuotes by remember { mutableStateOf(false) }
 
+    // Live StateFlow observation: UI instant update bina restart ke
+    val appDataState by CacheManager.appDataState.collectAsState()
+    val activeInvestmentList = appDataState?.investmentList ?: investmentList
+
     var editingLotInfo by remember { mutableStateOf<Triple<InvestmentItem, Int, InvestmentHistoryItem>?>(null) }
     var deletingAssetTarget by remember { mutableStateOf<InvestmentItem?>(null) }
     var deletingLotTarget by remember { mutableStateOf<Pair<InvestmentItem, Int>?>(null) }
@@ -108,9 +112,9 @@ fun InvestmentScreen(
         }
     }
 
-    val totalInvested = investmentList.sumOf { it.quantity * it.avgBuyPrice }
-    val totalCurrent = investmentList.sumOf { it.quantity * it.currentPrice }
-    val total1DChange = investmentList.sumOf { it.quantity * it.oneDayChangePrice }
+    val totalInvested = activeInvestmentList.sumOf { it.quantity * it.avgBuyPrice }
+    val totalCurrent = activeInvestmentList.sumOf { it.quantity * it.currentPrice }
+    val total1DChange = activeInvestmentList.sumOf { it.quantity * it.oneDayChangePrice }
     val totalReturn = totalCurrent - totalInvested
     val totalReturnPercent = if (totalInvested > 0) (totalReturn / totalInvested) * 100 else 0.0
     val total1DPercent = if (totalCurrent - total1DChange > 0) (total1DChange / (totalCurrent - total1DChange)) * 100 else 0.0
@@ -140,7 +144,7 @@ fun InvestmentScreen(
                 Spacer(modifier = Modifier.height(8.dp))
                 
                 InvestmentSummaryCard(
-                    itemCount = investmentList.size,
+                    itemCount = activeInvestmentList.size,
                     totalCurrent = totalCurrent,
                     total1DChange = total1DChange,
                     total1DPercent = total1DPercent,
@@ -158,7 +162,7 @@ fun InvestmentScreen(
                 Spacer(modifier = Modifier.height(8.dp))
             }
 
-            items(investmentList, key = { it.assetName }) { item ->
+            items(activeInvestmentList, key = { it.assetName }) { item ->
                 InvestmentListItem(
                     item = item,
                     isHidden = isHidden,
