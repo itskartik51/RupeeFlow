@@ -26,8 +26,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kartikey.rupeeflow.Cloud_Database.Constants
 import com.kartikey.rupeeflow.UI_Screens.bounceClick
-import java.text.SimpleDateFormat
-import java.util.Locale
 
 data class FDItem(
     val firebaseKey: String = "",
@@ -87,7 +85,7 @@ fun FixedDepositsScreen(
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize().padding(paddingValues),
-                contentPadding = PaddingValues(16.dp),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 100.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 items(fdList) { fd ->
@@ -102,27 +100,11 @@ fun FixedDepositsScreen(
 fun FDetailCard(fd: FDItem, onEditClick: (FDItem) -> Unit) {
     val logoRes = Constants.BankLogoMap[fd.bankName]
 
-    // ========================================================
-    // DYNAMIC FRONTEND COMPOUND INTEREST CALCULATION
-    // ========================================================
-    val todayMillis = remember { System.currentTimeMillis() }
-    val sdf = remember { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()) }
-
-    val createMillis = remember(fd.createDate) {
-        try { sdf.parse(fd.createDate)?.time ?: 0L } catch (e: Exception) { 0L }
-    }
-    val maturMillis = remember(fd.maturityDate) {
-        try { sdf.parse(fd.maturityDate)?.time ?: 0L } catch (e: Exception) { 0L }
-    }
-
-    val totalDays = if (createMillis > 0 && maturMillis > createMillis) maxOf(0L, (maturMillis - createMillis) / (1000 * 60 * 60 * 24)) else 0L
-    val daysToMat = if (maturMillis > 0) maxOf(0L, (maturMillis - todayMillis) / (1000 * 60 * 60 * 24)).toInt() else fd.daysToMaturity
-    val daysPassed = if (createMillis > 0) maxOf(0L, (minOf(todayMillis, maturMillis) - createMillis) / (1000 * 60 * 60 * 24)) else 0L
-
-    val matVal = if (totalDays > 0) fd.investedAmt * Math.pow(1 + (fd.interestRate / 100.0), totalDays / 365.0) else fd.investedAmt
-    val accVal = if (daysPassed > 0) fd.investedAmt * Math.pow(1 + (fd.interestRate / 100.0), daysPassed / 365.0) else fd.investedAmt
-    val accInt = accVal - fd.investedAmt
-    val oneDayInt = if (todayMillis >= maturMillis || todayMillis < createMillis) 0.0 else (accVal * (fd.interestRate / 100.0)) / 365.0
+    val daysToMat = fd.daysToMaturity
+    val matVal = fd.maturityValue
+    val accVal = fd.accruedValue
+    val accInt = fd.accruedInt
+    val oneDayInt = fd.oneDayInt
 
     Card(
         modifier = Modifier.fillMaxWidth(),
