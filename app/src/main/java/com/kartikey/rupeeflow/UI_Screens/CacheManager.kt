@@ -71,6 +71,14 @@ private data class ParsedExpensesResult(
     val year: Double
 )
 
+private data class FDCalculatedMetrics(
+    val daysToMaturity: Int,
+    val maturityValue: Double,
+    val accruedValue: Double,
+    val accruedInt: Double,
+    val oneDayInt: Double
+)
+
 object CacheManager {
     private const val PREFS_NAME = "RupeeFlow_GlobalCache"
     
@@ -85,6 +93,35 @@ object CacheManager {
     // ========================================================
     // 🛠️ LEAN SHARED PARSING HELPERS 🛠️
     // ========================================================
+
+    private fun calculateFDMetrics(
+        createDate: String,
+        maturityDate: String,
+        investedAmt: Double,
+        interestRate: Double
+    ): FDCalculatedMetrics {
+        val todayMillis = System.currentTimeMillis()
+        val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+        val createMillis = try { sdf.parse(createDate)?.time ?: 0L } catch (e: Exception) { 0L }
+        val maturMillis = try { sdf.parse(maturityDate)?.time ?: 0L } catch (e: Exception) { 0L }
+
+        val totalDays = if (createMillis > 0 && maturMillis > createMillis) maxOf(0L, (maturMillis - createMillis) / (1000 * 60 * 60 * 24)) else 0L
+        val daysToMat = if (maturMillis > 0) maxOf(0L, (maturMillis - todayMillis) / (1000 * 60 * 60 * 24)).toInt() else 0
+        val daysPassed = if (createMillis > 0) maxOf(0L, (minOf(todayMillis, maturMillis) - createMillis) / (1000 * 60 * 60 * 24)) else 0L
+
+        val matVal = if (totalDays > 0) investedAmt * Math.pow(1 + (interestRate / 100.0), totalDays / 365.0) else investedAmt
+        val accVal = if (daysPassed > 0) investedAmt * Math.pow(1 + (interestRate / 100.0), daysPassed / 365.0) else investedAmt
+        val accInt = accVal - investedAmt
+        val oneDayInt = if (todayMillis >= maturMillis || todayMillis < createMillis) 0.0 else (accVal * (interestRate / 100.0)) / 365.0
+
+        return FDCalculatedMetrics(
+            daysToMaturity = daysToMat,
+            maturityValue = matVal,
+            accruedValue = accVal,
+            accruedInt = accInt,
+            oneDayInt = oneDayInt
+        )
+    }
 
     private fun evaluateDatePeriods(dateStr: String, targetDay: Int, targetMonth: Int, targetYear: Int): Triple<Boolean, Boolean, Boolean> {
         val cleanDate = dateStr.trim().split(" ")[0]
@@ -285,6 +322,8 @@ object CacheManager {
                 val createStr = createTs?.let { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(it.toDate()) } ?: ""
                 val maturStr = maturTs?.let { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(it.toDate()) } ?: ""
 
+                val metrics = calculateFDMetrics(createStr, maturStr, amnt, rate)
+
                 list.add(
                     FDItem(
                         firebaseKey = key.toString(),
@@ -293,7 +332,12 @@ object CacheManager {
                         createDate = createStr,
                         maturityDate = maturStr,
                         investedAmt = amnt,
-                        interestRate = rate
+                        interestRate = rate,
+                        daysToMaturity = metrics.daysToMaturity,
+                        maturityValue = metrics.maturityValue,
+                        accruedValue = metrics.accruedValue,
+                        accruedInt = metrics.accruedInt,
+                        oneDayInt = metrics.oneDayInt
                     )
                 )
             }
@@ -625,7 +669,11 @@ object CacheManager {
 
                 val updatedInvestments = currentData.investmentList.map { inv ->
                     val sym = inv.assetName.uppercase()
-                    val liveQuote = liveQuotesMap[sym] ?: liveQuotesMap[sym.replace(".NS", "").replace(".BO", "")]
+                    val liveQuote = liveQuotesMap[sym] 
+                        ?: liveQuotesMap[sym.replace(".NS", "").replace(".BO", "")]
+                        ?: liveQuotesMap["$sym.NS"]
+                        ?: liveQuotesMap["$sym.BO"]
+
                     if (liveQuote != null && liveQuote.currentPrice > 0.0) {
                         inv.copy(
                             currentPrice = liveQuote.currentPrice,
@@ -1246,7 +1294,10 @@ object CacheManager {
                 
                 val liveQuotesMap = MarketEngine.fetchQuotes(symbolsToFetch)
                 val investments = parseInvestments(investMap) { sym, buyPrice ->
-                    val liveQuote = liveQuotesMap[sym] ?: liveQuotesMap[sym.replace(".NS", "").replace(".BO", "")]
+                    val liveQuote = liveQuotesMap[sym] 
+                        ?: liveQuotesMap[sym.replace(".NS", "").replace(".BO", "")]
+                        ?: liveQuotesMap["$sym.NS"]
+                        ?: liveQuotesMap["$sym.BO"]
                     val currentPrice = if (liveQuote != null && liveQuote.currentPrice > 0.0) liveQuote.currentPrice else buyPrice
                     val oneDayChange = liveQuote?.oneDayChangePrice ?: 0.0
                     Pair(currentPrice, oneDayChange)
@@ -1419,15 +1470,26 @@ object CacheManager {
         if (fdArray != null) {
             for (i in 0 until fdArray.length()) { 
                 val item = fdArray.getJSONObject(i)
+                val cDate = item.optString("create_date", "")
+                val mDate = item.optString("maturity_date", "")
+                val invAmt = item.optDouble("invested_amt", 0.0)
+                val rate = item.optDouble("interest_rate", 0.0)
+                val metrics = calculateFDMetrics(cDate, mDate, invAmt, rate)
+
                 fetchedFDList.add(
                     FDItem(
                         firebaseKey = item.optString("firebase_key", ""), 
                         bankName = item.optString("bank_name", ""), 
                         accountNo = item.optString("account_no", ""), 
-                        createDate = item.optString("create_date", ""), 
-                        maturityDate = item.optString("maturity_date", ""), 
-                        investedAmt = item.optDouble("invested_amt", 0.0), 
-                        interestRate = item.optDouble("interest_rate", 0.0)
+                        createDate = cDate, 
+                        maturityDate = mDate, 
+                        investedAmt = invAmt, 
+                        interestRate = rate,
+                        daysToMaturity = metrics.daysToMaturity,
+                        maturityValue = metrics.maturityValue,
+                        accruedValue = metrics.accruedValue,
+                        accruedInt = metrics.accruedInt,
+                        oneDayInt = metrics.oneDayInt
                     )
                 ) 
             }
